@@ -24,7 +24,7 @@ var (
 )
 
 type walfileT struct {
-	currpos  int
+	currpos  uint64
 	pathname string
 	fd       *os.File
 }
@@ -167,7 +167,7 @@ func ProcessXLogDataMsg(
 			return false, fmt.Errorf("received WAL at offset %d but no file open", xlogoff)
 		}
 	} else {
-		if walfile.currpos != int(xlogoff) {
+		if walfile.currpos != xlogoff {
 			return false, fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, walfile.currpos)
 		}
 	}
@@ -239,7 +239,7 @@ func ProcessXLogDataMsg(
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
-		walfile.currpos += n
+		walfile.currpos += uint64(n)
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
