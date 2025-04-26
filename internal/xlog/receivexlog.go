@@ -137,7 +137,7 @@ func closeAndRename() error {
 func ProcessXLogDataMsg(
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
-	copybuf []byte,
+	xld pglogrepl.XLogData,
 	blockpos *uint64,
 ) (bool, error) {
 	/*
@@ -148,14 +148,14 @@ func ProcessXLogDataMsg(
 		return true, nil
 	}
 
-	if len(copybuf) < 1+8+8+8 {
-		return false, fmt.Errorf("streaming header too small: %d", len(copybuf))
-	}
+	// if len(copybuf) < 1+8+8+8 {
+	// 	return false, fmt.Errorf("streaming header too small: %d", len(copybuf))
+	// }
 
-	xld, err := pglogrepl.ParseXLogData(copybuf[1:])
-	if err != nil {
-		return false, err
-	}
+	// xld, err := pglogrepl.ParseXLogData(copybuf[1:])
+	// if err != nil {
+	// 	return false, err
+	// }
 
 	xlogoff := XLogSegmentOffset(uint64(xld.WALStart), WalSegSz)
 
@@ -366,8 +366,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 
 				// TODO:types:fix
 				bp := uint64(blockPos)
-				// TODO:design:fix, now this will fail
-				if _, err := ProcessXLogDataMsg(conn, stream, xld.WALData, &bp); err != nil {
+				if _, err := ProcessXLogDataMsg(conn, stream, xld, &bp); err != nil {
 					return fmt.Errorf("processing xlogdata failed: %w", err)
 				}
 
