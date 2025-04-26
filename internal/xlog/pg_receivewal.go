@@ -162,11 +162,12 @@ func segNoToLSN(segNo uint64) pglogrepl.LSN {
 // 	return false;
 // }
 
+var (
+	prevTimeline uint32
+	prevPos      pglogrepl.LSN
+)
+
 func StopStreaming(xlogpos pglogrepl.LSN, timeline uint32, segmentFinished bool) bool {
-	var (
-		prevTimeline uint32
-		prevPos      pglogrepl.LSN
-	)
 
 	if verbose && segmentFinished {
 		log.Printf(
