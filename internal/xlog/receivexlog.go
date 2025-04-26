@@ -47,8 +47,8 @@ func (w *walfileT) Sync() error {
 	return nil
 }
 
-func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error) {
-	segno := XLByteToSeg(startpoint, WalSegSz)
+func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string, error) {
+	segno := XLByteToSeg(uint64(startpoint), WalSegSz)
 	filename := XLogFileName(stream.Timeline, segno, WalSegSz) + stream.PartialSuffix
 	// TODO:fix
 	fullPath := filepath.Join("wals", filename)
@@ -91,7 +91,7 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 	return fd, fullPath, nil
 }
 
-func closeWalfile(stream *StreamCtl, pos uint64) error {
+func closeWalfile(stream *StreamCtl, pos pglogrepl.LSN) error {
 	if walfile == nil {
 		return nil
 	}
@@ -140,7 +140,7 @@ func ProcessXLogDataMsg(
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
 	xld pglogrepl.XLogData,
-	blockpos *uint64,
+	blockpos *pglogrepl.LSN,
 ) (bool, error) {
 	/*
 	 * Once we've decided we don't want to receive any more, just ignore any
@@ -159,7 +159,7 @@ func ProcessXLogDataMsg(
 	// 	return false, err
 	// }
 
-	xlogoff := XLogSegmentOffset(uint64(xld.WALStart), WalSegSz)
+	xlogoff := XLogSegmentOffset(xld.WALStart, WalSegSz)
 
 	// If no open file, expect offset to be zero
 	if walfile == nil {
@@ -167,7 +167,7 @@ func ProcessXLogDataMsg(
 			return false, fmt.Errorf("received WAL at offset %d but no file open", xlogoff)
 		}
 	} else {
-		if walfile.currpos != xlogoff {
+		if walfile.currpos != int(xlogoff) {
 			return false, fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, walfile.currpos)
 		}
 	}
@@ -184,7 +184,7 @@ func ProcessXLogDataMsg(
 		 * If crossing a WAL boundary, only write up until we reach wal
 		 * segment size.
 		 */
-		if uint64(xlogoff+bytesLeft) > WalSegSz {
+		if int(xlogoff+bytesLeft) > int(WalSegSz) {
 			bytesToWrite = int(int(WalSegSz) - xlogoff)
 		} else {
 			bytesToWrite = bytesLeft
@@ -202,21 +202,56 @@ func ProcessXLogDataMsg(
 			}
 		}
 
+		//
 		// copiedBytes := copy(seg.data[seg.writeIndex:], xld.WALData[messageOffset:])
 		// seg.writeIndex += copiedBytes
 
-		_, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
+		//
+		// if (stream->walmethod->ops->write(walfile,
+		// 								  copybuf + hdr_len + bytes_written,
+		// 								  bytes_to_write) != bytes_to_write)
+		// {
+		// 	pg_log_error("could not write %d bytes to WAL file \"%s\": %s",
+		// 				 bytes_to_write, walfile->pathname,
+		// 				 GetLastWalMethodError(stream->walmethod));
+		// 	return false;
+		// }
+
+		// n, err := walfile.fd.Write(data[bytesWritten : bytesWritten+bytesToWrite])
+		// if err != nil {
+		// 	return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
+		// }
+
+		// v5
+		//
+		// // Write `bytes_to_write` bytes starting from `hdrLen + bytes_written`
+		// start := bytesWritten
+		// end := start + bytesToWrite
+		// n, err := walfile.fd.Write(data[start:end])
+		// if err != nil {
+		// 	return false, fmt.Errorf("could not write WAL data to file %s: %w", walfile.pathname, err)
+		// }
+		// if n != bytesToWrite {
+		// 	return false, fmt.Errorf("could not write all bytes to WAL file %s: written %d, expected %d", walfile.pathname, n, bytesToWrite)
+		// }
+
+		n, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
-		walfile.currpos += bytesToWrite
+		walfile.currpos += n
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
-		*blockpos += uint64(bytesToWrite)
+
+		log.Printf("blockpos=%d\n", *blockpos)
+		*blockpos += pglogrepl.LSN(bytesToWrite)
+		log.Printf("blockpos=%d\n", *blockpos)
+
 		xlogoff += bytesToWrite
 
-		if XLogSegmentOffset(*blockpos, WalSegSz) == 0 {
+		xlSegOff := XLogSegmentOffset(*blockpos, WalSegSz)
+		if xlSegOff == 0 {
 			err := closeWalfile(stream, *blockpos)
 			if err != nil {
 				return false, err
@@ -249,7 +284,7 @@ func checkCopyStreamStop(
 ) bool {
 	if stillSending && stream.StreamStop(blockpos, stream.Timeline, false) {
 		// Close WAL file first
-		if err := closeWalfile(stream, uint64(blockpos)); err != nil {
+		if err := closeWalfile(stream, blockpos); err != nil {
 			// Error already logged in closeWalFile
 			return false
 		}
@@ -371,8 +406,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 				}
 
 				// TODO:types:fix
-				bp := uint64(blockPos)
-				if _, err := ProcessXLogDataMsg(conn, stream, xld, &bp); err != nil {
+				if _, err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 					return fmt.Errorf("processing xlogdata failed: %w", err)
 				}
 

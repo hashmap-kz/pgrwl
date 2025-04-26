@@ -2,6 +2,8 @@ package xlog
 
 import (
 	"fmt"
+
+	"github.com/jackc/pglogrepl"
 )
 
 // TODO:query it
@@ -15,8 +17,8 @@ func XLByteToSeg(xlrp uint64, walSegSize uint64) uint64 {
 	return uint64(xlrp) / walSegSize
 }
 
-func XLogSegmentOffset(xlogptr uint64, walSegSize uint64) int {
-	return int(xlogptr & (walSegSize - 1))
+func XLogSegmentOffset(xlogptr pglogrepl.LSN, walSegSize uint64) int {
+	return int(uint64(xlogptr) & (walSegSize - 1))
 }
 
 func XLByteToPrevSeg(xlrp uint64, walSegSize uint64) uint64 {

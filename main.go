@@ -83,7 +83,7 @@ func main() {
 		SysIdentifier:         sysident.SystemID,
 	}
 
-	curPos := uint64(stream.StartPos) - uint64(xlog.XLogSegmentOffset(uint64(stream.StartPos), uint64(xlog.WalSegSz)))
+	curPos := uint64(stream.StartPos) - uint64(xlog.XLogSegmentOffset(stream.StartPos, uint64(xlog.WalSegSz)))
 	stream.StartPos = pglogrepl.LSN(curPos)
 
 	err = xlog.ReceiveXlogStream2(context.TODO(), conn, stream)
