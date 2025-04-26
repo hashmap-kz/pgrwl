@@ -38,6 +38,8 @@ type StreamCtl struct {
 	Synchronous           bool
 	PartialSuffix         string
 	StreamStop            func(blockpos pglogrepl.LSN, timeline uint32, endOfSegment bool) bool
+	ReplicationSlot       string
+	SysIdentifier         string
 }
 
 func (w *walfileT) Sync() error {
@@ -385,5 +387,107 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		default:
 			return fmt.Errorf("unexpected backend message: %T", msg)
 		}
+	}
+}
+
+///////
+
+func ReceiveXlogStream(conn *pgconn.PgConn, stream *StreamCtl) error {
+	// var stoppos pglogrepl.LSN
+
+	// TODO:fix:urgent
+	//
+	// // (Optional) Check PostgreSQL version for streaming compatibility
+	// if !checkServerVersion(conn) {
+	// 	return fmt.Errorf("server version incompatible")
+	// }
+	//
+	// // Decide whether we should report flush position
+	// if stream.ReplicationSlot != "" {
+	// 	reportFlushPosition = true
+	// } else {
+	// 	reportFlushPosition = stream.Synchronous
+	// }
+	//
+	// // Validate sysidentifier (optional)
+	// if stream.SysIdentifier != "" {
+	// 	sysident, servertli, err := RunIdentifySystem(context.Background(), conn)
+	// 	if err != nil {
+	// 		return fmt.Errorf("identify system failed: %w", err)
+	// 	}
+	// 	if stream.SysIdentifier != sysident {
+	// 		return fmt.Errorf("system identifier mismatch between base backup and streaming connection")
+	// 	}
+	// 	if stream.Timeline > servertli {
+	// 		return fmt.Errorf("starting timeline %d is not present on the server", stream.Timeline)
+	// 	}
+	// }
+
+	lastFlushPosition = stream.StartPos
+
+	for {
+		// TODO:fix:urgent
+		// // Check for timeline history fetch
+		// if !existsTimeLineHistoryFile(stream) {
+		// 	if err := fetchTimelineHistory(conn, stream); err != nil {
+		// 		return fmt.Errorf("failed to fetch timeline history: %w", err)
+		// 	}
+		// }
+
+		// Check if user wants to stop before streaming
+		if stream.StreamStop(stream.StartPos, stream.Timeline, false) {
+			return nil
+		}
+
+		// Start replication
+		startOpts := pglogrepl.StartReplicationOptions{
+			Timeline: int32(stream.Timeline),
+			Mode:     pglogrepl.PhysicalReplication,
+		}
+
+		// TODO:fix:urgent
+		// if stream.ReplicationSlot != "" {
+		// 	startOpts.SlotName = stream.ReplicationSlot
+		// }
+
+		err := pglogrepl.StartReplication(context.Background(), conn, stream.ReplicationSlot, stream.StartPos, startOpts)
+		if err != nil {
+			return fmt.Errorf("start replication failed: %w", err)
+		}
+
+		// Stream the WAL
+		err = HandleCopyStream(context.TODO(), conn, stream)
+		if err != nil {
+			return fmt.Errorf("streaming failed: %w", err)
+		}
+
+		// TODO:fix:urgent
+		//
+		// // After streaming: detect controlled shutdown vs timeline switch
+		// nextTimeline, newStartPos, err := ReadEndOfStreamingResult(conn)
+		// if err == nil {
+		// 	// Server sent a new timeline
+		// 	if nextTimeline <= stream.Timeline {
+		// 		return fmt.Errorf("server reported unexpected next timeline %d after timeline %d", nextTimeline, stream.Timeline)
+		// 	}
+		// 	if newStartPos > stoppos {
+		// 		return fmt.Errorf("server stopped timeline %d at %X/%X, but reported next timeline %d at %X/%X",
+		// 			stream.Timeline, uint32(stoppos>>32), uint32(stoppos),
+		// 			nextTimeline, uint32(newStartPos>>32), uint32(newStartPos))
+		// 	}
+		//
+		// 	stream.Timeline = nextTimeline
+		// 	stream.StartPos = newStartPos - pglogrepl.LSN(XLogSegmentOffset(newStartPos, WalSegSz))
+		//
+		// 	continue // Restart streaming on next timeline
+		// } else if errors.Is(err, errControlledShutdown) {
+		// 	// Server shutdown normally
+		// 	if stream.StreamStop(stoppos, stream.Timeline, false) {
+		// 		return nil
+		// 	}
+		// 	return fmt.Errorf("replication stream was terminated before stop point")
+		// } else {
+		// 	return fmt.Errorf("unexpected termination of replication stream: %w", err)
+		// }
 	}
 }

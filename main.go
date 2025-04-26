@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -64,10 +63,11 @@ func main() {
 
 	// 3
 
-	streamStartLSN, streamStartTimeline, err := xlog.FindStreamingStart("wals")
-	if err != nil {
-		log.Fatal(err)
-	}
+	streamStartLSN, streamStartTimeline, _ := xlog.FindStreamingStart("wals")
+	// TODO:fix:urgent
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 	if streamStartLSN == 0 {
 		streamStartLSN = sysident.XLogPos
 	}
@@ -79,9 +79,14 @@ func main() {
 		Synchronous:           true,
 		PartialSuffix:         ".partial",
 		StreamStop:            xlog.StopStreaming,
+		ReplicationSlot:       "pg_recval_5",
+		SysIdentifier:         sysident.SystemID,
 	}
 
-	fmt.Println(stream)
+	err = xlog.ReceiveXlogStream(conn, stream)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//	/*
 	//	 * Figure out where to start streaming.  First scan the local directory.
