@@ -175,7 +175,8 @@ func (queryRunner *PgQueryRunner) buildGetParameter() string {
 // buildGetPhysicalSlotInfo formats a query to get info on a Physical Replication Slot
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
-	return "select active, restart_lsn from pg_replication_slots where slot_name = $1"
+	// TODO: fix
+	return "select active, coalesce(restart_lsn, '0/0'::pg_lsn) from pg_replication_slots where slot_name = $1"
 }
 
 // Retrieve PostgreSQL numeric version
