@@ -13,7 +13,11 @@ import (
 	"github.com/jackc/pgx/v5/pgproto3"
 )
 
+// https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
+
 var stillSending = true
+
+type XLogRecPtr uint64
 
 // TODO:query it
 const walSegSz = 16 * 1024 * 1024 // PostgreSQL default 16MiB
@@ -24,7 +28,7 @@ type StreamCtl struct {
 	Timeline               uint32
 	StandbyMessageTimeout  time.Duration
 	Synchronous            bool
-	StopSocket             int // we can ignore this for now
+	PartialSuffix          string
 	StreamStop             func(blockpos pglogrepl.LSN, timeline uint32, endOfSegment bool) bool
 	SendFeedback           func(conn *pgconn.PgConn, blockpos pglogrepl.LSN, now time.Time, replyRequested bool) error
 	FlushWAL               func() error
@@ -32,11 +36,117 @@ type StreamCtl struct {
 	WriteKeepaliveResponse func() error
 }
 
-func openWalFile(dir string, timeline uint32, startLSN pglogrepl.LSN) (*os.File, string, error) {
+/*
+//  * Open a new WAL file in the specified directory.
+//  *
+//  * Returns true if OK; on failure, returns false after printing an error msg.
+//  * On success, 'walfile' is set to the opened WAL file.
+//  *
+//  * The file will be padded to 16Mb with zeroes.
+//  */
+// static bool
+// open_walfile(StreamCtl *stream, XLogRecPtr startpoint)
+// {
+// 	Walfile    *f;
+// 	char	   *fn;
+// 	ssize_t		size;
+// 	XLogSegNo	segno;
+// 	char		walfile_name[MAXPGPATH];
+//
+// 	XLByteToSeg(startpoint, segno, WalSegSz);
+// 	XLogFileName(walfile_name, stream->timeline, segno, WalSegSz);
+//
+// 	/* Note that this considers the compression used if necessary */
+// 	fn = stream->walmethod->ops->get_file_name(stream->walmethod,
+// 											   walfile_name,
+// 											   stream->partial_suffix);
+//
+// 	/*
+// 	 * When streaming to files, if an existing file exists we verify that it's
+// 	 * either empty (just created), or a complete WalSegSz segment (in which
+// 	 * case it has been created and padded). Anything else indicates a corrupt
+// 	 * file. Compressed files have no need for padding, so just ignore this
+// 	 * case.
+// 	 *
+// 	 * When streaming to tar, no file with this name will exist before, so we
+// 	 * never have to verify a size.
+// 	 */
+// 	if (stream->walmethod->compression_algorithm == PG_COMPRESSION_NONE &&
+// 		stream->walmethod->ops->existsfile(stream->walmethod, fn))
+// 	{
+// 		size = stream->walmethod->ops->get_file_size(stream->walmethod, fn);
+// 		if (size < 0)
+// 		{
+// 			pg_log_error("could not get size of write-ahead log file \"%s\": %s",
+// 						 fn, GetLastWalMethodError(stream->walmethod));
+// 			pg_free(fn);
+// 			return false;
+// 		}
+// 		if (size == WalSegSz)
+// 		{
+// 			/* Already padded file. Open it for use */
+// 			f = stream->walmethod->ops->open_for_write(stream->walmethod, walfile_name, stream->partial_suffix, 0);
+// 			if (f == NULL)
+// 			{
+// 				pg_log_error("could not open existing write-ahead log file \"%s\": %s",
+// 							 fn, GetLastWalMethodError(stream->walmethod));
+// 				pg_free(fn);
+// 				return false;
+// 			}
+//
+// 			/* fsync file in case of a previous crash */
+// 			if (stream->walmethod->ops->sync(f) != 0)
+// 			{
+// 				pg_log_error("could not fsync existing write-ahead log file \"%s\": %s",
+// 							 fn, GetLastWalMethodError(stream->walmethod));
+// 				stream->walmethod->ops->close(f, CLOSE_UNLINK);
+// 				exit(1);
+// 			}
+//
+// 			walfile = f;
+// 			pg_free(fn);
+// 			return true;
+// 		}
+// 		if (size != 0)
+// 		{
+// 			/* if write didn't set errno, assume problem is no disk space */
+// 			if (errno == 0)
+// 				errno = ENOSPC;
+// 			pg_log_error(ngettext("write-ahead log file \"%s\" has %zd byte, should be 0 or %d",
+// 								  "write-ahead log file \"%s\" has %zd bytes, should be 0 or %d",
+// 								  size),
+// 						 fn, size, WalSegSz);
+// 			pg_free(fn);
+// 			return false;
+// 		}
+// 		/* File existed and was empty, so fall through and open */
+// 	}
+//
+// 	/* No file existed, so create one */
+//
+// 	f = stream->walmethod->ops->open_for_write(stream->walmethod,
+// 											   walfile_name,
+// 											   stream->partial_suffix,
+// 											   WalSegSz);
+// 	if (f == NULL)
+// 	{
+// 		pg_log_error("could not open write-ahead log file \"%s\": %s",
+// 					 fn, GetLastWalMethodError(stream->walmethod));
+// 		pg_free(fn);
+// 		return false;
+// 	}
+//
+// 	pg_free(fn);
+// 	walfile = f;
+// 	return true;
+// }
 
-	segno := uint64(startLSN) / walSegSz
-	filename := fmt.Sprintf("%08X%08X%08X.partial", timeline, segno/xLogSegmentsPerXLogID, segno%xLogSegmentsPerXLogID)
-	fullPath := filepath.Join(dir, filename)
+func openWalFile(stream *StreamCtl, startpoint XLogRecPtr) (*os.File, string, error) {
+
+	segno := XLByteToSeg(uint64(startpoint), walSegSz)
+	filename := XLogFileName(stream.Timeline, segno, walSegSz) + stream.PartialSuffix
+	// TODO:fix
+	fullPath := filepath.Join("wals", filename)
 
 	// Check if file already exists
 	stat, err := os.Stat(fullPath)
