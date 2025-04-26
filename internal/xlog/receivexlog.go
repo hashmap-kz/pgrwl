@@ -194,16 +194,17 @@ func ProcessXLogDataMsg(
 				return false, err
 			}
 			walfile = &walfileT{
-				currpos:  int(*blockpos),
+				currpos:  0,
 				pathname: fullpath,
 				fd:       fd,
 			}
 		}
 
-		_, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
+		n, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
+		walfile.currpos += n
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
