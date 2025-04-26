@@ -17,7 +17,7 @@ import (
 var stillSending = true
 
 type walfileT struct {
-	currpos  uint64
+	currpos  int
 	pathname string
 	fd       *os.File
 }
@@ -191,6 +191,10 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 	return fd, fullPath, nil
 }
 
+func closeWalfile(stream *StreamCtl, pos uint64) error {
+	return nil
+}
+
 // /*
 //  * Process XLogData message.
 //  */
@@ -361,18 +365,18 @@ func ProcessXLogDataMsg(
 
 	data := xld.WALData
 
-	bytesLeft := uint64(len(data))
-	bytesWritten := uint64(0)
+	bytesLeft := len(data)
+	bytesWritten := 0
 
 	for bytesLeft > 0 {
-		var bytesToWrite uint64
+		var bytesToWrite int
 
 		/*
 		 * If crossing a WAL boundary, only write up until we reach wal
 		 * segment size.
 		 */
-		if xlogoff+uint64(bytesLeft) > walSegSz {
-			bytesToWrite = walSegSz - xlogoff
+		if xlogoff+bytesLeft > walSegSz {
+			bytesToWrite = int(walSegSz - xlogoff)
 		} else {
 			bytesToWrite = bytesLeft
 		}
@@ -383,7 +387,7 @@ func ProcessXLogDataMsg(
 				return false, err
 			}
 			walfile = &walfileT{
-				currpos:  uint64(*blockpos),
+				currpos:  int(*blockpos),
 				pathname: fullpath,
 				fd:       fd,
 			}
@@ -396,31 +400,51 @@ func ProcessXLogDataMsg(
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
-		*blockpos += bytesToWrite
+		*blockpos += uint64(bytesToWrite)
 		xlogoff += bytesToWrite
 
-		// If we completed a WAL segment
-		if xlogoff == walSegSz {
-			if err := (*seg).flush(); err != nil {
-				return false, fmt.Errorf("could not flush WAL file: %w", err)
-			}
-			if err := (*seg).closeAndRename(); err != nil {
-				return false, fmt.Errorf("could not close WAL file: %w", err)
-			}
-
-			// prepare next WAL segment
-			newSeg, _ := newWalSegment(stream.Timeline, *blockpos)
-			*seg = newSeg
-
-			// Check if we should stop
-			if stream.StreamStop != nil && stream.StreamStop(*blockpos, stream.Timeline, true) {
-				// Send CopyEnd
-				_, _ = pglogrepl.SendStandbyCopyDone(context.Background(), conn)
-				return true, nil
+		if XLogSegmentOffset(*blockpos, walSegSz) == 0 {
+			err := closeWalfile(stream, *blockpos)
+			if err != nil {
+				return false, err
 			}
 			xlogoff = 0
+
+			if stillSending && stream.StreamStop(pglogrepl.LSN(*blockpos), stream.Timeline, true) {
+				// Send CopyDone message
+				_, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
+				if err != nil {
+					return false, fmt.Errorf("could not send copy-end packet: %w", err)
+				}
+				stillSending = false
+				return true, nil
+			}
 		}
+
+		// // If we completed a WAL segment
+		// if xlogoff == walSegSz {
+		// 	if err := (*seg).flush(); err != nil {
+		// 		return false, fmt.Errorf("could not flush WAL file: %w", err)
+		// 	}
+		// 	if err := (*seg).closeAndRename(); err != nil {
+		// 		return false, fmt.Errorf("could not close WAL file: %w", err)
+		// 	}
+		//
+		// 	// prepare next WAL segment
+		// 	newSeg, _ := newWalSegment(stream.Timeline, *blockpos)
+		// 	*seg = newSeg
+		//
+		// 	// Check if we should stop
+		// 	if stream.StreamStop != nil && stream.StreamStop(*blockpos, stream.Timeline, true) {
+		// 		// Send CopyEnd
+		// 		_, _ = pglogrepl.SendStandbyCopyDone(context.Background(), conn)
+		// 		return true, nil
+		// 	}
+		// 	xlogoff = 0
+		// }
+
 	}
+
 	return true, nil
 }
 
