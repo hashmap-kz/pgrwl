@@ -118,6 +118,7 @@ func closeNoRename() error {
 	if err != nil {
 		return err
 	}
+	walfile = nil
 	return nil
 }
 
@@ -131,6 +132,7 @@ func closeAndRename() error {
 	if err != nil {
 		return err
 	}
+	walfile = nil
 	return nil
 }
 
@@ -459,6 +461,11 @@ func ReceiveXlogStream(conn *pgconn.PgConn, stream *StreamCtl) error {
 		err = HandleCopyStream(context.TODO(), conn, stream)
 		if err != nil {
 			return fmt.Errorf("streaming failed: %w", err)
+		}
+
+		err = closeNoRename()
+		if err != nil {
+			return err
 		}
 
 		// TODO:fix:urgent
