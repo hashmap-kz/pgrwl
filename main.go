@@ -86,7 +86,7 @@ func main() {
 	curPos := uint64(stream.StartPos) - uint64(xlog.XLogSegmentOffset(uint64(stream.StartPos), uint64(xlog.WalSegSz)))
 	stream.StartPos = pglogrepl.LSN(curPos)
 
-	err = xlog.ReceiveXlogStream(conn, stream)
+	err = xlog.ReceiveXlogStream2(context.TODO(), conn, stream)
 	if err != nil {
 		log.Fatal(err)
 	}

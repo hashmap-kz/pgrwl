@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -294,7 +295,7 @@ func sendFeedback(
 	return nil
 }
 
-func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
+func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl, stopPos *pglogrepl.LSN) error {
 	var lastStatus time.Time
 	blockPos := stream.StartPos
 
@@ -458,7 +459,8 @@ func ReceiveXlogStream(conn *pgconn.PgConn, stream *StreamCtl) error {
 		}
 
 		// Stream the WAL
-		err = HandleCopyStream(context.TODO(), conn, stream)
+		stopPos := pglogrepl.LSN(0)
+		err = HandleCopyStream(context.TODO(), conn, stream, &stopPos)
 		if err != nil {
 			return fmt.Errorf("streaming failed: %w", err)
 		}
@@ -497,4 +499,114 @@ func ReceiveXlogStream(conn *pgconn.PgConn, stream *StreamCtl) error {
 		// 	return fmt.Errorf("unexpected termination of replication stream: %w", err)
 		// }
 	}
+}
+
+/////// v2
+
+func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
+	var stopPos pglogrepl.LSN
+
+	lastFlushPosition = stream.StartPos
+
+	for {
+
+		// TODO:fix:urgent
+		//
+		// // Before starting, check if we need to fetch timeline history
+		// if !existsTimelineHistoryFile(stream.Timeline) {
+		// 	tlh, err := pglogrepl.TimelineHistory(ctx, conn, int32(stream.Timeline))
+		// 	if err != nil {
+		// 		return fmt.Errorf("failed to fetch timeline history: %w", err)
+		// 	}
+		// 	err = writeTimelineHistoryFile(tlh.FileName, tlh.Content)
+		// 	if err != nil {
+		// 		return fmt.Errorf("failed to write timeline history file: %w", err)
+		// 	}
+		// }
+
+		// Check if we should stop before starting replication
+		if stream.StreamStop(stream.StartPos, stream.Timeline, false) {
+			return nil
+		}
+
+		// Start replication
+		opts := pglogrepl.StartReplicationOptions{
+			Timeline: int32(stream.Timeline),
+			Mode:     pglogrepl.PhysicalReplication,
+		}
+		err := pglogrepl.StartReplication(ctx, conn, stream.ReplicationSlot, stream.StartPos, opts)
+		if err != nil {
+			return fmt.Errorf("failed to start replication: %w", err)
+		}
+
+		// Stream WAL
+		err = HandleCopyStream(ctx, conn, stream, &stopPos)
+		if err != nil {
+			return fmt.Errorf("error during streaming: %w", err)
+		}
+
+		// After CopyDone:
+		for {
+			msg, err := conn.ReceiveMessage(ctx)
+			if err != nil {
+				return fmt.Errorf("failed receiving server result: %w", err)
+			}
+
+			switch m := msg.(type) {
+			case *pgproto3.DataRow:
+				// Server sends end-of-timeline info
+				newTimeline, newStartPos, err := parseEndOfStreamingResult(m)
+				if err != nil {
+					return fmt.Errorf("could not parse end-of-stream result: %w", err)
+				}
+				if newTimeline <= stream.Timeline {
+					return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
+				}
+				if newStartPos > stopPos {
+					return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
+				}
+
+				stream.Timeline = newTimeline
+				stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(WalSegSz))
+				goto nextIteration
+
+			case *pgproto3.CommandComplete:
+				if stream.StreamStop(stopPos, stream.Timeline, false) {
+					return nil
+				}
+				return fmt.Errorf("replication stream terminated unexpectedly before stop point")
+
+			case *pgproto3.ErrorResponse:
+				return fmt.Errorf("error response from server: %s", m.Message)
+
+			case *pgproto3.ReadyForQuery:
+				// Ignore, ready for new commands
+				continue
+
+			default:
+				// Unexpected
+				continue
+			}
+		}
+	nextIteration:
+		continue
+	}
+}
+
+func parseEndOfStreamingResult(m *pgproto3.DataRow) (newTimeline uint32, startLSN pglogrepl.LSN, err error) {
+	if len(m.Values) != 2 {
+		return 0, 0, fmt.Errorf("unexpected DataRow format")
+	}
+	timelineStr := string(m.Values[0])
+	startLSNStr := string(m.Values[1])
+
+	tli, err := strconv.ParseUint(timelineStr, 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid timeline value: %w", err)
+	}
+	lsn, err := pglogrepl.ParseLSN(startLSNStr)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid LSN value: %w", err)
+	}
+	return uint32(tli), lsn, nil
 }
