@@ -70,6 +70,7 @@ func main() {
 	// }
 	if streamStartLSN == 0 {
 		streamStartLSN = sysident.XLogPos
+		streamStartTimeline = uint32(sysident.Timeline)
 	}
 
 	stream := &xlog.StreamCtl{
