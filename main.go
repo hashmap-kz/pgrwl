@@ -13,9 +13,9 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-func getCurrentWalInfo() (slot postgres.PhysicalSlot, walSegmentBytes uint64, err error) {
-	slotName := "pg_recval_5"
+const slotName = "pg_recval_5"
 
+func getCurrentWalInfo() (slot postgres.PhysicalSlot, walSegmentBytes uint64, err error) {
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tmpConn, err := postgres.Connect()
 	if err != nil {
