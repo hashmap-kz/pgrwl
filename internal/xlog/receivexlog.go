@@ -14,6 +14,7 @@ import (
 
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
+var lastFlushPosition uint64
 var stillSending = true
 
 type walfileT struct {
@@ -23,12 +24,6 @@ type walfileT struct {
 }
 
 var walfile *walfileT
-
-// TODO:query it
-const (
-	walSegSz              = 16 * 1024 * 1024 // PostgreSQL default 16MiB
-	xLogSegmentsPerXLogID = uint64(0x100000000) / walSegSz
-)
 
 type StreamCtl struct {
 	StartPos               pglogrepl.LSN
@@ -149,8 +144,8 @@ type StreamCtl struct {
 // }
 
 func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error) {
-	segno := XLByteToSeg(startpoint, walSegSz)
-	filename := XLogFileName(stream.Timeline, segno, walSegSz) + stream.PartialSuffix
+	segno := XLByteToSeg(startpoint, WalSegSz)
+	filename := XLogFileName(stream.Timeline, segno, WalSegSz) + stream.PartialSuffix
 	// TODO:fix
 	fullPath := filepath.Join("wals", filename)
 
@@ -158,7 +153,7 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 	stat, err := os.Stat(fullPath)
 	if err == nil {
 		// File exists
-		if stat.Size() == walSegSz {
+		if stat.Size() == WalSegSz {
 			// File already correctly sized, open it
 			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 			if err != nil {
@@ -172,7 +167,7 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 			return fd, fullPath, nil
 		}
 		if stat.Size() != 0 {
-			return nil, "", fmt.Errorf("corrupt WAL file %s: expected size 0 or %d bytes, found %d", fullPath, walSegSz, stat.Size())
+			return nil, "", fmt.Errorf("corrupt WAL file %s: expected size 0 or %d bytes, found %d", fullPath, WalSegSz, stat.Size())
 		}
 		// If size 0, proceed to initialize it
 	}
@@ -184,7 +179,7 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 	}
 
 	// Preallocate file with zeros up to 16 MiB
-	if err := fd.Truncate(int64(walSegSz)); err != nil {
+	if err := fd.Truncate(int64(WalSegSz)); err != nil {
 		fd.Close()
 		return nil, "", fmt.Errorf("could not preallocate WAL file %s: %w", fullPath, err)
 	}
@@ -350,7 +345,7 @@ func ProcessXLogDataMsg(
 		return false, err
 	}
 
-	xlogoff := XLogSegmentOffset(uint64(xld.WALStart), walSegSz)
+	xlogoff := XLogSegmentOffset(uint64(xld.WALStart), WalSegSz)
 
 	// If no open file, expect offset to be zero
 	if walfile == nil {
@@ -375,8 +370,8 @@ func ProcessXLogDataMsg(
 		 * If crossing a WAL boundary, only write up until we reach wal
 		 * segment size.
 		 */
-		if xlogoff+bytesLeft > walSegSz {
-			bytesToWrite = int(walSegSz - xlogoff)
+		if xlogoff+bytesLeft > WalSegSz {
+			bytesToWrite = int(WalSegSz - xlogoff)
 		} else {
 			bytesToWrite = bytesLeft
 		}
@@ -403,7 +398,7 @@ func ProcessXLogDataMsg(
 		*blockpos += uint64(bytesToWrite)
 		xlogoff += bytesToWrite
 
-		if XLogSegmentOffset(*blockpos, walSegSz) == 0 {
+		if XLogSegmentOffset(*blockpos, WalSegSz) == 0 {
 			err := closeWalfile(stream, *blockpos)
 			if err != nil {
 				return false, err

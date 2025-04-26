@@ -1,8 +1,13 @@
 package xlog
 
-import "fmt"
+import (
+	"fmt"
+)
 
-type XLogRecPtr uint64
+// TODO:query it
+const (
+	WalSegSz = 16 * 1024 * 1024 // PostgreSQL default 16MiB
+)
 
 // https://github.com/postgres/postgres/blob/master/src/include/access/xlog_internal.h
 
