@@ -45,6 +45,26 @@ func sendFeedback(
 	now time.Time,
 	replyRequested bool,
 ) error {
+	var standbyStatus pglogrepl.StandbyStatusUpdate
+
+	standbyStatus.WALWritePosition = blockpos
+
+	if reportFlushPosition {
+		standbyStatus.WALFlushPosition = lastFlushPosition
+	} else {
+		standbyStatus.WALFlushPosition = pglogrepl.LSN(0)
+	}
+
+	standbyStatus.WALApplyPosition = pglogrepl.LSN(0)
+	standbyStatus.ClientTime = now
+	standbyStatus.ReplyRequested = replyRequested
+
+	err := pglogrepl.SendStandbyStatusUpdate(ctx, conn, standbyStatus)
+	if err != nil {
+		log.Printf("could not send feedback packet: %v", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -86,7 +106,7 @@ func handleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		// Set next wake-up
 		timeout := stream.StandbyMessageTimeout
 		if timeout <= 0 {
-			timeout = time.Hour // some large number
+			timeout = 10 * time.Second
 		}
 
 		ctxTimeout, cancel := context.WithTimeout(ctx, timeout)

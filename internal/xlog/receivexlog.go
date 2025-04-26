@@ -17,8 +17,9 @@ import (
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
 var (
-	lastFlushPosition pglogrepl.LSN
-	stillSending      = true
+	lastFlushPosition   pglogrepl.LSN
+	stillSending        = true
+	reportFlushPosition = true
 )
 
 type walfileT struct {
