@@ -16,8 +16,10 @@ import (
 
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
-var lastFlushPosition uint64
-var stillSending = true
+var (
+	lastFlushPosition pglogrepl.LSN
+	stillSending      = true
+)
 
 type walfileT struct {
 	currpos  int
@@ -38,6 +40,11 @@ type StreamCtl struct {
 	FlushWAL               func() error
 	WriteXLogData          func(xld *pglogrepl.XLogData) error
 	WriteKeepaliveResponse func() error
+}
+
+func (w *walfileT) Sync() error {
+	// TODO:fix
+	return nil
 }
 
 /*
@@ -252,7 +259,7 @@ func closeWalfile(stream *StreamCtl, pos uint64) error {
 		err = closeAndRename()
 	}
 
-	lastFlushPosition = pos
+	lastFlushPosition = pglogrepl.LSN(pos)
 	return err
 }
 
