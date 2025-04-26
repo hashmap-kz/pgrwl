@@ -168,7 +168,6 @@ var (
 )
 
 func StopStreaming(xlogpos pglogrepl.LSN, timeline uint32, segmentFinished bool) bool {
-
 	if verbose && segmentFinished {
 		log.Printf(
 			"finished segment at %X/%X (timeline %d)",
