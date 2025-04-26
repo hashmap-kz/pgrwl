@@ -5,8 +5,8 @@ import (
 )
 
 // TODO:query it
-const (
-	WalSegSz = 16 * 1024 * 1024 // PostgreSQL default 16MiB
+var (
+	WalSegSz uint64 = 16 * 1024 * 1024 // PostgreSQL default 16MiB
 )
 
 // https://github.com/postgres/postgres/blob/master/src/include/access/xlog_internal.h

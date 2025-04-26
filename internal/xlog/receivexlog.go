@@ -55,7 +55,7 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 	stat, err := os.Stat(fullPath)
 	if err == nil {
 		// File exists
-		if stat.Size() == WalSegSz {
+		if stat.Size() == int64(WalSegSz) {
 			// File already correctly sized, open it
 			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 			if err != nil {
@@ -97,7 +97,7 @@ func closeWalfile(stream *StreamCtl, pos uint64) error {
 	// TODO:fsync, simplify, etc...
 	var err error
 	if strings.HasSuffix(walfile.pathname, ".partial") {
-		if walfile.currpos == WalSegSz {
+		if uint64(walfile.currpos) == WalSegSz {
 			err = closeAndRename()
 		} else {
 			err = closeNoRename()
@@ -180,8 +180,8 @@ func ProcessXLogDataMsg(
 		 * If crossing a WAL boundary, only write up until we reach wal
 		 * segment size.
 		 */
-		if xlogoff+bytesLeft > WalSegSz {
-			bytesToWrite = int(WalSegSz - xlogoff)
+		if uint64(xlogoff+bytesLeft) > WalSegSz {
+			bytesToWrite = int(int(WalSegSz) - xlogoff)
 		} else {
 			bytesToWrite = bytesLeft
 		}
