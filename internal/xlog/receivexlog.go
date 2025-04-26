@@ -1,0 +1,132 @@
+package xlog
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pglogrepl"
+	"github.com/jackc/pgx/v5/pgproto3"
+)
+
+var stillSending = true
+
+type StreamCtl struct {
+	StartPos               pglogrepl.LSN
+	Timeline               uint32
+	StandbyMessageTimeout  time.Duration
+	Synchronous            bool
+	StopSocket             int // we can ignore this for now
+	StreamStop             func(blockpos pglogrepl.LSN, timeline uint32, endOfSegment bool) bool
+	SendFeedback           func(conn *pgconn.PgConn, blockpos pglogrepl.LSN, now time.Time, replyRequested bool) error
+	FlushWAL               func() error
+	WriteXLogData          func(xld *pglogrepl.XLogData) error
+	WriteKeepaliveResponse func() error
+}
+
+func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) (pglogrepl.LSN, error) {
+	lastStatusTime := time.Time{}
+	blockPos := stream.StartPos
+
+	stillSending = true
+
+	for {
+		// Check if we should stop
+		if stillSending && stream.StreamStop(blockPos, stream.Timeline, false) {
+			// gracefully end
+			return blockPos, nil
+		}
+
+		now := time.Now()
+
+		// If synchronous, flush + feedback immediately
+		if stream.Synchronous {
+			if err := stream.FlushWAL(); err != nil {
+				return 0, fmt.Errorf("flush WAL failed: %w", err)
+			}
+			if err := stream.SendFeedback(conn, blockPos, now, false); err != nil {
+				return 0, fmt.Errorf("send feedback failed: %w", err)
+			}
+			lastStatusTime = now
+		}
+
+		// If timeout elapsed, send a standby status update
+		if stream.StandbyMessageTimeout > 0 &&
+			now.After(lastStatusTime.Add(stream.StandbyMessageTimeout)) {
+			if err := stream.SendFeedback(conn, blockPos, now, false); err != nil {
+				return 0, fmt.Errorf("send feedback timed out: %w", err)
+			}
+			lastStatusTime = now
+		}
+
+		// Calculate how long we can block
+		sleepTime := calculateSleepTimeout(now, lastStatusTime, stream.StandbyMessageTimeout)
+
+		// Receive WAL from the server
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, sleepTime)
+		msg, err := conn.ReceiveMessage(ctxWithTimeout)
+		cancel()
+
+		if err != nil {
+			if pgconn.Timeout(err) {
+				continue // normal, timed out waiting
+			}
+			return 0, fmt.Errorf("receive failed: %w", err)
+		}
+
+		switch m := msg.(type) {
+		case *pgproto3.CopyData:
+			switch m.Data[0] {
+			case pglogrepl.PrimaryKeepaliveMessageByteID:
+				keepalive, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
+				if err != nil {
+					return 0, fmt.Errorf("parse keepalive failed: %w", err)
+				}
+				if keepalive.ReplyRequested {
+					if err := stream.SendFeedback(conn, blockPos, now, false); err != nil {
+						return 0, fmt.Errorf("keepalive feedback failed: %w", err)
+					}
+					lastStatusTime = now
+				}
+
+			case pglogrepl.XLogDataByteID:
+				xld, err := pglogrepl.ParseXLogData(m.Data[1:])
+				if err != nil {
+					return 0, fmt.Errorf("parse XLogData failed: %w", err)
+				}
+				if err := stream.WriteXLogData(&xld); err != nil {
+					return 0, fmt.Errorf("writing xlogdata failed: %w", err)
+				}
+				blockPos = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
+
+				// Recheck if we should stop after writing
+				if stillSending && stream.StreamStop(blockPos, stream.Timeline, true) {
+					return blockPos, nil
+				}
+
+			default:
+				return 0, fmt.Errorf("unexpected CopyData message type: %v", m.Data[0])
+			}
+
+		case *pgproto3.CopyDone:
+			// Server indicates end of stream
+			return blockPos, nil
+
+		default:
+			return 0, fmt.Errorf("unexpected server message %T", msg)
+		}
+	}
+}
+
+// Helper: How long to wait for next standby_message_timeout
+func calculateSleepTimeout(now, lastStatus time.Time, standbyMessageTimeout time.Duration) time.Duration {
+	if standbyMessageTimeout <= 0 {
+		return time.Second * 10 // default
+	}
+	next := lastStatus.Add(standbyMessageTimeout)
+	if next.After(now) {
+		return next.Sub(now)
+	}
+	return time.Second
+}

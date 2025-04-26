@@ -17,9 +17,7 @@ const (
 	walSegmentSize = 16 * 1024 * 1024 // 16 MiB
 )
 
-var (
-	walFileRe = regexp.MustCompile(`^([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})(\.partial)?$`)
-)
+var walFileRe = regexp.MustCompile(`^([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})(\.partial)?$`)
 
 // utils+
 const (
@@ -31,7 +29,7 @@ func populateTestDir() {
 		"00000001000000000000004C",
 		"00000001000000000000004D.partial",
 	}
-	if err := os.MkdirAll(walDir, 0750); err != nil {
+	if err := os.MkdirAll(walDir, 0o750); err != nil {
 		log.Fatal(err)
 	}
 	for _, fname := range files {
