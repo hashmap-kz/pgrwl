@@ -143,7 +143,7 @@ func handleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 
 				// TODO:types:fix
 				bp := uint64(blockPos)
-
+				// TODO:design:fix, now this will fail
 				if _, err := ProcessXLogDataMsg(conn, stream, xld.WALData, &bp); err != nil {
 					return fmt.Errorf("processing xlogdata failed: %w", err)
 				}
