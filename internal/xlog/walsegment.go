@@ -49,14 +49,14 @@ func (ws *walSegment) openOrCreate() error {
 	filename := fmt.Sprintf("%08X%08X%08X.partial", ws.tli, segno/xLogSegmentsPerXLogID, segno%xLogSegmentsPerXLogID)
 	fullPath := filepath.Join(ws.baseDir, filename)
 
-	if err := os.MkdirAll(ws.baseDir, 0750); err != nil {
+	if err := os.MkdirAll(ws.baseDir, 0o750); err != nil {
 		return err
 	}
 
 	stat, err := os.Stat(fullPath)
 	if err == nil {
 		if stat.Size() == walSegSize {
-			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0660)
+			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 			if err != nil {
 				return fmt.Errorf("could not open WAL file %s: %w", fullPath, err)
 			}
@@ -76,7 +76,7 @@ func (ws *walSegment) openOrCreate() error {
 		// size 0 - fall through
 	}
 
-	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0660)
+	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
 	if err != nil {
 		return fmt.Errorf("could not create WAL file %s: %w", fullPath, err)
 	}

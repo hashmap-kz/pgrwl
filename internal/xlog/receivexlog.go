@@ -25,8 +25,10 @@ type walfileT struct {
 var walfile *walfileT
 
 // TODO:query it
-const walSegSz = 16 * 1024 * 1024 // PostgreSQL default 16MiB
-const xLogSegmentsPerXLogID = uint64(0x100000000) / walSegSz
+const (
+	walSegSz              = 16 * 1024 * 1024 // PostgreSQL default 16MiB
+	xLogSegmentsPerXLogID = uint64(0x100000000) / walSegSz
+)
 
 type StreamCtl struct {
 	StartPos               pglogrepl.LSN
@@ -147,7 +149,6 @@ type StreamCtl struct {
 // }
 
 func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error) {
-
 	segno := XLByteToSeg(startpoint, walSegSz)
 	filename := XLogFileName(stream.Timeline, segno, walSegSz) + stream.PartialSuffix
 	// TODO:fix
@@ -159,7 +160,7 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 		// File exists
 		if stat.Size() == walSegSz {
 			// File already correctly sized, open it
-			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0660)
+			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 			if err != nil {
 				return nil, "", fmt.Errorf("could not open existing WAL file %s: %w", fullPath, err)
 			}
@@ -177,7 +178,7 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 	}
 
 	// Otherwise create new file and preallocate
-	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0660)
+	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
 	if err != nil {
 		return nil, "", fmt.Errorf("could not create WAL file %s: %w", fullPath, err)
 	}
@@ -332,7 +333,6 @@ func ProcessXLogDataMsg(
 	copybuf []byte,
 	blockpos *uint64,
 ) (bool, error) {
-
 	/*
 	 * Once we've decided we don't want to receive any more, just ignore any
 	 * subsequent XLogData messages.
@@ -420,28 +420,6 @@ func ProcessXLogDataMsg(
 				return true, nil
 			}
 		}
-
-		// // If we completed a WAL segment
-		// if xlogoff == walSegSz {
-		// 	if err := (*seg).flush(); err != nil {
-		// 		return false, fmt.Errorf("could not flush WAL file: %w", err)
-		// 	}
-		// 	if err := (*seg).closeAndRename(); err != nil {
-		// 		return false, fmt.Errorf("could not close WAL file: %w", err)
-		// 	}
-		//
-		// 	// prepare next WAL segment
-		// 	newSeg, _ := newWalSegment(stream.Timeline, *blockpos)
-		// 	*seg = newSeg
-		//
-		// 	// Check if we should stop
-		// 	if stream.StreamStop != nil && stream.StreamStop(*blockpos, stream.Timeline, true) {
-		// 		// Send CopyEnd
-		// 		_, _ = pglogrepl.SendStandbyCopyDone(context.Background(), conn)
-		// 		return true, nil
-		// 	}
-		// 	xlogoff = 0
-		// }
 
 	}
 
