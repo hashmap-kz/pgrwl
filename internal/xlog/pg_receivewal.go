@@ -99,6 +99,7 @@ func FindStreamingStart(baseDir string) (pglogrepl.LSN, uint32, error) {
 		startLSN = segNoToLSN(best.segNo + 1)
 	}
 
+	log.Printf("resume from LSN=%s, TLI=%d\n", pglogrepl.LSN(startLSN).String(), best.tli)
 	return startLSN, best.tli, nil
 }
 

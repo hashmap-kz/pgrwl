@@ -174,18 +174,18 @@ func ProcessXLogDataMsg(
 
 	data := xld.WALData
 
-	bytesLeft := len(data)
-	bytesWritten := 0
+	bytesLeft := uint64(len(data))
+	bytesWritten := uint64(0)
 
-	for bytesLeft > 0 {
-		var bytesToWrite int
+	for bytesLeft != 0 {
+		var bytesToWrite uint64
 
 		/*
 		 * If crossing a WAL boundary, only write up until we reach wal
 		 * segment size.
 		 */
-		if int(xlogoff+bytesLeft) > int(WalSegSz) {
-			bytesToWrite = int(int(WalSegSz) - xlogoff)
+		if xlogoff+bytesLeft > WalSegSz {
+			bytesToWrite = WalSegSz - xlogoff
 		} else {
 			bytesToWrite = bytesLeft
 		}
@@ -244,9 +244,9 @@ func ProcessXLogDataMsg(
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
 
-		log.Printf("blockpos=%d\n", *blockpos)
+		log.Printf("blockpos bef=%s\n", pglogrepl.LSN(*blockpos).String())
 		*blockpos += pglogrepl.LSN(bytesToWrite)
-		log.Printf("blockpos=%d\n", *blockpos)
+		log.Printf("blockpos aft=%s\n", pglogrepl.LSN(*blockpos).String())
 
 		xlogoff += bytesToWrite
 
