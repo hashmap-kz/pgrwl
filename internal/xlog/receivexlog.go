@@ -2,7 +2,6 @@ package xlog
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,7 +16,13 @@ import (
 
 var stillSending = true
 
-type XLogRecPtr uint64
+type walfileT struct {
+	currpos  uint64
+	pathname string
+	fd       *os.File
+}
+
+var walfile *walfileT
 
 // TODO:query it
 const walSegSz = 16 * 1024 * 1024 // PostgreSQL default 16MiB
@@ -141,9 +146,9 @@ type StreamCtl struct {
 // 	return true;
 // }
 
-func openWalFile(stream *StreamCtl, startpoint XLogRecPtr) (*os.File, string, error) {
+func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error) {
 
-	segno := XLByteToSeg(uint64(startpoint), walSegSz)
+	segno := XLByteToSeg(startpoint, walSegSz)
 	filename := XLogFileName(stream.Timeline, segno, walSegSz) + stream.PartialSuffix
 	// TODO:fix
 	fullPath := filepath.Join("wals", filename)
@@ -186,64 +191,216 @@ func openWalFile(stream *StreamCtl, startpoint XLogRecPtr) (*os.File, string, er
 	return fd, fullPath, nil
 }
 
+// /*
+//  * Process XLogData message.
+//  */
+// static bool
+// ProcessXLogDataMsg(PGconn *conn, StreamCtl *stream, char *copybuf, int len,
+// 				   XLogRecPtr *blockpos)
+// {
+// 	int			xlogoff;
+// 	int			bytes_left;
+// 	int			bytes_written;
+// 	int			hdr_len;
+//
+// 	/*
+// 	 * Once we've decided we don't want to receive any more, just ignore any
+// 	 * subsequent XLogData messages.
+// 	 */
+// 	if (!(still_sending))
+// 		return true;
+//
+// 	/*
+// 	 * Read the header of the XLogData message, enclosed in the CopyData
+// 	 * message. We only need the WAL location field (dataStart), the rest of
+// 	 * the header is ignored.
+// 	 */
+// 	hdr_len = 1;				/* msgtype 'w' */
+// 	hdr_len += 8;				/* dataStart */
+// 	hdr_len += 8;				/* walEnd */
+// 	hdr_len += 8;				/* sendTime */
+// 	if (len < hdr_len)
+// 	{
+// 		pg_log_error("streaming header too small: %d", len);
+// 		return false;
+// 	}
+// 	*blockpos = fe_recvint64(&copybuf[1]);
+//
+// 	/* Extract WAL location for this block */
+// 	xlogoff = XLogSegmentOffset(*blockpos, WalSegSz);
+//
+// 	/*
+// 	 * Verify that the initial location in the stream matches where we think
+// 	 * we are.
+// 	 */
+// 	if (walfile == NULL)
+// 	{
+// 		/* No file open yet */
+// 		if (xlogoff != 0)
+// 		{
+// 			pg_log_error("received write-ahead log record for offset %u with no file open",
+// 						 xlogoff);
+// 			return false;
+// 		}
+// 	}
+// 	else
+// 	{
+// 		/* More data in existing segment */
+// 		if (walfile->currpos != xlogoff)
+// 		{
+// 			pg_log_error("got WAL data offset %08x, expected %08x",
+// 						 xlogoff, (int) walfile->currpos);
+// 			return false;
+// 		}
+// 	}
+//
+// 	bytes_left = len - hdr_len;
+// 	bytes_written = 0;
+//
+// 	while (bytes_left)
+// 	{
+// 		int			bytes_to_write;
+//
+// 		/*
+// 		 * If crossing a WAL boundary, only write up until we reach wal
+// 		 * segment size.
+// 		 */
+// 		if (xlogoff + bytes_left > WalSegSz)
+// 			bytes_to_write = WalSegSz - xlogoff;
+// 		else
+// 			bytes_to_write = bytes_left;
+//
+// 		if (walfile == NULL)
+// 		{
+// 			if (!open_walfile(stream, *blockpos))
+// 			{
+// 				/* Error logged by open_walfile */
+// 				return false;
+// 			}
+// 		}
+//
+// 		if (stream->walmethod->ops->write(walfile,
+// 										  copybuf + hdr_len + bytes_written,
+// 										  bytes_to_write) != bytes_to_write)
+// 		{
+// 			pg_log_error("could not write %d bytes to WAL file \"%s\": %s",
+// 						 bytes_to_write, walfile->pathname,
+// 						 GetLastWalMethodError(stream->walmethod));
+// 			return false;
+// 		}
+//
+// 		/* Write was successful, advance our position */
+// 		bytes_written += bytes_to_write;
+// 		bytes_left -= bytes_to_write;
+// 		*blockpos += bytes_to_write;
+// 		xlogoff += bytes_to_write;
+//
+// 		/* Did we reach the end of a WAL segment? */
+// 		if (XLogSegmentOffset(*blockpos, WalSegSz) == 0)
+// 		{
+// 			if (!close_walfile(stream, *blockpos))
+// 				/* Error message written in close_walfile() */
+// 				return false;
+//
+// 			xlogoff = 0;
+//
+// 			if (still_sending && stream->stream_stop(*blockpos, stream->timeline, true))
+// 			{
+// 				if (PQputCopyEnd(conn, NULL) <= 0 || PQflush(conn))
+// 				{
+// 					pg_log_error("could not send copy-end packet: %s",
+// 								 PQerrorMessage(conn));
+// 					return false;
+// 				}
+// 				still_sending = false;
+// 				return true;	/* ignore the rest of this XLogData packet */
+// 			}
+// 		}
+// 	}
+// 	/* No more data left to write, receive next copy packet */
+//
+// 	return true;
+// }
+
 func ProcessXLogDataMsg(
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
 	copybuf []byte,
-	blockpos *pglogrepl.LSN,
-	seg **walSegment, // <-- pass current segment reference
+	blockpos *uint64,
 ) (bool, error) {
+
+	/*
+	 * Once we've decided we don't want to receive any more, just ignore any
+	 * subsequent XLogData messages.
+	 */
+	if !stillSending {
+		return true, nil
+	}
 
 	if len(copybuf) < 1+8+8+8 {
 		return false, fmt.Errorf("streaming header too small: %d", len(copybuf))
 	}
 
-	dataStart := pglogrepl.LSN(binary.BigEndian.Uint64(copybuf[1:9]))
-	// walEnd := pglogrepl.LSN(binary.BigEndian.Uint64(copybuf[9:17]))
-	// sendTime := int64(binary.BigEndian.Uint64(copybuf[17:25]))
+	xld, err := pglogrepl.ParseXLogData(copybuf[1:])
+	if err != nil {
+		return false, err
+	}
 
-	xlogoff := int(uint64(dataStart) % walSegSz)
-	data := copybuf[25:] // actual WAL data
+	xlogoff := XLogSegmentOffset(uint64(xld.WALStart), walSegSz)
 
 	// If no open file, expect offset to be zero
-	if *seg == nil {
+	if walfile == nil {
 		if xlogoff != 0 {
 			return false, fmt.Errorf("received WAL at offset %d but no file open", xlogoff)
 		}
-		newSeg := newWalSegment(stream.timeline, dataStart)
-		*seg = newSeg
+	} else {
+		if walfile.currpos != xlogoff {
+			return false, fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, walfile.currpos)
+		}
 	}
 
-	// Check we are writing exactly at the expected position
-	curSize, err := (*seg).fd.Seek(0, os.SEEK_END)
-	if err != nil {
-		return false, fmt.Errorf("could not seek current WAL file: %w", err)
-	}
-	if int(curSize) != xlogoff {
-		return false, fmt.Errorf("unexpected WAL offset: got %08x, expected %08x", xlogoff, curSize)
-	}
+	data := xld.WALData
 
-	bytesLeft := len(data)
-	bytesWritten := 0
+	bytesLeft := uint64(len(data))
+	bytesWritten := uint64(0)
 
 	for bytesLeft > 0 {
-		bytesToWrite := bytesLeft
-		if xlogoff+bytesLeft > walSegSz {
+		var bytesToWrite uint64
+
+		/*
+		 * If crossing a WAL boundary, only write up until we reach wal
+		 * segment size.
+		 */
+		if xlogoff+uint64(bytesLeft) > walSegSz {
 			bytesToWrite = walSegSz - xlogoff
+		} else {
+			bytesToWrite = bytesLeft
 		}
 
-		_, err := (*seg).fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
+		if walfile == nil {
+			fd, fullpath, err := openWalFile(stream, *blockpos)
+			if err != nil {
+				return false, err
+			}
+			walfile = &walfileT{
+				currpos:  uint64(*blockpos),
+				pathname: fullpath,
+				fd:       fd,
+			}
+		}
+
+		_, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
-		*blockpos += pglogrepl.LSN(bytesToWrite)
+		*blockpos += bytesToWrite
 		xlogoff += bytesToWrite
 
 		// If we completed a WAL segment
-		if xlogoff == int(walSegSz) {
+		if xlogoff == walSegSz {
 			if err := (*seg).flush(); err != nil {
 				return false, fmt.Errorf("could not flush WAL file: %w", err)
 			}

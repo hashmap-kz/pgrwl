@@ -2,10 +2,16 @@ package xlog
 
 import "fmt"
 
+type XLogRecPtr uint64
+
 // https://github.com/postgres/postgres/blob/master/src/include/access/xlog_internal.h
 
 func XLByteToSeg(xlrp uint64, walSegSize uint64) uint64 {
-	return xlrp / walSegSize
+	return uint64(xlrp) / walSegSize
+}
+
+func XLogSegmentOffset(xlogptr uint64, walSegSize uint64) uint64 {
+	return uint64(xlogptr) & (walSegSize - 1)
 }
 
 func XLByteToPrevSeg(xlrp uint64, walSegSize uint64) uint64 {
