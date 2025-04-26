@@ -202,11 +202,14 @@ func ProcessXLogDataMsg(
 			}
 		}
 
-		n, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
+		// copiedBytes := copy(seg.data[seg.writeIndex:], xld.WALData[messageOffset:])
+		// seg.writeIndex += copiedBytes
+
+		_, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
-		walfile.currpos += n
+		walfile.currpos += bytesToWrite
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
