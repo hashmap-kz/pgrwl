@@ -3,8 +3,10 @@ package xlog
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jackc/pglogrepl"
@@ -187,7 +189,92 @@ func openWalFile(stream *StreamCtl, startpoint uint64) (*os.File, string, error)
 	return fd, fullPath, nil
 }
 
+// /*
+//  * Close the current WAL file (if open), and rename it to the correct
+//  * filename if it's complete. On failure, prints an error message to stderr
+//  * and returns false, otherwise returns true.
+//  */
+// static bool
+// close_walfile(StreamCtl *stream, XLogRecPtr pos)
+// {
+// 	strlcpy(walfile_name, walfile->pathname, MAXPGPATH);
+// 	currpos = walfile->currpos;
+//
+// 	/* Note that this considers the compression used if necessary */
+// 	fn = stream->walmethod->ops->get_file_name(stream->walmethod,
+// 											   walfile_name,
+// 											   stream->partial_suffix);
+//
+// 	if (stream->partial_suffix)
+// 	{
+// 		if (currpos == WalSegSz)
+// 			r = stream->walmethod->ops->close(walfile, CLOSE_NORMAL);
+// 		else
+// 		{
+// 			pg_log_info("not renaming \"%s\", segment is not complete", fn);
+// 			r = stream->walmethod->ops->close(walfile, CLOSE_NO_RENAME);
+// 		}
+// 	}
+// 	else
+// 		r = stream->walmethod->ops->close(walfile, CLOSE_NORMAL);
+//
+// 	walfile = NULL;
+//
+// 	if (r != 0)
+// 	{
+// 		pg_log_error("could not close file \"%s\": %s",
+// 					 fn, GetLastWalMethodError(stream->walmethod));
+//
+// 		pg_free(fn);
+// 		return false;
+// 	}
+//
+// 	pg_free(fn);
+//
+// 	lastFlushPosition = pos;
+// 	return true;
+// }
+
 func closeWalfile(stream *StreamCtl, pos uint64) error {
+	if walfile == nil {
+		return nil
+	}
+
+	// TODO:fsync, simplify, etc...
+	var err error
+	if strings.HasSuffix(walfile.pathname, ".partial") {
+		if walfile.currpos == WalSegSz {
+			err = closeAndRename()
+		} else {
+			err = closeNoRename()
+		}
+	} else {
+		err = closeAndRename()
+	}
+
+	lastFlushPosition = pos
+	return err
+}
+
+func closeNoRename() error {
+	log.Printf("not renaming \"%s\", segment is not complete", walfile.pathname)
+	err := walfile.fd.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func closeAndRename() error {
+	log.Printf("renaming \"%s\", segment is complete", walfile.pathname)
+	err := walfile.fd.Close()
+	if err != nil {
+		return err
+	}
+	err = os.Rename(walfile.pathname, strings.TrimSuffix(walfile.pathname, ".partial"))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
