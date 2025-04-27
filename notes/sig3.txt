@@ -1,0 +1,47 @@
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	for {
+		err := StreamLog(ctx)
+		if err != nil {
+			log.Printf("stream error: %v", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			log.Println("received stop signal, exiting...")
+			os.Exit(0)
+		default:
+			// Decide if you want reconnect behavior
+			log.Println("disconnected, retrying after 5 seconds...")
+			time.Sleep(5 * time.Second)
+		}
+	}
+}
+
+func StreamLog(ctx context.Context) error {
+	// simulate a streaming operation
+	log.Println("starting streaming...")
+
+	// simulate running until canceled
+	select {
+	case <-time.After(10 * time.Second): // pretend streaming worked for 10 sec
+		log.Println("stream finished normally")
+		return nil
+	case <-ctx.Done():
+		log.Println("stream canceled")
+		return ctx.Err()
+	}
+}
