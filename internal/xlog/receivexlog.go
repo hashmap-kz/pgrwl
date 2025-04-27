@@ -338,8 +338,18 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			*stopPos = blockPos
 			return nil
 
+			// Handle other commands
+		case *pgproto3.CommandComplete:
+			slog.Warn("received CommandComplete, treating as disconnection")
+			return nil // safe exit
+		case *pgproto3.ErrorResponse:
+			return fmt.Errorf("error response from server: %s", m.Message)
+		case *pgproto3.ReadyForQuery:
+			slog.Warn("received ReadyForQuery, treating as disconnection")
+			return nil // safe exit
 		default:
-			return fmt.Errorf("unexpected backend message: %T", msg)
+			slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
+			return nil // safe exit
 		}
 	}
 }
