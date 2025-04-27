@@ -1,26 +1,60 @@
-var noLoop bool = false
-var reconnectSleepTime = 5 * time.Second
+/////////////////////
+
+package main
+
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+)
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
 	for {
-		err := StreamLog(ctx)
-		if err != nil {
-			log.Printf("stream error: %v", err)
-		}
+		StreamLog(ctx)
 
-		if ctx.Err() != nil {
-			log.Println("stop signal received, exiting cleanly...")
+		select {
+		case <-ctx.Done():
+			slog.Info("received termination signal, exiting...")
 			os.Exit(0)
+		default:
 		}
 
 		if noLoop {
-			log.Fatalf("no-loop requested, exiting after disconnection")
+			slog.Error("disconnected")
+			os.Exit(1)
+		} else {
+			slog.Info("disconnected; waiting 5 seconds to try again")
+			time.Sleep(5 * time.Second)
 		}
-
-		log.Printf("disconnected, waiting %v to reconnect...", reconnectSleepTime)
-		time.Sleep(reconnectSleepTime)
 	}
 }
+
+
+/////////////////////
+// Patch HandleCopyStream
+
+select {
+case <-ctx.Done():
+    return ctx.Err()
+default:
+    ctxTimeout, cancel := context.WithTimeout(ctx, timeout)
+    msg, err := conn.ReceiveMessage(ctxTimeout)
+    cancel()
+    if pgconn.Timeout(err) {
+        continue
+    }
+    if err != nil {
+        return fmt.Errorf("receive message failed: %w", err)
+    }
+
+    // your switch { case *pgproto3.CopyData, etc } here
+}
+
+
+
+
