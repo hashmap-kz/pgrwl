@@ -3,6 +3,7 @@ package xlog
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,9 +108,8 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 		return nil
 	}
 
-	// TODO:fsync, simplify, etc...
 	var err error
-	if strings.HasSuffix(stream.walfile.pathname, ".partial") {
+	if strings.HasSuffix(stream.walfile.pathname, stream.PartialSuffix) {
 		if stream.walfile.currpos == stream.WalSegSz {
 			err = stream.closeAndRename()
 		} else {
@@ -119,8 +119,13 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 		err = stream.closeAndRename()
 	}
 
+	if err != nil {
+		slog.Error("could not close file, (CloseWalfile)", slog.Any("err", err))
+		return fmt.Errorf("could not close file: %w", err)
+	}
+
 	stream.LastFlushPosition = pglogrepl.LSN(pos)
-	return err
+	return nil
 }
 
 func (stream *StreamCtl) closeNoRename() error {
