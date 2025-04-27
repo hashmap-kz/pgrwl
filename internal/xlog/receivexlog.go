@@ -110,11 +110,7 @@ func ProcessXLogDataMsg(
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
-
-		log.Printf("blockpos bef=%s\n", pglogrepl.LSN(*blockpos).String())
 		*blockpos += pglogrepl.LSN(bytesToWrite)
-		log.Printf("blockpos aft=%s\n", pglogrepl.LSN(*blockpos).String())
-
 		xlogoff += bytesToWrite
 
 		xlSegOff := XLogSegmentOffset(*blockpos, stream.WalSegSz)
