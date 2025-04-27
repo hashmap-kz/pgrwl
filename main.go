@@ -13,7 +13,11 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-const slotName = "pg_recval_5"
+const (
+	slotName    = "pg_recval_5"
+	connStr     = "postgresql://postgres:postgres@localhost:5432/postgres"
+	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes"
+)
 
 func getCurrentWalInfo() (slot postgres.PhysicalSlot, walSegmentBytes uint64, err error) {
 	// Creating a temporary connection to read slot info and wal_segment_size
@@ -47,7 +51,7 @@ func main() {
 	xlog.WalSegSz = ws
 
 	// 2
-	conn, err := pgconn.Connect(context.Background(), "application_name=walg_test_slot user=postgres replication=yes")
+	conn, err := pgconn.Connect(context.Background(), connStrRepl)
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer conn.Close(context.Background())
 
