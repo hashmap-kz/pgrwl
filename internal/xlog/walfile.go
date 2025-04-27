@@ -18,20 +18,20 @@ type walfileT struct {
 
 func (stream *StreamCtl) SyncWalFile() error {
 	if stream.walfile == nil {
-		return fmt.Errorf("stream.walfile is nil, attempt to sync")
+		return fmt.Errorf("stream.walfile is nil (SyncWalFile)")
 	}
 	if stream.walfile.fd == nil {
-		return fmt.Errorf("stream.walfile.fd is nil, attempt to sync")
+		return fmt.Errorf("stream.walfile.fd is nil (SyncWalFile)")
 	}
 	return stream.walfile.fd.Sync()
 }
 
 func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff int64) error {
 	if stream.walfile == nil {
-		return fmt.Errorf("stream.walfile is nil, attempt to write")
+		return fmt.Errorf("stream.walfile is nil (WriteAtWalFile)")
 	}
 	if stream.walfile.fd == nil {
-		return fmt.Errorf("stream.walfile.fd is nil, attempt to sync")
+		return fmt.Errorf("stream.walfile.fd is nil (WriteAtWalFile)")
 	}
 	n, err := stream.walfile.fd.WriteAt(data, xlogoff)
 	if err != nil {
@@ -124,25 +124,52 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 }
 
 func (stream *StreamCtl) closeNoRename() error {
-	log.Printf("not renaming \"%s\", segment is not complete", stream.walfile.pathname)
+	if stream.walfile.fd == nil {
+		return fmt.Errorf("stream.walfile.fd is nil (closeNoRename)")
+	}
+
+	pathname := stream.walfile.pathname
+
+	log.Printf("not renaming \"%s\", segment is not complete", pathname)
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
 	stream.walfile = nil
+
+	log.Printf("fsync filename and parent-directory: %s", pathname)
+	err = FsyncFname(pathname)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (stream *StreamCtl) closeAndRename() error {
-	log.Printf("renaming \"%s\", segment is complete", stream.walfile.pathname)
+	if stream.walfile.fd == nil {
+		return fmt.Errorf("stream.walfile.fd is nil (closeAndRename)")
+	}
+
+	pathname := stream.walfile.pathname
+	finalName := strings.TrimSuffix(pathname, stream.PartialSuffix)
+
+	log.Printf("closing file: %s", pathname)
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
-	err = os.Rename(stream.walfile.pathname, strings.TrimSuffix(stream.walfile.pathname, ".partial"))
+
+	log.Printf("renaming %s to %s, segment is complete", pathname, finalName)
+	err = os.Rename(pathname, finalName)
 	if err != nil {
 		return err
 	}
 	stream.walfile = nil
+
+	log.Printf("fsync filename and parent-directory: %s", finalName)
+	err = FsyncFname(finalName)
+	if err != nil {
+		return err
+	}
 	return nil
 }
