@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -269,7 +270,6 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 					return fmt.Errorf("parse xlogdata failed: %w", err)
 				}
 
-				// TODO:types:fix
 				if _, err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 					return fmt.Errorf("processing xlogdata failed: %w", err)
 				}
@@ -284,7 +284,20 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			}
 
 		case *pgproto3.CopyDone:
-			// Server ended streaming normally
+			slog.Info("HandleCopyStream: received CopyDone, HandleEndOfCopyStream()")
+
+			// Server ended the stream. Handle CopyDone properly!
+			// HandleEndOfCopyStream(PGconn *conn, StreamCtl *stream, char *copybuf, XLogRecPtr blockpos, XLogRecPtr *stoppos)
+			if stream.StillSending {
+				if err := stream.CloseWalfile(blockPos); err != nil {
+					return fmt.Errorf("failed to close WAL file: %w", err)
+				}
+				if _, err := pglogrepl.SendStandbyCopyDone(ctx, conn); err != nil {
+					return fmt.Errorf("failed to send client CopyDone: %w", err)
+				}
+				stream.StillSending = false
+			}
+			*stopPos = blockPos
 			return nil
 
 		default:
