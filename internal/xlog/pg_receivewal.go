@@ -1,7 +1,6 @@
 package xlog
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -18,6 +17,8 @@ var (
 	verbose                  = true
 	timeToStop               = false
 	endpos     pglogrepl.LSN = 0
+
+	ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 )
 
 // FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
@@ -76,7 +77,7 @@ func FindStreamingStart(baseDir string, walSegSz uint64) (pglogrepl.LSN, uint32,
 	}
 
 	if len(entries) == 0 {
-		return 0, 0, errors.New("no valid WAL segments found")
+		return 0, 0, ErrNoWalEntries
 	}
 
 	// Sort by segNo, tli, isPartial (completed > partial)
