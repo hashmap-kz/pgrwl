@@ -417,8 +417,25 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 					return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
 				}
 
+				/* Read the final result, which should be CommandComplete. */
+				// NOW: expect the final CommandComplete
+				msg2, err := conn.ReceiveMessage(ctx)
+				if err != nil {
+					return fmt.Errorf("failed receiving final CommandComplete: %w", err)
+				}
+
+				if _, ok := msg2.(*pgproto3.CommandComplete); !ok {
+					return fmt.Errorf("expected CommandComplete after DataRow, got %T", msg2)
+				}
+
+				/*
+				* Loop back to start streaming from the new timeline. Always
+				* start streaming at the beginning of a segment.
+				 */
 				stream.Timeline = newTimeline
 				stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
+
+				// After consuming CommandComplete, restart replication
 				goto nextIteration
 
 			case *pgproto3.CommandComplete:
