@@ -157,10 +157,11 @@ func ScanWalSegSize(sizeStr string) (uint64, error) {
 		return 0, fmt.Errorf("unknown unit: %s", unit)
 	}
 
-	if !IsValidWalSegSize(uint64(val)) {
+	segSize := uint64(val * multiplier)
+
+	if !IsValidWalSegSize(segSize) {
 		return 0, fmt.Errorf("wal_segment_size is out of range: %d", val)
 	}
 
-	segSize := uint64(val * multiplier)
 	return segSize, nil
 }

@@ -14,7 +14,6 @@ func TestScanWalSegSize_ValidInputs(t *testing.T) {
 		{"16MB", 16 * 1024 * 1024},
 		{"1GB", 1 * 1024 * 1024 * 1024},
 		{"32MB", 32 * 1024 * 1024},
-		{"2GB", 2 * 1024 * 1024 * 1024},
 	}
 
 	for _, tt := range tests {
