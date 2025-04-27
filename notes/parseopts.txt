@@ -1,0 +1,82 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+)
+
+type ReceiveWalOpts struct {
+	Directory      string
+	DBName         string
+	EndPos         string
+	Host           string
+	Port           int
+	Username       string
+	NoLoop         bool
+	NoPassword     bool
+	Password       bool
+	StatusInterval int
+	Slot           string
+	Verbose        bool
+	CompressLevel  int
+	CreateSlot     bool
+	DropSlot       bool
+	IfNotExists    bool
+	Synchronous    bool
+	NoSync         bool
+}
+
+func parseFlags() *ReceiveWalOpts {
+	opts := &ReceiveWalOpts{}
+
+	// Main flags
+	flag.StringVar(&opts.Directory, "directory", "", "Directory where to write received WAL files")
+	flag.StringVar(&opts.DBName, "dbname", "", "Database connection string")
+	flag.StringVar(&opts.EndPos, "endpos", "", "Stop replication at this LSN position")
+	flag.StringVar(&opts.Host, "host", "", "PostgreSQL server host")
+	flag.IntVar(&opts.Port, "port", 5432, "PostgreSQL server port")
+	flag.StringVar(&opts.Username, "username", "", "Username to connect as")
+	flag.BoolVar(&opts.NoLoop, "no-loop", false, "Exit after reaching end of WAL stream")
+	flag.BoolVar(&opts.NoPassword, "no-password", false, "Never prompt for password")
+	flag.BoolVar(&opts.Password, "password", false, "Force password prompt")
+	flag.IntVar(&opts.StatusInterval, "status-interval", 10, "Send status updates to server every N seconds")
+	flag.StringVar(&opts.Slot, "slot", "", "Replication slot to use")
+	flag.BoolVar(&opts.Verbose, "verbose", false, "Enable verbose logging")
+	flag.IntVar(&opts.CompressLevel, "compress", 0, "Compression level (if using compression)")
+
+	// Actions
+	flag.BoolVar(&opts.CreateSlot, "create-slot", false, "Create replication slot")
+	flag.BoolVar(&opts.DropSlot, "drop-slot", false, "Drop replication slot")
+	flag.BoolVar(&opts.IfNotExists, "if-not-exists", false, "Ignore if slot already exists when creating")
+	flag.BoolVar(&opts.Synchronous, "synchronous", false, "Wait until WAL is flushed after writing")
+	flag.BoolVar(&opts.NoSync, "no-sync", false, "Do not fsync WAL files to disk")
+
+	// Aliases for --help and --version
+	help := flag.Bool("help", false, "Show help")
+	version := flag.Bool("version", false, "Show version")
+
+	flag.Parse()
+
+	if *help {
+		flag.Usage()
+		os.Exit(0)
+	}
+	if *version {
+		fmt.Println("pg_receivewal clone, version 1.0.0")
+		os.Exit(0)
+	}
+
+	return opts
+}
+
+func main() {
+	opts := parseFlags()
+
+	fmt.Printf("Parsed options: %+v\n", opts)
+
+	// Example usage
+	if opts.CreateSlot {
+		fmt.Println("You asked to create a slot!")
+	}
+}
