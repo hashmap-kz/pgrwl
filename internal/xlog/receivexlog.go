@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
+// TODO:noglobal
 var (
 	lastFlushPosition   pglogrepl.LSN
 	stillSending        = true
@@ -153,15 +155,6 @@ func ProcessXLogDataMsg(
 		return true, nil
 	}
 
-	// if len(copybuf) < 1+8+8+8 {
-	// 	return false, fmt.Errorf("streaming header too small: %d", len(copybuf))
-	// }
-
-	// xld, err := pglogrepl.ParseXLogData(copybuf[1:])
-	// if err != nil {
-	// 	return false, err
-	// }
-
 	xlogoff := XLogSegmentOffset(xld.WALStart, WalSegSz)
 
 	// If no open file, expect offset to be zero
@@ -205,11 +198,6 @@ func ProcessXLogDataMsg(
 			}
 		}
 
-		//
-		// copiedBytes := copy(seg.data[seg.writeIndex:], xld.WALData[messageOffset:])
-		// seg.writeIndex += copiedBytes
-
-		//
 		// if (stream->walmethod->ops->write(walfile,
 		// 								  copybuf + hdr_len + bytes_written,
 		// 								  bytes_to_write) != bytes_to_write)
@@ -218,24 +206,6 @@ func ProcessXLogDataMsg(
 		// 				 bytes_to_write, walfile->pathname,
 		// 				 GetLastWalMethodError(stream->walmethod));
 		// 	return false;
-		// }
-
-		// n, err := walfile.fd.Write(data[bytesWritten : bytesWritten+bytesToWrite])
-		// if err != nil {
-		// 	return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
-		// }
-
-		// v5
-		//
-		// // Write `bytes_to_write` bytes starting from `hdrLen + bytes_written`
-		// start := bytesWritten
-		// end := start + bytesToWrite
-		// n, err := walfile.fd.Write(data[start:end])
-		// if err != nil {
-		// 	return false, fmt.Errorf("could not write WAL data to file %s: %w", walfile.pathname, err)
-		// }
-		// if n != bytesToWrite {
-		// 	return false, fmt.Errorf("could not write all bytes to WAL file %s: written %d, expected %d", walfile.pathname, n, bytesToWrite)
 		// }
 
 		n, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
@@ -474,72 +444,73 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
-		// 	// After CopyDone:
-		// 	for {
-		// 		msg, err := conn.ReceiveMessage(ctx)
-		// 		if err != nil {
-		// 			return fmt.Errorf("failed receiving server result: %w", err)
-		// 		}
-		//
-		// 		switch m := msg.(type) {
-		// 		case *pgproto3.DataRow:
-		// 			// Server sends end-of-timeline info
-		// 			newTimeline, newStartPos, err := parseEndOfStreamingResult(m)
-		// 			if err != nil {
-		// 				return fmt.Errorf("could not parse end-of-stream result: %w", err)
-		// 			}
-		// 			if newTimeline <= stream.Timeline {
-		// 				return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
-		// 			}
-		// 			if newStartPos > stopPos {
-		// 				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
-		// 			}
-		//
-		// 			stream.Timeline = newTimeline
-		// 			stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(WalSegSz))
-		// 			goto nextIteration
-		//
-		// 		case *pgproto3.CommandComplete:
-		// 			if stream.StreamStop(stopPos, stream.Timeline, false) {
-		// 				return nil
-		// 			}
-		// 			return fmt.Errorf("replication stream terminated unexpectedly before stop point")
-		//
-		// 		case *pgproto3.ErrorResponse:
-		// 			return fmt.Errorf("error response from server: %s", m.Message)
-		//
-		// 		case *pgproto3.ReadyForQuery:
-		// 			// Ignore, ready for new commands
-		// 			continue
-		//
-		// 		default:
-		// 			// Unexpected
-		// 			continue
-		// 		}
-		// 	}
-		// nextIteration:
-		// 	continue
+		// After CopyDone:
+		for {
+			msg, err := conn.ReceiveMessage(ctx)
+			if err != nil {
+				return fmt.Errorf("failed receiving server result: %w", err)
+			}
+
+			switch m := msg.(type) {
+			case *pgproto3.DataRow:
+				// Server sends end-of-timeline info
+				newTimeline, newStartPos, err := parseEndOfStreamingResult(m)
+				if err != nil {
+					return fmt.Errorf("could not parse end-of-stream result: %w", err)
+				}
+				if newTimeline <= stream.Timeline {
+					return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
+				}
+				if newStartPos > stopPos {
+					return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
+				}
+
+				stream.Timeline = newTimeline
+				stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(WalSegSz))
+				goto nextIteration
+
+			case *pgproto3.CommandComplete:
+				if stream.StreamStop(stopPos, stream.Timeline, false) {
+					return nil
+				}
+				return fmt.Errorf("replication stream terminated unexpectedly before stop point")
+
+			case *pgproto3.ErrorResponse:
+				return fmt.Errorf("error response from server: %s", m.Message)
+
+			case *pgproto3.ReadyForQuery:
+				// Ignore, ready for new commands
+				continue
+
+			default:
+				// Unexpected
+				continue
+			}
+		}
+	nextIteration:
+		continue
+		// After CopyDone:
 
 	}
 }
 
-// func parseEndOfStreamingResult(m *pgproto3.DataRow) (newTimeline uint32, startLSN pglogrepl.LSN, err error) {
-// 	if len(m.Values) != 2 {
-// 		return 0, 0, fmt.Errorf("unexpected DataRow format")
-// 	}
-// 	timelineStr := string(m.Values[0])
-// 	startLSNStr := string(m.Values[1])
-//
-// 	tli, err := strconv.ParseUint(timelineStr, 10, 32)
-// 	if err != nil {
-// 		return 0, 0, fmt.Errorf("invalid timeline value: %w", err)
-// 	}
-// 	lsn, err := pglogrepl.ParseLSN(startLSNStr)
-// 	if err != nil {
-// 		return 0, 0, fmt.Errorf("invalid LSN value: %w", err)
-// 	}
-// 	return uint32(tli), lsn, nil
-// }
+func parseEndOfStreamingResult(m *pgproto3.DataRow) (newTimeline uint32, startLSN pglogrepl.LSN, err error) {
+	if len(m.Values) != 2 {
+		return 0, 0, fmt.Errorf("unexpected DataRow format")
+	}
+	timelineStr := string(m.Values[0])
+	startLSNStr := string(m.Values[1])
+
+	tli, err := strconv.ParseUint(timelineStr, 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid timeline value: %w", err)
+	}
+	lsn, err := pglogrepl.ParseLSN(startLSNStr)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid LSN value: %w", err)
+	}
+	return uint32(tli), lsn, nil
+}
 
 // timeline history file
 
