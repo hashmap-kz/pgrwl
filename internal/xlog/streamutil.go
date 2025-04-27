@@ -125,3 +125,42 @@ func parseShowParameter(mrr *pgconn.MultiResultReader) (string, error) {
 
 	return string(row[0]), nil
 }
+
+// scan utils
+
+// e.g. "16MB"
+func ScanWalSegSize(sizeStr string) (uint64, error) {
+	if sizeStr == "" {
+		return 0, fmt.Errorf("empty input")
+	}
+
+	var val int
+	var unit string
+	_, err := fmt.Sscanf(sizeStr, "%d%2s", &val, &unit)
+	if err != nil {
+		return 0, err
+	}
+
+	if val == 0 {
+		return 0, fmt.Errorf("segment size cannot be zero")
+	}
+	if unit == "" {
+		return 0, fmt.Errorf("unit cannot be empty")
+	}
+
+	multiplier := 1
+	if unit == "MB" {
+		multiplier = 1024 * 1024
+	} else if unit == "GB" {
+		multiplier = 1024 * 1024 * 1024
+	} else {
+		return 0, fmt.Errorf("unknown unit: %s", unit)
+	}
+
+	if !IsValidWalSegSize(uint64(val)) {
+		return 0, fmt.Errorf("wal_segment_size is out of range: %d", val)
+	}
+
+	segSize := uint64(val * multiplier)
+	return segSize, nil
+}
