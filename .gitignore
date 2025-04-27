@@ -16,3 +16,4 @@ dist/
 bin/
 *.log
 coverage.txt
+__debug_bin*
