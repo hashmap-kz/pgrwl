@@ -15,6 +15,10 @@ import (
 	"github.com/jackc/pgx/v5/pgproto3"
 )
 
+type StreamClient interface {
+	StreamStop(blockpos pglogrepl.LSN, timeline uint32, endOfSegment bool) bool
+}
+
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
 type StreamCtl struct {
@@ -23,7 +27,7 @@ type StreamCtl struct {
 	StandbyMessageTimeout time.Duration
 	Synchronous           bool
 	PartialSuffix         string
-	StreamStop            func(blockpos pglogrepl.LSN, timeline uint32, endOfSegment bool) bool
+	StreamClient          StreamClient
 	ReplicationSlot       string
 	SysIdentifier         string
 	WalSegSz              uint64
@@ -121,7 +125,7 @@ func ProcessXLogDataMsg(
 			}
 			xlogoff = 0
 
-			if stream.StillSending && stream.StreamStop(pglogrepl.LSN(*blockpos), stream.Timeline, true) {
+			if stream.StillSending && stream.StreamClient.StreamStop(pglogrepl.LSN(*blockpos), stream.Timeline, true) {
 				// Send CopyDone message
 				_, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
 				if err != nil {
@@ -145,7 +149,7 @@ func checkCopyStreamStop(
 	stream *StreamCtl,
 	blockpos pglogrepl.LSN,
 ) bool {
-	if stream.StillSending && stream.StreamStop(blockpos, stream.Timeline, false) {
+	if stream.StillSending && stream.StreamClient.StreamStop(blockpos, stream.Timeline, false) {
 		// Close WAL file first
 		if err := stream.CloseWalfile(blockpos); err != nil {
 			// Error already logged in closeWalFile
@@ -315,7 +319,7 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 		}
 
 		// Check if we should stop before starting replication
-		if stream.StreamStop(stream.StartPos, stream.Timeline, false) {
+		if stream.StreamClient.StreamStop(stream.StartPos, stream.Timeline, false) {
 			return nil
 		}
 
@@ -361,7 +365,7 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 				goto nextIteration
 
 			case *pgproto3.CommandComplete:
-				if stream.StreamStop(stopPos, stream.Timeline, false) {
+				if stream.StreamClient.StreamStop(stopPos, stream.Timeline, false) {
 					return nil
 				}
 				return fmt.Errorf("replication stream terminated unexpectedly before stop point")

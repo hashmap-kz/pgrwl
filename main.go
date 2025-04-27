@@ -51,6 +51,12 @@ func StreamLog() error {
 
 	walSegSz := startupInfo.walSegSz
 
+	pgrw := &xlog.PgReceiveWal{
+		Verbose:  true,
+		BaseDir:  baseDir,
+		WalSegSz: walSegSz,
+	}
+
 	// 2
 	if conn == nil {
 		// 2
@@ -89,7 +95,7 @@ func StreamLog() error {
 	}
 
 	// 4
-	streamStartLSN, streamStartTimeline, err := xlog.FindStreamingStart(baseDir, walSegSz)
+	streamStartLSN, streamStartTimeline, err := pgrw.FindStreamingStart()
 	if err != nil {
 		if !errors.Is(err, xlog.ErrNoWalEntries) {
 			return err
@@ -125,7 +131,7 @@ func StreamLog() error {
 		StandbyMessageTimeout: 10 * time.Second,
 		Synchronous:           true,
 		PartialSuffix:         ".partial",
-		StreamStop:            xlog.StopStreaming,
+		StreamClient:          pgrw,
 		ReplicationSlot:       slotName,
 		SysIdentifier:         sysident.SystemID,
 		WalSegSz:              walSegSz,

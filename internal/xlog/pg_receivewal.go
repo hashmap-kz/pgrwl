@@ -12,17 +12,26 @@ import (
 	"github.com/jackc/pglogrepl"
 )
 
-var (
-	walFileRe                = regexp.MustCompile(`^([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})(\.partial)?$`)
-	verbose                  = true
-	timeToStop               = false
-	endpos     pglogrepl.LSN = 0
+type PgReceiveWal struct {
+	Verbose  bool
+	BaseDir  string
+	WalSegSz uint64
 
+	timeToStop   bool
+	endpos       pglogrepl.LSN
+	prevTimeline uint32
+	prevPos      pglogrepl.LSN
+}
+
+var _ StreamClient = &PgReceiveWal{}
+
+var (
+	walFileRe       = regexp.MustCompile(`^([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})(\.partial)?$`)
 	ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 )
 
 // FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
-func FindStreamingStart(baseDir string, walSegSz uint64) (pglogrepl.LSN, uint32, error) {
+func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 	type walEntry struct {
 		tli       uint32
 		segNo     uint64
@@ -31,7 +40,7 @@ func FindStreamingStart(baseDir string, walSegSz uint64) (pglogrepl.LSN, uint32,
 
 	var entries []walEntry
 
-	err := filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(pgrw.BaseDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -51,14 +60,14 @@ func FindStreamingStart(baseDir string, walSegSz uint64) (pglogrepl.LSN, uint32,
 			return nil // skip invalid names
 		}
 
-		segNo := uint64(log)*0x100000000/walSegSz + uint64(seg)
+		segNo := uint64(log)*0x100000000/pgrw.WalSegSz + uint64(seg)
 
 		if !isPartial {
 			info, err := os.Stat(path)
 			if err != nil {
 				return fmt.Errorf("could not stat file %q: %w", path, err)
 			}
-			if uint64(info.Size()) != walSegSz {
+			if uint64(info.Size()) != pgrw.WalSegSz {
 				fmt.Fprintf(os.Stderr, "warning: WAL segment %q has incorrect size %d, skipping\n", base, info.Size())
 				return nil
 			}
@@ -73,7 +82,7 @@ func FindStreamingStart(baseDir string, walSegSz uint64) (pglogrepl.LSN, uint32,
 		return nil
 	})
 	if err != nil {
-		return 0, 0, fmt.Errorf("could not read directory %q: %w", baseDir, err)
+		return 0, 0, fmt.Errorf("could not read directory %q: %w", pgrw.BaseDir, err)
 	}
 
 	if len(entries) == 0 {
@@ -95,9 +104,9 @@ func FindStreamingStart(baseDir string, walSegSz uint64) (pglogrepl.LSN, uint32,
 
 	var startLSN pglogrepl.LSN
 	if best.isPartial {
-		startLSN = segNoToLSN(best.segNo, walSegSz)
+		startLSN = segNoToLSN(best.segNo, pgrw.WalSegSz)
 	} else {
-		startLSN = segNoToLSN(best.segNo+1, walSegSz)
+		startLSN = segNoToLSN(best.segNo+1, pgrw.WalSegSz)
 	}
 
 	log.Printf("resume from LSN=%s, TLI=%d\n", pglogrepl.LSN(startLSN).String(), best.tli)
@@ -114,92 +123,39 @@ func segNoToLSN(segNo, walSegSz uint64) pglogrepl.LSN {
 	return pglogrepl.LSN(segNo * walSegSz)
 }
 
-// stop
-
-// static bool
-// stop_streaming(XLogRecPtr xlogpos, uint32 timeline, bool segment_finished)
-// {
-// 	static uint32 prevtimeline = 0;
-// 	static XLogRecPtr prevpos = InvalidXLogRecPtr;
-//
-// 	/* we assume that we get called once at the end of each segment */
-// 	if (verbose && segment_finished)
-// 		pg_log_info("finished segment at %X/%X (timeline %u)",
-// 					LSN_FORMAT_ARGS(xlogpos),
-// 					timeline);
-//
-// 	if (!XLogRecPtrIsInvalid(endpos) && endpos < xlogpos)
-// 	{
-// 		if (verbose)
-// 			pg_log_info("stopped log streaming at %X/%X (timeline %u)",
-// 						LSN_FORMAT_ARGS(xlogpos),
-// 						timeline);
-// 		time_to_stop = true;
-// 		return true;
-// 	}
-//
-// 	/*
-// 	 * Note that we report the previous, not current, position here. After a
-// 	 * timeline switch, xlogpos points to the beginning of the segment because
-// 	 * that's where we always begin streaming. Reporting the end of previous
-// 	 * timeline isn't totally accurate, because the next timeline can begin
-// 	 * slightly before the end of the WAL that we received on the previous
-// 	 * timeline, but it's close enough for reporting purposes.
-// 	 */
-// 	if (verbose && prevtimeline != 0 && prevtimeline != timeline)
-// 		pg_log_info("switched to timeline %u at %X/%X",
-// 					timeline,
-// 					LSN_FORMAT_ARGS(prevpos));
-//
-// 	prevtimeline = timeline;
-// 	prevpos = xlogpos;
-//
-// 	if (time_to_stop)
-// 	{
-// 		if (verbose)
-// 			pg_log_info("received interrupt signal, exiting");
-// 		return true;
-// 	}
-// 	return false;
-// }
-
-var (
-	prevTimeline uint32
-	prevPos      pglogrepl.LSN
-)
-
-func StopStreaming(xlogpos pglogrepl.LSN, timeline uint32, segmentFinished bool) bool {
-	if verbose && segmentFinished {
+// stop_streaming
+func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, segmentFinished bool) bool {
+	if pgrw.Verbose && segmentFinished {
 		log.Printf(
 			"finished segment at %X/%X (timeline %d)",
 			uint32(xlogpos>>32), uint32(xlogpos), timeline,
 		)
 	}
 
-	if endpos != 0 && endpos < xlogpos {
-		if verbose {
+	if pgrw.endpos != 0 && pgrw.endpos < xlogpos {
+		if pgrw.Verbose {
 			log.Printf(
 				"stopped log streaming at %X/%X (timeline %d)",
 				uint32(xlogpos>>32), uint32(xlogpos), timeline,
 			)
 		}
-		timeToStop = true
+		pgrw.timeToStop = true
 		return true
 	}
 
-	if verbose && prevTimeline != 0 && prevTimeline != timeline {
+	if pgrw.Verbose && pgrw.prevTimeline != 0 && pgrw.prevTimeline != timeline {
 		log.Printf(
 			"switched to timeline %d at %X/%X",
 			timeline,
-			uint32(prevPos>>32), uint32(prevPos),
+			uint32(pgrw.prevPos>>32), uint32(pgrw.prevPos),
 		)
 	}
 
-	prevTimeline = timeline
-	prevPos = xlogpos
+	pgrw.prevTimeline = timeline
+	pgrw.prevPos = xlogpos
 
-	if timeToStop {
-		if verbose {
+	if pgrw.timeToStop {
+		if pgrw.Verbose {
 			log.Printf("received interrupt signal, exiting")
 		}
 		return true
