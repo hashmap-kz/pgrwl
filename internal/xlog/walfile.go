@@ -16,8 +16,27 @@ type walfileT struct {
 	fd       *os.File
 }
 
-func (w *walfileT) Sync() error {
-	// TODO:fix
+func (stream *StreamCtl) SyncWalFile() error {
+	if stream.walfile == nil {
+		return fmt.Errorf("stream.walfile is nil, attempt to sync")
+	}
+	if stream.walfile.fd == nil {
+		return fmt.Errorf("stream.walfile.fd is nil, attempt to sync")
+	}
+	return stream.walfile.fd.Sync()
+}
+
+func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff int64) error {
+	if stream.walfile == nil {
+		return fmt.Errorf("stream.walfile is nil, attempt to write")
+	}
+	n, err := stream.walfile.fd.WriteAt(data, xlogoff)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		stream.walfile.currpos += uint64(n)
+	}
 	return nil
 }
 

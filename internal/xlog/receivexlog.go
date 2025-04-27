@@ -99,12 +99,9 @@ func ProcessXLogDataMsg(
 		// 	return false;
 		// }
 
-		n, err := stream.walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
+		err := stream.WriteAtWalFile(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
-		}
-		if n > 0 {
-			stream.walfile.currpos += uint64(n)
 		}
 
 		bytesWritten += bytesToWrite
@@ -215,7 +212,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 
 		// If synchronous, flush WAL file and update server immediately
 		if stream.Synchronous && stream.LastFlushPosition < blockPos && stream.walfile != nil {
-			if err := stream.walfile.Sync(); err != nil {
+			if err := stream.SyncWalFile(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
 			stream.LastFlushPosition = blockPos
