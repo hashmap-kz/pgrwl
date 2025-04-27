@@ -1,0 +1,26 @@
+var noLoop bool = false
+var reconnectSleepTime = 5 * time.Second
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	for {
+		err := StreamLog(ctx)
+		if err != nil {
+			log.Printf("stream error: %v", err)
+		}
+
+		if ctx.Err() != nil {
+			log.Println("stop signal received, exiting cleanly...")
+			os.Exit(0)
+		}
+
+		if noLoop {
+			log.Fatalf("no-loop requested, exiting after disconnection")
+		}
+
+		log.Printf("disconnected, waiting %v to reconnect...", reconnectSleepTime)
+		time.Sleep(reconnectSleepTime)
+	}
+}
