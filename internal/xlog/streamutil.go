@@ -85,3 +85,43 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 	isr.RestartTLI = uint32(restartTLI)
 	return isr, nil
 }
+
+// parameters
+
+// GetShowParameter executes "SHOW parameterName" and returns its string value.
+func GetShowParameter(conn *pgconn.PgConn, parameterName string) (string, error) {
+	query := "SHOW " + parameterName
+
+	mrr := conn.Exec(context.Background(), query)
+
+	value, err := parseShowParameter(mrr)
+	if err != nil {
+		return "", fmt.Errorf("failed to read SHOW %s: %w", parameterName, err)
+	}
+
+	return value, nil
+}
+
+// parseShowParameter parses the result of the SHOW command.
+func parseShowParameter(mrr *pgconn.MultiResultReader) (string, error) {
+	results, err := mrr.ReadAll()
+	if err != nil {
+		return "", err
+	}
+
+	if len(results) != 1 {
+		return "", fmt.Errorf("expected 1 result set, got %d", len(results))
+	}
+
+	result := results[0]
+	if len(result.Rows) != 1 {
+		return "", fmt.Errorf("expected 1 result row, got %d", len(result.Rows))
+	}
+
+	row := result.Rows[0]
+	if len(row) < 1 {
+		return "", fmt.Errorf("expected at least 1 column in SHOW result, got %d", len(row))
+	}
+
+	return string(row[0]), nil
+}
