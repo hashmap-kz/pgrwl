@@ -165,3 +165,38 @@ func ScanWalSegSize(sizeStr string) (uint64, error) {
 
 	return segSize, nil
 }
+
+// startup info
+
+type StartupInfo struct {
+	WalSegSz uint64
+}
+
+func GetStartupInfo(conn *pgconn.PgConn) (*StartupInfo, error) {
+	// WAL segment size
+	p, err := GetShowParameter(conn, "wal_segment_size")
+	if err != nil {
+		return nil, err
+	}
+	wss, err := ScanWalSegSize(p)
+	if err != nil {
+		return nil, err
+	}
+
+	// Server version
+	p, err = GetShowParameter(conn, "server_version_num")
+	if err != nil {
+		return nil, err
+	}
+	serverVersion, err := strconv.ParseInt(p, 10, 32)
+	if err != nil {
+		return nil, err
+	}
+	if serverVersion < 150000 {
+		return nil, fmt.Errorf("unsupported version %d, postgresql >=15 is expected", serverVersion)
+	}
+
+	return &StartupInfo{
+		WalSegSz: wss,
+	}, nil
+}

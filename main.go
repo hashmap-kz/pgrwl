@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	"pgreceivewal5/internal/pg"
-
 	"pgreceivewal5/internal/xlog"
 
 	"github.com/jackc/pglogrepl"
@@ -18,7 +16,6 @@ import (
 
 const (
 	slotName    = "pg_recval_5"
-	connStr     = "postgresql://postgres:postgres@localhost:5432/postgres"
 	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes"
 	baseDir     = "wals"
 )
@@ -58,42 +55,27 @@ func init() {
 	slog.SetDefault(logger)
 }
 
-type startupInfo struct {
-	walSegSz uint64
-}
-
-func getStartupInfo() (*startupInfo, error) {
-	qs, err := pg.NewPGQuerySession(context.TODO(), connStr)
-	if err != nil {
-		return nil, err
-	}
-	defer qs.Close()
-
-	return &startupInfo{
-		walSegSz: qs.WalSegmentSize(),
-	}, nil
-}
-
 func StreamLog() {
+	var err error
+
 	// 1
-	startupInfo, err := getStartupInfo()
-	FatalOnErr(err, "cannot get startup info (wal_segment_size, server_version_num)")
-
-	walSegSz := startupInfo.walSegSz
-
-	pgrw := &xlog.PgReceiveWal{
-		Verbose:  true,
-		BaseDir:  baseDir,
-		WalSegSz: walSegSz,
-	}
-
-	// 2
 	if conn == nil {
 		conn, err = pgconn.Connect(context.Background(), connStrRepl)
 		if err != nil {
 			slog.Error("cannot establish connection", slog.Any("err", err))
 			return
 		}
+	}
+
+	// 2
+	startupInfo, err := xlog.GetStartupInfo(conn)
+	FatalOnErr(err, "cannot get startup info (wal_segment_size, server_version_num)")
+	walSegSz := startupInfo.WalSegSz
+
+	pgrw := &xlog.PgReceiveWal{
+		Verbose:  true,
+		BaseDir:  baseDir,
+		WalSegSz: walSegSz,
 	}
 
 	// 3
