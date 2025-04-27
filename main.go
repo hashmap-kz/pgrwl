@@ -19,6 +19,7 @@ const (
 	slotName    = "pg_recval_5"
 	connStr     = "postgresql://postgres:postgres@localhost:5432/postgres"
 	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes"
+	baseDir     = "wals"
 )
 
 var conn *pgconn.PgConn
@@ -74,7 +75,7 @@ func StreamLog() error {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// 4
-	streamStartLSN, streamStartTimeline, err := xlog.FindStreamingStart("wals", walSegSz)
+	streamStartLSN, streamStartTimeline, err := xlog.FindStreamingStart(baseDir, walSegSz)
 	if err != nil {
 		if !errors.Is(err, xlog.ErrNoWalEntries) {
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -114,6 +115,12 @@ func StreamLog() error {
 		ReplicationSlot:       slotName,
 		SysIdentifier:         sysident.SystemID,
 		WalSegSz:              walSegSz,
+
+		LastFlushPosition:   pglogrepl.LSN(0),
+		StillSending:        true,
+		ReportFlushPosition: true,
+
+		BaseDir: baseDir,
 	}
 
 	err = xlog.ReceiveXlogStream2(context.TODO(), conn, stream)

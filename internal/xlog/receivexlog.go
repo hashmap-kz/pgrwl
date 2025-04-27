@@ -18,16 +18,6 @@ import (
 
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
-// TODO:noglobal
-var (
-	lastFlushPosition   pglogrepl.LSN
-	stillSending        = true
-	reportFlushPosition = true
-)
-
-// TODO:fix
-const baseDir = "wals"
-
 type walfileT struct {
 	currpos  uint64
 	pathname string
@@ -46,6 +36,12 @@ type StreamCtl struct {
 	ReplicationSlot       string
 	SysIdentifier         string
 	WalSegSz              uint64
+
+	LastFlushPosition   pglogrepl.LSN
+	StillSending        bool
+	ReportFlushPosition bool
+
+	BaseDir string
 }
 
 func (w *walfileT) Sync() error {
@@ -56,8 +52,7 @@ func (w *walfileT) Sync() error {
 func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string, error) {
 	segno := XLByteToSeg(uint64(startpoint), stream.WalSegSz)
 	filename := XLogFileName(stream.Timeline, segno, stream.WalSegSz) + stream.PartialSuffix
-	// TODO:fix
-	fullPath := filepath.Join(baseDir, filename)
+	fullPath := filepath.Join(stream.BaseDir, filename)
 
 	// Check if file already exists
 	stat, err := os.Stat(fullPath)
@@ -118,7 +113,7 @@ func closeWalfile(stream *StreamCtl, pos pglogrepl.LSN) error {
 		err = closeAndRename()
 	}
 
-	lastFlushPosition = pglogrepl.LSN(pos)
+	stream.LastFlushPosition = pglogrepl.LSN(pos)
 	return err
 }
 
@@ -156,7 +151,7 @@ func ProcessXLogDataMsg(
 	 * Once we've decided we don't want to receive any more, just ignore any
 	 * subsequent XLogData messages.
 	 */
-	if !stillSending {
+	if !stream.StillSending {
 		return true, nil
 	}
 
@@ -236,13 +231,13 @@ func ProcessXLogDataMsg(
 			}
 			xlogoff = 0
 
-			if stillSending && stream.StreamStop(pglogrepl.LSN(*blockpos), stream.Timeline, true) {
+			if stream.StillSending && stream.StreamStop(pglogrepl.LSN(*blockpos), stream.Timeline, true) {
 				// Send CopyDone message
 				_, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
 				if err != nil {
 					return false, fmt.Errorf("could not send copy-end packet: %w", err)
 				}
-				stillSending = false
+				stream.StillSending = false
 				return true, nil
 			}
 		}
@@ -260,7 +255,7 @@ func checkCopyStreamStop(
 	stream *StreamCtl,
 	blockpos pglogrepl.LSN,
 ) bool {
-	if stillSending && stream.StreamStop(blockpos, stream.Timeline, false) {
+	if stream.StillSending && stream.StreamStop(blockpos, stream.Timeline, false) {
 		// Close WAL file first
 		if err := closeWalfile(stream, blockpos); err != nil {
 			// Error already logged in closeWalFile
@@ -274,7 +269,7 @@ func checkCopyStreamStop(
 			return false
 		}
 
-		stillSending = false
+		stream.StillSending = false
 	}
 
 	return true
@@ -282,6 +277,7 @@ func checkCopyStreamStop(
 
 func sendFeedback(
 	ctx context.Context,
+	stream *StreamCtl,
 	conn *pgconn.PgConn,
 	blockpos pglogrepl.LSN,
 	now time.Time,
@@ -291,8 +287,8 @@ func sendFeedback(
 
 	standbyStatus.WALWritePosition = blockpos
 
-	if reportFlushPosition {
-		standbyStatus.WALFlushPosition = lastFlushPosition
+	if stream.ReportFlushPosition {
+		standbyStatus.WALFlushPosition = stream.LastFlushPosition
 	} else {
 		standbyStatus.WALFlushPosition = pglogrepl.LSN(0)
 	}
@@ -314,7 +310,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 	var lastStatus time.Time
 	blockPos := stream.StartPos
 
-	stillSending = true
+	stream.StillSending = true
 
 	for {
 		// Check if we should stop streaming
@@ -325,21 +321,21 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		now := time.Now()
 
 		// If synchronous, flush WAL file and update server immediately
-		if stream.Synchronous && lastFlushPosition < blockPos && walfile != nil {
+		if stream.Synchronous && stream.LastFlushPosition < blockPos && walfile != nil {
 			if err := walfile.Sync(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			lastFlushPosition = blockPos
-			if err := sendFeedback(ctx, conn, blockPos, now, false); err != nil {
+			stream.LastFlushPosition = blockPos
+			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
 				return fmt.Errorf("could not send feedback after sync: %w", err)
 			}
 			lastStatus = now
 		}
 
 		// If time to send feedback
-		if stillSending && stream.StandbyMessageTimeout > 0 &&
+		if stream.StillSending && stream.StandbyMessageTimeout > 0 &&
 			time.Since(lastStatus) > stream.StandbyMessageTimeout {
-			if err := sendFeedback(ctx, conn, blockPos, now, false); err != nil {
+			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
 				return fmt.Errorf("could not send periodic feedback: %w", err)
 			}
 			lastStatus = now
@@ -371,7 +367,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 					return fmt.Errorf("parse keepalive failed: %w", err)
 				}
 				if pkm.ReplyRequested {
-					if err := sendFeedback(ctx, conn, blockPos, time.Now(), false); err != nil {
+					if err := sendFeedback(ctx, stream, conn, blockPos, time.Now(), false); err != nil {
 						return fmt.Errorf("send feedback on reply requested failed: %w", err)
 					}
 					lastStatus = time.Now()
@@ -412,7 +408,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
 	var stopPos pglogrepl.LSN
 
-	lastFlushPosition = stream.StartPos
+	stream.LastFlushPosition = stream.StartPos
 
 	for {
 
@@ -526,7 +522,7 @@ func existsTimeLineHistoryFile(stream *StreamCtl) bool {
 	}
 
 	histfname := fmt.Sprintf("%08X.history", stream.Timeline)
-	return fileExists(filepath.Join(baseDir, histfname))
+	return fileExists(filepath.Join(stream.BaseDir, histfname))
 }
 
 // fileExists is a tiny helper for checking existence
@@ -542,7 +538,7 @@ func writeTimeLineHistoryFile(stream *StreamCtl, filename, content string) error
 		return fmt.Errorf("server reported unexpected history file name for timeline %d: %s", stream.Timeline, filename)
 	}
 
-	histPath := filepath.Join(baseDir, filename+".tmp")
+	histPath := filepath.Join(stream.BaseDir, filename+".tmp")
 
 	// Create temporary file first
 	f, err := os.OpenFile(histPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -571,7 +567,7 @@ func writeTimeLineHistoryFile(stream *StreamCtl, filename, content string) error
 	}
 
 	// Rename from .tmp to final
-	finalPath := filepath.Join(baseDir, filename)
+	finalPath := filepath.Join(stream.BaseDir, filename)
 	if err := os.Rename(histPath, finalPath); err != nil {
 		return fmt.Errorf("could not rename temp timeline history file to final: %w", err)
 	}
