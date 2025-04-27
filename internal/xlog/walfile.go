@@ -30,6 +30,9 @@ func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff int64) error {
 	if stream.walfile == nil {
 		return fmt.Errorf("stream.walfile is nil, attempt to write")
 	}
+	if stream.walfile.fd == nil {
+		return fmt.Errorf("stream.walfile.fd is nil, attempt to sync")
+	}
 	n, err := stream.walfile.fd.WriteAt(data, xlogoff)
 	if err != nil {
 		return err
