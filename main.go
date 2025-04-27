@@ -5,7 +5,8 @@ import (
 	"log"
 	"time"
 
-	"pgreceivewal5/internal/postgres"
+	"pgreceivewal5/internal/pg"
+
 	"pgreceivewal5/internal/xlog"
 
 	"github.com/jackc/pglogrepl"
@@ -19,26 +20,27 @@ const (
 	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes"
 )
 
-func getCurrentWalInfo() (slot postgres.PhysicalSlot, walSegmentBytes uint64, err error) {
-	// Creating a temporary connection to read slot info and wal_segment_size
-	tmpConn, err := postgres.Connect()
-	if err != nil {
-		return
-	}
-	defer tmpConn.Close(context.TODO())
+type startupInfo struct {
+	slotInfo *pg.PhysicalSlot
+	walSegSz uint64
+}
 
-	queryRunner, err := postgres.NewPgQueryRunner(tmpConn)
+func getStartupInfo() (*startupInfo, error) {
+	qs, err := pg.NewPGQuerySession(context.TODO(), connStr)
 	if err != nil {
-		return
+		return nil, err
+	}
+	defer qs.Close()
+
+	slotInfo, err := qs.SlotInfo(slotName)
+	if err != nil {
+		return nil, err
 	}
 
-	slot, err = queryRunner.GetPhysicalSlotInfo(slotName)
-	if err != nil {
-		return
-	}
-
-	walSegmentBytes, err = queryRunner.GetWalSegmentBytes()
-	return
+	return &startupInfo{
+		slotInfo: &slotInfo,
+		walSegSz: qs.WalSegmentSize(),
+	}, nil
 }
 
 // /*
@@ -167,10 +169,10 @@ func getCurrentWalInfo() (slot postgres.PhysicalSlot, walSegmentBytes uint64, er
 
 func main() {
 	// 1
-	slot, walSegSz, err := getCurrentWalInfo()
-	if err != nil {
-		log.Fatal(err)
-	}
+	startupInfo, err := getStartupInfo()
+	tracelog.ErrorLogger.FatalOnError(err)
+	slotInfo := startupInfo.slotInfo
+	walSegSz := startupInfo.walSegSz
 
 	// 2
 	conn, err := pgconn.Connect(context.Background(), connStrRepl)
@@ -180,9 +182,9 @@ func main() {
 	sysident, err := pglogrepl.IdentifySystem(context.Background(), conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	if !slot.Exists {
+	if !slotInfo.Exists {
 		tracelog.InfoLogger.Println("Trying to create the replication slot")
-		_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slot.Name, "",
+		_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slotInfo.Name, "",
 			pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
 		tracelog.ErrorLogger.FatalOnError(err)
 	}

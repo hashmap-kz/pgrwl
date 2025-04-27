@@ -21,8 +21,8 @@ type QuerySession interface {
 	GetParameter(name string) (string, error)
 	WalSegmentSize() uint64
 	DataDirectory() string
-	SlotExists(slotName string) (bool, error)
-	SlotInfo(slotName string) (*PhysicalSlot, error)
+	SlotInfo(slotName string) (PhysicalSlot, error)
+	Close() error
 }
 
 type querySession struct {
@@ -34,13 +34,14 @@ type querySession struct {
 	walSegmentSize   uint64
 }
 
-var _ QuerySession = &querySession{}
-
 type PhysicalSlot struct {
 	Name       string
+	Exists     bool
 	Active     bool
 	RestartLSN pglogrepl.LSN
 }
+
+var _ QuerySession = &querySession{}
 
 // xlog_internal.c
 
@@ -152,25 +153,7 @@ func (qs *querySession) DataDirectory() string {
 	return qs.dataDirectory
 }
 
-func (qs *querySession) SlotExists(slotName string) (bool, error) {
-	var exists bool
-	err := qs.conn.QueryRow(context.TODO(), `
-		SELECT EXISTS (
-			SELECT 1
-			FROM pg_catalog.pg_replication_slots
-			WHERE slot_name = $1
-		)
-	`, slotName).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("checking slot existence failed: %w", err)
-	}
-	return exists, nil
-}
-
-func (qs *querySession) SlotInfo(slotName string) (*PhysicalSlot, error) {
-	var active bool
-	var restartLSN string
-
+func (qs *querySession) SlotInfo(slotName string) (PhysicalSlot, error) {
 	query := `
 	select
 		active,
@@ -179,19 +162,35 @@ func (qs *querySession) SlotInfo(slotName string) (*PhysicalSlot, error) {
 	where slot_name = $1
 	`
 
+	var active bool
+	var restartLSN string
 	err := qs.conn.QueryRow(context.TODO(), query, slotName).Scan(&active, &restartLSN)
-	if err != nil {
-		return nil, err
+	if err == pgx.ErrNoRows {
+		return PhysicalSlot{Name: slotName}, nil
+	} else if err != nil {
+		return PhysicalSlot{Name: slotName}, err
 	}
 
 	restLSN, err := pglogrepl.ParseLSN(restartLSN)
 	if err != nil {
-		return nil, err
+		return PhysicalSlot{
+			Name:   slotName,
+			Exists: true,
+			Active: active,
+		}, err
 	}
 
-	return &PhysicalSlot{
+	return PhysicalSlot{
 		Name:       slotName,
+		Exists:     true,
 		Active:     active,
 		RestartLSN: restLSN,
 	}, nil
+}
+
+func (qs *querySession) Close() error {
+	if qs.conn != nil {
+		return qs.conn.Close(context.TODO())
+	}
+	return nil
 }
