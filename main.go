@@ -18,6 +18,7 @@ const (
 	slotName    = "pg_recval_5"
 	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes"
 	baseDir     = "wals"
+	noLoop      = false
 )
 
 var conn *pgconn.PgConn
@@ -173,7 +174,12 @@ func main() {
 	for {
 		StreamLog()
 
-		slog.Info("disconnected; waiting 5 seconds to try again")
-		time.Sleep(5 * time.Second)
+		if noLoop {
+			slog.Error("disconnected")
+			os.Exit(1)
+		} else {
+			slog.Info("disconnected; waiting 5 seconds to try again")
+			time.Sleep(5 * time.Second)
+		}
 	}
 }
