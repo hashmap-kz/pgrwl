@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -21,7 +20,6 @@ type QuerySession interface {
 	GetParameter(name string) (string, error)
 	WalSegmentSize() uint64
 	DataDirectory() string
-	SlotInfo(slotName string) (PhysicalSlot, error)
 	Close() error
 }
 
@@ -32,13 +30,6 @@ type querySession struct {
 	systemIdentifier int64
 	dataDirectory    string
 	walSegmentSize   uint64
-}
-
-type PhysicalSlot struct {
-	Name       string
-	Exists     bool
-	Active     bool
-	RestartLSN pglogrepl.LSN
 }
 
 var _ QuerySession = &querySession{}
@@ -151,41 +142,6 @@ func (qs *querySession) WalSegmentSize() uint64 {
 
 func (qs *querySession) DataDirectory() string {
 	return qs.dataDirectory
-}
-
-func (qs *querySession) SlotInfo(slotName string) (PhysicalSlot, error) {
-	query := `
-	select
-		active,
-		coalesce(restart_lsn, '0/0'::pg_lsn)
-	from pg_catalog.pg_replication_slots
-	where slot_name = $1
-	`
-
-	var active bool
-	var restartLSN string
-	err := qs.conn.QueryRow(context.TODO(), query, slotName).Scan(&active, &restartLSN)
-	if err == pgx.ErrNoRows {
-		return PhysicalSlot{Name: slotName}, nil
-	} else if err != nil {
-		return PhysicalSlot{Name: slotName}, err
-	}
-
-	restLSN, err := pglogrepl.ParseLSN(restartLSN)
-	if err != nil {
-		return PhysicalSlot{
-			Name:   slotName,
-			Exists: true,
-			Active: active,
-		}, err
-	}
-
-	return PhysicalSlot{
-		Name:       slotName,
-		Exists:     true,
-		Active:     active,
-		RestartLSN: restLSN,
-	}, nil
 }
 
 func (qs *querySession) Close() error {

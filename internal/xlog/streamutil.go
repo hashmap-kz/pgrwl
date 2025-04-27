@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+var ErrSlotDoesNotExist = fmt.Errorf("replication slot does not exist")
+
 // IdentifySystemResult is the parsed result of the IDENTIFY_SYSTEM command.
 type ReadReplicationSlotResultResult struct {
 	// https://www.postgresql.org/docs/current/protocol-replication.html#PROTOCOL-REPLICATION-READ-REPLICATION-SLOT
@@ -57,6 +59,10 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 		return isr, fmt.Errorf("expected 3 result columns, got %d", len(row))
 	}
 
+	if len(row[0]) == 0 {
+		return isr, ErrSlotDoesNotExist
+	}
+
 	var restartLSN pglogrepl.LSN
 	var restartTLI int64
 
@@ -67,9 +73,11 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 		}
 	}
 
-	restartTLI, err = strconv.ParseInt(string(row[2]), 10, 32)
-	if err != nil {
-		return isr, fmt.Errorf("failed to parse restart_tli: %w", err)
+	if string(row[2]) != "" {
+		restartTLI, err = strconv.ParseInt(string(row[2]), 10, 32)
+		if err != nil {
+			return isr, fmt.Errorf("failed to parse restart_tli: %w", err)
+		}
 	}
 
 	isr.SlotType = string(row[0])
