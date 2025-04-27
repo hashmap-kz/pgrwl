@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"pgreceivewal5/internal/pg"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/wal-g/tracelog"
 )
 
 const (
@@ -45,40 +45,54 @@ func StreamLog() error {
 
 	// 1
 	startupInfo, err := getStartupInfo()
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
+
 	walSegSz := startupInfo.walSegSz
 
 	// 2
 	if conn == nil {
 		// 2
 		conn, err = pgconn.Connect(context.Background(), connStrRepl)
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return err
+		}
 		defer conn.Close(context.Background())
 	}
 
 	// 3
 	var slotRestartInfo *xlog.ReadReplicationSlotResultResult
 	_, err = xlog.GetSlotInformation(conn, slotName)
-	if errors.Is(err, xlog.ErrSlotDoesNotExist) {
-		tracelog.InfoLogger.Println("Trying to create the replication slot")
-		_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slotName, "",
-			pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
-		tracelog.ErrorLogger.FatalOnError(err)
-	} else {
-		tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		if errors.Is(err, xlog.ErrSlotDoesNotExist) {
+			log.Println("creating replication slot")
+			_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slotName, "",
+				pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
+
 	slotRestartInfo, err = xlog.GetSlotInformation(conn, slotName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
 
 	// 3
 	sysident, err := pglogrepl.IdentifySystem(context.Background(), conn)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return err
+	}
 
 	// 4
 	streamStartLSN, streamStartTimeline, err := xlog.FindStreamingStart(baseDir, walSegSz)
 	if err != nil {
 		if !errors.Is(err, xlog.ErrNoWalEntries) {
-			tracelog.ErrorLogger.FatalOnError(err)
+			return err
 		}
 	}
 
@@ -128,5 +142,10 @@ func StreamLog() error {
 }
 
 func main() {
-	StreamLog()
+	for {
+		err := StreamLog()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
