@@ -197,14 +197,45 @@ func StreamLog() error {
 	}
 
 	if streamStartLSN == 0 {
-		if slotInfo.RestartLSN != 0 {
+		slotRestartInfo, err := xlog.GetSlotInformation(conn, slotName)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		if slotRestartInfo.RestartLSN != 0 {
 			streamStartLSN = slotInfo.RestartLSN
+			streamStartTimeline = slotRestartInfo.RestartTLI
 		}
 	}
 
-	fmt.Println(sysident, streamStartTimeline)
+	if streamStartLSN == 0 {
+		streamStartLSN = sysident.XLogPos
+		streamStartTimeline = uint32(sysident.Timeline)
+	}
 
-	return nil
+	// final check
+	if streamStartLSN == 0 || streamStartTimeline == 0 {
+		return fmt.Errorf("cannot find start LSN for streaming")
+	}
+
+	// 5
+
+	// Always start streaming at the beginning of a segment
+	curPos := uint64(streamStartLSN) - xlog.XLogSegmentOffset(streamStartLSN, walSegSz)
+	streamStartLSN = pglogrepl.LSN(curPos)
+
+	stream := &xlog.StreamCtl{
+		StartPos:              streamStartLSN,
+		Timeline:              streamStartTimeline,
+		StandbyMessageTimeout: 10 * time.Second,
+		Synchronous:           true,
+		PartialSuffix:         ".partial",
+		StreamStop:            xlog.StopStreaming,
+		ReplicationSlot:       slotName,
+		SysIdentifier:         sysident.SystemID,
+		WalSegSz:              walSegSz,
+	}
+
+	err = xlog.ReceiveXlogStream2(context.TODO(), conn, stream)
+	return err
 }
 
 func main() {
