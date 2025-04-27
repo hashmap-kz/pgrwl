@@ -45,6 +45,7 @@ type StreamCtl struct {
 	StreamStop            func(blockpos pglogrepl.LSN, timeline uint32, endOfSegment bool) bool
 	ReplicationSlot       string
 	SysIdentifier         string
+	WalSegSz              uint64
 }
 
 func (w *walfileT) Sync() error {
@@ -53,8 +54,8 @@ func (w *walfileT) Sync() error {
 }
 
 func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string, error) {
-	segno := XLByteToSeg(uint64(startpoint), WalSegSz)
-	filename := XLogFileName(stream.Timeline, segno, WalSegSz) + stream.PartialSuffix
+	segno := XLByteToSeg(uint64(startpoint), stream.WalSegSz)
+	filename := XLogFileName(stream.Timeline, segno, stream.WalSegSz) + stream.PartialSuffix
 	// TODO:fix
 	fullPath := filepath.Join(baseDir, filename)
 
@@ -62,7 +63,7 @@ func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string,
 	stat, err := os.Stat(fullPath)
 	if err == nil {
 		// File exists
-		if stat.Size() == int64(WalSegSz) {
+		if uint64(stat.Size()) == stream.WalSegSz {
 			// File already correctly sized, open it
 			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 			if err != nil {
@@ -76,7 +77,11 @@ func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string,
 			return fd, fullPath, nil
 		}
 		if stat.Size() != 0 {
-			return nil, "", fmt.Errorf("corrupt WAL file %s: expected size 0 or %d bytes, found %d", fullPath, WalSegSz, stat.Size())
+			return nil, "", fmt.Errorf("corrupt WAL file %s: expected size 0 or %d bytes, found %d",
+				fullPath,
+				stream.WalSegSz,
+				stat.Size(),
+			)
 		}
 		// If size 0, proceed to initialize it
 	}
@@ -88,7 +93,7 @@ func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string,
 	}
 
 	// Preallocate file with zeros up to 16 MiB
-	if err := fd.Truncate(int64(WalSegSz)); err != nil {
+	if err := fd.Truncate(int64(stream.WalSegSz)); err != nil {
 		fd.Close()
 		return nil, "", fmt.Errorf("could not preallocate WAL file %s: %w", fullPath, err)
 	}
@@ -104,7 +109,7 @@ func closeWalfile(stream *StreamCtl, pos pglogrepl.LSN) error {
 	// TODO:fsync, simplify, etc...
 	var err error
 	if strings.HasSuffix(walfile.pathname, ".partial") {
-		if uint64(walfile.currpos) == WalSegSz {
+		if walfile.currpos == stream.WalSegSz {
 			err = closeAndRename()
 		} else {
 			err = closeNoRename()
@@ -155,7 +160,7 @@ func ProcessXLogDataMsg(
 		return true, nil
 	}
 
-	xlogoff := XLogSegmentOffset(xld.WALStart, WalSegSz)
+	xlogoff := XLogSegmentOffset(xld.WALStart, stream.WalSegSz)
 
 	// If no open file, expect offset to be zero
 	if walfile == nil {
@@ -180,8 +185,8 @@ func ProcessXLogDataMsg(
 		 * If crossing a WAL boundary, only write up until we reach wal
 		 * segment size.
 		 */
-		if xlogoff+bytesLeft > WalSegSz {
-			bytesToWrite = WalSegSz - xlogoff
+		if xlogoff+bytesLeft > stream.WalSegSz {
+			bytesToWrite = stream.WalSegSz - xlogoff
 		} else {
 			bytesToWrite = bytesLeft
 		}
@@ -223,7 +228,7 @@ func ProcessXLogDataMsg(
 
 		xlogoff += bytesToWrite
 
-		xlSegOff := XLogSegmentOffset(*blockpos, WalSegSz)
+		xlSegOff := XLogSegmentOffset(*blockpos, stream.WalSegSz)
 		if xlSegOff == 0 {
 			err := closeWalfile(stream, *blockpos)
 			if err != nil {
@@ -466,7 +471,7 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 				}
 
 				stream.Timeline = newTimeline
-				stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(WalSegSz))
+				stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
 				goto nextIteration
 
 			case *pgproto3.CommandComplete:

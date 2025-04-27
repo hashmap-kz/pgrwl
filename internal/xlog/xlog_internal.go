@@ -6,11 +6,6 @@ import (
 	"github.com/jackc/pglogrepl"
 )
 
-// TODO:query it
-var (
-	WalSegSz uint64 = 16 * 1024 * 1024 // PostgreSQL default 16MiB
-)
-
 // https://github.com/postgres/postgres/blob/master/src/include/access/xlog_internal.h
 
 func XLByteToSeg(xlrp uint64, walSegSize uint64) uint64 {

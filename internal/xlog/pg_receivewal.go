@@ -21,7 +21,7 @@ var (
 )
 
 // FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
-func FindStreamingStart(baseDir string) (pglogrepl.LSN, uint32, error) {
+func FindStreamingStart(baseDir string, walSegSz uint64) (pglogrepl.LSN, uint32, error) {
 	type walEntry struct {
 		tli       uint32
 		segNo     uint64
@@ -50,14 +50,14 @@ func FindStreamingStart(baseDir string) (pglogrepl.LSN, uint32, error) {
 			return nil // skip invalid names
 		}
 
-		segNo := uint64(log)*0x100000000/WalSegSz + uint64(seg)
+		segNo := uint64(log)*0x100000000/walSegSz + uint64(seg)
 
 		if !isPartial {
 			info, err := os.Stat(path)
 			if err != nil {
 				return fmt.Errorf("could not stat file %q: %w", path, err)
 			}
-			if info.Size() != int64(WalSegSz) {
+			if uint64(info.Size()) != walSegSz {
 				fmt.Fprintf(os.Stderr, "warning: WAL segment %q has incorrect size %d, skipping\n", base, info.Size())
 				return nil
 			}
@@ -94,9 +94,9 @@ func FindStreamingStart(baseDir string) (pglogrepl.LSN, uint32, error) {
 
 	var startLSN pglogrepl.LSN
 	if best.isPartial {
-		startLSN = segNoToLSN(best.segNo)
+		startLSN = segNoToLSN(best.segNo, walSegSz)
 	} else {
-		startLSN = segNoToLSN(best.segNo + 1)
+		startLSN = segNoToLSN(best.segNo+1, walSegSz)
 	}
 
 	log.Printf("resume from LSN=%s, TLI=%d\n", pglogrepl.LSN(startLSN).String(), best.tli)
@@ -109,8 +109,8 @@ func parseHex32(s string) (uint32, error) {
 	return v, err
 }
 
-func segNoToLSN(segNo uint64) pglogrepl.LSN {
-	return pglogrepl.LSN(segNo * WalSegSz)
+func segNoToLSN(segNo, walSegSz uint64) pglogrepl.LSN {
+	return pglogrepl.LSN(segNo * walSegSz)
 }
 
 // stop
