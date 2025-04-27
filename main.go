@@ -172,5 +172,8 @@ func StreamLog() {
 func main() {
 	for {
 		StreamLog()
+
+		slog.Info("disconnected; waiting 5 seconds to try again")
+		time.Sleep(5 * time.Second)
 	}
 }
