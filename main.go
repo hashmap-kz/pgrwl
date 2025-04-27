@@ -152,9 +152,9 @@ func StreamLog() {
 		BaseDir: baseDir,
 	}
 
-	err = xlog.ReceiveXlogStream2(context.TODO(), conn, stream)
+	err = xlog.ReceiveXlogStream3(context.TODO(), conn, stream)
 	if err != nil {
-		slog.Error("stream terminated (ReceiveXlogStream2)", slog.Any("err", err))
+		slog.Error("stream terminated (ReceiveXlogStream3)", slog.Any("err", err))
 	}
 
 	// fsync dir

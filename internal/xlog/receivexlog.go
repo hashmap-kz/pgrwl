@@ -354,14 +354,15 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 	}
 }
 
-/////// v2
+/////// v3
 
-func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
+func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
 	var stopPos pglogrepl.LSN
 
 	stream.LastFlushPosition = stream.StartPos
 
 	for {
+		// --- Before streaming starts ---
 
 		// Before starting, check if we need to fetch timeline history
 		if !existsTimeLineHistoryFile(stream) {
@@ -369,8 +370,7 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 			if err != nil {
 				return fmt.Errorf("failed to fetch timeline history: %w", err)
 			}
-			err = writeTimeLineHistoryFile(stream, tlh.FileName, string(tlh.Content))
-			if err != nil {
+			if err := writeTimeLineHistoryFile(stream, tlh.FileName, string(tlh.Content)); err != nil {
 				return fmt.Errorf("failed to write timeline history file: %w", err)
 			}
 		}
@@ -385,81 +385,86 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 			Timeline: int32(stream.Timeline),
 			Mode:     pglogrepl.PhysicalReplication,
 		}
-		err := pglogrepl.StartReplication(ctx, conn, stream.ReplicationSlot, stream.StartPos, opts)
-		if err != nil {
+		if err := pglogrepl.StartReplication(ctx, conn, stream.ReplicationSlot, stream.StartPos, opts); err != nil {
 			return fmt.Errorf("failed to start replication: %w", err)
 		}
 
 		// Stream WAL
-		err = HandleCopyStream(ctx, conn, stream, &stopPos)
-		if err != nil {
+		if err := HandleCopyStream(ctx, conn, stream, &stopPos); err != nil {
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
-		// After CopyDone:
-		for {
-			msg, err := conn.ReceiveMessage(ctx)
-			if err != nil {
-				return fmt.Errorf("failed receiving server result: %w", err)
-			}
+		// --- After CopyDone ---
 
-			switch m := msg.(type) {
-			case *pgproto3.DataRow:
-				// Server sends end-of-timeline info
-				newTimeline, newStartPos, err := parseEndOfStreamingResult(m)
+		readServerResult := func() (restart bool, err error) {
+			for {
+				msg, err := conn.ReceiveMessage(ctx)
 				if err != nil {
-					return fmt.Errorf("could not parse end-of-stream result: %w", err)
-				}
-				if newTimeline <= stream.Timeline {
-					return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
-				}
-				if newStartPos > stopPos {
-					return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
+					return false, fmt.Errorf("failed receiving server result: %w", err)
 				}
 
-				/* Read the final result, which should be CommandComplete. */
-				// NOW: expect the final CommandComplete
-				msg2, err := conn.ReceiveMessage(ctx)
-				if err != nil {
-					return fmt.Errorf("failed receiving final CommandComplete: %w", err)
+				switch m := msg.(type) {
+				case *pgproto3.DataRow:
+					// Server sends end-of-timeline info
+					newTimeline, newStartPos, err := parseEndOfStreamingResult(m)
+					if err != nil {
+						return false, fmt.Errorf("could not parse end-of-stream result: %w", err)
+					}
+					if newTimeline <= stream.Timeline {
+						return false, fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
+					}
+					if newStartPos > stopPos {
+						return false, fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
+					}
+
+					// Expect CommandComplete after DataRow
+					msg2, err := conn.ReceiveMessage(ctx)
+					if err != nil {
+						return false, fmt.Errorf("failed receiving final CommandComplete: %w", err)
+					}
+					if _, ok := msg2.(*pgproto3.CommandComplete); !ok {
+						return false, fmt.Errorf("expected CommandComplete after DataRow, got %T", msg2)
+					}
+
+					/*
+					* Loop back to start streaming from the new timeline. Always
+					* start streaming at the beginning of a segment.
+					 */
+					stream.Timeline = newTimeline
+					stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
+
+					return true, nil // restart streaming
+
+				case *pgproto3.CommandComplete:
+					if stream.StreamClient.StreamStop(stopPos, stream.Timeline, false) {
+						return false, nil // clean shutdown
+					}
+					return false, fmt.Errorf("replication stream terminated unexpectedly before stop point")
+
+				case *pgproto3.ErrorResponse:
+					return false, fmt.Errorf("error response from server: %s", m.Message)
+
+				case *pgproto3.ReadyForQuery:
+					// Ignore
+					continue
+
+				default:
+					// Unexpected, but ignore
+					continue
 				}
-
-				if _, ok := msg2.(*pgproto3.CommandComplete); !ok {
-					return fmt.Errorf("expected CommandComplete after DataRow, got %T", msg2)
-				}
-
-				/*
-				* Loop back to start streaming from the new timeline. Always
-				* start streaming at the beginning of a segment.
-				 */
-				stream.Timeline = newTimeline
-				stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
-
-				// After consuming CommandComplete, restart replication
-				goto nextIteration
-
-			case *pgproto3.CommandComplete:
-				if stream.StreamClient.StreamStop(stopPos, stream.Timeline, false) {
-					return nil
-				}
-				return fmt.Errorf("replication stream terminated unexpectedly before stop point")
-
-			case *pgproto3.ErrorResponse:
-				return fmt.Errorf("error response from server: %s", m.Message)
-
-			case *pgproto3.ReadyForQuery:
-				// Ignore, ready for new commands
-				continue
-
-			default:
-				// Unexpected
-				continue
 			}
 		}
-	nextIteration:
-		continue
-		// After CopyDone:
 
+		restart, err := readServerResult()
+		if err != nil {
+			return err
+		}
+		if restart {
+			// Timeline switch, continue outer for-loop
+			continue
+		}
+		// Otherwise (clean shutdown) exit
+		return nil
 	}
 }
 
