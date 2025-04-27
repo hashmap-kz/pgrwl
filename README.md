@@ -14,3 +14,10 @@ The idea is: no data loss, because commit waits until replicas confirm.
 In short:
 PostgreSQL will block the client until the WAL is safely written to the standbys you list in synchronous_standby_names.
 ```
+
+```
+synchronous_standby_names = 'pg_receivewal,pg_recval_5'
+
+# to 'force' keepalive messages
+wal_sender_timeout = 5000  # 5 seconds
+```
