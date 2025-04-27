@@ -23,6 +23,9 @@ var (
 	reportFlushPosition = true
 )
 
+// TODO:fix
+const baseDir = "wals"
+
 type walfileT struct {
 	currpos  uint64
 	pathname string
@@ -51,7 +54,7 @@ func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string,
 	segno := XLByteToSeg(uint64(startpoint), WalSegSz)
 	filename := XLogFileName(stream.Timeline, segno, WalSegSz) + stream.PartialSuffix
 	// TODO:fix
-	fullPath := filepath.Join("wals", filename)
+	fullPath := filepath.Join(baseDir, filename)
 
 	// Check if file already exists
 	stat, err := os.Stat(fullPath)
@@ -438,19 +441,17 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 
 	for {
 
-		// TODO:fix:urgent
-		//
-		// // Before starting, check if we need to fetch timeline history
-		// if !existsTimelineHistoryFile(stream.Timeline) {
-		// 	tlh, err := pglogrepl.TimelineHistory(ctx, conn, int32(stream.Timeline))
-		// 	if err != nil {
-		// 		return fmt.Errorf("failed to fetch timeline history: %w", err)
-		// 	}
-		// 	err = writeTimelineHistoryFile(tlh.FileName, tlh.Content)
-		// 	if err != nil {
-		// 		return fmt.Errorf("failed to write timeline history file: %w", err)
-		// 	}
-		// }
+		// Before starting, check if we need to fetch timeline history
+		if !existsTimeLineHistoryFile(stream) {
+			tlh, err := pglogrepl.TimelineHistory(ctx, conn, int32(stream.Timeline))
+			if err != nil {
+				return fmt.Errorf("failed to fetch timeline history: %w", err)
+			}
+			err = writeTimeLineHistoryFile(stream, tlh.FileName, string(tlh.Content))
+			if err != nil {
+				return fmt.Errorf("failed to write timeline history file: %w", err)
+			}
+		}
 
 		// Check if we should stop before starting replication
 		if stream.StreamStop(stream.StartPos, stream.Timeline, false) {
@@ -539,3 +540,65 @@ func ReceiveXlogStream2(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 // 	}
 // 	return uint32(tli), lsn, nil
 // }
+
+// timeline history file
+
+func existsTimeLineHistoryFile(stream *StreamCtl) bool {
+	// Timeline 1 never has a history file
+	if stream.Timeline == 1 {
+		return true
+	}
+
+	histfname := fmt.Sprintf("%08X.history", stream.Timeline)
+	return fileExists(filepath.Join(baseDir, histfname))
+}
+
+// fileExists is a tiny helper for checking existence
+func fileExists(name string) bool {
+	_, err := os.Stat(name)
+	return err == nil
+}
+
+func writeTimeLineHistoryFile(stream *StreamCtl, filename, content string) error {
+	expectedName := fmt.Sprintf("%08X.history", stream.Timeline)
+
+	if expectedName != filename {
+		return fmt.Errorf("server reported unexpected history file name for timeline %d: %s", stream.Timeline, filename)
+	}
+
+	histPath := filepath.Join(baseDir, filename+".tmp")
+
+	// Create temporary file first
+	f, err := os.OpenFile(histPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("could not create timeline history file %s: %w", histPath, err)
+	}
+	defer func() {
+		_ = f.Close() // ensure close even on error
+	}()
+
+	// Write content
+	n, err := f.WriteString(content)
+	if err != nil || n != len(content) {
+		_ = os.Remove(histPath) // delete temp file
+		return fmt.Errorf("could not write timeline history file %s: %w", histPath, err)
+	}
+
+	// Sync to disk
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("could not fsync timeline history file %s: %w", histPath, err)
+	}
+
+	// Close file
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("could not close timeline history file %s: %w", histPath, err)
+	}
+
+	// Rename from .tmp to final
+	finalPath := filepath.Join(baseDir, filename)
+	if err := os.Rename(histPath, finalPath); err != nil {
+		return fmt.Errorf("could not rename temp timeline history file to final: %w", err)
+	}
+
+	return nil
+}
