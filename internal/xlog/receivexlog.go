@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jackc/pglogrepl"
@@ -17,14 +16,6 @@ import (
 )
 
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
-
-type walfileT struct {
-	currpos  uint64
-	pathname string
-	fd       *os.File
-}
-
-var walfile *walfileT
 
 type StreamCtl struct {
 	StartPos              pglogrepl.LSN
@@ -42,103 +33,8 @@ type StreamCtl struct {
 	ReportFlushPosition bool
 
 	BaseDir string
-}
 
-func (w *walfileT) Sync() error {
-	// TODO:fix
-	return nil
-}
-
-func openWalFile(stream *StreamCtl, startpoint pglogrepl.LSN) (*os.File, string, error) {
-	segno := XLByteToSeg(uint64(startpoint), stream.WalSegSz)
-	filename := XLogFileName(stream.Timeline, segno, stream.WalSegSz) + stream.PartialSuffix
-	fullPath := filepath.Join(stream.BaseDir, filename)
-
-	// Check if file already exists
-	stat, err := os.Stat(fullPath)
-	if err == nil {
-		// File exists
-		if uint64(stat.Size()) == stream.WalSegSz {
-			// File already correctly sized, open it
-			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
-			if err != nil {
-				return nil, "", fmt.Errorf("could not open existing WAL file %s: %w", fullPath, err)
-			}
-			// Fsync to be safe
-			if err := fd.Sync(); err != nil {
-				fd.Close()
-				return nil, "", fmt.Errorf("could not fsync WAL file %s: %w", fullPath, err)
-			}
-			return fd, fullPath, nil
-		}
-		if stat.Size() != 0 {
-			return nil, "", fmt.Errorf("corrupt WAL file %s: expected size 0 or %d bytes, found %d",
-				fullPath,
-				stream.WalSegSz,
-				stat.Size(),
-			)
-		}
-		// If size 0, proceed to initialize it
-	}
-
-	// Otherwise create new file and preallocate
-	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
-	if err != nil {
-		return nil, "", fmt.Errorf("could not create WAL file %s: %w", fullPath, err)
-	}
-
-	// Preallocate file with zeros up to 16 MiB
-	if err := fd.Truncate(int64(stream.WalSegSz)); err != nil {
-		fd.Close()
-		return nil, "", fmt.Errorf("could not preallocate WAL file %s: %w", fullPath, err)
-	}
-
-	return fd, fullPath, nil
-}
-
-func closeWalfile(stream *StreamCtl, pos pglogrepl.LSN) error {
-	if walfile == nil {
-		return nil
-	}
-
-	// TODO:fsync, simplify, etc...
-	var err error
-	if strings.HasSuffix(walfile.pathname, ".partial") {
-		if walfile.currpos == stream.WalSegSz {
-			err = closeAndRename()
-		} else {
-			err = closeNoRename()
-		}
-	} else {
-		err = closeAndRename()
-	}
-
-	stream.LastFlushPosition = pglogrepl.LSN(pos)
-	return err
-}
-
-func closeNoRename() error {
-	log.Printf("not renaming \"%s\", segment is not complete", walfile.pathname)
-	err := walfile.fd.Close()
-	if err != nil {
-		return err
-	}
-	walfile = nil
-	return nil
-}
-
-func closeAndRename() error {
-	log.Printf("renaming \"%s\", segment is complete", walfile.pathname)
-	err := walfile.fd.Close()
-	if err != nil {
-		return err
-	}
-	err = os.Rename(walfile.pathname, strings.TrimSuffix(walfile.pathname, ".partial"))
-	if err != nil {
-		return err
-	}
-	walfile = nil
-	return nil
+	walfile *walfileT
 }
 
 func ProcessXLogDataMsg(
@@ -158,13 +54,13 @@ func ProcessXLogDataMsg(
 	xlogoff := XLogSegmentOffset(xld.WALStart, stream.WalSegSz)
 
 	// If no open file, expect offset to be zero
-	if walfile == nil {
+	if stream.walfile == nil {
 		if xlogoff != 0 {
 			return false, fmt.Errorf("received WAL at offset %d but no file open", xlogoff)
 		}
 	} else {
-		if walfile.currpos != xlogoff {
-			return false, fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, walfile.currpos)
+		if stream.walfile.currpos != xlogoff {
+			return false, fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, stream.walfile.currpos)
 		}
 	}
 
@@ -186,15 +82,10 @@ func ProcessXLogDataMsg(
 			bytesToWrite = bytesLeft
 		}
 
-		if walfile == nil {
-			fd, fullpath, err := openWalFile(stream, *blockpos)
+		if stream.walfile == nil {
+			err := stream.OpenWalFile(*blockpos)
 			if err != nil {
 				return false, err
-			}
-			walfile = &walfileT{
-				currpos:  0,
-				pathname: fullpath,
-				fd:       fd,
 			}
 		}
 
@@ -208,11 +99,13 @@ func ProcessXLogDataMsg(
 		// 	return false;
 		// }
 
-		n, err := walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
+		n, err := stream.walfile.fd.WriteAt(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
-		walfile.currpos += uint64(n)
+		if n > 0 {
+			stream.walfile.currpos += uint64(n)
+		}
 
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
@@ -225,7 +118,7 @@ func ProcessXLogDataMsg(
 
 		xlSegOff := XLogSegmentOffset(*blockpos, stream.WalSegSz)
 		if xlSegOff == 0 {
-			err := closeWalfile(stream, *blockpos)
+			err := stream.CloseWalfile(*blockpos)
 			if err != nil {
 				return false, err
 			}
@@ -257,7 +150,7 @@ func checkCopyStreamStop(
 ) bool {
 	if stream.StillSending && stream.StreamStop(blockpos, stream.Timeline, false) {
 		// Close WAL file first
-		if err := closeWalfile(stream, blockpos); err != nil {
+		if err := stream.CloseWalfile(blockpos); err != nil {
 			// Error already logged in closeWalFile
 			return false
 		}
@@ -321,8 +214,8 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		now := time.Now()
 
 		// If synchronous, flush WAL file and update server immediately
-		if stream.Synchronous && stream.LastFlushPosition < blockPos && walfile != nil {
-			if err := walfile.Sync(); err != nil {
+		if stream.Synchronous && stream.LastFlushPosition < blockPos && stream.walfile != nil {
+			if err := stream.walfile.Sync(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
 			stream.LastFlushPosition = blockPos
