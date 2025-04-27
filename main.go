@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"pgreceivewal5/internal/pg"
@@ -24,6 +25,39 @@ const (
 
 var conn *pgconn.PgConn
 
+func FatalOnErr(err error, msg string, args ...any) {
+	if err != nil {
+		slog.Error(msg, append(args, "error", err)...)
+		os.Exit(1)
+	}
+}
+
+func init() {
+	lvlCfg := os.Getenv("LOG_LEVEL")
+	// Init logger
+	levels := map[string]slog.Level{
+		"trace": slog.LevelDebug,
+		"debug": slog.LevelDebug,
+		"info":  slog.LevelInfo,
+		"warn":  slog.LevelWarn,
+		"error": slog.LevelError,
+	}
+	lvl := slog.LevelInfo
+	if cfgLvl, ok := levels[lvlCfg]; ok {
+		lvl = cfgLvl
+	}
+	// Create a base handler
+	baseHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: lvl,
+	})
+	// Add global "app" attribute to all logs
+	logger := slog.New(baseHandler.WithAttrs([]slog.Attr{
+		slog.String("app", "x05"),
+	}))
+	// Set it as the default logger for the project
+	slog.SetDefault(logger)
+}
+
 type startupInfo struct {
 	walSegSz uint64
 }
@@ -40,14 +74,10 @@ func getStartupInfo() (*startupInfo, error) {
 	}, nil
 }
 
-func StreamLog() error {
-	var err error
-
+func StreamLog() {
 	// 1
 	startupInfo, err := getStartupInfo()
-	if err != nil {
-		return err
-	}
+	FatalOnErr(err, "cannot get startup info (wal_segment_size, server_version_num)")
 
 	walSegSz := startupInfo.walSegSz
 
@@ -59,12 +89,11 @@ func StreamLog() error {
 
 	// 2
 	if conn == nil {
-		// 2
 		conn, err = pgconn.Connect(context.Background(), connStrRepl)
 		if err != nil {
-			return err
+			slog.Error("cannot establish connection", slog.Any("err", err))
+			return
 		}
-		defer conn.Close(context.Background())
 	}
 
 	// 3
@@ -72,33 +101,29 @@ func StreamLog() error {
 	_, err = xlog.GetSlotInformation(conn, slotName)
 	if err != nil {
 		if errors.Is(err, xlog.ErrSlotDoesNotExist) {
-			log.Println("creating replication slot")
+			slog.Info("creating replication slot")
 			_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slotName, "",
 				pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
-			if err != nil {
-				return err
-			}
+			FatalOnErr(err, "cannot create replication slot")
 		} else {
-			return err
+			FatalOnErr(err, "cannot get slot information")
 		}
 	}
 
 	slotRestartInfo, err = xlog.GetSlotInformation(conn, slotName)
-	if err != nil {
-		return err
-	}
+	FatalOnErr(err, "cannot get slot information")
 
 	// 3
 	sysident, err := pglogrepl.IdentifySystem(context.Background(), conn)
-	if err != nil {
-		return err
-	}
+	FatalOnErr(err, "cannot identify system")
 
 	// 4
 	streamStartLSN, streamStartTimeline, err := pgrw.FindStreamingStart()
 	if err != nil {
 		if !errors.Is(err, xlog.ErrNoWalEntries) {
-			return err
+			// just log an error and continue, stream-start-lsn and timeline
+			// are required, and we will proceed with slot-info or sysident
+			slog.Error("cannot find streaming start", slog.Any("err", err))
 		}
 	}
 
@@ -116,7 +141,8 @@ func StreamLog() error {
 
 	// final check
 	if streamStartLSN == 0 || streamStartTimeline == 0 {
-		return fmt.Errorf("cannot find start LSN for streaming")
+		err := fmt.Errorf("cannot find start LSN for streaming")
+		FatalOnErr(err, "")
 	}
 
 	// 5
@@ -144,14 +170,25 @@ func StreamLog() error {
 	}
 
 	err = xlog.ReceiveXlogStream2(context.TODO(), conn, stream)
-	return err
+	if err != nil {
+		slog.Error("stream terminated (ReceiveXlogStream2)", slog.Any("err", err))
+	}
+
+	// fsync dir
+	err = xlog.FsyncFname(pgrw.BaseDir)
+	if err != nil {
+		slog.Info("could not finish writing WAL files", slog.Any("err", err))
+		return
+	}
+
+	if conn != nil {
+		conn.Close(context.Background())
+		conn = nil
+	}
 }
 
 func main() {
 	for {
-		err := StreamLog()
-		if err != nil {
-			log.Fatal(err)
-		}
+		StreamLog()
 	}
 }
