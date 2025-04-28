@@ -2,7 +2,6 @@ package xlog
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -120,7 +119,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 		return err
 	}
 	if err := fd.Truncate(truncateSize); err != nil {
-		fd.Close()
+		_ = fd.Close()
 		return fmt.Errorf("could not preallocate WAL file %s: %w", fullPath, err)
 	}
 
@@ -165,14 +164,14 @@ func (stream *StreamCtl) closeNoRename() error {
 
 	pathname := stream.walfile.pathname
 
-	log.Printf("not renaming \"%s\", segment is not complete", pathname)
+	slog.Info("close without renaming, segment is not complete", slog.String("path", filepath.ToSlash(pathname)))
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
 	stream.walfile = nil
 
-	log.Printf("fsync filename and parent-directory: %s", pathname)
+	slog.Info("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(pathname)))
 	err = FsyncFname(pathname)
 	if err != nil {
 		return err
@@ -188,20 +187,23 @@ func (stream *StreamCtl) closeAndRename() error {
 	pathname := stream.walfile.pathname
 	finalName := strings.TrimSuffix(pathname, stream.PartialSuffix)
 
-	log.Printf("closing file: %s", pathname)
+	slog.Info("closing fd", slog.String("path", filepath.ToSlash(pathname)))
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
 
-	log.Printf("renaming %s to %s, segment is complete", pathname, finalName)
+	slog.Info("renaming complete segment",
+		slog.String("src", filepath.ToSlash(pathname)),
+		slog.String("dst", filepath.ToSlash(finalName)),
+	)
 	err = os.Rename(pathname, finalName)
 	if err != nil {
 		return err
 	}
 	stream.walfile = nil
 
-	log.Printf("fsync filename and parent-directory: %s", finalName)
+	slog.Info("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(finalName)))
 	err = FsyncFname(finalName)
 	if err != nil {
 		return err
