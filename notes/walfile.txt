@@ -1,0 +1,104 @@
+
+/////// walfile handler ///////
+
+type WalCloseMethod int
+
+const (
+	WalCloseMethodNormal WalCloseMethod = iota
+	WalCloseMethodNoRename
+	WalCloseMethodUnlink
+)
+
+type WalWriteMethod interface {
+	GetBaseDir() string
+	NeedSync() bool
+}
+
+type walWriteDirMethod struct {
+	baseDir string
+	sync    bool
+}
+
+func NewWalWriteMethodDir(baseDir string, sync bool) WalWriteMethod {
+	return &walWriteDirMethod{
+		baseDir: baseDir,
+		sync:    sync,
+	}
+}
+
+func (w *walWriteDirMethod) GetBaseDir() string {
+	return w.baseDir
+}
+
+func (w *walWriteDirMethod) NeedSync() bool {
+	return w.sync
+}
+
+var _ WalWriteMethod = &walWriteDirMethod{}
+
+type WalfileT struct {
+	currpos  uint64
+	pathname string
+	fd       *os.File
+}
+
+func OpenForWrite(method WalWriteMethod, pathname, tempSuffix string, padToSize int64) (*WalfileT, error) {
+	if method == nil {
+		return nil, fmt.Errorf("Walfile.OpenForWrite() -> method cannot be nil")
+	}
+	if method.GetBaseDir() == "" {
+		return nil, fmt.Errorf("Walfile.OpenForWrite() -> method.GetBaseDir() cannot be empty")
+	}
+	if pathname == "" {
+		return nil, fmt.Errorf("Walfile.OpenForWrite() -> pathname cannot be empty")
+	}
+
+	baseDir := method.GetBaseDir()
+	fullPath := filepath.Join(baseDir, pathname) + tempSuffix
+
+	// open file
+	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
+	if err != nil {
+		return nil, fmt.Errorf("could not create WAL file %s: %w", fullPath, err)
+	}
+
+	// truncate to requested size
+	if padToSize > 0 {
+		if err := fd.Truncate(padToSize); err != nil {
+			_ = fd.Close() // TODO:log:fclose()
+			return nil, fmt.Errorf("could not preallocate WAL file %s: %w", fullPath, err)
+		}
+	}
+
+	// fsync file and its directory
+	if method.NeedSync() {
+		err := fd.Sync()
+		if err != nil {
+			_ = fd.Close() // TODO:log:fclose()
+			return nil, fmt.Errorf("cannot sync WAL file %s: %w", fullPath, err)
+		}
+		err = FsyncFname(baseDir)
+		if err != nil {
+			_ = fd.Close() // TODO:log:fclose()
+			return nil, fmt.Errorf("cannot sync WAL file basedir %s: %w", baseDir, err)
+		}
+	}
+
+	return &WalfileT{
+		currpos:  0,
+		pathname: fullPath,
+		fd:       fd,
+	}, nil
+}
+
+func (w *WalfileT) Close(method WalCloseMethod) error {
+	return nil
+}
+
+func (w *WalfileT) ExistsFile() (bool, error) {
+	return false, nil
+}
+
+func (w *WalfileT) GetFileName(tempSuffix string) string {
+	return fmt.Sprintf("%s%s", w.pathname, tempSuffix)
+}
