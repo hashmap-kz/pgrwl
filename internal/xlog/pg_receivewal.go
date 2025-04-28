@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"pgreceivewal5/internal/conv"
 	"regexp"
 	"sort"
 	"sync/atomic"
+
+	"pgreceivewal5/internal/conv"
 
 	"github.com/jackc/pglogrepl"
 )

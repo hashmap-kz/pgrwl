@@ -444,7 +444,9 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 
 		readServerResult := func() (restart bool, err error) {
 			for {
-				msg, err := conn.ReceiveMessage(ctx)
+				ctxTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+				msg, err := conn.ReceiveMessage(ctxTimeout)
+				cancel()
 				if err != nil {
 					closeWalfileNoRename(stream)
 					return false, fmt.Errorf("failed receiving server result: %w", err)
