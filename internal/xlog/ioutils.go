@@ -33,10 +33,9 @@ func FsyncDir(dirPath string) error {
 	if err != nil {
 		return fmt.Errorf("cannot open dir %s: %w", dirPath, err)
 	}
-	defer d.Close()
-
 	if err := d.Sync(); err != nil {
+		_ = d.Close()
 		return fmt.Errorf("cannot fsync dir %s: %w", dirPath, err)
 	}
-	return nil
+	return d.Close()
 }
