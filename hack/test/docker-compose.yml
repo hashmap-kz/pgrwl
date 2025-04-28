@@ -1,0 +1,46 @@
+services:
+  pg-primary:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "15432:5432"
+    volumes:
+      - pg-primary-data:/var/lib/postgresql/data
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    command: -c wal_level=replica
+      -c archive_mode=on
+      -c max_wal_senders=10
+      -c hot_standby=on
+      -c wal_keep_size=64MB
+      -c listen_addresses=*
+      -c hba_file=/etc/postgresql/pg_hba.conf
+
+  pg-standby:
+    image: postgres:17
+    depends_on:
+      - pg-primary
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "15433:5432"
+    volumes:
+      - pg-standby-data:/var/lib/postgresql/data
+    entrypoint: [
+        "/bin/bash",
+        "-c",
+        "
+        rm -rf /var/lib/postgresql/data/* &&
+        until pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U postgres -Fp -Xs -P -R; do
+        echo 'Waiting for primary...';
+        sleep 2;
+        done &&
+        exec docker-entrypoint.sh postgres
+        ",
+      ]
+
+volumes:
+  pg-primary-data:
+  pg-standby-data:
