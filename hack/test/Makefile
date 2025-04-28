@@ -50,5 +50,8 @@ clean:
 	$(COMPOSE) -f $(COMPOSE_FILE) down -v
 	@echo "🧹 Containers and volumes are removed."
 
+create-slot:
+	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-standby bash -c "su postgres -c 'pg_receivewal --no-password --no-loop --slot=pg_receivewal --create-slot --if-not-exists'"
+
 # Default target
 default: up
