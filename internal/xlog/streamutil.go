@@ -11,7 +11,7 @@ import (
 
 var ErrSlotDoesNotExist = fmt.Errorf("replication slot does not exist")
 
-// IdentifySystemResult is the parsed result of the IDENTIFY_SYSTEM command.
+// ReadReplicationSlotResultResult is the parsed result of the READ_REPLICATION_SLOT command.
 type ReadReplicationSlotResultResult struct {
 	// https://www.postgresql.org/docs/current/protocol-replication.html#PROTOCOL-REPLICATION-READ-REPLICATION-SLOT
 	//
@@ -66,14 +66,14 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 	var restartLSN pglogrepl.LSN
 	var restartTLI int64
 
-	if string(row[1]) != "" {
+	if len(row[1]) != 0 {
 		restartLSN, err = pglogrepl.ParseLSN(string(row[1]))
 		if err != nil {
 			return isr, fmt.Errorf("failed to parse restart_lsn: %w", err)
 		}
 	}
 
-	if string(row[2]) != "" {
+	if len(row[2]) != 0 {
 		restartTLI, err = strconv.ParseInt(string(row[2]), 10, 32)
 		if err != nil {
 			return isr, fmt.Errorf("failed to parse restart_tli: %w", err)
@@ -81,7 +81,7 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 	}
 
 	isr.SlotType = string(row[0])
-	isr.RestartLSN = pglogrepl.LSN(restartLSN)
+	isr.RestartLSN = restartLSN
 	isr.RestartTLI = uint32(restartTLI)
 	return isr, nil
 }
@@ -128,7 +128,7 @@ func parseShowParameter(mrr *pgconn.MultiResultReader) (string, error) {
 
 // scan utils
 
-// e.g. "16MB"
+// ScanWalSegSize scans wal segment size with units, e.g. "16MB" into bytes size
 func ScanWalSegSize(sizeStr string) (uint64, error) {
 	if sizeStr == "" {
 		return 0, fmt.Errorf("empty input")
@@ -148,12 +148,13 @@ func ScanWalSegSize(sizeStr string) (uint64, error) {
 		return 0, fmt.Errorf("unit cannot be empty")
 	}
 
-	multiplier := 1
-	if unit == "MB" {
+	var multiplier int
+	switch unit {
+	case "MB":
 		multiplier = 1024 * 1024
-	} else if unit == "GB" {
+	case "GB":
 		multiplier = 1024 * 1024 * 1024
-	} else {
+	default:
 		return 0, fmt.Errorf("unknown unit: %s", unit)
 	}
 
@@ -193,6 +194,8 @@ func GetStartupInfo(conn *pgconn.PgConn) (*StartupInfo, error) {
 		return nil, err
 	}
 	if serverVersion < 150000 {
+		// because 'READ_REPLICATION_SLOT' that we use was introduced in v15
+		// anyway, this particular error may be revived later
 		return nil, fmt.Errorf("unsupported version %d, postgresql >=15 is expected", serverVersion)
 	}
 

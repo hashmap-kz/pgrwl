@@ -25,23 +25,22 @@ func IsValidWalSegSize(size uint64) bool {
 
 // https://github.com/postgres/postgres/blob/master/src/include/access/xlog_internal.h
 
-func XLByteToSeg(xlrp uint64, walSegSize uint64) uint64 {
-	return uint64(xlrp) / walSegSize
+func XLByteToSeg(xlrp, walSegSize uint64) uint64 {
+	return xlrp / walSegSize
 }
 
+//nolint:revive
 func XLogSegmentOffset(xlogptr pglogrepl.LSN, walSegSize uint64) uint64 {
 	return uint64(xlogptr) & (walSegSize - 1)
 }
 
-func XLByteToPrevSeg(xlrp uint64, walSegSize uint64) uint64 {
-	return (xlrp - 1) / walSegSize
-}
-
+//nolint:revive
 func XLogSegmentsPerXLogId(walSegSize uint64) uint64 {
 	return 0x100000000 / walSegSize
 }
 
-func XLogFileName(tli uint32, logSegNo uint64, walSegSize uint64) string {
+//nolint:revive
+func XLogFileName(tli uint32, logSegNo, walSegSize uint64) string {
 	return fmt.Sprintf("%08X%08X%08X",
 		tli,
 		uint32(logSegNo/XLogSegmentsPerXLogId(walSegSize)),

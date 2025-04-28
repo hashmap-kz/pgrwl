@@ -3,7 +3,6 @@ package xlog
 import (
 	"fmt"
 	"io/fs"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -47,7 +46,7 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 
 	var entries []walEntry
 
-	err := filepath.WalkDir(pgrw.BaseDir, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(pgrw.BaseDir, func(path string, _ fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -58,16 +57,16 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 			return nil // not a WAL file
 		}
 
-		tli, err1 := parseHex32(matches[1])
-		log, err2 := parseHex32(matches[2])
-		seg, err3 := parseHex32(matches[3])
+		xTli, err1 := parseHex32(matches[1])
+		xLog, err2 := parseHex32(matches[2])
+		xSeg, err3 := parseHex32(matches[3])
 		isPartial := matches[4] == ".partial"
 
 		if err1 != nil || err2 != nil || err3 != nil {
 			return nil // skip invalid names
 		}
 
-		segNo := uint64(log)*0x100000000/pgrw.WalSegSz + uint64(seg)
+		segNo := uint64(xLog)*0x100000000/pgrw.WalSegSz + uint64(xSeg)
 
 		if !isPartial {
 			info, err := os.Stat(path)
@@ -75,13 +74,16 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 				return fmt.Errorf("could not stat file %q: %w", path, err)
 			}
 			if uint64(info.Size()) != pgrw.WalSegSz {
-				fmt.Fprintf(os.Stderr, "warning: WAL segment %q has incorrect size %d, skipping\n", base, info.Size())
+				slog.Warn("WAL segment has incorrect size, skipping",
+					slog.String("base", base),
+					slog.Int64("size", info.Size()),
+				)
 				return nil
 			}
 		}
 
 		entries = append(entries, walEntry{
-			tli:       tli,
+			tli:       xTli,
 			segNo:     segNo,
 			isPartial: isPartial,
 			basename:  base,
@@ -138,17 +140,17 @@ func segNoToLSN(segNo, walSegSz uint64) pglogrepl.LSN {
 // stop_streaming
 func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, segmentFinished bool) bool {
 	if pgrw.Verbose && segmentFinished {
-		log.Printf(
-			"finished segment at %X/%X (timeline %d)",
-			uint32(xlogpos>>32), uint32(xlogpos), timeline,
+		slog.Debug("finished segment",
+			slog.String("lsn", xlogpos.String()),
+			slog.Uint64("tli", uint64(timeline)),
 		)
 	}
 
 	if pgrw.endpos != 0 && pgrw.endpos < xlogpos {
 		if pgrw.Verbose {
-			log.Printf(
-				"stopped log streaming at %X/%X (timeline %d)",
-				uint32(xlogpos>>32), uint32(xlogpos), timeline,
+			slog.Debug("stopped log streaming",
+				slog.String("lsn", xlogpos.String()),
+				slog.Uint64("tli", uint64(timeline)),
 			)
 		}
 		pgrw.timeToStop = true
@@ -156,10 +158,9 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 	}
 
 	if pgrw.Verbose && pgrw.prevTimeline != 0 && pgrw.prevTimeline != timeline {
-		log.Printf(
-			"switched to timeline %d at %X/%X",
-			timeline,
-			uint32(pgrw.prevPos>>32), uint32(pgrw.prevPos),
+		slog.Debug("switched to timeline",
+			slog.String("lsn", pgrw.prevPos.String()),
+			slog.Uint64("tli", uint64(timeline)),
 		)
 	}
 
@@ -168,7 +169,7 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 
 	if pgrw.timeToStop {
 		if pgrw.Verbose {
-			log.Printf("received interrupt signal, exiting")
+			slog.Debug("received interrupt signal, exiting")
 		}
 		return true
 	}

@@ -43,7 +43,7 @@ func init() {
 
 	// Create a base handler (TEXT if not set)
 	var baseHandler slog.Handler
-	if strings.ToLower(logFormat) == "json" {
+	if strings.EqualFold(logFormat, "json") {
 		baseHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 			Level: lvl,
 		})
@@ -210,9 +210,9 @@ func main() {
 		if noLoop {
 			slog.Error("disconnected")
 			os.Exit(1)
-		} else {
-			slog.Info("disconnected; waiting 5 seconds to try again")
-			time.Sleep(5 * time.Second)
 		}
+
+		slog.Info("disconnected; waiting 5 seconds to try again")
+		time.Sleep(5 * time.Second)
 	}
 }

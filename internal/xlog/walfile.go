@@ -143,7 +143,7 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 		return fmt.Errorf("could not close file: %w", err)
 	}
 
-	stream.LastFlushPosition = pglogrepl.LSN(pos)
+	stream.LastFlushPosition = pos
 	return nil
 }
 

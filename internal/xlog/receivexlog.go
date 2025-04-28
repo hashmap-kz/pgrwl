@@ -122,7 +122,7 @@ func ProcessXLogDataMsg(
 			}
 			xlogoff = 0
 
-			if stream.StillSending && stream.StreamClient.StreamStop(pglogrepl.LSN(*blockpos), stream.Timeline, true) {
+			if stream.StillSending && stream.StreamClient.StreamStop(*blockpos, stream.Timeline, true) {
 				// Send CopyDone message
 				_, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
 				if err != nil {
@@ -132,9 +132,7 @@ func ProcessXLogDataMsg(
 				return true, nil
 			}
 		}
-
 	}
-
 	return true, nil
 }
 
@@ -277,23 +275,9 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		}
 
 		switch m := msg.(type) {
-
 		case *pgproto3.CopyData:
 			switch m.Data[0] {
 			case pglogrepl.PrimaryKeepaliveMessageByteID:
-				// v0
-				// pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
-				// if err != nil {
-				// 	return fmt.Errorf("parse keepalive failed: %w", err)
-				// }
-				// if pkm.ReplyRequested {
-				// 	if err := sendFeedback(ctx, stream, conn, blockPos, time.Now(), false); err != nil {
-				// 		return fmt.Errorf("send feedback on reply requested failed: %w", err)
-				// 	}
-				// 	lastStatus = time.Now()
-				// }
-
-				// v1
 				pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
 				if err != nil {
 					return fmt.Errorf("parse keepalive failed: %w", err)
