@@ -318,9 +318,12 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 				if err := stream.CloseWalfile(blockPos); err != nil {
 					return fmt.Errorf("failed to close WAL file: %w", err)
 				}
-				if _, err := pglogrepl.SendStandbyCopyDone(ctx, conn); err != nil {
+
+				cdr, err := SendStandbyCopyDone(ctx, conn)
+				if err != nil {
 					return fmt.Errorf("failed to send client CopyDone: %w", err)
 				}
+				slog.Debug("copy-done-result", slog.Any("cdr", cdr))
 				stream.StillSending = false
 			}
 			*stopPos = blockPos
@@ -338,6 +341,52 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		default:
 			slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
 			return nil // safe exit
+		}
+	}
+}
+
+func SendStandbyCopyDone(_ context.Context, conn *pgconn.PgConn) (cdr *pglogrepl.CopyDoneResult, err error) {
+	conn.Frontend().Send(&pgproto3.CopyDone{})
+	err = conn.Frontend().Flush()
+	if err != nil {
+		return
+	}
+
+	cdr = &pglogrepl.CopyDoneResult{} // <<< Fix: initialize the pointer!
+
+	for {
+		var msg pgproto3.BackendMessage
+		msg, err = conn.Frontend().Receive()
+		if err != nil {
+			return cdr, err
+		}
+
+		switch m := msg.(type) {
+		case *pgproto3.CopyDone:
+			// ignore
+		case *pgproto3.ParameterStatus, *pgproto3.NoticeResponse:
+			// ignore
+		case *pgproto3.CommandComplete:
+			// ignore
+		case *pgproto3.RowDescription:
+			// ignore
+		case *pgproto3.DataRow:
+			if len(m.Values) == 2 {
+				timeline, lerr := strconv.Atoi(string(m.Values[0]))
+				if lerr == nil {
+					lsn, lerr := pglogrepl.ParseLSN(string(m.Values[1]))
+					if lerr == nil {
+						cdr.Timeline = int32(timeline)
+						cdr.LSN = lsn
+					}
+				}
+			}
+		case *pgproto3.EmptyQueryResponse:
+			// ignore
+		case *pgproto3.ErrorResponse:
+			return cdr, pgconn.ErrorResponseToPgError(m)
+		case *pgproto3.ReadyForQuery:
+			return cdr, err
 		}
 	}
 }
