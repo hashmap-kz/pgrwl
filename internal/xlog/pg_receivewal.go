@@ -32,6 +32,11 @@ var (
 
 // FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
 func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
+	// ensure dir exists
+	if err := os.MkdirAll(pgrw.BaseDir, 0o750); err != nil {
+		return 0, 0, err
+	}
+
 	type walEntry struct {
 		tli       uint32
 		segNo     uint64
