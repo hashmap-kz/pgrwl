@@ -20,7 +20,7 @@ import (
 
 const (
 	slotName    = "pg_recval_5"
-	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes"
+	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes host=localhost port=15433"
 	baseDir     = "wals"
 	noLoop      = false
 )
@@ -225,7 +225,9 @@ func main() {
 	for {
 		err := StreamLog(ctx)
 		if err != nil {
-			slog.Error("an error occurred in StreamLog(), exiting")
+			slog.Error("an error occurred in StreamLog(), exiting",
+				slog.Any("err", err),
+			)
 			os.Exit(1)
 		}
 
