@@ -5,21 +5,23 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"syscall"
 
 	"pgreceivewal5/internal/conv"
 
 	"github.com/jackc/pglogrepl"
 )
 
-type PgReceiveWal struct {
-	Verbose  bool
-	BaseDir  string
-	WalSegSz uint64
+// TODO:revive
+var timeToStop = false
 
-	timeToStop   bool
+type PgReceiveWal struct {
+	BaseDir      string
+	WalSegSz     uint64
 	endpos       pglogrepl.LSN
 	prevTimeline uint32
 	prevPos      pglogrepl.LSN
@@ -141,7 +143,7 @@ func segNoToLSN(segNo, walSegSz uint64) pglogrepl.LSN {
 
 // stop_streaming
 func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, segmentFinished bool) bool {
-	if pgrw.Verbose && segmentFinished {
+	if segmentFinished {
 		slog.Debug("finished segment",
 			slog.String("lsn", xlogpos.String()),
 			slog.Uint64("tli", uint64(timeline)),
@@ -149,17 +151,15 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 	}
 
 	if pgrw.endpos != 0 && pgrw.endpos < xlogpos {
-		if pgrw.Verbose {
-			slog.Debug("stopped log streaming",
-				slog.String("lsn", xlogpos.String()),
-				slog.Uint64("tli", uint64(timeline)),
-			)
-		}
-		pgrw.timeToStop = true
+		slog.Debug("stopped log streaming",
+			slog.String("lsn", xlogpos.String()),
+			slog.Uint64("tli", uint64(timeline)),
+		)
+		timeToStop = true
 		return true
 	}
 
-	if pgrw.Verbose && pgrw.prevTimeline != 0 && pgrw.prevTimeline != timeline {
+	if pgrw.prevTimeline != 0 && pgrw.prevTimeline != timeline {
 		slog.Debug("switched to timeline",
 			slog.String("lsn", pgrw.prevPos.String()),
 			slog.Uint64("tli", uint64(timeline)),
@@ -169,12 +169,24 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 	pgrw.prevTimeline = timeline
 	pgrw.prevPos = xlogpos
 
-	if pgrw.timeToStop {
-		if pgrw.Verbose {
-			slog.Debug("received interrupt signal, exiting")
-		}
+	if timeToStop {
+		slog.Debug("received interrupt signal, exiting")
 		return true
 	}
 
 	return false
+}
+
+func init() {
+	c := make(chan os.Signal, 1)
+
+	// Listen for SIGINT (Ctrl+C), SIGTERM (termination), SIGHUP if needed
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-c
+		// Just set the flag, like sigexit_handler()
+		timeToStop = true
+		slog.Info("received signal, prepared to stop", slog.Any("sig", sig))
+	}()
 }

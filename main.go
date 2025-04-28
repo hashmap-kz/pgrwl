@@ -28,6 +28,10 @@ const (
 var conn *pgconn.PgConn
 
 func init() {
+	// TODO:localdev
+	os.Setenv("LOG_LEVEL", "debug")
+	os.Setenv("LOG_ADD_SOURCE", "1")
+
 	logLevel := os.Getenv("LOG_LEVEL")
 	logFormat := os.Getenv("LOG_FORMAT")
 	logAddSource := os.Getenv("LOG_ADD_SOURCE")
@@ -103,7 +107,6 @@ func StreamLog(ctx context.Context) error {
 	walSegSz := startupInfo.WalSegSz
 
 	pgrw := &xlog.PgReceiveWal{
-		Verbose:  true,
 		BaseDir:  baseDir,
 		WalSegSz: walSegSz,
 	}
