@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 
+	"pgreceivewal5/internal/conv"
+
 	"github.com/jackc/pglogrepl"
 )
 
@@ -73,7 +75,7 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 			if err != nil {
 				return fmt.Errorf("could not stat file %q: %w", path, err)
 			}
-			if uint64(info.Size()) != pgrw.WalSegSz {
+			if conv.ToUint64(info.Size()) != pgrw.WalSegSz {
 				slog.Warn("WAL segment has incorrect size, skipping",
 					slog.String("base", base),
 					slog.Int64("size", info.Size()),

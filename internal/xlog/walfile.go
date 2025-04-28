@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"pgreceivewal5/internal/conv"
+
 	"github.com/jackc/pglogrepl"
 )
 
@@ -27,14 +29,19 @@ func (stream *StreamCtl) SyncWalFile() error {
 	return stream.walfile.fd.Sync()
 }
 
-func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff int64) error {
+func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) error {
+	xlogOffToInt64, err := conv.Uint64ToInt64(xlogoff)
+	if err != nil {
+		return err
+	}
+
 	if stream.walfile == nil {
 		return fmt.Errorf("stream.walfile is nil (WriteAtWalFile)")
 	}
 	if stream.walfile.fd == nil {
 		return fmt.Errorf("stream.walfile.fd is nil (WriteAtWalFile)")
 	}
-	n, err := stream.walfile.fd.WriteAt(data, xlogoff)
+	n, err := stream.walfile.fd.WriteAt(data, xlogOffToInt64)
 	if err != nil {
 		return err
 	}
@@ -55,7 +62,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	stat, err := os.Stat(fullPath)
 	if err == nil {
 		// File exists
-		if uint64(stat.Size()) == stream.WalSegSz {
+		if conv.ToUint64(stat.Size()) == stream.WalSegSz {
 			// File already correctly sized, open it
 			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 			if err != nil {
@@ -108,7 +115,11 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	}
 
 	// Preallocate file with zeros up to 16 MiB
-	if err := fd.Truncate(int64(stream.WalSegSz)); err != nil {
+	truncateSize, err := conv.Uint64ToInt64(stream.WalSegSz)
+	if err != nil {
+		return err
+	}
+	if err := fd.Truncate(truncateSize); err != nil {
 		fd.Close()
 		return fmt.Errorf("could not preallocate WAL file %s: %w", fullPath, err)
 	}

@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"pgreceivewal5/internal/conv"
+
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
@@ -48,6 +50,8 @@ func ProcessXLogDataMsg(
 	xld pglogrepl.XLogData,
 	blockpos *pglogrepl.LSN,
 ) (bool, error) {
+	var err error
+
 	/*
 	 * Once we've decided we don't want to receive any more, just ignore any
 	 * subsequent XLogData messages.
@@ -104,7 +108,7 @@ func ProcessXLogDataMsg(
 		// 	return false;
 		// }
 
-		err := stream.WriteAtWalFile(data[bytesWritten:bytesWritten+bytesToWrite], int64(xlogoff))
+		err = stream.WriteAtWalFile(data[bytesWritten:bytesWritten+bytesToWrite], xlogoff)
 		if err != nil {
 			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
@@ -348,9 +352,14 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 	for {
 		// --- Before streaming starts ---
 
+		timelineToI32, err := conv.Uint32ToInt32(stream.Timeline)
+		if err != nil {
+			return err
+		}
+
 		// Before starting, check if we need to fetch timeline history
 		if !existsTimeLineHistoryFile(stream) {
-			tlh, err := pglogrepl.TimelineHistory(ctx, conn, int32(stream.Timeline))
+			tlh, err := pglogrepl.TimelineHistory(ctx, conn, timelineToI32)
 			if err != nil {
 				return fmt.Errorf("failed to fetch timeline history: %w", err)
 			}
@@ -366,7 +375,7 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 
 		// Start replication
 		opts := pglogrepl.StartReplicationOptions{
-			Timeline: int32(stream.Timeline),
+			Timeline: timelineToI32,
 			Mode:     pglogrepl.PhysicalReplication,
 		}
 		if err := pglogrepl.StartReplication(ctx, conn, stream.ReplicationSlot, stream.StartPos, opts); err != nil {

@@ -41,9 +41,7 @@ func XLogSegmentsPerXLogId(walSegSize uint64) uint64 {
 
 //nolint:revive
 func XLogFileName(tli uint32, logSegNo, walSegSize uint64) string {
-	return fmt.Sprintf("%08X%08X%08X",
-		tli,
-		uint32(logSegNo/XLogSegmentsPerXLogId(walSegSize)),
-		uint32(logSegNo%XLogSegmentsPerXLogId(walSegSize)),
-	)
+	hi := logSegNo / XLogSegmentsPerXLogId(walSegSize)
+	lo := logSegNo % XLogSegmentsPerXLogId(walSegSize)
+	return fmt.Sprintf("%08X%08X%08X", tli, hi, lo)
 }

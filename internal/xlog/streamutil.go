@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"pgreceivewal5/internal/conv"
+
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -64,7 +66,7 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 	}
 
 	var restartLSN pglogrepl.LSN
-	var restartTLI int64
+	var restartTLI uint32
 
 	if len(row[1]) != 0 {
 		restartLSN, err = pglogrepl.ParseLSN(string(row[1]))
@@ -74,7 +76,7 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 	}
 
 	if len(row[2]) != 0 {
-		restartTLI, err = strconv.ParseInt(string(row[2]), 10, 32)
+		restartTLI, err = conv.ParseUint32(string(row[2]))
 		if err != nil {
 			return isr, fmt.Errorf("failed to parse restart_tli: %w", err)
 		}
@@ -82,7 +84,7 @@ func parseReadReplicationSlot(mrr *pgconn.MultiResultReader) (ReadReplicationSlo
 
 	isr.SlotType = string(row[0])
 	isr.RestartLSN = restartLSN
-	isr.RestartTLI = uint32(restartTLI)
+	isr.RestartTLI = restartTLI
 	return isr, nil
 }
 
@@ -158,7 +160,7 @@ func ScanWalSegSize(sizeStr string) (uint64, error) {
 		return 0, fmt.Errorf("unknown unit: %s", unit)
 	}
 
-	segSize := uint64(val * multiplier)
+	segSize := conv.ToUint64(int64(val * multiplier))
 
 	if !IsValidWalSegSize(segSize) {
 		return 0, fmt.Errorf("wal_segment_size is out of range: %d", val)

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"pgreceivewal5/internal/conv"
+
 	"pgreceivewal5/internal/xlog"
 
 	"github.com/jackc/pglogrepl"
@@ -135,7 +137,7 @@ func StreamLog(ctx context.Context) error {
 
 	if streamStartLSN == 0 {
 		streamStartLSN = sysident.XLogPos
-		streamStartTimeline = uint32(sysident.Timeline)
+		streamStartTimeline = conv.ToUint32(sysident.Timeline)
 	}
 
 	// final check
