@@ -227,7 +227,7 @@ func ProcessKeepaliveMsg(ctx context.Context,
 	return nil
 }
 
-func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl, stopPos *pglogrepl.LSN) error {
+func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl, stopPos *pglogrepl.LSN) (*pglogrepl.CopyDoneResult, error) {
 	var lastStatus time.Time
 	blockPos := stream.StartPos
 
@@ -236,7 +236,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 	for {
 		// Check if we should stop streaming
 		if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
-			return errors.New("stream stop requested")
+			return nil, fmt.Errorf("stream stop requested")
 		}
 
 		now := time.Now()
@@ -244,11 +244,11 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		// If synchronous, flush WAL file and update server immediately
 		if stream.Synchronous && stream.LastFlushPosition < blockPos && stream.walfile != nil {
 			if err := stream.SyncWalFile(); err != nil {
-				return fmt.Errorf("could not fsync WAL file: %w", err)
+				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
 			}
 			stream.LastFlushPosition = blockPos
 			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
-				return fmt.Errorf("could not send feedback after sync: %w", err)
+				return nil, fmt.Errorf("could not send feedback after sync: %w", err)
 			}
 			lastStatus = now
 		}
@@ -257,7 +257,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		if stream.StillSending && stream.StandbyMessageTimeout > 0 &&
 			time.Since(lastStatus) > stream.StandbyMessageTimeout {
 			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
-				return fmt.Errorf("could not send periodic feedback: %w", err)
+				return nil, fmt.Errorf("could not send periodic feedback: %w", err)
 			}
 			lastStatus = now
 		}
@@ -275,7 +275,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("receive message failed: %w", err)
+			return nil, fmt.Errorf("receive message failed: %w", err)
 		}
 
 		switch m := msg.(type) {
@@ -284,63 +284,64 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			case pglogrepl.PrimaryKeepaliveMessageByteID:
 				pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
 				if err != nil {
-					return fmt.Errorf("parse keepalive failed: %w", err)
+					return nil, fmt.Errorf("parse keepalive failed: %w", err)
 				}
 				if err := ProcessKeepaliveMsg(ctx, conn, stream, pkm, blockPos, &lastStatus); err != nil {
-					return fmt.Errorf("process keepalive failed: %w", err)
+					return nil, fmt.Errorf("process keepalive failed: %w", err)
 				}
 
 			case pglogrepl.XLogDataByteID:
 				xld, err := pglogrepl.ParseXLogData(m.Data[1:])
 				if err != nil {
-					return fmt.Errorf("parse xlogdata failed: %w", err)
+					return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 				}
 
 				if _, err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
-					return fmt.Errorf("processing xlogdata failed: %w", err)
+					return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 				}
 
 				// After processing XLogData, check again if stop is requested
 				if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
-					return errors.New("stream stop requested after XLogData")
+					return nil, errors.New("stream stop requested after XLogData")
 				}
 
 			default:
-				return fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
+				return nil, fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
 			}
 
 		case *pgproto3.CopyDone:
 			slog.Info("HandleCopyStream: received CopyDone, HandleEndOfCopyStream()")
+			var cdr *pglogrepl.CopyDoneResult
 
 			// Server ended the stream. Handle CopyDone properly!
 			// HandleEndOfCopyStream(PGconn *conn, StreamCtl *stream, char *copybuf, XLogRecPtr blockpos, XLogRecPtr *stoppos)
 			if stream.StillSending {
 				if err := stream.CloseWalfile(blockPos); err != nil {
-					return fmt.Errorf("failed to close WAL file: %w", err)
+					return nil, fmt.Errorf("failed to close WAL file: %w", err)
 				}
 
-				cdr, err := SendStandbyCopyDone(ctx, conn)
+				cdr, err = SendStandbyCopyDone(ctx, conn)
 				if err != nil {
-					return fmt.Errorf("failed to send client CopyDone: %w", err)
+					return nil, fmt.Errorf("failed to send client CopyDone: %w", err)
 				}
 				slog.Debug("copy-done-result", slog.Any("cdr", cdr))
 				stream.StillSending = false
 			}
 			*stopPos = blockPos
-			return nil
+			return cdr, nil
 
 			// Handle other commands
 		case *pgproto3.CommandComplete:
 			slog.Warn("received CommandComplete, treating as disconnection")
-			return nil // safe exit
+			return nil, nil // safe exit
 		case *pgproto3.ErrorResponse:
-			return fmt.Errorf("error response from server: %s", m.Message)
+			return nil, fmt.Errorf("error response from server: %s", m.Message)
 		case *pgproto3.ReadyForQuery:
 			slog.Warn("received ReadyForQuery, treating as disconnection")
-			return nil // safe exit
+			return nil, nil // safe exit
 		default:
 			slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
-			return nil // safe exit
+			return nil, nil // safe exit
 		}
 	}
 }
@@ -435,93 +436,38 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 		// TODO: see "goto error" in the original code
 
 		// Stream WAL
-		if err := HandleCopyStream(ctx, conn, stream, &stopPos); err != nil {
+		cdr, err := HandleCopyStream(ctx, conn, stream, &stopPos)
+		if err != nil {
 			closeWalfileNoRename(stream)
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
+		// TODO: revise
 		// --- After CopyDone ---
 
-		readServerResult := func() (restart bool, err error) {
-			for {
-				ctxTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
-				msg, err := conn.ReceiveMessage(ctxTimeout)
-				cancel()
-				if err != nil {
-					closeWalfileNoRename(stream)
-					return false, fmt.Errorf("failed receiving server result: %w", err)
-				}
+		if cdr != nil {
+			// Server sends end-of-timeline info
+			newTimeline := conv.ToUint32(cdr.Timeline)
+			newStartPos := cdr.LSN
 
-				switch m := msg.(type) {
-				case *pgproto3.DataRow:
-					// Server sends end-of-timeline info
-					newTimeline, newStartPos, err := parseEndOfStreamingResult(m)
-					if err != nil {
-						closeWalfileNoRename(stream)
-						return false, fmt.Errorf("could not parse end-of-stream result: %w", err)
-					}
-					if newTimeline <= stream.Timeline {
-						closeWalfileNoRename(stream)
-						return false, fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
-					}
-					if newStartPos > stopPos {
-						closeWalfileNoRename(stream)
-						return false, fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
-					}
-
-					// Expect CommandComplete after DataRow
-					msg2, err := conn.ReceiveMessage(ctx)
-					if err != nil {
-						closeWalfileNoRename(stream)
-						return false, fmt.Errorf("failed receiving final CommandComplete: %w", err)
-					}
-					if _, ok := msg2.(*pgproto3.CommandComplete); !ok {
-						closeWalfileNoRename(stream)
-						return false, fmt.Errorf("expected CommandComplete after DataRow, got %T", msg2)
-					}
-
-					/*
-					* Loop back to start streaming from the new timeline. Always
-					* start streaming at the beginning of a segment.
-					 */
-					stream.Timeline = newTimeline
-					stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
-
-					return true, nil // restart streaming
-
-				case *pgproto3.CommandComplete:
-					if stream.StreamClient.StreamStop(stopPos, stream.Timeline, false) {
-						return false, nil // clean shutdown
-					}
-					closeWalfileNoRename(stream)
-					return false, fmt.Errorf("replication stream terminated unexpectedly before stop point")
-
-				case *pgproto3.ErrorResponse:
-					closeWalfileNoRename(stream)
-					return false, fmt.Errorf("error response from server: %s", m.Message)
-
-				case *pgproto3.ReadyForQuery:
-					// Ignore
-					continue
-
-				default:
-					// Unexpected, but ignore
-					continue
-				}
+			if newTimeline <= stream.Timeline {
+				closeWalfileNoRename(stream)
+				return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
 			}
-		}
+			if newStartPos > stopPos {
+				closeWalfileNoRename(stream)
+				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
+			}
 
-		restart, err := readServerResult()
-		if err != nil {
-			closeWalfileNoRename(stream)
-			return err
+			/*
+			* Loop back to start streaming from the new timeline. Always
+			* start streaming at the beginning of a segment.
+			 */
+			stream.Timeline = newTimeline
+			stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
+
+			continue // restart streaming
 		}
-		if restart {
-			// Timeline switch, continue outer for-loop
-			continue
-		}
-		// Otherwise (clean shutdown) exit
-		return nil
 	}
 }
 
