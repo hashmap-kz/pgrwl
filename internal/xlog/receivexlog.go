@@ -347,13 +347,13 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 }
 
 func SendStandbyCopyDone(_ context.Context, conn *pgconn.PgConn) (cdr *pglogrepl.CopyDoneResult, err error) {
+	cdr = &pglogrepl.CopyDoneResult{} // <<< Fix: initialize the pointer!
+
 	conn.Frontend().Send(&pgproto3.CopyDone{})
 	err = conn.Frontend().Flush()
 	if err != nil {
-		return
+		return cdr, err
 	}
-
-	cdr = &pglogrepl.CopyDoneResult{} // <<< Fix: initialize the pointer!
 
 	for {
 		var msg pgproto3.BackendMessage
@@ -479,24 +479,6 @@ func closeWalfileNoRename(stream *StreamCtl) {
 			log.Printf("could not close WAL file: %v", err)
 		}
 	}
-}
-
-func parseEndOfStreamingResult(m *pgproto3.DataRow) (newTimeline uint32, startLSN pglogrepl.LSN, err error) {
-	if len(m.Values) != 2 {
-		return 0, 0, fmt.Errorf("unexpected DataRow format")
-	}
-	timelineStr := string(m.Values[0])
-	startLSNStr := string(m.Values[1])
-
-	tli, err := strconv.ParseUint(timelineStr, 10, 32)
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid timeline value: %w", err)
-	}
-	lsn, err := pglogrepl.ParseLSN(startLSNStr)
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid LSN value: %w", err)
-	}
-	return uint32(tli), lsn, nil
 }
 
 // timeline history file
