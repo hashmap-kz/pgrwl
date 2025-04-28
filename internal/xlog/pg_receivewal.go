@@ -5,23 +5,19 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"os/signal"
 	"path/filepath"
+	"pgreceivewal5/internal/conv"
 	"regexp"
 	"sort"
-	"syscall"
-
-	"pgreceivewal5/internal/conv"
+	"sync/atomic"
 
 	"github.com/jackc/pglogrepl"
 )
 
-// TODO:revive
-var timeToStop = false
-
 type PgReceiveWal struct {
 	BaseDir      string
 	WalSegSz     uint64
+	timeToStop   atomic.Bool
 	endpos       pglogrepl.LSN
 	prevTimeline uint32
 	prevPos      pglogrepl.LSN
@@ -33,6 +29,11 @@ var (
 	walFileRe       = regexp.MustCompile(`^([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})(\.partial)?$`)
 	ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 )
+
+// Allow external interrupt
+func (pgrw *PgReceiveWal) RequestStop() {
+	pgrw.timeToStop.Store(true)
+}
 
 // FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
 func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
@@ -155,7 +156,7 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 			slog.String("lsn", xlogpos.String()),
 			slog.Uint64("tli", uint64(timeline)),
 		)
-		timeToStop = true
+		pgrw.timeToStop.Store(true)
 		return true
 	}
 
@@ -169,24 +170,10 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 	pgrw.prevTimeline = timeline
 	pgrw.prevPos = xlogpos
 
-	if timeToStop {
+	if pgrw.timeToStop.Load() {
 		slog.Debug("received interrupt signal, exiting")
 		return true
 	}
 
 	return false
-}
-
-func init() {
-	c := make(chan os.Signal, 1)
-
-	// Listen for SIGINT (Ctrl+C), SIGTERM (termination), SIGHUP if needed
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		sig := <-c
-		// Just set the flag, like sigexit_handler()
-		timeToStop = true
-		slog.Info("received signal, prepared to stop", slog.Any("sig", sig))
-	}()
 }
