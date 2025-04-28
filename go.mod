@@ -3,7 +3,6 @@ module pgreceivewal5
 go 1.24.1
 
 require (
-	github.com/jackc/pgerrcode v0.0.0-20240316143900-6e2875d9b438
 	github.com/jackc/pglogrepl v0.0.0-20250331215543-51ad596ee12f
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/stretchr/testify v1.8.4
