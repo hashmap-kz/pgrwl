@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -44,17 +45,30 @@ func init() {
 		lvl = cfgLvl
 	}
 
+	replaceAttr := func(_ []string, attr slog.Attr) slog.Attr {
+		if attr.Key == slog.SourceKey {
+			if src, ok := attr.Value.Any().(*slog.Source); ok {
+				// Trim to basename
+				src.File = filepath.Base(src.File)
+				attr.Value = slog.AnyValue(src)
+			}
+		}
+		return attr
+	}
+
 	// Create a base handler (TEXT if not set)
 	var baseHandler slog.Handler
 	if strings.EqualFold(logFormat, "json") {
 		baseHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			AddSource: logAddSource != "",
-			Level:     lvl,
+			AddSource:   logAddSource != "",
+			Level:       lvl,
+			ReplaceAttr: replaceAttr,
 		})
 	} else {
 		baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			AddSource: logAddSource != "",
-			Level:     lvl,
+			AddSource:   logAddSource != "",
+			Level:       lvl,
+			ReplaceAttr: replaceAttr,
 		})
 	}
 
