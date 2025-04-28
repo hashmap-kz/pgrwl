@@ -1,0 +1,61 @@
+package main
+
+import (
+	"errors"
+	"os"
+	"time"
+
+	"github.com/rs/zerolog"
+)
+
+func main() {
+	//logger := zerolog.New(os.Stdout).With().Timestamp().Caller().Logger()
+
+	output := zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}
+	// Here we override LevelFormatter
+	output.FormatLevel = func(i interface{}) string {
+		// Always output full uppercased level name
+		if ll, ok := i.(string); ok {
+			switch ll {
+			case "trace":
+				return "TRACE"
+			case "debug":
+				return "DEBUG"
+			case "info":
+				return "INFO "
+			case "warn":
+				return "WARN "
+			case "error":
+				return "ERROR"
+			case "fatal":
+				return "FATAL"
+			case "panic":
+				return "PANIC"
+			default:
+				return ll
+			}
+		}
+		return ""
+	}
+
+	logger := zerolog.New(output).
+		Level(zerolog.TraceLevel).
+		With().
+		Timestamp().
+		Caller().
+		Int("pid", os.Getpid()).
+		Logger()
+
+	logger.Trace().Msg("trace message")
+	logger.Debug().Msg("debug message")
+	logger.Info().Msg("info message")
+	logger.Warn().Msg("warn message")
+	logger.Error().Msg("error message")
+
+	err := errors.New("A repo man spends his life getting into tense situations")
+	service := "myservice"
+	logger.Fatal().
+		Err(err).
+		Str("service", service).
+		Msgf("Cannot start %s", service)
+}
