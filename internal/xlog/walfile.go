@@ -45,6 +45,8 @@ func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff int64) error {
 }
 
 func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
+	var err error
+
 	segno := XLByteToSeg(uint64(startpoint), stream.WalSegSz)
 	filename := XLogFileName(stream.Timeline, segno, stream.WalSegSz) + stream.PartialSuffix
 	fullPath := filepath.Join(stream.BaseDir, filename)
@@ -59,10 +61,27 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 			if err != nil {
 				return fmt.Errorf("could not open existing WAL file %s: %w", fullPath, err)
 			}
-			// Fsync to be safe
+
+			// fsync file in case of a previous crash
 			if err := fd.Sync(); err != nil {
-				fd.Close()
-				return fmt.Errorf("could not fsync WAL file %s: %w", fullPath, err)
+				slog.Error("OpenWalFile -> could not fsync existing write-ahead log file. exiting with status 1.",
+					slog.String("path", fullPath),
+					slog.Any("err", err),
+				)
+				if err = fd.Close(); err != nil {
+					slog.Warn("OpenWalFile -> cannot close file",
+						slog.String("path", fullPath),
+						slog.Any("err", err),
+					)
+				}
+				if err = os.Remove(fullPath); err != nil {
+					slog.Warn("OpenWalFile -> cannot unlink file",
+						slog.String("path", fullPath),
+						slog.Any("err", err),
+					)
+				}
+				// MARK:exit
+				os.Exit(1)
 			}
 
 			stream.walfile = &walfileT{
