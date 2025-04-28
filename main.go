@@ -29,6 +29,7 @@ var conn *pgconn.PgConn
 func init() {
 	logLevel := os.Getenv("LOG_LEVEL")
 	logFormat := os.Getenv("LOG_FORMAT")
+	logAddSource := os.Getenv("LOG_ADD_SOURCE")
 
 	// Get logger level (INFO if not set)
 	levels := map[string]slog.Level{
@@ -47,11 +48,13 @@ func init() {
 	var baseHandler slog.Handler
 	if strings.EqualFold(logFormat, "json") {
 		baseHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level: lvl,
+			AddSource: logAddSource != "",
+			Level:     lvl,
 		})
 	} else {
 		baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: lvl,
+			AddSource: logAddSource != "",
+			Level:     lvl,
 		})
 	}
 
