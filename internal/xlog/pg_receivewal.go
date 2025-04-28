@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -41,6 +42,7 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 		tli       uint32
 		segNo     uint64
 		isPartial bool
+		basename  string
 	}
 
 	var entries []walEntry
@@ -82,6 +84,7 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 			tli:       tli,
 			segNo:     segNo,
 			isPartial: isPartial,
+			basename:  base,
 		})
 
 		return nil
@@ -114,7 +117,11 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 		startLSN = segNoToLSN(best.segNo+1, pgrw.WalSegSz)
 	}
 
-	log.Printf("resume from LSN=%s, TLI=%d\n", pglogrepl.LSN(startLSN).String(), best.tli)
+	slog.Info("found streaming start (based on WAL dir)",
+		slog.String("lsn", startLSN.String()),
+		slog.Uint64("tli", uint64(best.tli)),
+		slog.String("wal", best.basename),
+	)
 	return startLSN, best.tli, nil
 }
 

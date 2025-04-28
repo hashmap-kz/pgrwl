@@ -24,13 +24,6 @@ const (
 
 var conn *pgconn.PgConn
 
-func FatalOnErr(err error, msg string, args ...any) {
-	if err != nil {
-		slog.Error(msg, append(args, "error", err)...)
-		os.Exit(1)
-	}
-}
-
 func init() {
 	logLevel := os.Getenv("LOG_LEVEL")
 	logFormat := os.Getenv("LOG_FORMAT")
@@ -69,7 +62,8 @@ func init() {
 	slog.SetDefault(logger)
 }
 
-func StreamLog() {
+// StreamLog the main loop of WAL receiving, any error FATAL
+func StreamLog(ctx context.Context) error {
 	var err error
 
 	// 1
@@ -77,13 +71,16 @@ func StreamLog() {
 		conn, err = pgconn.Connect(context.Background(), connStrRepl)
 		if err != nil {
 			slog.Error("cannot establish connection", slog.Any("err", err))
-			return
+			// not a fatal error, a reconnect loop will handle it
+			return nil
 		}
 	}
 
 	// 2
 	startupInfo, err := xlog.GetStartupInfo(conn)
-	FatalOnErr(err, "cannot get startup info (wal_segment_size, server_version_num)")
+	if err != nil {
+		return fmt.Errorf("cannot get startup info (wal_segment_size, server_version_num): %w", err)
+	}
 	walSegSz := startupInfo.WalSegSz
 
 	pgrw := &xlog.PgReceiveWal{
@@ -97,21 +94,27 @@ func StreamLog() {
 	_, err = xlog.GetSlotInformation(conn, slotName)
 	if err != nil {
 		if errors.Is(err, xlog.ErrSlotDoesNotExist) {
-			slog.Info("creating replication slot")
-			_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slotName, "",
-				pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
-			FatalOnErr(err, "cannot create replication slot")
+			slog.Info("creating replication slot", slog.String("name", slotName))
+			replicationSlotOptions := pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication}
+			_, err = pglogrepl.CreateReplicationSlot(ctx, conn, slotName, "", replicationSlotOptions)
+			if err != nil {
+				return fmt.Errorf("cannot create replication slot: %w", err)
+			}
 		} else {
-			FatalOnErr(err, "cannot get slot information")
+			return fmt.Errorf("cannot get slot information when checking existence: %w", err)
 		}
 	}
 
 	slotRestartInfo, err = xlog.GetSlotInformation(conn, slotName)
-	FatalOnErr(err, "cannot get slot information")
+	if err != nil {
+		return fmt.Errorf("cannot get slot information: %w", err)
+	}
 
 	// 3
-	sysident, err := pglogrepl.IdentifySystem(context.Background(), conn)
-	FatalOnErr(err, "cannot identify system")
+	sysident, err := pglogrepl.IdentifySystem(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("cannot identify system: %w", err)
+	}
 
 	// 4
 	streamStartLSN, streamStartTimeline, err := pgrw.FindStreamingStart()
@@ -137,8 +140,7 @@ func StreamLog() {
 
 	// final check
 	if streamStartLSN == 0 || streamStartTimeline == 0 {
-		err := fmt.Errorf("cannot find start LSN for streaming")
-		FatalOnErr(err, "")
+		return fmt.Errorf("cannot find start LSN for streaming")
 	}
 
 	// 5
@@ -146,6 +148,11 @@ func StreamLog() {
 	// Always start streaming at the beginning of a segment
 	curPos := uint64(streamStartLSN) - xlog.XLogSegmentOffset(streamStartLSN, walSegSz)
 	streamStartLSN = pglogrepl.LSN(curPos)
+
+	slog.Info("start streaming",
+		slog.String("lsn", streamStartLSN.String()),
+		slog.Uint64("tli", uint64(streamStartTimeline)),
+	)
 
 	stream := &xlog.StreamCtl{
 		StartPos:              streamStartLSN,
@@ -165,7 +172,7 @@ func StreamLog() {
 		BaseDir: baseDir,
 	}
 
-	err = xlog.ReceiveXlogStream3(context.TODO(), conn, stream)
+	err = xlog.ReceiveXlogStream3(ctx, conn, stream)
 	if err != nil {
 		slog.Error("stream terminated (ReceiveXlogStream3)", slog.Any("err", err))
 	}
@@ -174,18 +181,31 @@ func StreamLog() {
 	err = xlog.FsyncDir(pgrw.BaseDir)
 	if err != nil {
 		slog.Info("could not finish writing WAL files", slog.Any("err", err))
-		return
+		// not a fatal error, just log it
+		return nil
 	}
 
 	if conn != nil {
-		conn.Close(context.Background())
+		err := conn.Close(ctx)
+		if err != nil {
+			// not a fatal error, just log it
+			slog.Info("could not close connection", slog.Any("err", err))
+		}
 		conn = nil
 	}
+
+	return nil
 }
 
 func main() {
+	ctx := context.Background()
+
 	for {
-		StreamLog()
+		err := StreamLog(ctx)
+		if err != nil {
+			slog.Error("an error occurred in StreamLog(), exiting")
+			os.Exit(1)
+		}
 
 		if noLoop {
 			slog.Error("disconnected")
