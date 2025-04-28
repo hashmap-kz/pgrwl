@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"pgreceivewal5/internal/xlog"
@@ -31,8 +32,10 @@ func FatalOnErr(err error, msg string, args ...any) {
 }
 
 func init() {
-	lvlCfg := os.Getenv("LOG_LEVEL")
-	// Init logger
+	logLevel := os.Getenv("LOG_LEVEL")
+	logFormat := os.Getenv("LOG_FORMAT")
+
+	// Get logger level (INFO if not set)
 	levels := map[string]slog.Level{
 		"trace": slog.LevelDebug,
 		"debug": slog.LevelDebug,
@@ -41,17 +44,27 @@ func init() {
 		"error": slog.LevelError,
 	}
 	lvl := slog.LevelInfo
-	if cfgLvl, ok := levels[lvlCfg]; ok {
+	if cfgLvl, ok := levels[strings.ToLower(logLevel)]; ok {
 		lvl = cfgLvl
 	}
-	// Create a base handler
-	baseHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: lvl,
-	})
-	// Add global "app" attribute to all logs
+
+	// Create a base handler (TEXT if not set)
+	var baseHandler slog.Handler
+	if strings.ToLower(logFormat) == "json" {
+		baseHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level: lvl,
+		})
+	} else {
+		baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: lvl,
+		})
+	}
+
+	// Add global "pid" attribute to all logs
 	logger := slog.New(baseHandler.WithAttrs([]slog.Attr{
-		slog.String("app", "x05"),
+		slog.Int("pid", os.Getpid()),
 	}))
+
 	// Set it as the default logger for the project
 	slog.SetDefault(logger)
 }
