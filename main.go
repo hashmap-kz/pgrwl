@@ -158,7 +158,7 @@ func StreamLog() {
 	}
 
 	// fsync dir
-	err = xlog.FsyncFname(pgrw.BaseDir)
+	err = xlog.FsyncDir(pgrw.BaseDir)
 	if err != nil {
 		slog.Info("could not finish writing WAL files", slog.Any("err", err))
 		return

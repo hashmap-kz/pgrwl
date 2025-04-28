@@ -390,10 +390,11 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 		}
 
 		// TODO:fix -> if an error occur in the code below close wal file with no renaming
-		// TODO: see "goto error" in the original code 
+		// TODO: see "goto error" in the original code
 
 		// Stream WAL
 		if err := HandleCopyStream(ctx, conn, stream, &stopPos); err != nil {
+			closeWalfileNoRename(stream)
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
@@ -403,6 +404,7 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 			for {
 				msg, err := conn.ReceiveMessage(ctx)
 				if err != nil {
+					closeWalfileNoRename(stream)
 					return false, fmt.Errorf("failed receiving server result: %w", err)
 				}
 
@@ -411,21 +413,26 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 					// Server sends end-of-timeline info
 					newTimeline, newStartPos, err := parseEndOfStreamingResult(m)
 					if err != nil {
+						closeWalfileNoRename(stream)
 						return false, fmt.Errorf("could not parse end-of-stream result: %w", err)
 					}
 					if newTimeline <= stream.Timeline {
+						closeWalfileNoRename(stream)
 						return false, fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
 					}
 					if newStartPos > stopPos {
+						closeWalfileNoRename(stream)
 						return false, fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
 					}
 
 					// Expect CommandComplete after DataRow
 					msg2, err := conn.ReceiveMessage(ctx)
 					if err != nil {
+						closeWalfileNoRename(stream)
 						return false, fmt.Errorf("failed receiving final CommandComplete: %w", err)
 					}
 					if _, ok := msg2.(*pgproto3.CommandComplete); !ok {
+						closeWalfileNoRename(stream)
 						return false, fmt.Errorf("expected CommandComplete after DataRow, got %T", msg2)
 					}
 
@@ -442,9 +449,11 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 					if stream.StreamClient.StreamStop(stopPos, stream.Timeline, false) {
 						return false, nil // clean shutdown
 					}
+					closeWalfileNoRename(stream)
 					return false, fmt.Errorf("replication stream terminated unexpectedly before stop point")
 
 				case *pgproto3.ErrorResponse:
+					closeWalfileNoRename(stream)
 					return false, fmt.Errorf("error response from server: %s", m.Message)
 
 				case *pgproto3.ReadyForQuery:
@@ -460,6 +469,7 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 
 		restart, err := readServerResult()
 		if err != nil {
+			closeWalfileNoRename(stream)
 			return err
 		}
 		if restart {
@@ -468,6 +478,16 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 		}
 		// Otherwise (clean shutdown) exit
 		return nil
+	}
+}
+
+func closeWalfileNoRename(stream *StreamCtl) {
+	slog.Warn("an error occur after CopyDone, trying to close walfile without renaming")
+	if stream.walfile != nil {
+		err := stream.closeNoRename()
+		if err != nil {
+			log.Printf("could not close WAL file: %v", err)
+		}
 	}
 }
 

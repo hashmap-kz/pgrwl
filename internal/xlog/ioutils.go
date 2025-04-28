@@ -21,6 +21,14 @@ func FsyncFname(path string) error {
 	return nil
 }
 
+// FsyncDir fsyncs dir contents.
+func FsyncDir(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	return fsync(dir)
+}
+
 func fsync(path string) error {
 	f, err := os.OpenFile(path, os.O_RDWR, 0o600)
 	if err != nil {
