@@ -389,6 +389,9 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 			return fmt.Errorf("failed to start replication: %w", err)
 		}
 
+		// TODO:fix -> if an error occur in the code below close wal file with no renaming
+		// TODO: see "goto error" in the original code 
+
 		// Stream WAL
 		if err := HandleCopyStream(ctx, conn, stream, &stopPos); err != nil {
 			return fmt.Errorf("error during streaming: %w", err)
