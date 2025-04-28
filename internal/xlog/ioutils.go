@@ -7,10 +7,10 @@ import (
 	"runtime"
 )
 
-// FsyncFile fsyncs path contents and the parent directory contents.
+// FsyncFname fsyncs path contents and the parent directory contents.
 func FsyncFname(path string) error {
 	if err := fsync(path); err != nil {
-		return fmt.Errorf("cannot fsync file %q: %s", path, err)
+		return fmt.Errorf("cannot fsync file %s: %s", filepath.ToSlash(path), err)
 	}
 	if runtime.GOOS != "windows" {
 		dir := filepath.Dir(path)
@@ -22,7 +22,7 @@ func FsyncFname(path string) error {
 }
 
 func fsync(path string) error {
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDWR, 0o600)
 	if err != nil {
 		return err
 	}
