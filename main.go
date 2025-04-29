@@ -47,6 +47,8 @@ func main() {
 		ConnStrRepl: connStrRepl,
 		SlotName:    slotName,
 	}
+	// TODO:fix
+	// pgrw.SetupSignalHandler()
 
 	for {
 		err := pgrw.StreamLog(ctx)

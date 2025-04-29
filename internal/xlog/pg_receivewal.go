@@ -7,9 +7,11 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -38,6 +40,19 @@ var (
 	walFileRe       = regexp.MustCompile(`^([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})(\.partial)?$`)
 	ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 )
+
+func (pgrw *PgReceiveWal) SetupSignalHandler() {
+	c := make(chan os.Signal, 1)
+
+	// Listen for SIGINT (Ctrl+C), SIGTERM (termination), SIGHUP if needed
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-c
+		pgrw.timeToStop = true
+		slog.Info("received signal, prepared to stop", slog.Any("sig", sig))
+	}()
+}
 
 // StreamLog the main loop of WAL receiving, any error FATAL
 func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
