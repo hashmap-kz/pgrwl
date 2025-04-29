@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"pgreceivewal5/internal/conv"
@@ -346,52 +345,6 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 	}
 }
 
-func SendStandbyCopyDone(_ context.Context, conn *pgconn.PgConn) (cdr *pglogrepl.CopyDoneResult, err error) {
-	cdr = &pglogrepl.CopyDoneResult{} // <<< Fix: initialize the pointer!
-
-	conn.Frontend().Send(&pgproto3.CopyDone{})
-	err = conn.Frontend().Flush()
-	if err != nil {
-		return cdr, err
-	}
-
-	for {
-		var msg pgproto3.BackendMessage
-		msg, err = conn.Frontend().Receive()
-		if err != nil {
-			return cdr, err
-		}
-
-		switch m := msg.(type) {
-		case *pgproto3.CopyDone:
-			// ignore
-		case *pgproto3.ParameterStatus, *pgproto3.NoticeResponse:
-			// ignore
-		case *pgproto3.CommandComplete:
-			// ignore
-		case *pgproto3.RowDescription:
-			// ignore
-		case *pgproto3.DataRow:
-			if len(m.Values) == 2 {
-				timeline, lerr := strconv.Atoi(string(m.Values[0]))
-				if lerr == nil {
-					lsn, lerr := pglogrepl.ParseLSN(string(m.Values[1]))
-					if lerr == nil {
-						cdr.Timeline = int32(timeline)
-						cdr.LSN = lsn
-					}
-				}
-			}
-		case *pgproto3.EmptyQueryResponse:
-			// ignore
-		case *pgproto3.ErrorResponse:
-			return cdr, pgconn.ErrorResponseToPgError(m)
-		case *pgproto3.ReadyForQuery:
-			return cdr, err
-		}
-	}
-}
-
 /////// v3
 
 func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
@@ -431,9 +384,6 @@ func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *Stream
 		if err := pglogrepl.StartReplication(ctx, conn, stream.ReplicationSlot, stream.StartPos, opts); err != nil {
 			return fmt.Errorf("failed to start replication: %w", err)
 		}
-
-		// TODO:fix -> if an error occur in the code below close wal file with no renaming
-		// TODO: see "goto error" in the original code
 
 		// Stream WAL
 		cdr, err := HandleCopyStream(ctx, conn, stream, &stopPos)

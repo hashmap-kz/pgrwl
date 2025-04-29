@@ -3,6 +3,7 @@ package xlog
 import (
 	"context"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgproto3"
 	"strconv"
 
 	"pgreceivewal5/internal/conv"
@@ -204,4 +205,53 @@ func GetStartupInfo(conn *pgconn.PgConn) (*StartupInfo, error) {
 	return &StartupInfo{
 		WalSegSz: wss,
 	}, nil
+}
+
+// modified version from pglogrepl
+// perhaps will be fixed: https://github.com/jackc/pglogrepl/pull/77
+
+func SendStandbyCopyDone(_ context.Context, conn *pgconn.PgConn) (cdr *pglogrepl.CopyDoneResult, err error) {
+	cdr = &pglogrepl.CopyDoneResult{} // <<< Fix: initialize the pointer!
+
+	conn.Frontend().Send(&pgproto3.CopyDone{})
+	err = conn.Frontend().Flush()
+	if err != nil {
+		return cdr, err
+	}
+
+	for {
+		var msg pgproto3.BackendMessage
+		msg, err = conn.Frontend().Receive()
+		if err != nil {
+			return cdr, err
+		}
+
+		switch m := msg.(type) {
+		case *pgproto3.CopyDone:
+			// ignore
+		case *pgproto3.ParameterStatus, *pgproto3.NoticeResponse:
+			// ignore
+		case *pgproto3.CommandComplete:
+			// ignore
+		case *pgproto3.RowDescription:
+			// ignore
+		case *pgproto3.DataRow:
+			if len(m.Values) == 2 {
+				timeline, lerr := strconv.Atoi(string(m.Values[0]))
+				if lerr == nil {
+					lsn, lerr := pglogrepl.ParseLSN(string(m.Values[1]))
+					if lerr == nil {
+						cdr.Timeline = int32(timeline)
+						cdr.LSN = lsn
+					}
+				}
+			}
+		case *pgproto3.EmptyQueryResponse:
+			// ignore
+		case *pgproto3.ErrorResponse:
+			return cdr, pgconn.ErrorResponseToPgError(m)
+		case *pgproto3.ReadyForQuery:
+			return cdr, err
+		}
+	}
 }
