@@ -3,8 +3,9 @@ package xlog
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgproto3"
 	"strconv"
+
+	"github.com/jackc/pgx/v5/pgproto3"
 
 	"pgreceivewal5/internal/conv"
 

@@ -121,7 +121,7 @@ func ProcessXLogDataMsg(
 
 			if stream.StillSending && stream.StreamClient.StreamStop(*blockpos, stream.Timeline, true) {
 				// Send CopyDone message
-				_, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
+				_, err := SendStandbyCopyDone(context.Background(), conn)
 				if err != nil {
 					return fmt.Errorf("could not send copy-end packet: %w", err)
 				}
@@ -135,6 +135,9 @@ func ProcessXLogDataMsg(
 
 // handle copy //
 
+/*
+ * Check if we should continue streaming, or abort at this point.
+ */
 func checkCopyStreamStop(
 	ctx context.Context,
 	conn *pgconn.PgConn,
@@ -149,7 +152,7 @@ func checkCopyStreamStop(
 		}
 
 		// Send CopyDone
-		_, err := pglogrepl.SendStandbyCopyDone(ctx, conn)
+		_, err := SendStandbyCopyDone(ctx, conn)
 		if err != nil {
 			slog.Error("could not send copy-end packet", slog.Any("err", err))
 			return false
@@ -238,7 +241,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 	for {
 		// Check if we should stop streaming
 		if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
-			return nil, fmt.Errorf("stream stop requested")
+			return nil, nil
 		}
 
 		now := time.Now()
@@ -249,22 +252,31 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
 			}
 			stream.LastFlushPosition = blockPos
+			/*
+			 * Send feedback so that the server sees the latest WAL locations
+			 * immediately.
+			 */
 			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
 				return nil, fmt.Errorf("could not send feedback after sync: %w", err)
 			}
 			lastStatus = now
 		}
 
-		// If time to send feedback
+		/*
+		 * Potentially send a status message to the primary
+		 */
 		if stream.StillSending && stream.StandbyMessageTimeout > 0 &&
 			time.Since(lastStatus) > stream.StandbyMessageTimeout {
+			/* Time to send feedback! */
 			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
 				return nil, fmt.Errorf("could not send periodic feedback: %w", err)
 			}
 			lastStatus = now
 		}
 
-		// Set next wake-up
+		/*
+		 * Calculate how long send/receive loops should sleep
+		 */
 		timeout := stream.StandbyMessageTimeout
 		if timeout <= 0 {
 			timeout = 10 * time.Second
@@ -312,25 +324,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			}
 
 		case *pgproto3.CopyDone:
-			slog.Info("HandleCopyStream: received CopyDone, HandleEndOfCopyStream()")
-			var cdr *pglogrepl.CopyDoneResult
-
-			// Server ended the stream. Handle CopyDone properly!
-			// HandleEndOfCopyStream(PGconn *Conn, StreamCtl *stream, char *copybuf, XLogRecPtr blockpos, XLogRecPtr *stoppos)
-			if stream.StillSending {
-				if err := stream.CloseWalfile(blockPos); err != nil {
-					return nil, fmt.Errorf("failed to close WAL file: %w", err)
-				}
-
-				cdr, err = SendStandbyCopyDone(ctx, conn)
-				if err != nil {
-					return nil, fmt.Errorf("failed to send client CopyDone: %w", err)
-				}
-				slog.Debug("copy-done-result", slog.Any("cdr", cdr))
-				stream.StillSending = false
-			}
-			*stopPos = blockPos
-			return cdr, nil
+			return handleEndOfCopyStream(ctx, conn, stream, blockPos, stopPos)
 
 			// Handle other commands
 		case *pgproto3.CommandComplete:
@@ -348,9 +342,35 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 	}
 }
 
+func handleEndOfCopyStream(
+	ctx context.Context,
+	conn *pgconn.PgConn,
+	stream *StreamCtl,
+	blockPos pglogrepl.LSN,
+	stopPos *pglogrepl.LSN,
+) (*pglogrepl.CopyDoneResult, error) {
+	slog.Info("HandleCopyStream: received CopyDone, HandleEndOfCopyStream()")
+	var cdr *pglogrepl.CopyDoneResult
+
+	if stream.StillSending {
+		if err := stream.CloseWalfile(blockPos); err != nil {
+			return nil, fmt.Errorf("failed to close WAL file: %w", err)
+		}
+
+		cdr, err := SendStandbyCopyDone(ctx, conn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to send client CopyDone: %w", err)
+		}
+		slog.Debug("copy-done-result", slog.Any("cdr", cdr))
+		stream.StillSending = false
+	}
+	*stopPos = blockPos
+	return cdr, nil
+}
+
 /////// v3
 
-func ReceiveXlogStream3(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
+func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
 	var stopPos pglogrepl.LSN
 
 	stream.LastFlushPosition = stream.StartPos

@@ -151,7 +151,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		BaseDir:               pgrw.BaseDir,
 	}
 
-	err = ReceiveXlogStream3(ctx, pgrw.Conn, stream)
+	err = ReceiveXlogStream(ctx, pgrw.Conn, stream)
 	if err != nil {
 		slog.Error("stream terminated (ReceiveXlogStream3)", slog.Any("err", err))
 	}
