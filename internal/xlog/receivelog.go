@@ -145,7 +145,6 @@ func checkCopyStreamStop(
 	blockpos pglogrepl.LSN,
 ) bool {
 	if stream.StillSending && stream.StreamClient.StreamStop(blockpos, stream.Timeline, false) {
-		slog.Debug("checkCopyStreamStop -> false")
 
 		// Close WAL file first
 		if err := stream.CloseWalfile(blockpos); err != nil {
@@ -162,8 +161,6 @@ func checkCopyStreamStop(
 
 		stream.StillSending = false
 	}
-
-	slog.Debug("checkCopyStreamStop -> true")
 	return true
 }
 
@@ -439,6 +436,8 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
 
 			continue // restart streaming
+		} else {
+			slog.Debug("cdr == nil")
 		}
 	}
 }
