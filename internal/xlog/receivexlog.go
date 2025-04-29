@@ -48,7 +48,7 @@ func ProcessXLogDataMsg(
 	stream *StreamCtl,
 	xld pglogrepl.XLogData,
 	blockpos *pglogrepl.LSN,
-) (bool, error) {
+) error {
 	var err error
 
 	/*
@@ -56,7 +56,7 @@ func ProcessXLogDataMsg(
 	 * subsequent XLogData messages.
 	 */
 	if !stream.StillSending {
-		return true, nil
+		return nil
 	}
 
 	xlogoff := XLogSegmentOffset(xld.WALStart, stream.WalSegSz)
@@ -64,11 +64,11 @@ func ProcessXLogDataMsg(
 	// If no open file, expect offset to be zero
 	if stream.walfile == nil {
 		if xlogoff != 0 {
-			return false, fmt.Errorf("received WAL at offset %d but no file open", xlogoff)
+			return fmt.Errorf("received WAL at offset %d but no file open", xlogoff)
 		}
 	} else {
 		if stream.walfile.currpos != xlogoff {
-			return false, fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, stream.walfile.currpos)
+			return fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, stream.walfile.currpos)
 		}
 	}
 
@@ -93,23 +93,17 @@ func ProcessXLogDataMsg(
 		if stream.walfile == nil {
 			err := stream.OpenWalFile(*blockpos)
 			if err != nil {
-				return false, err
+				return err
 			}
 		}
 
-		// if (stream->walmethod->ops->write(walfile,
-		// 								  copybuf + hdr_len + bytes_written,
-		// 								  bytes_to_write) != bytes_to_write)
-		// {
-		// 	pg_log_error("could not write %d bytes to WAL file \"%s\": %s",
-		// 				 bytes_to_write, walfile->pathname,
-		// 				 GetLastWalMethodError(stream->walmethod));
-		// 	return false;
-		// }
+		// if(stream->walmethod->ops->write(walfile,
+		// 	copybuf + hdr_len + bytes_written,
+		// 	bytes_to_write) != bytes_to_write) {}
 
 		err = stream.WriteAtWalFile(data[bytesWritten:bytesWritten+bytesToWrite], xlogoff)
 		if err != nil {
-			return false, fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
+			return fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
 
 		bytesWritten += bytesToWrite
@@ -121,7 +115,7 @@ func ProcessXLogDataMsg(
 		if xlSegOff == 0 {
 			err := stream.CloseWalfile(*blockpos)
 			if err != nil {
-				return false, err
+				return err
 			}
 			xlogoff = 0
 
@@ -129,14 +123,14 @@ func ProcessXLogDataMsg(
 				// Send CopyDone message
 				_, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
 				if err != nil {
-					return false, fmt.Errorf("could not send copy-end packet: %w", err)
+					return fmt.Errorf("could not send copy-end packet: %w", err)
 				}
 				stream.StillSending = false
-				return true, nil
+				return nil /* ignore the rest of this XLogData packet */
 			}
 		}
 	}
-	return true, nil
+	return nil
 }
 
 // handle copy //
@@ -157,7 +151,7 @@ func checkCopyStreamStop(
 		// Send CopyDone
 		_, err := pglogrepl.SendStandbyCopyDone(ctx, conn)
 		if err != nil {
-			log.Printf("could not send copy-end packet: %v", err)
+			slog.Error("could not send copy-end packet", slog.Any("err", err))
 			return false
 		}
 
@@ -209,7 +203,16 @@ func ProcessKeepaliveMsg(ctx context.Context,
 
 	if keepalive.ReplyRequested && stream.StillSending {
 		// If a valid flush location needs to be reported, and WAL file exists
-		if stream.ReportFlushPosition && stream.LastFlushPosition < blockPos && stream.walfile != nil {
+		if stream.ReportFlushPosition &&
+			stream.LastFlushPosition < blockPos &&
+			stream.walfile != nil {
+			/*
+			 * If a valid flush location needs to be reported, flush the
+			 * current WAL file so that the latest flush location is sent back
+			 * to the server. This is necessary to see whether the last WAL
+			 * data has been successfully replicated or not, at the normal
+			 * shutdown of the server.
+			 */
 			if err := stream.SyncWalFile(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
@@ -295,7 +298,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 					return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 				}
 
-				if _, err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
+				if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 					return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 				}
 
