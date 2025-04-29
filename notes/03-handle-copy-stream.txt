@@ -1,0 +1,62 @@
+func handleCopyStream(
+	ctx context.Context,
+	conn *pgconn.PgConn,
+	stream *StreamCtl,
+	sleeptime time.Duration,
+	blockPos pglogrepl.LSN,
+	stopPos *pglogrepl.LSN,
+) error {
+	var (
+		data []byte
+		result int
+		err error
+	)
+
+	// First receive attempt with sleeptime timeout
+	data, result, err = CopyStreamReceive(conn, sleeptime)
+	for result != 0 {
+		if err != nil {
+			return fmt.Errorf("error receiving from WAL stream: %w", err)
+		}
+
+		switch result {
+		case -1:
+			return fmt.Errorf("fatal error in stream receive")
+		case -2:
+			// Server ended COPY — HandleEndOfCopyStream
+			err := HandleEndOfCopyStream(ctx, conn, stream, nil, blockPos, stopPos, &stillSending)
+			if err != nil {
+				return fmt.Errorf("error handling end of copy: %w", err)
+			}
+			log.Println("r == -2: server ended copy stream")
+			return nil // finished cleanly
+		}
+
+		// Normal CopyData message
+		if len(data) == 0 {
+			return fmt.Errorf("received empty CopyData message")
+		}
+
+		switch data[0] {
+		case 'k': // keepalive
+			if err := ProcessKeepaliveMsg(conn, stream, data, blockPos, &lastStatus); err != nil {
+				return fmt.Errorf("error processing keepalive message: %w", err)
+			}
+		case 'w': // WAL data
+			if err := ProcessXLogDataMsg(conn, stream, data, blockPos); err != nil {
+				return fmt.Errorf("error processing WAL data message: %w", err)
+			}
+
+			if err := CheckCopyStreamStop(conn, stream, blockPos); err != nil {
+				return fmt.Errorf("copy stream stop requested: %w", err)
+			}
+		default:
+			return fmt.Errorf("unrecognized streaming header: '%c'", data[0])
+		}
+
+		// Done processing that message, try to immediately get more
+		data, result, err = CopyStreamReceive(conn, 0) // timeout = 0 for fast loop
+	}
+
+	return nil
+}
