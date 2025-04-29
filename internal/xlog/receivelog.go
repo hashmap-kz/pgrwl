@@ -355,6 +355,7 @@ func handleEndOfCopyStream(
 	stopPos *pglogrepl.LSN,
 ) (*pglogrepl.CopyDoneResult, error) {
 	slog.Info("HandleCopyStream: received CopyDone, HandleEndOfCopyStream()")
+	var err error
 	var cdr *pglogrepl.CopyDoneResult
 
 	if stream.StillSending {
@@ -362,7 +363,7 @@ func handleEndOfCopyStream(
 			return nil, fmt.Errorf("failed to close WAL file: %w", err)
 		}
 
-		cdr, err := SendStandbyCopyDone(ctx, conn)
+		cdr, err = SendStandbyCopyDone(ctx, conn)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send client CopyDone: %w", err)
 		}

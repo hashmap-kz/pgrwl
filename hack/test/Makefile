@@ -53,5 +53,11 @@ clean:
 create-slot:
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-standby bash -c "su postgres -c 'pg_receivewal --no-password --no-loop --slot=pg_receivewal --create-slot --if-not-exists'"
 
+switch-wal-primary:
+	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary psql -U postgres -p 5432 -c "SELECT pg_switch_wal();"
+
+switch-wal-standby:
+	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-standby psql -U postgres -p 5432 -c "SELECT pg_switch_wal();"
+
 # Default target
 default: up
