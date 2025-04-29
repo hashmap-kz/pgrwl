@@ -315,12 +315,14 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 				if err != nil {
 					return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 				}
-
 				if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 					return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 				}
 
-				// After processing XLogData, check again if stop is requested
+				/*
+				 * Check if we should continue streaming, or abort at this
+				 * point.
+				 */
 				if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
 					return nil, errors.New("stream stop requested after XLogData")
 				}
@@ -332,18 +334,9 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		case *pgproto3.CopyDone:
 			return handleEndOfCopyStream(ctx, conn, stream, blockPos, stopPos)
 
-			// Handle other commands
-		case *pgproto3.CommandComplete:
-			slog.Warn("received CommandComplete, treating as disconnection")
-			return nil, nil // safe exit
-		case *pgproto3.ErrorResponse:
-			return nil, fmt.Errorf("error response from server: %s", m.Message)
-		case *pgproto3.ReadyForQuery:
-			slog.Warn("received ReadyForQuery, treating as disconnection")
-			return nil, nil // safe exit
 		default:
 			slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
-			return nil, nil // safe exit
+			return nil, fmt.Errorf("received unexpected message: %T", msg)
 		}
 	}
 }
