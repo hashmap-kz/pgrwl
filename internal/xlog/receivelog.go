@@ -145,6 +145,8 @@ func checkCopyStreamStop(
 	blockpos pglogrepl.LSN,
 ) bool {
 	if stream.StillSending && stream.StreamClient.StreamStop(blockpos, stream.Timeline, false) {
+		slog.Debug("checkCopyStreamStop -> false")
+
 		// Close WAL file first
 		if err := stream.CloseWalfile(blockpos); err != nil {
 			// Error already logged in closeWalFile
@@ -161,6 +163,7 @@ func checkCopyStreamStop(
 		stream.StillSending = false
 	}
 
+	slog.Debug("checkCopyStreamStop -> true")
 	return true
 }
 
@@ -239,9 +242,12 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 	stream.StillSending = true
 
 	for {
-		// Check if we should stop streaming
+
+		/*
+		 * Check if we should continue streaming, or abort at this point.
+		 */
 		if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
-			return nil, nil
+			return nil, fmt.Errorf("check copy stream stop")
 		}
 
 		now := time.Now()
