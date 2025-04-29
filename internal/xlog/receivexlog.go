@@ -314,7 +314,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			var cdr *pglogrepl.CopyDoneResult
 
 			// Server ended the stream. Handle CopyDone properly!
-			// HandleEndOfCopyStream(PGconn *conn, StreamCtl *stream, char *copybuf, XLogRecPtr blockpos, XLogRecPtr *stoppos)
+			// HandleEndOfCopyStream(PGconn *Conn, StreamCtl *stream, char *copybuf, XLogRecPtr blockpos, XLogRecPtr *stoppos)
 			if stream.StillSending {
 				if err := stream.CloseWalfile(blockPos); err != nil {
 					return nil, fmt.Errorf("failed to close WAL file: %w", err)

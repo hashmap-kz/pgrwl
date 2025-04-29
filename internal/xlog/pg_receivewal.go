@@ -1,6 +1,8 @@
 package xlog
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -8,7 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"sync/atomic"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"pgreceivewal5/internal/conv"
 
@@ -16,9 +20,13 @@ import (
 )
 
 type PgReceiveWal struct {
-	BaseDir      string
-	WalSegSz     uint64
-	timeToStop   atomic.Bool
+	BaseDir     string
+	WalSegSz    uint64
+	Conn        *pgconn.PgConn
+	ConnStrRepl string
+	SlotName    string
+
+	timeToStop   bool
 	endpos       pglogrepl.LSN
 	prevTimeline uint32
 	prevPos      pglogrepl.LSN
@@ -31,9 +39,131 @@ var (
 	ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 )
 
+// StreamLog the main loop of WAL receiving, any error FATAL
+func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
+	var err error
+
+	// 1
+	if pgrw.Conn == nil {
+		pgrw.Conn, err = pgconn.Connect(context.Background(), pgrw.ConnStrRepl)
+		if err != nil {
+			slog.Error("cannot establish connection", slog.Any("err", err))
+			// not a fatal error, a reconnect loop will handle it
+			return nil
+		}
+	}
+
+	walSegSz := pgrw.WalSegSz
+
+	// 3
+	var slotRestartInfo *ReadReplicationSlotResultResult
+	_, err = GetSlotInformation(pgrw.Conn, pgrw.SlotName)
+	if err != nil {
+		if errors.Is(err, ErrSlotDoesNotExist) {
+			slog.Info("creating replication slot", slog.String("name", pgrw.SlotName))
+			replicationSlotOptions := pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication}
+			_, err = pglogrepl.CreateReplicationSlot(ctx, pgrw.Conn, pgrw.SlotName, "", replicationSlotOptions)
+			if err != nil {
+				return fmt.Errorf("cannot create replication slot: %w", err)
+			}
+		} else {
+			return fmt.Errorf("cannot get slot information when checking existence: %w", err)
+		}
+	}
+
+	slotRestartInfo, err = GetSlotInformation(pgrw.Conn, pgrw.SlotName)
+	if err != nil {
+		return fmt.Errorf("cannot get slot information: %w", err)
+	}
+
+	// 3
+	sysident, err := pglogrepl.IdentifySystem(ctx, pgrw.Conn)
+	if err != nil {
+		return fmt.Errorf("cannot identify system: %w", err)
+	}
+
+	// 4
+	streamStartLSN, streamStartTimeline, err := pgrw.FindStreamingStart()
+	if err != nil {
+		if !errors.Is(err, ErrNoWalEntries) {
+			// just log an error and continue, stream-start-lsn and timeline
+			// are required, and we will proceed with slot-info or sysident
+			slog.Error("cannot find streaming start", slog.Any("err", err))
+		}
+	}
+
+	if streamStartLSN == 0 {
+		if slotRestartInfo.RestartLSN != 0 {
+			streamStartLSN = slotRestartInfo.RestartLSN
+			streamStartTimeline = slotRestartInfo.RestartTLI
+		}
+	}
+
+	if streamStartLSN == 0 {
+		streamStartLSN = sysident.XLogPos
+		streamStartTimeline = conv.ToUint32(sysident.Timeline)
+	}
+
+	// final check
+	if streamStartLSN == 0 || streamStartTimeline == 0 {
+		return fmt.Errorf("cannot find start LSN for streaming")
+	}
+
+	// 5
+
+	// Always start streaming at the beginning of a segment
+	curPos := uint64(streamStartLSN) - XLogSegmentOffset(streamStartLSN, walSegSz)
+	streamStartLSN = pglogrepl.LSN(curPos)
+
+	slog.Info("start streaming",
+		slog.String("lsn", streamStartLSN.String()),
+		slog.Uint64("tli", uint64(streamStartTimeline)),
+	)
+
+	stream := &StreamCtl{
+		StartPos:              streamStartLSN,
+		Timeline:              streamStartTimeline,
+		StandbyMessageTimeout: 10 * time.Second,
+		Synchronous:           true,
+		PartialSuffix:         ".partial",
+		StreamClient:          pgrw,
+		ReplicationSlot:       pgrw.SlotName,
+		SysIdentifier:         sysident.SystemID,
+		WalSegSz:              walSegSz,
+		LastFlushPosition:     pglogrepl.LSN(0),
+		StillSending:          true,
+		ReportFlushPosition:   true,
+		BaseDir:               pgrw.BaseDir,
+	}
+
+	err = ReceiveXlogStream3(ctx, pgrw.Conn, stream)
+	if err != nil {
+		slog.Error("stream terminated (ReceiveXlogStream3)", slog.Any("err", err))
+	}
+
+	// fsync dir
+	err = FsyncDir(pgrw.BaseDir)
+	if err != nil {
+		slog.Info("could not finish writing WAL files", slog.Any("err", err))
+		// not a fatal error, just log it
+		return nil
+	}
+
+	if pgrw.Conn != nil {
+		err := pgrw.Conn.Close(ctx)
+		if err != nil {
+			// not a fatal error, just log it
+			slog.Info("could not close connection", slog.Any("err", err))
+		}
+		pgrw.Conn = nil
+	}
+
+	return nil
+}
+
 // Allow external interrupt
 func (pgrw *PgReceiveWal) RequestStop() {
-	pgrw.timeToStop.Store(true)
+	pgrw.timeToStop = true
 }
 
 // FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
@@ -157,7 +287,7 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 			slog.String("lsn", xlogpos.String()),
 			slog.Uint64("tli", uint64(timeline)),
 		)
-		pgrw.timeToStop.Store(true)
+		pgrw.timeToStop = true
 		return true
 	}
 
@@ -171,7 +301,7 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 	pgrw.prevTimeline = timeline
 	pgrw.prevPos = xlogpos
 
-	if pgrw.timeToStop.Load() {
+	if pgrw.timeToStop {
 		slog.Debug("received interrupt signal, exiting")
 		return true
 	}
