@@ -60,6 +60,8 @@ func ProcessXLogDataMsg(
 		return nil
 	}
 
+	*blockpos = xld.WALStart
+
 	xlogoff := XLogSegmentOffset(xld.WALStart, stream.WalSegSz)
 
 	// If no open file, expect offset to be zero
@@ -77,6 +79,13 @@ func ProcessXLogDataMsg(
 
 	bytesLeft := uint64(len(data))
 	bytesWritten := uint64(0)
+
+	slog.Debug(fmt.Sprintf("received xlog-data, len %d lastFlushPosition %d blockpos %d diff %d",
+		bytesLeft,
+		stream.LastFlushPosition,
+		*blockpos,
+		*blockpos-stream.LastFlushPosition,
+	))
 
 	for bytesLeft != 0 {
 		var bytesToWrite uint64
@@ -330,9 +339,12 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 					if err != nil {
 						return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 					}
+
+					slog.Debug("X - ProcessXLogDataMsg START")
 					if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 						return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 					}
+					slog.Debug("X - ProcessXLogDataMsg END")
 
 					/*
 					 * Check if we should continue streaming, or abort at this
