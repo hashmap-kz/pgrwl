@@ -18,7 +18,7 @@ import (
 // TODO: CLI
 const (
 	slotName    = "pg_recval_5"
-	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes host=localhost port=5432"
+	connStrRepl = "application_name=pg_recval_5 replication=yes"
 	baseDir     = "wals"
 	noLoop      = false
 )
@@ -27,6 +27,11 @@ func init() {
 	// TODO:localdev
 	os.Setenv("LOG_LEVEL", "debug")
 	os.Setenv("LOG_ADD_SOURCE", "1")
+
+	os.Setenv("PGHOST", "localhost")
+	os.Setenv("PGPORT", "5432")
+	os.Setenv("PGUSER", "postgres")
+	os.Setenv("PGPASSWORD", "postgres")
 }
 
 func main() {
