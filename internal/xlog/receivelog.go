@@ -281,12 +281,13 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		/*
 		 * Calculate how long send/receive loops should sleep
 		 */
-		timeout := stream.StandbyMessageTimeout
-		if timeout <= 0 {
-			timeout = 10 * time.Second
-		}
+		sleeptime := calculateCopyStreamSleepTime(stream, now, stream.StandbyMessageTimeout, lastStatus)
+		//slog.Debug("sleeptime",
+		//	slog.Any("sleeptime", sleeptime),
+		//	slog.Any("deadline", now.Add(sleeptime)),
+		//)
 
-		ctxTimeout, cancel := context.WithTimeout(ctx, timeout)
+		ctxTimeout, cancel := context.WithDeadline(ctx, now.Add(sleeptime))
 		msg, err := conn.ReceiveMessage(ctxTimeout)
 		cancel()
 		if pgconn.Timeout(err) {
@@ -525,4 +526,33 @@ func writeTimeLineHistoryFile(stream *StreamCtl, filename, content string) error
 	}
 
 	return nil
+}
+
+func calculateCopyStreamSleepTime(
+	stream *StreamCtl,
+	now time.Time,
+	standbyMessageTimeout time.Duration,
+	lastStatus time.Time,
+) time.Duration {
+	var statusTargetTime time.Time
+	var sleepTime time.Duration
+
+	if standbyMessageTimeout > 0 && stream.StillSending {
+		statusTargetTime = lastStatus.Add(standbyMessageTimeout)
+	}
+
+	if !statusTargetTime.IsZero() {
+		diff := statusTargetTime.Sub(now)
+
+		if diff <= 0 {
+			// Always sleep at least 1 second if overdue
+			sleepTime = 1 * time.Second
+		} else {
+			sleepTime = diff
+		}
+	} else {
+		sleepTime = -1
+	}
+
+	return sleepTime
 }
