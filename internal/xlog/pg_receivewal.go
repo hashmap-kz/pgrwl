@@ -51,7 +51,7 @@ func (pgrw *PgReceiveWal) SetupSignalHandler() {
 
 	go func() {
 		s := <-sig
-		slog.Info("received signal", slog.String("signal", s.String()))
+		slog.Info("(pgrw) received signal", slog.String("signal", s.String()))
 		close(pgrw.StopCh)
 	}()
 }
@@ -155,7 +155,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 
 	err = ReceiveXlogStream(ctx, pgrw.Conn, stream)
 	if err != nil {
-		slog.Error("stream terminated (ReceiveXlogStream3)", slog.Any("err", err))
+		slog.Error("ReceiveXlogStream() terminated", slog.Any("err", err))
 	}
 
 	// fsync dir

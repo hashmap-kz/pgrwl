@@ -5,6 +5,8 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"pgreceivewal5/internal/logger"
@@ -28,7 +30,8 @@ func init() {
 }
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 	logger.Init()
 
 	conn, err := pgconn.Connect(context.Background(), connStrRepl)
@@ -48,7 +51,7 @@ func main() {
 		SlotName:    slotName,
 	}
 	// TODO:fix
-	// pgrw.SetupSignalHandler()
+	pgrw.SetupSignalHandler()
 
 	for {
 		err := pgrw.StreamLog(ctx)
@@ -57,6 +60,13 @@ func main() {
 				slog.Any("err", err),
 			)
 			os.Exit(1)
+		}
+
+		select {
+		case <-ctx.Done():
+			slog.Info("(main) received termination signal, exiting...")
+			os.Exit(0)
+		default:
 		}
 
 		if noLoop {
