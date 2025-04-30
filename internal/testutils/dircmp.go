@@ -1,0 +1,120 @@
+package testutils
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+)
+
+type FileDiff struct {
+	Path       string
+	MissingInA bool
+	MissingInB bool
+	Different  bool
+}
+
+func CompareDirs(dirA, dirB string) ([]FileDiff, error) {
+	var diffs []FileDiff
+	filesA := make(map[string]string)
+	filesB := make(map[string]string)
+
+	// Walk dirA
+	err := filepath.WalkDir(dirA, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(dirA, path)
+		filesA[rel] = path
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Walk dirB
+	err = filepath.WalkDir(dirB, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(dirB, path)
+		filesB[rel] = path
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Union of paths
+	seen := make(map[string]bool)
+	for path := range filesA {
+		seen[path] = true
+	}
+	for path := range filesB {
+		seen[path] = true
+	}
+
+	// Compare
+	for relPath := range seen {
+		aPath, aOk := filesA[relPath]
+		bPath, bOk := filesB[relPath]
+
+		diff := FileDiff{Path: relPath, MissingInA: !aOk, MissingInB: !bOk}
+
+		if aOk && bOk {
+			same, err := compareFilesBytes(aPath, bPath)
+			if err != nil {
+				return nil, fmt.Errorf("compare %s: %w", relPath, err)
+			}
+			if !same {
+				diff.Different = true
+			}
+		}
+
+		if diff.MissingInA || diff.MissingInB || diff.Different {
+			diffs = append(diffs, diff)
+		}
+	}
+
+	return diffs, nil
+}
+
+func compareFilesBytes(path1, path2 string) (bool, error) {
+	b1, err := os.ReadFile(path1)
+	if err != nil {
+		return false, fmt.Errorf("read %s: %w", path1, err)
+	}
+	b2, err := os.ReadFile(path2)
+	if err != nil {
+		return false, fmt.Errorf("read %s: %w", path2, err)
+	}
+	return bytes.Equal(b1, b2), nil
+}
+
+func compareFilesSHA256(pathA, pathB string) (bool, error) {
+	hashA, err := fileSHA256(pathA)
+	if err != nil {
+		return false, err
+	}
+	hashB, err := fileSHA256(pathB)
+	if err != nil {
+		return false, err
+	}
+	return hashA == hashB, nil
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
