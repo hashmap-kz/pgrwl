@@ -45,9 +45,12 @@ type StreamCtl struct {
 }
 
 func (stream *StreamCtl) updateLastFlushPosition(p pglogrepl.LSN, reason string) {
-	slog.Debug(fmt.Sprintf("updateLastFlushPosition prev=%d, next=%d, diff=%d, reason=%s",
-		stream.LastFlushPosition, p, p-stream.LastFlushPosition, reason,
-	))
+	slog.Debug("updateLastFlushPosition()",
+		slog.Uint64("prev", uint64(stream.LastFlushPosition)),
+		slog.Uint64("next", uint64(p)),
+		slog.Uint64("diff", uint64(p-stream.LastFlushPosition)),
+		slog.String("reason", reason),
+	)
 	stream.LastFlushPosition = p
 }
 
@@ -87,12 +90,14 @@ func ProcessXLogDataMsg(
 	bytesLeft := uint64(len(data))
 	bytesWritten := uint64(0)
 
-	slog.Debug(fmt.Sprintf("received xlog-data, len %d lastFlushPosition %d blockpos %d diff %d",
-		bytesLeft,
-		stream.LastFlushPosition,
-		*blockpos,
-		*blockpos-stream.LastFlushPosition,
-	))
+	slog.Debug("received xlog-data",
+		slog.Uint64("len", bytesLeft),
+		slog.Uint64("lastFlushPosition-u64", uint64(stream.LastFlushPosition)),
+		slog.Uint64("blockPos-u64", uint64(*blockpos)),
+		slog.String("lastFlushPosition-lsn", stream.LastFlushPosition.String()),
+		slog.String("blockPos-lsn", blockpos.String()),
+		slog.Uint64("diff", uint64(*blockpos-stream.LastFlushPosition)),
+	)
 
 	for bytesLeft != 0 {
 		var bytesToWrite uint64
@@ -348,11 +353,18 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 							return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 						}
 
-						slog.Debug("X - ProcessXLogDataMsg START")
+						slog.Debug("X--ProcessXLogDataMsg--START",
+							slog.String("blockpos-lsn", blockPos.String()),
+							slog.Uint64("blockpos-u64", uint64(blockPos)),
+							slog.Int("datalen", len(xld.WALData)),
+						)
 						if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 							return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 						}
-						slog.Debug("X - ProcessXLogDataMsg END")
+						slog.Debug("X--ProcessXLogDataMsg--END",
+							slog.String("blockpos-lsn", blockPos.String()),
+							slog.Uint64("blockpos-u64", uint64(blockPos)),
+						)
 
 						/*
 						 * Check if we should continue streaming, or abort at this
