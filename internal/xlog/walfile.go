@@ -30,26 +30,26 @@ func (stream *StreamCtl) SyncWalFile() error {
 	return fsync.Fsync(stream.walfile.fd)
 }
 
-func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) error {
+func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) (int, error) {
 	xlogOffToInt64, err := conv.Uint64ToInt64(xlogoff)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	if stream.walfile == nil {
-		return fmt.Errorf("stream.walfile is nil (WriteAtWalFile)")
+		return -1, fmt.Errorf("stream.walfile is nil (WriteAtWalFile)")
 	}
 	if stream.walfile.fd == nil {
-		return fmt.Errorf("stream.walfile.fd is nil (WriteAtWalFile)")
+		return -1, fmt.Errorf("stream.walfile.fd is nil (WriteAtWalFile)")
 	}
 	n, err := stream.walfile.fd.WriteAt(data, xlogOffToInt64)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	if n > 0 {
 		stream.walfile.currpos += uint64(n)
 	}
-	return nil
+	return n, nil
 }
 
 func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {

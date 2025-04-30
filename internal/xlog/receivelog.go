@@ -92,7 +92,7 @@ func ProcessXLogDataMsg(
 		}
 
 		if stream.walfile == nil {
-			err := stream.OpenWalFile(*blockpos)
+			err = stream.OpenWalFile(*blockpos)
 			if err != nil {
 				return err
 			}
@@ -102,8 +102,11 @@ func ProcessXLogDataMsg(
 		// 	copybuf + hdr_len + bytes_written,
 		// 	bytes_to_write) != bytes_to_write) {}
 
-		err = stream.WriteAtWalFile(data[bytesWritten:bytesWritten+bytesToWrite], xlogoff)
+		n, err := stream.WriteAtWalFile(data[bytesWritten:bytesWritten+bytesToWrite], xlogoff)
 		if err != nil {
+			return fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
+		}
+		if conv.ToUint64(int64(n)) != bytesToWrite {
 			return fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
 
