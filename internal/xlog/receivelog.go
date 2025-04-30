@@ -329,70 +329,57 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 				return nil, fmt.Errorf("receive message failed: %w", err)
 			}
 
-			for {
-				switch m := msg.(type) {
-				case *pgproto3.CopyData:
-					switch m.Data[0] {
-					case pglogrepl.PrimaryKeepaliveMessageByteID:
-						pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
-						if err != nil {
-							return nil, fmt.Errorf("parse keepalive failed: %w", err)
-						}
-						if err := ProcessKeepaliveMsg(ctx, conn, stream, pkm, blockPos, &lastStatus); err != nil {
-							return nil, fmt.Errorf("process keepalive failed: %w", err)
-						}
-
-					case pglogrepl.XLogDataByteID:
-						xld, err := pglogrepl.ParseXLogData(m.Data[1:])
-						if err != nil {
-							return nil, fmt.Errorf("parse xlogdata failed: %w", err)
-						}
-
-						slog.Debug("X - ProcessXLogDataMsg START")
-						if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
-							return nil, fmt.Errorf("processing xlogdata failed: %w", err)
-						}
-						slog.Debug("X - ProcessXLogDataMsg END")
-
-						/*
-						 * Check if we should continue streaming, or abort at this
-						 * point.
-						 */
-						if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
-							return nil, errors.New("stream stop requested after XLogData")
-						}
-
-					default:
-						return nil, fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
+			switch m := msg.(type) {
+			case *pgproto3.CopyData:
+				switch m.Data[0] {
+				case pglogrepl.PrimaryKeepaliveMessageByteID:
+					pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
+					if err != nil {
+						return nil, fmt.Errorf("parse keepalive failed: %w", err)
+					}
+					if err := ProcessKeepaliveMsg(ctx, conn, stream, pkm, blockPos, &lastStatus); err != nil {
+						return nil, fmt.Errorf("process keepalive failed: %w", err)
 					}
 
-				case *pgproto3.CopyDone:
-					return handleEndOfCopyStream(ctx, conn, stream, blockPos, stopPos)
+				case pglogrepl.XLogDataByteID:
+					xld, err := pglogrepl.ParseXLogData(m.Data[1:])
+					if err != nil {
+						return nil, fmt.Errorf("parse xlogdata failed: %w", err)
+					}
 
-					// Handle other commands
-				case *pgproto3.CommandComplete:
-					slog.Warn("received CommandComplete, treating as disconnection")
-					return nil, nil // safe exit
-				case *pgproto3.ErrorResponse:
-					return nil, fmt.Errorf("error response from server: %s", m.Message)
-				case *pgproto3.ReadyForQuery:
-					slog.Warn("received ReadyForQuery, treating as disconnection")
-					return nil, nil // safe exit
+					slog.Debug("X - ProcessXLogDataMsg START")
+					if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
+						return nil, fmt.Errorf("processing xlogdata failed: %w", err)
+					}
+					slog.Debug("X - ProcessXLogDataMsg END")
+
+					/*
+					 * Check if we should continue streaming, or abort at this
+					 * point.
+					 */
+					if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
+						return nil, errors.New("stream stop requested after XLogData")
+					}
+
 				default:
-					slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
-					return nil, fmt.Errorf("received unexpected message: %T", msg)
+					return nil, fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
 				}
 
-				// try to read next message without blocking
-				ctxTimeout, cancel = context.WithTimeout(ctx, 1)
-				msg, err = conn.ReceiveMessage(ctxTimeout)
-				cancel()
-				if pgconn.Timeout(err) {
-					break // done draining
-				}
-				if err != nil {
-					return nil, err
-				}
+			case *pgproto3.CopyDone:
+				return handleEndOfCopyStream(ctx, conn, stream, blockPos, stopPos)
+
+				// Handle other commands
+			case *pgproto3.CommandComplete:
+				slog.Warn("received CommandComplete, treating as disconnection")
+				return nil, nil // safe exit
+			case *pgproto3.ErrorResponse:
+				return nil, fmt.Errorf("error response from server: %s", m.Message)
+			case *pgproto3.ReadyForQuery:
+				slog.Warn("received ReadyForQuery, treating as disconnection")
+				return nil, nil // safe exit
+			default:
+				slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
+				return nil, fmt.Errorf("received unexpected message: %T", msg)
 			}
 		}
 	}
