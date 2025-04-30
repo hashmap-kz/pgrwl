@@ -282,12 +282,8 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		 * Calculate how long send/receive loops should sleep
 		 */
 		sleeptime := calculateCopyStreamSleepTime(stream, now, stream.StandbyMessageTimeout, lastStatus)
-		//slog.Debug("sleeptime",
-		//	slog.Any("sleeptime", sleeptime),
-		//	slog.Any("deadline", now.Add(sleeptime)),
-		//)
 
-		ctxTimeout, cancel := context.WithDeadline(ctx, now.Add(sleeptime))
+		ctxTimeout, cancel := context.WithTimeout(ctx, sleeptime)
 		msg, err := conn.ReceiveMessage(ctxTimeout)
 		cancel()
 		if pgconn.Timeout(err) {
