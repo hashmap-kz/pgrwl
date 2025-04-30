@@ -169,14 +169,18 @@ func (stream *StreamCtl) closeNoRename() error {
 
 	pathname := stream.walfile.pathname
 
-	slog.Info("close without renaming, segment is not complete", slog.String("path", filepath.ToSlash(pathname)))
+	slog.Warn("close without renaming, segment is not complete",
+		slog.String("path", filepath.ToSlash(pathname)),
+	)
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
 	stream.walfile = nil
 
-	slog.Info("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(pathname)))
+	slog.Debug("fsync filename and parent-directory",
+		slog.String("path", filepath.ToSlash(pathname)),
+	)
 	err = fsync.FsyncFnameAndDir(pathname)
 	if err != nil {
 		return err
@@ -192,13 +196,13 @@ func (stream *StreamCtl) closeAndRename() error {
 	pathname := stream.walfile.pathname
 	finalName := strings.TrimSuffix(pathname, stream.PartialSuffix)
 
-	slog.Info("closing fd", slog.String("path", filepath.ToSlash(pathname)))
+	slog.Debug("closing fd", slog.String("path", filepath.ToSlash(pathname)))
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
 
-	slog.Info("renaming complete segment",
+	slog.Debug("renaming complete segment",
 		slog.String("src", filepath.ToSlash(pathname)),
 		slog.String("dst", filepath.ToSlash(finalName)),
 	)
@@ -208,10 +212,16 @@ func (stream *StreamCtl) closeAndRename() error {
 	}
 	stream.walfile = nil
 
-	slog.Info("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(finalName)))
+	slog.Debug("fsync filename and parent-directory",
+		slog.String("path", filepath.ToSlash(finalName)),
+	)
 	err = fsync.FsyncFnameAndDir(finalName)
 	if err != nil {
 		return err
 	}
+
+	slog.Info("segment is complete",
+		slog.String("path", filepath.ToSlash(finalName)),
+	)
 	return nil
 }
