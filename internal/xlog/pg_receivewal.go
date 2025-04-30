@@ -30,7 +30,7 @@ type PgReceiveWal struct {
 	ConnStrRepl string
 	SlotName    string
 
-	timeToStop   bool
+	StopCh       chan struct{} // <- signal channel
 	endpos       pglogrepl.LSN
 	prevTimeline uint32
 	prevPos      pglogrepl.LSN
@@ -44,15 +44,15 @@ var (
 )
 
 func (pgrw *PgReceiveWal) SetupSignalHandler() {
-	c := make(chan os.Signal, 1)
+	pgrw.StopCh = make(chan struct{})
 
-	// Listen for SIGINT (Ctrl+C), SIGTERM (termination), SIGHUP if needed
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		sig := <-c
-		pgrw.timeToStop = true
-		slog.Info("received signal, prepared to stop", slog.Any("sig", sig))
+		s := <-sig
+		slog.Info("received signal", slog.String("signal", s.String()))
+		close(pgrw.StopCh)
 	}()
 }
 
@@ -178,11 +178,6 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	return nil
 }
 
-// Allow external interrupt
-func (pgrw *PgReceiveWal) RequestStop() {
-	pgrw.timeToStop = true
-}
-
 // FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
 func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 	// ensure dir exists
@@ -304,7 +299,6 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 			slog.String("lsn", xlogpos.String()),
 			slog.Uint64("tli", uint64(timeline)),
 		)
-		pgrw.timeToStop = true
 		return true
 	}
 
@@ -318,9 +312,12 @@ func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, seg
 	pgrw.prevTimeline = timeline
 	pgrw.prevPos = xlogpos
 
-	if pgrw.timeToStop {
-		slog.Debug("received interrupt signal, exiting")
+	// Stop if signal channel is closed
+	select {
+	case <-pgrw.StopCh:
+		slog.Debug("received termination signal, stopping streaming")
 		return true
+	default:
 	}
 
 	return false
