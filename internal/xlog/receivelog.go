@@ -395,7 +395,10 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 					return nil, fmt.Errorf("received unexpected message: %T", msg)
 				}
 
-				// try to read next message without blocking
+				/*
+				 * Process the received data, and any subsequent data we can read
+				 * without blocking.
+				 */
 				ctxTimeout, cancel = context.WithTimeout(ctx, 1*time.Second)
 				msg, err = conn.ReceiveMessage(ctxTimeout)
 				cancel()
