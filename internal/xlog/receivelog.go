@@ -44,6 +44,13 @@ type StreamCtl struct {
 	walfile *walfileT
 }
 
+func (stream *StreamCtl) updateLastFlushPosition(p pglogrepl.LSN, reason string) {
+	slog.Debug(fmt.Sprintf("updateLastFlushPosition prev=%d, next=%d, diff=%d, reason=%s",
+		stream.LastFlushPosition, p, p-stream.LastFlushPosition, reason,
+	))
+	stream.LastFlushPosition = p
+}
+
 func ProcessXLogDataMsg(
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
@@ -239,7 +246,7 @@ func ProcessKeepaliveMsg(ctx context.Context,
 			if err := stream.SyncWalFile(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			stream.LastFlushPosition = blockPos
+			stream.updateLastFlushPosition(blockPos, "ProcessKeepaliveMsg: (stream.LastFlushPosition < blockPos)")
 		}
 
 		now := time.Now()
@@ -280,7 +287,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			if err := stream.SyncWalFile(); err != nil {
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			stream.LastFlushPosition = blockPos
+			stream.updateLastFlushPosition(blockPos, "HandleCopyStream -> stream.LastFlushPosition < blockPos")
 			/*
 			 * Send feedback so that the server sees the latest WAL locations
 			 * immediately.
@@ -410,7 +417,7 @@ func handleEndOfCopyStream(
 func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
 	var stopPos pglogrepl.LSN
 
-	stream.LastFlushPosition = stream.StartPos
+	stream.updateLastFlushPosition(stream.StartPos, "ReceiveXlogStream -> init")
 
 	for {
 		// --- Before streaming starts ---
