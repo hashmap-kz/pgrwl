@@ -48,7 +48,7 @@ func main() {
 		SlotName:    slotName,
 	}
 	// TODO:fix
-	pgrw.SetupSignalHandler()
+	// pgrw.SetupSignalHandler()
 
 	for {
 		err := pgrw.StreamLog(ctx)
