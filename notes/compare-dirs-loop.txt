@@ -1,0 +1,13 @@
+	go func() {
+		for {
+			diffs, err := testutils.CompareDirs("./wals", "/tmp/pg_receivewal_wals")
+			if err != nil {
+				slog.Error("dircmp", slog.Any("err", err))
+			}
+			if len(diffs) != 0 {
+				fmt.Printf("diffs: %+v\n", diffs)
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
+	
