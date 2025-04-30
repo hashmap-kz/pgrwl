@@ -292,7 +292,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 			if err := stream.SyncWalFile(); err != nil {
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			stream.updateLastFlushPosition(blockPos, "HandleCopyStream -> stream.LastFlushPosition < blockPos")
+			stream.updateLastFlushPosition(blockPos, "HandleCopyStream: (stream.LastFlushPosition < blockPos)")
 			/*
 			 * Send feedback so that the server sees the latest WAL locations
 			 * immediately.
@@ -445,7 +445,7 @@ func handleEndOfCopyStream(
 func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
 	var stopPos pglogrepl.LSN
 
-	stream.updateLastFlushPosition(stream.StartPos, "ReceiveXlogStream -> init")
+	stream.updateLastFlushPosition(stream.StartPos, "ReceiveXlogStream: init")
 
 	for {
 		// --- Before streaming starts ---
