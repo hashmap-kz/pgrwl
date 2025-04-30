@@ -1,11 +1,18 @@
-package xlog
+//go:build !windows
+// +build !windows
+
+package fsync
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
+	"syscall"
 )
+
+func Fsync(f *os.File) error {
+	return syscall.Fsync(int(f.Fd()))
+}
 
 // FsyncFname fsyncs path contents and the parent directory contents.
 func FsyncFname(path string) error {
@@ -13,11 +20,7 @@ func FsyncFname(path string) error {
 	if err != nil {
 		return err
 	}
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		return err
-	}
-	if err := FsyncDir(filepath.Dir(path)); err != nil {
+	if err := Fsync(f); err != nil {
 		_ = f.Close()
 		return err
 	}
@@ -26,16 +29,21 @@ func FsyncFname(path string) error {
 
 // FsyncDir fsyncs dir contents.
 func FsyncDir(dirPath string) error {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
 	d, err := os.Open(dirPath)
 	if err != nil {
 		return fmt.Errorf("cannot open dir %s: %w", dirPath, err)
 	}
-	if err := d.Sync(); err != nil {
+	if err := Fsync(d); err != nil {
 		_ = d.Close()
 		return fmt.Errorf("cannot fsync dir %s: %w", dirPath, err)
 	}
 	return d.Close()
+}
+
+// FsyncFnameAndDir fsyncs the file by its path, and the parent dir
+func FsyncFnameAndDir(fname string) error {
+	if err := FsyncFname(fname); err != nil {
+		return err
+	}
+	return FsyncDir(filepath.Dir(fname))
 }

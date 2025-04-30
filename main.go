@@ -16,7 +16,7 @@ import (
 // TODO: CLI
 const (
 	slotName    = "pg_recval_5"
-	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes host=localhost port=15433"
+	connStrRepl = "application_name=pg_recval_5 user=postgres replication=yes host=localhost port=5432"
 	baseDir     = "wals"
 	noLoop      = false
 )

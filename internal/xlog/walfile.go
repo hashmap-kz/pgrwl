@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"pgreceivewal5/internal/fsync"
+
 	"pgreceivewal5/internal/conv"
 
 	"github.com/jackc/pglogrepl"
@@ -25,7 +27,7 @@ func (stream *StreamCtl) SyncWalFile() error {
 	if stream.walfile.fd == nil {
 		return fmt.Errorf("stream.walfile.fd is nil (SyncWalFile)")
 	}
-	return stream.walfile.fd.Sync()
+	return fsync.Fsync(stream.walfile.fd)
 }
 
 func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) error {
@@ -69,7 +71,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 			}
 
 			// fsync file in case of a previous crash
-			if err := fd.Sync(); err != nil {
+			if err := fsync.Fsync(fd); err != nil {
 				slog.Error("OpenWalFile -> could not fsync existing write-ahead log file. exiting with status 1.",
 					slog.String("path", fullPath),
 					slog.Any("err", err),
@@ -172,7 +174,7 @@ func (stream *StreamCtl) closeNoRename() error {
 	stream.walfile = nil
 
 	slog.Info("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(pathname)))
-	err = FsyncFname(pathname)
+	err = fsync.FsyncFnameAndDir(pathname)
 	if err != nil {
 		return err
 	}
@@ -204,7 +206,7 @@ func (stream *StreamCtl) closeAndRename() error {
 	stream.walfile = nil
 
 	slog.Info("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(finalName)))
-	err = FsyncFname(finalName)
+	err = fsync.FsyncFnameAndDir(finalName)
 	if err != nil {
 		return err
 	}

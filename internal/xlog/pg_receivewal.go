@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"pgreceivewal5/internal/fsync"
+
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"pgreceivewal5/internal/conv"
@@ -157,7 +159,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	}
 
 	// fsync dir
-	err = FsyncDir(pgrw.BaseDir)
+	err = fsync.FsyncDir(pgrw.BaseDir)
 	if err != nil {
 		slog.Info("could not finish writing WAL files", slog.Any("err", err))
 		// not a fatal error, just log it

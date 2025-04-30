@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"pgreceivewal5/internal/fsync"
+
 	"pgreceivewal5/internal/conv"
 
 	"github.com/jackc/pglogrepl"
@@ -506,7 +508,7 @@ func writeTimeLineHistoryFile(stream *StreamCtl, filename, content string) error
 	}
 
 	// Sync to disk
-	if err := f.Sync(); err != nil {
+	if err := fsync.Fsync(f); err != nil {
 		return fmt.Errorf("could not fsync timeline history file %s: %w", histPath, err)
 	}
 
