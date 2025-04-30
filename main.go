@@ -58,6 +58,19 @@ func main() {
 	// TODO:fix
 	pgrw.SetupSignalHandler()
 
+	//go func() {
+	//	for {
+	//		diffs, err := testutils.CompareDirs("./wals", "./hack/pg_receivewal/wals")
+	//		if err != nil {
+	//			slog.Error("dircmp", slog.Any("err", err))
+	//		}
+	//		if len(diffs) != 0 {
+	//			fmt.Printf("diffs: %+v\n", diffs)
+	//		}
+	//		time.Sleep(5 * time.Second)
+	//	}
+	//}()
+
 	for {
 		err := pgrw.StreamLog(ctx)
 		if err != nil {
