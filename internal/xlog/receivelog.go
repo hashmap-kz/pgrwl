@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -190,7 +189,7 @@ func sendFeedback(
 
 	err := pglogrepl.SendStandbyStatusUpdate(ctx, conn, standbyStatus)
 	if err != nil {
-		log.Printf("could not send feedback packet: %v", err)
+		slog.Error("could not send feedback packet", slog.Any("err", err))
 		return err
 	}
 
@@ -419,7 +418,7 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 		// Stream WAL
 		cdr, err := HandleCopyStream(ctx, conn, stream, &stopPos)
 		if err != nil {
-			closeWalfileNoRename(stream)
+			closeWalfileNoRename(stream, "func HandleCopyStream() exits with an error")
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
@@ -432,11 +431,11 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			newStartPos := cdr.LSN
 
 			if newTimeline <= stream.Timeline {
-				closeWalfileNoRename(stream)
+				closeWalfileNoRename(stream, "newTimeline <= stream.Timeline")
 				return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
 			}
 			if newStartPos > stopPos {
-				closeWalfileNoRename(stream)
+				closeWalfileNoRename(stream, "newStartPos > stopPos")
 				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
 			}
 
@@ -449,17 +448,19 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 
 			continue // restart streaming
 		} else {
-			slog.Debug("cdr == nil")
+			// controlled shutdown
+			slog.Debug("func HandleCopyStream() exits normally, stopping to receive xlog")
+			return nil
 		}
 	}
 }
 
-func closeWalfileNoRename(stream *StreamCtl) {
-	slog.Warn("an error occur after CopyDone, trying to close walfile without renaming")
+func closeWalfileNoRename(stream *StreamCtl, notice string) {
+	slog.Warn("closing WAL file without renaming", slog.String("cause", notice))
 	if stream.walfile != nil {
 		err := stream.closeNoRename()
 		if err != nil {
-			log.Printf("could not close WAL file: %v", err)
+			slog.Error("could not close WAL file", slog.Any("err", err))
 		}
 	}
 }
