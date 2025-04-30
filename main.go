@@ -58,6 +58,12 @@ func main() {
 	// TODO:fix
 	pgrw.SetupSignalHandler()
 
+	//// compare streaming with pg_receivewal
+	//logfile, err := os.Create("cmplogs.log")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//defer logfile.Close()
 	//go func() {
 	//	for {
 	//		diffs, err := testutils.CompareDirs("./wals", "./hack/pg_receivewal/wals")
@@ -65,11 +71,12 @@ func main() {
 	//			slog.Error("dircmp", slog.Any("err", err))
 	//		}
 	//		if len(diffs) != 0 {
-	//			fmt.Printf("diffs: %+v\n", diffs)
+	//			_, _ = logfile.WriteString(fmt.Sprintf("diffs: %+v\n", diffs))
 	//		}
 	//		time.Sleep(5 * time.Second)
 	//	}
 	//}()
+	//// compare streaming with pg_receivewal
 
 	for {
 		err := pgrw.StreamLog(ctx)
