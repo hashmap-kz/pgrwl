@@ -384,7 +384,7 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 				}
 
 				// try to read next message without blocking
-				ctxTimeout, cancel = context.WithTimeout(ctx, 1)
+				ctxTimeout, cancel = context.WithTimeout(ctx, 1*time.Second)
 				msg, err = conn.ReceiveMessage(ctxTimeout)
 				cancel()
 				if pgconn.Timeout(err) {

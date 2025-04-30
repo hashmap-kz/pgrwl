@@ -1,0 +1,76 @@
+// First message — with calculated timeout
+ctxTimeout, cancel := context.WithTimeout(ctx, sleeptime)
+msg, err := conn.ReceiveMessage(ctxTimeout)
+cancel()
+if pgconn.Timeout(err) {
+	continue
+}
+if err != nil {
+	return nil, fmt.Errorf("receive message failed: %w", err)
+}
+
+handleMsg := func(msg pgproto3.BackendMessage) error {
+	switch m := msg.(type) {
+	case *pgproto3.CopyData:
+		switch m.Data[0] {
+		case pglogrepl.PrimaryKeepaliveMessageByteID:
+			pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
+			if err != nil {
+				return fmt.Errorf("parse keepalive failed: %w", err)
+			}
+			return ProcessKeepaliveMsg(ctx, conn, stream, pkm, blockPos, &lastStatus)
+
+		case pglogrepl.XLogDataByteID:
+			xld, err := pglogrepl.ParseXLogData(m.Data[1:])
+			if err != nil {
+				return fmt.Errorf("parse xlogdata failed: %w", err)
+			}
+
+			slog.Debug("X - ProcessXLogDataMsg START")
+			if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
+				return fmt.Errorf("processing xlogdata failed: %w", err)
+			}
+			slog.Debug("X - ProcessXLogDataMsg END")
+
+			if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
+				return errors.New("stream stop requested after XLogData")
+			}
+			return nil
+
+		default:
+			return fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
+		}
+
+	case *pgproto3.CopyDone:
+		_, err := handleEndOfCopyStream(ctx, conn, stream, blockPos, stopPos)
+		return err
+	case *pgproto3.CommandComplete, *pgproto3.ReadyForQuery:
+		return nil
+	case *pgproto3.ErrorResponse:
+		return fmt.Errorf("error response from server: %s", m.(*pgproto3.ErrorResponse).Message)
+	default:
+		return fmt.Errorf("unexpected message: %T", msg)
+	}
+}
+
+if err := handleMsg(msg); err != nil {
+	return nil, err
+}
+
+// Drain remaining available messages without blocking
+for {
+	drainCtx, cancel := context.WithTimeout(ctx, 0)
+	msg, err := conn.ReceiveMessage(drainCtx)
+	cancel()
+
+	if pgconn.Timeout(err) {
+		break // nothing more to drain
+	}
+	if err != nil {
+		return nil, fmt.Errorf("receive during drain failed: %w", err)
+	}
+
+	if err := handleMsg(msg); err != nil {
+		return nil, err
+	}
+}
