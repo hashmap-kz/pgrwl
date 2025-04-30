@@ -217,6 +217,13 @@ func ProcessKeepaliveMsg(ctx context.Context,
 			 * data has been successfully replicated or not, at the normal
 			 * shutdown of the server.
 			 */
+
+			slog.Debug("SYNC-K",
+				slog.Uint64("lastFlushPosition", uint64(stream.LastFlushPosition)),
+				slog.Uint64("blockPos", uint64(blockPos)),
+				slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
+			)
+
 			if err := stream.SyncWalFile(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
@@ -252,6 +259,12 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 
 		// If synchronous, flush WAL file and update server immediately
 		if stream.Synchronous && stream.LastFlushPosition < blockPos && stream.walfile != nil {
+			slog.Debug("SYNC-1",
+				slog.Uint64("lastFlushPosition", uint64(stream.LastFlushPosition)),
+				slog.Uint64("blockPos", uint64(blockPos)),
+				slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
+			)
+
 			if err := stream.SyncWalFile(); err != nil {
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
 			}
