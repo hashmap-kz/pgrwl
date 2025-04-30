@@ -53,6 +53,7 @@ func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) error {
 }
 
 func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
+	slog.Debug("OpenWalFile")
 	var err error
 
 	segno := XLByteToSeg(uint64(startpoint), stream.WalSegSz)
@@ -135,11 +136,13 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 }
 
 func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
+	slog.Debug("CloseWalfile")
+	var err error
+
 	if stream.walfile == nil {
 		return nil
 	}
 
-	var err error
 	if strings.HasSuffix(stream.walfile.pathname, stream.PartialSuffix) {
 		if stream.walfile.currpos == stream.WalSegSz {
 			err = stream.closeAndRename()
