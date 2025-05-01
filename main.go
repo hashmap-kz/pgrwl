@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,26 +22,15 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// TODO: CLI
-const (
-	slotName    = "pg_recval_5"
-	connStrRepl = "application_name=pg_recval_5 replication=yes"
-	baseDir     = "wals"
-	noLoop      = false
-)
-
-func init() {
-	// TODO:localdev
-	os.Setenv("LOG_LEVEL", "info")
-	os.Setenv("LOG_ADD_SOURCE", "1")
-
-	os.Setenv("PGHOST", "localhost")
-	os.Setenv("PGPORT", "5432")
-	os.Setenv("PGUSER", "postgres")
-	os.Setenv("PGPASSWORD", "postgres")
+type Opts struct {
+	Directory    string
+	Slot         string
+	NoLoop       bool
+	LogLevel     string
+	LogAddSource bool
 }
 
-// socket for managing
+// socket for managing +
 
 type Command struct {
 	Type string `json:"type"`
@@ -91,9 +83,58 @@ func handleCommandConn(conn net.Conn, cancel context.CancelFunc) {
 	}
 }
 
-// socket for managing
+// socket for managing -
 
 func main() {
+	opts := Opts{}
+
+	// parse flags
+
+	flag.StringVar(&opts.Directory, "D", "", "receive write-ahead log files into this directory")
+	flag.StringVar(&opts.Directory, "directory", "", "(same as -D)")
+	flag.StringVar(&opts.Slot, "S", "", "replication slot to use")
+	flag.StringVar(&opts.Slot, "slot", "", "(same as -S)")
+	flag.BoolVar(&opts.NoLoop, "n", false, "do not loop on connection lost")
+	flag.BoolVar(&opts.NoLoop, "no-loop", false, "(same as -n)")
+	flag.StringVar(&opts.LogLevel, "log-level", "info", "set log level (e.g., debug, info, warn, error)")
+	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "include source file and line in log output")
+	flag.Parse()
+
+	if opts.Directory == "" {
+		log.Fatal("directory is not specified")
+	}
+	if opts.Slot == "" {
+		log.Fatal("replication slot name is not specified")
+	}
+
+	// set env-vars
+	_ = os.Setenv("LOG_LEVEL", opts.LogLevel)
+	if opts.LogAddSource {
+		_ = os.Setenv("LOG_ADD_SOURCE", "1")
+	}
+
+	// check connstr vars are set
+
+	requiredVars := []string{
+		"PGHOST",
+		"PGPORT",
+		"PGUSER",
+		"PGPASSWORD",
+	}
+	empty := []string{}
+	for _, v := range requiredVars {
+		if os.Getenv(v) == "" {
+			empty = append(empty, v)
+		}
+	}
+	if len(empty) > 0 {
+		log.Fatalf("required vars are empty: [%s]", strings.Join(empty, " "))
+	}
+
+	connStrRepl := fmt.Sprintf("application_name=%s replication=yes", opts.Slot)
+
+	// setup context
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	logger.Init()
@@ -109,34 +150,15 @@ func main() {
 		log.Fatal(err)
 	}
 	pgrw := &xlog.PgReceiveWal{
-		BaseDir:     baseDir,
+		BaseDir:     opts.Directory,
 		WalSegSz:    startupInfo.WalSegSz,
 		Conn:        conn,
 		ConnStrRepl: connStrRepl,
-		SlotName:    slotName,
+		SlotName:    opts.Slot,
 	}
-	// TODO:fix
 	pgrw.SetupSignalHandler()
 
-	//// compare streaming with pg_receivewal
-	//logfile, err := os.Create("cmplogs.log")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//defer logfile.Close()
-	//go func() {
-	//	for {
-	//		diffs, err := testutils.CompareDirs("./wals", "./hack/pg_receivewal/wals")
-	//		if err != nil {
-	//			slog.Error("dircmp", slog.Any("err", err))
-	//		}
-	//		if len(diffs) != 0 {
-	//			_, _ = logfile.WriteString(fmt.Sprintf("diffs: %+v\n", diffs))
-	//		}
-	//		time.Sleep(5 * time.Second)
-	//	}
-	//}()
-	//// compare streaming with pg_receivewal
+	// enter main streaming loop
 
 	for {
 		err := pgrw.StreamLog(ctx)
@@ -154,7 +176,7 @@ func main() {
 		default:
 		}
 
-		if noLoop {
+		if opts.NoLoop {
 			slog.Error("disconnected")
 			os.Exit(1)
 		}

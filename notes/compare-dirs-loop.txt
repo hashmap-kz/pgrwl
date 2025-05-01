@@ -1,13 +1,19 @@
-	go func() {
-		for {
-			diffs, err := testutils.CompareDirs("./wals", "/tmp/pg_receivewal_wals")
-			if err != nil {
-				slog.Error("dircmp", slog.Any("err", err))
-			}
-			if len(diffs) != 0 {
-				fmt.Printf("diffs: %+v\n", diffs)
-			}
-			time.Sleep(5 * time.Second)
-		}
-	}()
-	
+	//// compare streaming with pg_receivewal
+	//logfile, err := os.Create("cmplogs.log")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//defer logfile.Close()
+	//go func() {
+	//	for {
+	//		diffs, err := testutils.CompareDirs("./wals", "./hack/pg_receivewal/wals")
+	//		if err != nil {
+	//			slog.Error("dircmp", slog.Any("err", err))
+	//		}
+	//		if len(diffs) != 0 {
+	//			_, _ = logfile.WriteString(fmt.Sprintf("diffs: %+v\n", diffs))
+	//		}
+	//		time.Sleep(5 * time.Second)
+	//	}
+	//}()
+	//// compare streaming with pg_receivewal

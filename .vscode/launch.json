@@ -8,8 +8,20 @@
       "mode": "debug",
       "program": "${workspaceFolder}/main.go",
       "args": [
+        "-D",
+        "wals",
+        "-S",
+        "pg_recval_5",
+        "--log-add-source",
+        "--log-level",
+        "debug"
       ],
-      "env": {},
+      "env": {
+        "PGHOST": "localhost",
+        "PGPORT": "5432",
+        "PGUSER": "postgres",
+        "PGPASSWORD": "postgres"
+      },
       "console": "integratedTerminal"
     }
   ]
