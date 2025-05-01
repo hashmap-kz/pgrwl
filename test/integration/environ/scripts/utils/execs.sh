@@ -24,13 +24,21 @@ x_backup_restore() {
     --no-password \
     --verbose
 
-  # run fresh cluster, make basebackup, fill with 1M rows
+  # run inserts in a background
+  chmod +x "/var/lib/postgresql/scripts/pg/inserts.sh"
+  nohup "/var/lib/postgresql/scripts/pg/inserts.sh" &
+
+  # fill with 1M rows
   pgbench -i -s 10 postgres
+
+  # wait a little
+  sleep 5
 
   # remember the state
   pg_dumpall -f /tmp/pg_dumpall-before
 
   # stop cluster, cleanup data
+  echo "$(date "+%Y-%m-%d %H:%M:%S.%6N")" > /tmp/before-drop.log
   xpg_teardown
 
   # restore from backup
@@ -61,4 +69,8 @@ EOF
   # check diffs
   pg_dumpall -f /tmp/pg_dumpall-arter
   diff /tmp/pg_dumpall-before /tmp/pg_dumpall-arter
+
+  # read the latest rec
+  psql -c "select * from public.tslog;"
+  cat /tmp/before-drop.log
 }
