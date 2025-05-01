@@ -12,7 +12,6 @@
         "wals",
         "-S",
         "pg_recval_5",
-        "--log-add-source",
         "--log-level",
         "debug"
       ],
@@ -20,7 +19,7 @@
         "PGHOST": "localhost",
         "PGPORT": "5432",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres"
+        "PGPASSWORD": "postgres",
       },
       "console": "integratedTerminal"
     }

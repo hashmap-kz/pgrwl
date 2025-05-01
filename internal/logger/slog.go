@@ -90,9 +90,10 @@ func (h *CleanHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	newAttrs = append(newAttrs, h.attrs...)
 	newAttrs = append(newAttrs, attrs...)
 	return &CleanHandler{
-		Level: h.Level,
-		Out:   h.Out,
-		attrs: newAttrs,
+		Level:     h.Level,
+		Out:       h.Out,
+		AddSource: h.AddSource,
+		attrs:     newAttrs,
 	}
 }
 
@@ -110,8 +111,8 @@ func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
 	level := strings.ToUpper(r.Level.String())
 
 	// Source (file:line)
-	src := ""
 	if h.AddSource {
+		src := ""
 		if r.PC != 0 {
 			if fn := runtime.FuncForPC(r.PC); fn != nil {
 				file, line := fn.FileLine(r.PC)
@@ -129,15 +130,15 @@ func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
 
 	// Append attributes as key=value
 
+	// Write handler-level attrs (from WithAttrs)
+	for _, attr := range h.attrs {
+		fmt.Fprintf(&buf, " %s=%v", attr.Key, attr.Value.Any())
+	}
 	// Write record-level attrs
 	r.Attrs(func(attr slog.Attr) bool {
 		fmt.Fprintf(&buf, " %s=%v", attr.Key, attr.Value.Any())
 		return true
 	})
-	// Write handler-level attrs (from WithAttrs)
-	for _, attr := range h.attrs {
-		fmt.Fprintf(&buf, " %s=%v", attr.Key, attr.Value.Any())
-	}
 
 	buf.WriteByte('\n')
 	_, err := h.Out.Write(buf.Bytes())
