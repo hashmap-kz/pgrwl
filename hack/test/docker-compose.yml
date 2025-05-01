@@ -11,7 +11,6 @@ services:
       - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     command: -c wal_level=replica
       -c max_wal_senders=10
-      -c hot_standby=on
       -c wal_keep_size=64MB
       -c listen_addresses=*
       -c log_replication_commands=on
@@ -38,7 +37,7 @@ services:
         echo 'Waiting for primary...';
         sleep 2;
         done &&
-        exec docker-entrypoint.sh postgres -c hba_file=/etc/postgresql/pg_hba.conf -c log_replication_commands=on
+        exec docker-entrypoint.sh postgres -c hba_file=/etc/postgresql/pg_hba.conf -c log_replication_commands=on -c hot_standby=on
         ",
       ]
 

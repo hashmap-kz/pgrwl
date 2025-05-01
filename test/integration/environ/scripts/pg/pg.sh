@@ -75,24 +75,22 @@ host  replication all all trust
 EOF
 
   cat <<'EOF' >"${PG_CFG}"
-listen_addresses    = '*'
-logging_collector   = on
-log_directory       = '/var/log/postgresql'
-log_filename        = 'pg.log'
-log_lock_waits      = on
-log_temp_files      = 0
-log_checkpoints     = on
-log_connections     = off
-log_destination     = 'stderr'
-log_error_verbosity = 'DEFAULT' # TERSE, DEFAULT, VERBOSE
-log_hostname        = off
-log_min_messages    = 'WARNING' # DEBUG5, DEBUG4, DEBUG3, DEBUG2, DEBUG1, INFO, NOTICE, WARNING, ERROR, LOG, FATAL, PANIC
-log_timezone        = 'Asia/Aqtau'
-log_line_prefix     = '%t [%p-%l] %r %q%u@%d '
-
+listen_addresses         = '*'
+logging_collector        = on
+log_directory            = '/var/log/postgresql'
+log_filename             = 'pg.log'
+log_lock_waits           = on
+log_temp_files           = 0
+log_checkpoints          = on
+log_connections          = off
+log_destination          = 'stderr'
+log_error_verbosity      = 'DEFAULT' # TERSE, DEFAULT, VERBOSE
+log_hostname             = off
+log_min_messages         = 'WARNING' # DEBUG5, DEBUG4, DEBUG3, DEBUG2, DEBUG1, INFO, NOTICE, WARNING, ERROR, LOG, FATAL, PANIC
+log_timezone             = 'Asia/Aqtau'
+log_line_prefix          = '%t [%p-%l] %r %q%u@%d '
 wal_level                = replica
 max_wal_senders          = 10
-hot_standby              = on
 wal_keep_size            = 64MB
 log_replication_commands = on
 EOF
