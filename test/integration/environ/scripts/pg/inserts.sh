@@ -2,7 +2,7 @@ export PGHOST="localhost"
 export PGPORT="5432"
 export PGUSER="postgres"
 export PGPASSWORD="postgres"
-export LOG_FILE="/tmp/insertts.log"
+export LOG_FILE="/tmp/insert-ts.log"
 
 psql -c "drop table if exists public.tslog;"
 psql -c "create table if not exists public.tslog (ts TIMESTAMP DEFAULT now());"
