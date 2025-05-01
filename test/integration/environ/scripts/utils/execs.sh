@@ -38,7 +38,8 @@ x_backup_restore() {
   pg_dumpall -f /tmp/pg_dumpall-before
 
   # stop cluster, cleanup data
-  echo "$(date "+%Y-%m-%d %H:%M:%S.%6N")" > /tmp/before-drop.log
+  echo "$(date "+%Y-%m-%d %H:%M:%S.%6N")" >/tmp/before-drop.log
+  pkill -f inserts.sh
   xpg_teardown
 
   # restore from backup
@@ -72,5 +73,6 @@ EOF
 
   # read the latest rec
   psql -c "select * from public.tslog;"
+  tail /tmp/insert-ts.log
   cat /tmp/before-drop.log
 }
