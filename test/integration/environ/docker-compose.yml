@@ -32,7 +32,7 @@ services:
         echo 'Waiting for primary...';
         sleep 2;
         done &&
-        exec docker-entrypoint.sh postgres -c hba_file=/etc/postgresql/pg_hba.conf -c log_replication_commands=on
+        exec docker-entrypoint.sh postgres -c hba_file=/etc/postgresql/pg_hba.conf -c log_replication_commands=on -c hot_standby=on
         ",
       ]
 
