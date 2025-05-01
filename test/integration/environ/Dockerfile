@@ -57,9 +57,7 @@ COPY files/dotfiles/ /root
 ######################################################################
 # Execs
 
-# TODO: build binary and put into image
-# COPY bin/ /usr/local/bin
-
+COPY bin/ /usr/local/bin
 COPY files/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

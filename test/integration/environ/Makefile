@@ -10,7 +10,7 @@ COMPOSE_FILE = docker-compose.yml
 
 # Start the cluster
 up:
-	$(COMPOSE) -f $(COMPOSE_FILE) up -d
+	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build
 	@echo "✅ Cluster is starting..."
 
 # Stop the cluster
@@ -41,6 +41,8 @@ status-primary:
 
 # Restart the cluster
 restart:
+	@rm -rf bin
+	@sh -c 'cd ../../../ && make build && mv bin test/integration/environ'
 	$(MAKE) down
 	sleep 2
 	$(MAKE) up
