@@ -2,40 +2,50 @@
 set -euo pipefail
 . /var/lib/postgresql/scripts/pg/pg.sh
 
-x_backup_restore() {
-  local config_path="${1:?Expect argument config_path}"
+export BASEBACKUP_PATH="/tmp/basebackup"
+export WAL_PATH="/tmp/wal-archive"
 
+x_backup_restore() {
   # rerun the cluster
   xpg_rebuild
-  cat <<EOF >>"${PG_CFG}"
-archive_mode = on
-archive_command = '/usr/local/bin/pgwal wal-archive -c ${config_path} %p %f'
-EOF
   xpg_start
 
-  # run fresh cluster, make basebackup, fill with 1M rows
-  /usr/local/bin/pgwal backup -c ${config_path}
-  pgbench -i -s 10 postgres
-  psql -c 'select pg_walfile_name(pg_current_wal_insert_lsn());'
-  psql -c 'CHECKPOINT;'
-  psql -c 'select pg_switch_wal();'
+  # run wal-receiver
+  bash "/var/lib/postgresql/scripts/pg/run_receiver.sh" "start"
 
+  # make a basebackup before doing anything
+  rm -rf "${BASEBACKUP_PATH}"
+  mkdir -p "${BASEBACKUP_PATH}"
+  pg_basebackup \
+    --pgdata="${BASEBACKUP_PATH}/data" \
+    --wal-method=none \
+    --checkpoint=fast \
+    --progress \
+    --no-password \
+    --verbose
+
+  # run fresh cluster, make basebackup, fill with 1M rows
+  pgbench -i -s 10 postgres
+
+  # remember the state
   pg_dumpall -f /tmp/pg_dumpall-before
 
   # stop cluster, cleanup data
   xpg_teardown
 
   # restore from backup
-  /usr/local/bin/pgwal restore -c ${config_path} --dest="${PGDATA}"
+  mv "${BASEBACKUP_PATH}/data" "${PGDATA}"
   chmod 0750 "${PGDATA}"
   chown -R postgres:postgres "${PGDATA}"
   touch "${PGDATA}/recovery.signal"
 
+  # prepare archive (all partial files contain valid wal-segments)
+  find "${WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
+
   # fix configs
   xpg_config
   cat <<EOF >>"${PG_CFG}"
-archive_mode = on
-restore_command = '/usr/local/bin/pgwal wal-restore -c ${config_path} %f %p'
+restore_command = 'cp ${WAL_PATH}/%f %p'
 EOF
 
   # cleanup logs

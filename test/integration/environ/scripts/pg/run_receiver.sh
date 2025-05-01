@@ -14,6 +14,7 @@ ARGS=(
   "-D" "${WAL_PATH}"
   "-S" "pg_recval_5"
   "--log-add-source"
+  "--no-loop"
   "--log-level" "debug"
 )
 
