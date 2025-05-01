@@ -53,18 +53,30 @@ func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) (int, error
 }
 
 func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
-	slog.Debug("OpenWalFile")
 	var err error
 
 	segno := XLByteToSeg(uint64(startpoint), stream.WalSegSz)
 	filename := XLogFileName(stream.Timeline, segno, stream.WalSegSz) + stream.PartialSuffix
 	fullPath := filepath.Join(stream.BaseDir, filename)
 
+	l := slog.With(
+		slog.String("job", "open-wal-file"),
+		slog.String("startpoint", startpoint.String()),
+		slog.String("segno", fmt.Sprintf("%08X", segno)),
+		slog.String("path", filepath.ToSlash(fullPath)),
+	)
+
+	l.Debug("open WAL file for write")
+
 	// Check if file already exists
 	stat, err := os.Stat(fullPath)
 	if err == nil {
+		l.Debug("file exists, check size")
+
 		// File exists
 		if conv.ToUint64(stat.Size()) == stream.WalSegSz {
+			l.Debug("file exists and correctly sized, open")
+
 			// File already correctly sized, open it
 			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 			if err != nil {
@@ -110,6 +122,10 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 		// If size 0, proceed to initialize it
 	}
 
+	l.Debug("file does not exists, creating",
+		slog.Uint64("size", stream.WalSegSz),
+	)
+
 	// Otherwise create new file and preallocate
 	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
 	if err != nil {
@@ -136,12 +152,18 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 }
 
 func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
-	slog.Debug("CloseWalfile")
 	var err error
 
 	if stream.walfile == nil {
 		return nil
 	}
+
+	l := slog.With(
+		slog.String("job", "close-wal-file"),
+		slog.String("pos", pos.String()),
+		slog.String("path", filepath.ToSlash(stream.walfile.pathname)),
+	)
+	l.Debug("close WAL file")
 
 	if strings.HasSuffix(stream.walfile.pathname, stream.PartialSuffix) {
 		if stream.walfile.currpos == stream.WalSegSz {
@@ -168,19 +190,19 @@ func (stream *StreamCtl) closeNoRename() error {
 	}
 
 	pathname := stream.walfile.pathname
-
-	slog.Warn("close without renaming, segment is not complete",
+	l := slog.With(
+		slog.String("job", "close-wal-file-no-rename"),
 		slog.String("path", filepath.ToSlash(pathname)),
 	)
+
+	l.Warn("close without renaming, segment is not complete")
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
 	stream.walfile = nil
 
-	slog.Debug("fsync filename and parent-directory",
-		slog.String("path", filepath.ToSlash(pathname)),
-	)
+	l.Debug("fsync filename and parent-directory")
 	err = fsync.FsyncFnameAndDir(pathname)
 	if err != nil {
 		return err
@@ -195,33 +217,31 @@ func (stream *StreamCtl) closeAndRename() error {
 
 	pathname := stream.walfile.pathname
 	finalName := strings.TrimSuffix(pathname, stream.PartialSuffix)
+	l := slog.With(
+		slog.String("job", "close-wal-file-with-rename"),
+		slog.String("src", filepath.ToSlash(pathname)),
+		slog.String("dst", filepath.ToSlash(finalName)),
+	)
 
-	slog.Debug("closing fd", slog.String("path", filepath.ToSlash(pathname)))
+	l.Debug("closing fd")
 	err := stream.walfile.fd.Close()
 	if err != nil {
 		return err
 	}
 
-	slog.Debug("renaming complete segment",
-		slog.String("src", filepath.ToSlash(pathname)),
-		slog.String("dst", filepath.ToSlash(finalName)),
-	)
+	l.Debug("renaming complete segment")
 	err = os.Rename(pathname, finalName)
 	if err != nil {
 		return err
 	}
 	stream.walfile = nil
 
-	slog.Debug("fsync filename and parent-directory",
-		slog.String("path", filepath.ToSlash(finalName)),
-	)
+	l.Debug("fsync filename and parent-directory")
 	err = fsync.FsyncFnameAndDir(finalName)
 	if err != nil {
 		return err
 	}
 
-	slog.Info("segment is complete",
-		slog.String("path", filepath.ToSlash(finalName)),
-	)
+	l.Info("segment is complete")
 	return nil
 }
