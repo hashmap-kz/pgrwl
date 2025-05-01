@@ -90,11 +90,11 @@ func ProcessXLogDataMsg(
 	bytesLeft := uint64(len(data))
 	bytesWritten := uint64(0)
 
-	slog.Debug("received xlog-data",
-		slog.Uint64("len", bytesLeft),
+	slog.Debug("received xlog-data (xld)",
 		slog.String("lastFlushPos", stream.LastFlushPosition.String()),
 		slog.String("blockPos", blockpos.String()),
 		slog.Uint64("diff", uint64(*blockpos-stream.LastFlushPosition)),
+		slog.Uint64("len", bytesLeft),
 	)
 
 	for bytesLeft != 0 {
