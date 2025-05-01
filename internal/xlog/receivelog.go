@@ -45,9 +45,9 @@ type StreamCtl struct {
 }
 
 func (stream *StreamCtl) updateLastFlushPosition(p pglogrepl.LSN, reason string) {
-	slog.Debug("updateLastFlushPosition()",
-		slog.Uint64("prev", uint64(stream.LastFlushPosition)),
-		slog.Uint64("next", uint64(p)),
+	slog.Debug("updateLastFlushPos",
+		slog.String("prev", stream.LastFlushPosition.String()),
+		slog.String("next", p.String()),
 		slog.Uint64("diff", uint64(p-stream.LastFlushPosition)),
 		slog.String("reason", reason),
 	)
@@ -92,10 +92,8 @@ func ProcessXLogDataMsg(
 
 	slog.Debug("received xlog-data",
 		slog.Uint64("len", bytesLeft),
-		slog.Uint64("lastFlushPosition-u64", uint64(stream.LastFlushPosition)),
-		slog.Uint64("blockPos-u64", uint64(*blockpos)),
-		slog.String("lastFlushPosition-lsn", stream.LastFlushPosition.String()),
-		slog.String("blockPos-lsn", blockpos.String()),
+		slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+		slog.String("blockPos", blockpos.String()),
 		slog.Uint64("diff", uint64(*blockpos-stream.LastFlushPosition)),
 	)
 
@@ -243,8 +241,8 @@ func ProcessKeepaliveMsg(ctx context.Context,
 			 */
 
 			slog.Debug("SYNC-K",
-				slog.Uint64("lastFlushPosition", uint64(stream.LastFlushPosition)),
-				slog.Uint64("blockPos", uint64(blockPos)),
+				slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+				slog.String("blockPos", blockPos.String()),
 				slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
 			)
 
@@ -284,8 +282,8 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 		// If synchronous, flush WAL file and update server immediately
 		if stream.Synchronous && stream.LastFlushPosition < blockPos && stream.walfile != nil {
 			slog.Debug("SYNC-1",
-				slog.Uint64("lastFlushPosition", uint64(stream.LastFlushPosition)),
-				slog.Uint64("blockPos", uint64(blockPos)),
+				slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+				slog.String("blockPos", blockPos.String()),
 				slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
 			)
 
@@ -353,17 +351,19 @@ func HandleCopyStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCt
 							return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 						}
 
-						slog.Debug("X--ProcessXLogDataMsg--START",
-							slog.String("blockpos-lsn", blockPos.String()),
-							slog.Uint64("blockpos-u64", uint64(blockPos)),
+						slog.Debug("ProcessXLogDataMsg (run)",
+							slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+							slog.String("blockPos", blockPos.String()),
+							slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
 							slog.Int("datalen", len(xld.WALData)),
 						)
 						if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 							return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 						}
-						slog.Debug("X--ProcessXLogDataMsg--END",
-							slog.String("blockpos-lsn", blockPos.String()),
-							slog.Uint64("blockpos-u64", uint64(blockPos)),
+						slog.Debug("ProcessXLogDataMsg (end)",
+							slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+							slog.String("blockPos", blockPos.String()),
+							slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
 						)
 
 						/*
@@ -420,7 +420,7 @@ func handleEndOfCopyStream(
 	blockPos pglogrepl.LSN,
 	stopPos *pglogrepl.LSN,
 ) (*pglogrepl.CopyDoneResult, error) {
-	slog.Info("HandleCopyStream: received CopyDone, HandleEndOfCopyStream()")
+	slog.Debug("received CopyDone")
 	var err error
 	var cdr *pglogrepl.CopyDoneResult
 
@@ -433,7 +433,7 @@ func handleEndOfCopyStream(
 		if err != nil {
 			return nil, fmt.Errorf("failed to send client CopyDone: %w", err)
 		}
-		slog.Debug("copy-done-result", slog.Any("cdr", cdr))
+		slog.Debug("CopyDoneResult", slog.Any("cdr", cdr))
 		stream.StillSending = false
 	}
 	*stopPos = blockPos
