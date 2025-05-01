@@ -55,7 +55,11 @@ func Init() {
 			Level:       lvl,
 			ReplaceAttr: replaceAttr,
 		})
-		baseHandler = NewCleanHandler(os.Stderr, lvl)
+		baseHandler = &CleanHandler{
+			Out:       os.Stderr,
+			Level:     lvl,
+			AddSource: logAddSource != "",
+		}
 	}
 
 	// Add global "pid" attribute to all logs
@@ -70,17 +74,14 @@ func Init() {
 // clean
 
 type CleanHandler struct {
-	level slog.Level
-	out   io.Writer
-	attrs []slog.Attr
-}
-
-func NewCleanHandler(out io.Writer, level slog.Level) slog.Handler {
-	return &CleanHandler{level: level, out: out}
+	Out       io.Writer
+	Level     slog.Level
+	AddSource bool
+	attrs     []slog.Attr
 }
 
 func (h *CleanHandler) Enabled(_ context.Context, lvl slog.Level) bool {
-	return lvl >= h.level
+	return lvl >= h.Level
 }
 
 func (h *CleanHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
@@ -89,8 +90,8 @@ func (h *CleanHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	newAttrs = append(newAttrs, h.attrs...)
 	newAttrs = append(newAttrs, attrs...)
 	return &CleanHandler{
-		level: h.level,
-		out:   h.out,
+		Level: h.Level,
+		Out:   h.Out,
 		attrs: newAttrs,
 	}
 }
@@ -110,15 +111,21 @@ func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
 
 	// Source (file:line)
 	src := ""
-	if r.PC != 0 {
-		if fn := runtime.FuncForPC(r.PC); fn != nil {
-			file, line := fn.FileLine(r.PC)
-			src = fmt.Sprintf("%s:%d", filepath.Base(file), line)
+	if h.AddSource {
+		if r.PC != 0 {
+			if fn := runtime.FuncForPC(r.PC); fn != nil {
+				file, line := fn.FileLine(r.PC)
+				src = fmt.Sprintf("%s:%d", filepath.Base(file), line)
+			}
 		}
-	}
 
-	// Write header line: time level source > msg
-	fmt.Fprintf(&buf, "%s %-5s %-20s > %s", ts, level, src, r.Message)
+		// Write header line: time level source > msg
+		fmt.Fprintf(&buf, "%s %-5s %-20s > %s", ts, level, src, r.Message)
+
+	} else {
+		// Write header line: time level > msg
+		fmt.Fprintf(&buf, "%s %-5s > %s", ts, level, r.Message)
+	}
 
 	// Append attributes as key=value
 
@@ -133,6 +140,6 @@ func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
 	}
 
 	buf.WriteByte('\n')
-	_, err := h.out.Write(buf.Bytes())
+	_, err := h.Out.Write(buf.Bytes())
 	return err
 }
