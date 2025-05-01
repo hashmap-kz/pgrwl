@@ -13,6 +13,7 @@ services:
 
   pg-standby:
     image: postgres:17
+    container_name: pg-standby
     depends_on:
       - pg-primary
     environment:

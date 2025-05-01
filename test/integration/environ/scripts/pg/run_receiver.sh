@@ -4,10 +4,14 @@ APP_NAME="x05"
 APP_PATH="/usr/local/bin/x05" # compiled binary
 PID_FILE="/tmp/${APP_NAME}.pid"
 LOG_FILE="/tmp/${APP_NAME}.log"
+WAL_PATH="/tmp/wal-archive"
+
+mkdir -p "${WAL_PATH}"
+chown -R postgres:postgres "${WAL_PATH}"
 
 # CLI args
 ARGS=(
-  "-D" "/var/lib/postgresql/wal-archive"
+  "-D" "${WAL_PATH}"
   "-S" "pg_recval_5"
   "--log-add-source"
   "--log-level" "debug"
