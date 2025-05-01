@@ -142,12 +142,6 @@ func HandleCopyStream(
 
 	stream.StillSending = true
 
-	l := slog.With(
-		slog.String("lastFlushPos", stream.LastFlushPosition.String()),
-		slog.String("blockPos", blockPos.String()),
-		slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
-	)
-
 	for {
 
 		/*
@@ -161,7 +155,11 @@ func HandleCopyStream(
 
 		// If synchronous, flush WAL file and update server immediately
 		if stream.Synchronous && stream.LastFlushPosition < blockPos && stream.walfile != nil {
-			l.Debug("SYNC-1")
+			slog.Debug("SYNC-1",
+				slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+				slog.String("blockPos", blockPos.String()),
+				slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
+			)
 
 			if err := stream.SyncWalFile(); err != nil {
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
@@ -227,11 +225,20 @@ func HandleCopyStream(
 							return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 						}
 
-						l.Debug("ProcessXLogDataMsg (run)", slog.Int("len", len(xld.WALData)))
+						slog.Debug("ProcessXLogDataMsg (run)",
+							slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+							slog.String("blockPos", blockPos.String()),
+							slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
+							slog.Int("len", len(xld.WALData)),
+						)
 						if err := ProcessXLogDataMsg(conn, stream, xld, &blockPos); err != nil {
 							return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 						}
-						l.Debug("ProcessXLogDataMsg (end)")
+						slog.Debug("ProcessXLogDataMsg (end)",
+							slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+							slog.String("blockPos", blockPos.String()),
+							slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
+						)
 
 						/*
 						 * Check if we should continue streaming, or abort at this
@@ -250,15 +257,15 @@ func HandleCopyStream(
 
 					// Handle other commands
 				case *pgproto3.CommandComplete:
-					l.Warn("received CommandComplete, treating as disconnection")
+					slog.Warn("received CommandComplete, treating as disconnection")
 					return nil, nil // safe exit
 				case *pgproto3.ErrorResponse:
 					return nil, fmt.Errorf("error response from server: %s", m.Message)
 				case *pgproto3.ReadyForQuery:
-					l.Warn("received ReadyForQuery, treating as disconnection")
+					slog.Warn("received ReadyForQuery, treating as disconnection")
 					return nil, nil // safe exit
 				default:
-					l.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
+					slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
 					return nil, fmt.Errorf("received unexpected message: %T", msg)
 				}
 
@@ -445,6 +452,13 @@ func sendFeedback(
 	now time.Time,
 	replyRequested bool,
 ) error {
+	slog.Debug("send feedback",
+		slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+		slog.String("blockPos", blockpos.String()),
+		slog.Uint64("diff", uint64(blockpos)-uint64(stream.LastFlushPosition)),
+		slog.Time("now", now),
+	)
+
 	var standbyStatus pglogrepl.StandbyStatusUpdate
 
 	standbyStatus.WALWritePosition = blockpos
