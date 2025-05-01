@@ -113,10 +113,19 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			stream.Timeline = newTimeline
 			stream.StartPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.WalSegSz))
 
+			slog.Debug("end of timeline, continue",
+				slog.Uint64("new-tli", uint64(stream.Timeline)),
+				slog.String("startPos", stream.StartPos.String()),
+			)
+
 			continue // restart streaming
 		} else {
 			// controlled shutdown
-			slog.Debug("func HandleCopyStream() exits normally, stopping to receive xlog")
+			slog.Debug("stopping to receive xlog",
+				slog.String("reason", "controlled shutdown"),
+				slog.Uint64("tli", uint64(stream.Timeline)),
+				slog.String("lastFlushPos", stream.LastFlushPosition.String()),
+			)
 			return nil
 		}
 	}
