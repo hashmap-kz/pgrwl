@@ -5,6 +5,8 @@ services:
       dockerfile: ./Dockerfile
     container_name: pg-primary
     restart: unless-stopped
+    environment:
+      TZ: "Asia/Aqtau"
     ports:
       - "15432:5432"
       - "2323:22"
@@ -19,6 +21,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      TZ: "Asia/Aqtau"
     ports:
       - "15433:5432"
     volumes:

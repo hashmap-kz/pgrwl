@@ -19,6 +19,14 @@ RUN apt install -y postgresql-common && \
     apt install -y postgresql-${PG_MAJOR} postgresql-client-${PG_MAJOR}
 
 ######################################################################
+## TZ settings
+
+ENV TZ=Asia/Aqtau
+RUN echo $TZ > /etc/timezone && \
+    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    apt-get install -y tzdata && dpkg-reconfigure -f noninteractive tzdata
+
+######################################################################
 # SSH configs
 
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
