@@ -60,7 +60,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	fullPath := filepath.Join(stream.BaseDir, filename)
 
 	l := slog.With(
-		slog.String("job", "open-wal-file"),
+		slog.String("job", "OPEN_WAL_FILE"),
 		slog.String("startpoint", startpoint.String()),
 		slog.String("segno", fmt.Sprintf("%08X", segno)),
 		slog.String("path", filepath.ToSlash(fullPath)),
@@ -85,26 +85,18 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 
 			// fsync file in case of a previous crash
 			if err := fsync.Fsync(fd); err != nil {
-				slog.Error("OpenWalFile -> could not fsync existing write-ahead log file. exiting with status 1.",
-					slog.String("path", fullPath),
-					slog.Any("err", err),
-				)
+				l.Error("could not fsync existing WAL file. exiting with status 1", slog.Any("err", err))
 				if err = fd.Close(); err != nil {
-					slog.Warn("OpenWalFile -> cannot close file",
-						slog.String("path", fullPath),
-						slog.Any("err", err),
-					)
+					l.Warn("cannot close file", slog.Any("err", err))
 				}
 				if err = os.Remove(fullPath); err != nil {
-					slog.Warn("OpenWalFile -> cannot unlink file",
-						slog.String("path", fullPath),
-						slog.Any("err", err),
-					)
+					l.Warn("cannot unlink file", slog.Any("err", err))
 				}
 				// MARK:exit
 				os.Exit(1)
 			}
 
+			l.Info("streaming into existing WAL file")
 			stream.walfile = &walfileT{
 				currpos:  0,
 				pathname: fullPath,
@@ -148,6 +140,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 		fd:       fd,
 	}
 
+	l.Info("new WAL file opened for writing")
 	return nil
 }
 
@@ -159,7 +152,7 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 	}
 
 	l := slog.With(
-		slog.String("job", "close-wal-file"),
+		slog.String("job", "CLOSE_WAL_FILE"),
 		slog.String("pos", pos.String()),
 		slog.String("path", filepath.ToSlash(stream.walfile.pathname)),
 	)
@@ -191,7 +184,7 @@ func (stream *StreamCtl) closeNoRename() error {
 
 	pathname := stream.walfile.pathname
 	l := slog.With(
-		slog.String("job", "close-wal-file-no-rename"),
+		slog.String("job", "CLOSE_WAL_FILE_NO_RENAME"),
 		slog.String("path", filepath.ToSlash(pathname)),
 	)
 
@@ -218,7 +211,7 @@ func (stream *StreamCtl) closeAndRename() error {
 	pathname := stream.walfile.pathname
 	finalName := strings.TrimSuffix(pathname, stream.PartialSuffix)
 	l := slog.With(
-		slog.String("job", "close-wal-file-with-rename"),
+		slog.String("job", "CLOSE_WAL_FILE_WITH_RENAME"),
 		slog.String("src", filepath.ToSlash(pathname)),
 		slog.String("dst", filepath.ToSlash(finalName)),
 	)
