@@ -115,7 +115,7 @@ func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
 		src := ""
 		if r.PC != 0 {
 			if fn := runtime.FuncForPC(r.PC); fn != nil {
-				file, line := fn.FileLine(r.PC)
+				file, line := fn.FileLine(r.PC - 1) // TODO:fix
 				src = fmt.Sprintf("%s:%d", filepath.Base(file), line)
 			}
 		}
