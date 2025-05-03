@@ -149,6 +149,7 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 
 			continue // restart streaming
 		}
+
 		/*
 		 * End of replication (ie. controlled shut down of the server).
 		 *
@@ -156,7 +157,7 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 		 * complain.
 		 */
 
-		slog.Debug("stopping to receive xlog",
+		slog.Debug("stream termination",
 			slog.String("job", "receive_xlog_stream"),
 			slog.String("reason", "controlled shutdown"),
 			slog.Uint64("tli", uint64(stream.Timeline)),
