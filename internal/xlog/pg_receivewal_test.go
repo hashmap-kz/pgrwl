@@ -16,11 +16,11 @@ func TestFindStreamingStart_PartialAndComplete(t *testing.T) {
 
 	// Create a complete WAL file: 000000010000000000000001
 	complete := "000000010000000000000001"
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, complete), make([]byte, segSize), 0o644))
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, complete), make([]byte, segSize), 0o600))
 
 	// Create a partial newer segment: 000000010000000000000002.partial
 	partial := "000000010000000000000002.partial"
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, partial), make([]byte, 1*1024*1024), 0o644)) // shorter
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, partial), make([]byte, 1*1024*1024), 0o600)) // shorter
 
 	pgrw := &PgReceiveWal{
 		BaseDir:  dir,
@@ -42,7 +42,7 @@ func TestFindStreamingStart_OnlyComplete(t *testing.T) {
 
 	// Complete WAL segment
 	name := "00000002000000000000000A"
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, name), make([]byte, segSize), 0o644))
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, name), make([]byte, segSize), 0o600))
 
 	pgrw := &PgReceiveWal{
 		BaseDir:  dir,
@@ -78,8 +78,8 @@ func TestFindStreamingStart_DifferentTimelines(t *testing.T) {
 	fileTLI1 := "00000001000000000000000A"         // TLI 1, seg 10, complete
 	fileTLI2 := "00000002000000000000000A.partial" // TLI 2, seg 10, partial (preferred due to higher TLI)
 
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, fileTLI1), make([]byte, segSize), 0o644))
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, fileTLI2), make([]byte, 1*1024*1024), 0o644)) // smaller partial
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, fileTLI1), make([]byte, segSize), 0o600))
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, fileTLI2), make([]byte, 1*1024*1024), 0o600)) // smaller partial
 
 	pgrw := &PgReceiveWal{
 		BaseDir:  dir,
@@ -100,10 +100,10 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 
 	// Create a bunch of files with different segment numbers and TLIs
 	files := []struct {
-		tli      int
-		seg      int
-		partial  bool
-		prefered bool // one "best" entry
+		tli       int
+		seg       int
+		partial   bool
+		preferred bool // one "best" entry
 	}{
 		{1, 9, false, false},
 		{1, 10, true, false},
@@ -130,14 +130,15 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 			contentSize = segSize / 4
 		}
 
-		assert.NoError(t, os.WriteFile(path, make([]byte, contentSize), 0o644))
+		assert.NoError(t, os.WriteFile(path, make([]byte, contentSize), 0o600))
 
-		if f.prefered {
+		if f.preferred {
+			//nolint:gosec
 			expectedTLI = uint32(f.tli)
 			if f.partial {
-				expectedLSN = segNoToLSN(uint64(f.seg), segSize)
+				expectedLSN = segNoToLSN(uint64(f.seg), segSize) //nolint:gosec
 			} else {
-				expectedLSN = segNoToLSN(uint64(f.seg)+1, segSize)
+				expectedLSN = segNoToLSN(uint64(f.seg)+1, segSize) //nolint:gosec
 			}
 		}
 	}

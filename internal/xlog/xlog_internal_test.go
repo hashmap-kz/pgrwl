@@ -70,3 +70,91 @@ func TestXLogFileName(t *testing.T) {
 	expected := "000000010000000100000001"
 	assert.Equal(t, expected, name)
 }
+
+// wal file names
+
+func TestIsXLogFileNameManual(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"valid", "0000000100000000000000A1", true},
+		{"too short", "00000001", false},
+		{"invalid hex", "0000000100000000000000ZZ", false},
+		{"lowercase hex", "0000000100000000000000a1", false},
+		{"too long", "0000000100000000000000A1X", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsXLogFileNameManual(tt.input))
+		})
+	}
+}
+
+func TestIsPartialXLogFileName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"valid", "0000000100000000000000A1.partial", true},
+		{"missing suffix", "0000000100000000000000A1", false},
+		{"invalid hex", "0000000100000000000000ZZ.partial", false},
+		{"lowercase hex", "0000000100000000000000a1.partial", false},
+		{"wrong suffix", "0000000100000000000000A1.part", false},
+		{"too long", "0000000100000000000000A1.partialx", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsPartialXLogFileName(tt.input))
+		})
+	}
+}
+
+func TestXLogFromFileName(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		walSegSize uint64
+		wantTLI    TimeLineID
+		wantSegNo  XLogSegNo
+		expectErr  bool
+	}{
+		{
+			name:       "valid",
+			input:      "0000000100000000000000A1",
+			walSegSize: 16 * 1024 * 1024,
+			wantTLI:    1,
+			wantSegNo:  161,
+			expectErr:  false,
+		},
+		{
+			name:       "invalid hex",
+			input:      "0000000100000000000000ZZ",
+			walSegSize: 16 * 1024 * 1024,
+			expectErr:  true,
+		},
+		{
+			name:       "too short",
+			input:      "00000001",
+			walSegSize: 16 * 1024 * 1024,
+			expectErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tli, segno, err := XLogFromFileName(tt.input, tt.walSegSize)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantTLI, tli)
+				assert.Equal(t, tt.wantSegNo, segno)
+			}
+		})
+	}
+}

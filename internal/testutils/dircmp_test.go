@@ -69,6 +69,6 @@ func writeFile(t *testing.T, dir, name, content string) {
 	fullPath := filepath.Join(dir, name)
 	err := os.MkdirAll(filepath.Dir(fullPath), 0o755)
 	assert.NoError(t, err)
-	err = os.WriteFile(fullPath, []byte(content), 0o644)
+	err = os.WriteFile(fullPath, []byte(content), 0o600)
 	assert.NoError(t, err)
 }

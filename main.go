@@ -143,6 +143,7 @@ func main() {
 	conn, err := pgconn.Connect(context.Background(), connStrRepl)
 	if err != nil {
 		slog.Error("cannot establish connection", slog.Any("err", err))
+		//nolint:gocritic
 		os.Exit(1)
 	}
 	startupInfo, err := xlog.GetStartupInfo(conn)

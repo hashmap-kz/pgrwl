@@ -242,7 +242,7 @@ func SendStandbyCopyDone(_ context.Context, conn *pgconn.PgConn) (cdr *pglogrepl
 				if lerr == nil {
 					lsn, lerr := pglogrepl.ParseLSN(string(m.Values[1]))
 					if lerr == nil {
-						cdr.Timeline = int32(timeline)
+						cdr.Timeline = int32(timeline) //nolint:gosec
 						cdr.LSN = lsn
 					}
 				}

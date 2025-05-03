@@ -55,11 +55,12 @@ func Init() {
 			ReplaceAttr: replaceAttr,
 		})
 	} else {
-		baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			AddSource:   logAddSource != "",
-			Level:       lvl,
-			ReplaceAttr: replaceAttr,
-		})
+		//nolint:gocritic
+		// baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		// 	AddSource:   logAddSource != "",
+		// 	Level:       lvl,
+		// 	ReplaceAttr: replaceAttr,
+		// })
 		baseHandler = &CleanHandler{
 			Out:       os.Stderr,
 			Level:     lvl,
@@ -106,8 +107,9 @@ func (h *CleanHandler) WithGroup(_ string) slog.Handler {
 	return h
 }
 
+//nolint:gocritic
 func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
-	buf := bufPool.Get().(*bytes.Buffer)
+	buf := bufPool.Get().(*bytes.Buffer) //nolint:errcheck
 	buf.Reset()
 	defer bufPool.Put(buf)
 

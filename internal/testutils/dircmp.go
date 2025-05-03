@@ -26,7 +26,10 @@ func CompareDirs(dirA, dirB string) ([]FileDiff, error) {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		rel, _ := filepath.Rel(dirA, path)
+		rel, err := filepath.Rel(dirA, path)
+		if err != nil {
+			return err
+		}
 		filesA[rel] = path
 		return nil
 	})
@@ -39,7 +42,10 @@ func CompareDirs(dirA, dirB string) ([]FileDiff, error) {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		rel, _ := filepath.Rel(dirB, path)
+		rel, err := filepath.Rel(dirB, path)
+		if err != nil {
+			return err
+		}
 		filesB[rel] = path
 		return nil
 	})
@@ -93,6 +99,7 @@ func compareFilesBytes(path1, path2 string) (bool, error) {
 	return bytes.Equal(b1, b2), nil
 }
 
+//nolint:unused
 func compareFilesSHA256(pathA, pathB string) (bool, error) {
 	hashA, err := fileSHA256(pathA)
 	if err != nil {
@@ -105,6 +112,7 @@ func compareFilesSHA256(pathA, pathB string) (bool, error) {
 	return hashA == hashB, nil
 }
 
+//nolint:unused
 func fileSHA256(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {

@@ -12,7 +12,7 @@ func TestFsyncFname_Success(t *testing.T) {
 	tmp := t.TempDir()
 	fpath := filepath.Join(tmp, "testfile.txt")
 
-	err := os.WriteFile(fpath, []byte("data"), 0o644)
+	err := os.WriteFile(fpath, []byte("data"), 0o600)
 	require.NoError(t, err)
 
 	err = FsyncFname(fpath)
@@ -39,7 +39,7 @@ func TestFsyncDir_DirNotExist(t *testing.T) {
 func TestFsyncFnameAndDir_Success(t *testing.T) {
 	tmp := t.TempDir()
 	fpath := filepath.Join(tmp, "file.txt")
-	err := os.WriteFile(fpath, []byte("test"), 0o644)
+	err := os.WriteFile(fpath, []byte("test"), 0o600)
 	require.NoError(t, err)
 
 	err = FsyncFnameAndDir(fpath)

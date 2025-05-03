@@ -119,16 +119,15 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			)
 
 			continue // restart streaming
-		} else {
-			// controlled shutdown
-			slog.Debug("stopping to receive xlog",
-				slog.String("job", "receive_xlog_stream"),
-				slog.String("reason", "controlled shutdown"),
-				slog.Uint64("tli", uint64(stream.Timeline)),
-				slog.String("last_flush_pos", stream.LastFlushPosition.String()),
-			)
-			return nil
 		}
+		// controlled shutdown
+		slog.Debug("stopping to receive xlog",
+			slog.String("job", "receive_xlog_stream"),
+			slog.String("reason", "controlled shutdown"),
+			slog.Uint64("tli", uint64(stream.Timeline)),
+			slog.String("last_flush_pos", stream.LastFlushPosition.String()),
+		)
+		return nil
 	}
 }
 
@@ -144,7 +143,6 @@ func HandleCopyStream(
 	stream.StillSending = true
 
 	for {
-
 		/*
 		 * Check if we should continue streaming, or abort at this point.
 		 */
@@ -523,7 +521,6 @@ func checkCopyStreamStop(
 	blockpos pglogrepl.LSN,
 ) bool {
 	if stream.StillSending && stream.StreamClient.StreamStop(blockpos, stream.Timeline, false) {
-
 		// Close WAL file first
 		if err := stream.CloseWalfile(blockpos); err != nil {
 			// Error already logged in closeWalFile

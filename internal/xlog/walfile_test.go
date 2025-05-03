@@ -34,12 +34,12 @@ func TestOpenWalFile_CreateAndTruncate(t *testing.T) {
 
 	stat, err := os.Stat(stream.walfile.pathname)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(stream.WalSegSz), stat.Size())
+	assert.Equal(t, int64(stream.WalSegSz), stat.Size()) //nolint:gosec
 }
 
 func TestWriteAtWalFile(t *testing.T) {
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	n, err := stream.WriteAtWalFile([]byte("hello wal"), 0)
 	assert.NoError(t, err)
@@ -58,7 +58,7 @@ func TestWriteAtWalFile_LoopAndVerify(t *testing.T) {
 		[]byte("CCCCCCCC"),
 	}
 
-	var offset uint64 = 0
+	var offset uint64
 	var expectedData []byte
 
 	for _, chunk := range chunks {
@@ -66,6 +66,7 @@ func TestWriteAtWalFile_LoopAndVerify(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, len(chunk), n)
 
+		//nolint:gosec
 		offset += uint64(n)
 		expectedData = append(expectedData, chunk...)
 	}
@@ -85,7 +86,7 @@ func TestWriteAtWalFile_OffsetConversionFails(t *testing.T) {
 	invalidOffset := uint64(math.MaxInt64) + 1 // causes conversion to fail
 
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	n, err := stream.WriteAtWalFile([]byte("invalid"), invalidOffset)
 	assert.Error(t, err)
@@ -94,7 +95,7 @@ func TestWriteAtWalFile_OffsetConversionFails(t *testing.T) {
 
 func TestWriteAtWalFile_FileIsNil(t *testing.T) {
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	stream.walfile.fd = nil
 
@@ -114,7 +115,7 @@ func TestWriteAtWalFile_StreamWalfileNil(t *testing.T) {
 
 func TestWriteAtWalFile_AppendIncreasesCurrpos(t *testing.T) {
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	data := []byte("12345")
 	_, err := stream.WriteAtWalFile(data, 0)
@@ -126,7 +127,7 @@ func TestWriteAtWalFile_AppendIncreasesCurrpos(t *testing.T) {
 func TestWriteAtWalFile_WriteFails(t *testing.T) {
 	// Simulate file that fails WriteAt using a closed file
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	_ = stream.walfile.fd.Close() // force it to be invalid
 
@@ -137,7 +138,7 @@ func TestWriteAtWalFile_WriteFails(t *testing.T) {
 
 func TestSyncWalFile(t *testing.T) {
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	err := stream.SyncWalFile()
 	assert.NoError(t, err)
@@ -145,11 +146,12 @@ func TestSyncWalFile(t *testing.T) {
 
 func TestCloseWalfile_WithIncompleteSegment(t *testing.T) {
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
-	_, _ = stream.WriteAtWalFile([]byte("partial data"), 0)
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
+	_, err := stream.WriteAtWalFile([]byte("partial data"), 0)
+	assert.NoError(t, err)
 
 	pathname := stream.walfile.pathname
-	err := stream.CloseWalfile(pglogrepl.LSN(0))
+	err = stream.CloseWalfile(pglogrepl.LSN(0))
 	assert.NoError(t, err)
 
 	// Should not rename due to incomplete segment
@@ -160,14 +162,15 @@ func TestCloseWalfile_WithIncompleteSegment(t *testing.T) {
 
 func TestCloseWalfile_WithCompleteSegment(t *testing.T) {
 	stream := setupTestStreamCtl(t)
-	_ = stream.OpenWalFile(pglogrepl.LSN(0))
+	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	// Write exactly segment size
 	data := make([]byte, stream.WalSegSz)
-	_, _ = stream.WriteAtWalFile(data, 0)
+	_, err := stream.WriteAtWalFile(data, 0)
+	assert.NoError(t, err)
 
 	pathname := stream.walfile.pathname
-	err := stream.CloseWalfile(pglogrepl.LSN(0))
+	err = stream.CloseWalfile(pglogrepl.LSN(0))
 	assert.NoError(t, err)
 
 	// File should be renamed to final path
