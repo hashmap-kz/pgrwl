@@ -47,6 +47,10 @@ type StreamCtl struct {
 func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
 	var stopPos pglogrepl.LSN
 
+	/*
+	 * initialize flush position to starting point, it's the caller's
+	 * responsibility that that's sane.
+	 */
 	stream.updateLastFlushPosition(stream.StartPos, "ReceiveXlogStream: init")
 
 	for {
@@ -57,7 +61,12 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			return err
 		}
 
-		// Before starting, check if we need to fetch timeline history
+		/*
+		 * Fetch the timeline history file for this timeline, if we don't have
+		 * it already. When streaming log to tar, this will always return
+		 * false, as we are never streaming into an existing file and
+		 * therefore there can be no pre-existing timeline history file.
+		 */
 		if !existsTimeLineHistoryFile(stream) {
 			tlh, err := pglogrepl.TimelineHistory(ctx, conn, timelineToI32)
 			if err != nil {
@@ -68,12 +77,15 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			}
 		}
 
-		// Check if we should stop before starting replication
+		/*
+		 * Before we start streaming from the requested location, check if the
+		 * callback tells us to stop here.
+		 */
 		if stream.StreamClient.StreamStop(stream.StartPos, stream.Timeline, false) {
 			return nil
 		}
 
-		// Start replication
+		/* Initiate the replication stream at specified location */
 		opts := pglogrepl.StartReplicationOptions{
 			Timeline: timelineToI32,
 			Mode:     pglogrepl.PhysicalReplication,
@@ -82,18 +94,35 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			return fmt.Errorf("failed to start replication: %w", err)
 		}
 
-		// Stream WAL
+		/* Stream the WAL */
 		cdr, err := HandleCopyStream(ctx, conn, stream, &stopPos)
 		if err != nil {
 			closeWalfileNoRename(stream, "func HandleCopyStream() exits with an error")
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
-		// TODO: revise
-		// --- After CopyDone ---
+		/*
+		 * Streaming finished.
+		 *
+		 * There are two possible reasons for that: a controlled shutdown, or
+		 * we reached the end of the current timeline. In case of
+		 * end-of-timeline, the server sends a result set after Copy has
+		 * finished, containing information about the next timeline. Read
+		 * that, and restart streaming from the next timeline. In case of
+		 * controlled shutdown, stop here.
+		 */
 
 		if cdr != nil {
-			// Server sends end-of-timeline info
+			/*
+			 * End-of-timeline. Read the next timeline's ID and starting
+			 * position. Usually, the starting position will match the end of
+			 * the previous timeline, but there are corner cases like if the
+			 * server had sent us half of a WAL record, when it was promoted.
+			 * The new timeline will begin at the end of the last complete
+			 * record in that case, overlapping the partial WAL record on the
+			 * old timeline.
+			 */
+
 			newTimeline := conv.ToUint32(cdr.Timeline)
 			newStartPos := cdr.LSN
 
@@ -120,13 +149,25 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 
 			continue // restart streaming
 		}
-		// controlled shutdown
+		/*
+		 * End of replication (ie. controlled shut down of the server).
+		 *
+		 * Check if the callback thinks it's OK to stop here. If not,
+		 * complain.
+		 */
+
 		slog.Debug("stopping to receive xlog",
 			slog.String("job", "receive_xlog_stream"),
 			slog.String("reason", "controlled shutdown"),
 			slog.Uint64("tli", uint64(stream.Timeline)),
 			slog.String("last_flush_pos", stream.LastFlushPosition.String()),
 		)
+		if stream.StreamClient.StreamStop(stopPos, stream.Timeline, false) {
+			return nil
+		}
+
+		slog.Error("replication stream was terminated before stop point")
+		closeWalfileNoRename(stream, "controlled shutdown")
 		return nil
 	}
 }
