@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"syscall"
 	"time"
@@ -38,10 +37,7 @@ type PgReceiveWal struct {
 
 var _ StreamClient = &PgReceiveWal{}
 
-var (
-	walFileRe       = regexp.MustCompile(`^([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})(\.partial)?$`)
-	ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
-)
+var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 
 func (pgrw *PgReceiveWal) SetupSignalHandler() {
 	pgrw.StopCh = make(chan struct{})
@@ -200,21 +196,16 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 		}
 
 		base := filepath.Base(path)
-		matches := walFileRe.FindStringSubmatch(base)
-		if matches == nil {
-			return nil // not a WAL file
+
+		isPartial := IsPartialXLogFileName(base)
+		if !IsXLogFileName(base) && !isPartial {
+			return nil
 		}
 
-		xTli, err1 := parseHex32(matches[1])
-		xLog, err2 := parseHex32(matches[2])
-		xSeg, err3 := parseHex32(matches[3])
-		isPartial := matches[4] == ".partial"
-
-		if err1 != nil || err2 != nil || err3 != nil {
-			return nil // skip invalid names
+		tli, segNo, err := XLogFromFileName(base, pgrw.WalSegSz)
+		if err != nil {
+			return err
 		}
-
-		segNo := uint64(xLog)*0x100000000/pgrw.WalSegSz + uint64(xSeg)
 
 		if !isPartial {
 			info, err := os.Stat(path)
@@ -231,7 +222,7 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 		}
 
 		entries = append(entries, walEntry{
-			tli:       xTli,
+			tli:       tli,
 			segNo:     segNo,
 			isPartial: isPartial,
 			basename:  base,
@@ -262,9 +253,9 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 
 	var startLSN pglogrepl.LSN
 	if best.isPartial {
-		startLSN = segNoToLSN(best.segNo, pgrw.WalSegSz)
+		startLSN = XLogSegNoToRecPtr(best.segNo, pgrw.WalSegSz)
 	} else {
-		startLSN = segNoToLSN(best.segNo+1, pgrw.WalSegSz)
+		startLSN = XLogSegNoToRecPtr(best.segNo+1, pgrw.WalSegSz)
 	}
 
 	slog.Info("found streaming start (based on WAL dir)",
@@ -273,16 +264,6 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 		slog.String("wal", best.basename),
 	)
 	return startLSN, best.tli, nil
-}
-
-func parseHex32(s string) (uint32, error) {
-	var v uint32
-	_, err := fmt.Sscanf(s, "%08X", &v)
-	return v, err
-}
-
-func segNoToLSN(segNo, walSegSz uint64) pglogrepl.LSN {
-	return pglogrepl.LSN(segNo * walSegSz)
 }
 
 // stop_streaming

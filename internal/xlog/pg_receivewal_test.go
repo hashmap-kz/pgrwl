@@ -31,7 +31,7 @@ func TestFindStreamingStart_PartialAndComplete(t *testing.T) {
 	assert.NoError(t, err)
 
 	// partial = segNo 2 -> startLSN = 2
-	expectedLSN := segNoToLSN(2, segSize)
+	expectedLSN := XLogSegNoToRecPtr(2, segSize)
 	assert.Equal(t, expectedLSN, lsn)
 	assert.Equal(t, uint32(1), tli)
 }
@@ -53,7 +53,7 @@ func TestFindStreamingStart_OnlyComplete(t *testing.T) {
 	assert.NoError(t, err)
 
 	// segNo = 10 -> startLSN = 11
-	expectedLSN := segNoToLSN(11, segSize)
+	expectedLSN := XLogSegNoToRecPtr(11, segSize)
 	assert.Equal(t, expectedLSN, lsn)
 	assert.Equal(t, uint32(2), tli)
 }
@@ -89,7 +89,7 @@ func TestFindStreamingStart_DifferentTimelines(t *testing.T) {
 	lsn, tli, err := pgrw.FindStreamingStart()
 	assert.NoError(t, err)
 
-	expectedLSN := segNoToLSN(10, segSize) // segNo = 10
+	expectedLSN := XLogSegNoToRecPtr(10, segSize) // segNo = 10
 	assert.Equal(t, expectedLSN, lsn)
 	assert.Equal(t, uint32(2), tli) // should prefer TLI 2
 }
@@ -101,7 +101,7 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 	// Create a bunch of files with different segment numbers and TLIs
 	files := []struct {
 		tli       int
-		seg       int
+		seg       uint64
 		partial   bool
 		preferred bool // one "best" entry
 	}{
@@ -136,9 +136,9 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 			//nolint:gosec
 			expectedTLI = uint32(f.tli)
 			if f.partial {
-				expectedLSN = segNoToLSN(uint64(f.seg), segSize) //nolint:gosec
+				expectedLSN = XLogSegNoToRecPtr(f.seg, segSize)
 			} else {
-				expectedLSN = segNoToLSN(uint64(f.seg)+1, segSize) //nolint:gosec
+				expectedLSN = XLogSegNoToRecPtr(f.seg+1, segSize)
 			}
 		}
 	}

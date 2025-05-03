@@ -4,16 +4,12 @@ import (
 	"fmt"
 	"strconv"
 
+	"pgreceivewal5/internal/conv"
+
 	"github.com/jackc/pglogrepl"
 )
 
 // https://github.com/postgres/postgres/blob/master/src/include/access/xlog_internal.h
-
-type (
-	TimeLineID uint32
-	//nolint:revive
-	XLogSegNo uint64
-)
 
 const (
 	WalSegMinSize = 1 * 1024 * 1024        // 1 MiB
@@ -47,9 +43,11 @@ func XLogSegmentsPerXLogId(walSegSize uint64) uint64 {
 	return 0x100000000 / walSegSize
 }
 
+// XLogSegNoToRecPtr adapter version of postgres XLogSegNoOffsetToRecPtr
+//
 //nolint:revive
-func XLogSegNoOffsetToRecPtr(segno XLogSegNo, offset uint32, walSegSize uint64) pglogrepl.LSN {
-	return pglogrepl.LSN(uint64(segno)*walSegSize + uint64(offset))
+func XLogSegNoToRecPtr(segno, walSegSize uint64) pglogrepl.LSN {
+	return pglogrepl.LSN(segno * walSegSize)
 }
 
 //nolint:revive
@@ -79,7 +77,7 @@ func strspnMap(s string, valid map[rune]bool) int {
 	return count
 }
 
-func IsXLogFileNameManual(fname string) bool {
+func IsXLogFileName(fname string) bool {
 	return len(fname) == XLogFileNameLen &&
 		strspnMap(fname, hexSet) == XLogFileNameLen
 }
@@ -95,7 +93,7 @@ func IsPartialXLogFileName(fname string) bool {
 // XLogFromFileName parses a 24-character WAL segment filename.
 //
 //nolint:revive
-func XLogFromFileName(fname string, walSegSize uint64) (tli TimeLineID, logSegNo XLogSegNo, err error) {
+func XLogFromFileName(fname string, walSegSize uint64) (tli uint32, logSegNo uint64, err error) {
 	if len(fname) < 24 {
 		return 0, 0, fmt.Errorf("WAL filename too short: %s", fname)
 	}
@@ -108,6 +106,10 @@ func XLogFromFileName(fname string, walSegSize uint64) (tli TimeLineID, logSegNo
 	if err != nil {
 		return 0, 0, fmt.Errorf("invalid TLI: %w", err)
 	}
+	tli32, err := conv.Uint64ToUint32(tli64)
+	if err != nil {
+		return 0, 0, err
+	}
 	log, err := strconv.ParseUint(logHex, 16, 32)
 	if err != nil {
 		return 0, 0, fmt.Errorf("invalid log ID: %w", err)
@@ -118,7 +120,7 @@ func XLogFromFileName(fname string, walSegSize uint64) (tli TimeLineID, logSegNo
 	}
 
 	segmentsPerXlogID := XLogSegmentsPerXLogId(walSegSize)
-	logSegNo = XLogSegNo(log)*XLogSegNo(segmentsPerXlogID) + XLogSegNo(seg)
+	logSegNo = log*segmentsPerXlogID + seg
 
-	return TimeLineID(tli64), logSegNo, nil
+	return tli32, logSegNo, nil
 }

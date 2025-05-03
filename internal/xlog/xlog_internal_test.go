@@ -88,7 +88,7 @@ func TestIsXLogFileNameManual(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, IsXLogFileNameManual(tt.input))
+			assert.Equal(t, tt.expected, IsXLogFileName(tt.input))
 		})
 	}
 }
@@ -119,8 +119,8 @@ func TestXLogFromFileName(t *testing.T) {
 		name       string
 		input      string
 		walSegSize uint64
-		wantTLI    TimeLineID
-		wantSegNo  XLogSegNo
+		wantTLI    uint32
+		wantSegNo  uint64
 		expectErr  bool
 	}{
 		{
