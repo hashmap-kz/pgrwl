@@ -361,14 +361,19 @@ func ProcessXLogDataMsg(
 
 	*blockpos = xld.WALStart
 
-	xlogoff := XLogSegmentOffset(xld.WALStart, stream.WalSegSz)
+	/* Extract WAL location for this block */
+	xlogoff := XLogSegmentOffset(*blockpos, stream.WalSegSz)
 
-	// If no open file, expect offset to be zero
+	/*
+	 * Verify that the initial location in the stream matches where we think
+	 * we are.
+	 */
 	if stream.walfile == nil {
 		if xlogoff != 0 {
 			return fmt.Errorf("received WAL at offset %d but no file open", xlogoff)
 		}
 	} else {
+		/* More data in existing segment */
 		if stream.walfile.currpos != xlogoff {
 			return fmt.Errorf("got WAL data offset %08x, expected %08x", xlogoff, stream.walfile.currpos)
 		}
@@ -419,11 +424,13 @@ func ProcessXLogDataMsg(
 			return fmt.Errorf("could not write %d bytes to WAL file: %w", bytesToWrite, err)
 		}
 
+		/* Write was successful, advance our position */
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
 		*blockpos += pglogrepl.LSN(bytesToWrite)
 		xlogoff += bytesToWrite
 
+		/* Did we reach the end of a WAL segment? */
 		xlSegOff := XLogSegmentOffset(*blockpos, stream.WalSegSz)
 		if xlSegOff == 0 {
 			err := stream.CloseWalfile(*blockpos)
@@ -443,6 +450,8 @@ func ProcessXLogDataMsg(
 			}
 		}
 	}
+
+	/* No more data left to write, receive next copy packet */
 	return nil
 }
 
