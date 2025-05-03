@@ -96,7 +96,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 				os.Exit(1)
 			}
 
-			l.Info("streaming into existing WAL file")
+			l.Info("streaming resumes")
 			stream.walfile = &walfileT{
 				currpos:  0,
 				pathname: fullPath,
@@ -140,7 +140,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 		fd:       fd,
 	}
 
-	l.Info("new WAL file opened for writing")
+	l.Info("starting new WAL segment")
 	return nil
 }
 

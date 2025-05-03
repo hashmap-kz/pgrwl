@@ -13,7 +13,7 @@
         "-S",
         "pg_recval_5",
         "--log-level",
-        "debug"
+        "info"
       ],
       "env": {
         "PGHOST": "localhost",

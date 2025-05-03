@@ -128,7 +128,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	curPos := uint64(streamStartLSN) - XLogSegmentOffset(streamStartLSN, walSegSz)
 	streamStartLSN = pglogrepl.LSN(curPos)
 
-	slog.Info("start streaming",
+	slog.Info("starting log streaming",
 		slog.String("lsn", streamStartLSN.String()),
 		slog.Uint64("tli", uint64(streamStartTimeline)),
 	)
@@ -258,7 +258,7 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 		startLSN = XLogSegNoToRecPtr(best.segNo+1, pgrw.WalSegSz)
 	}
 
-	slog.Info("found streaming start (based on WAL dir)",
+	slog.Debug("found streaming start (based on WAL dir)",
 		slog.String("lsn", startLSN.String()),
 		slog.Uint64("tli", uint64(best.tli)),
 		slog.String("wal", best.basename),
