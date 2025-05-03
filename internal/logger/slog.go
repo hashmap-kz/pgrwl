@@ -10,7 +10,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
+
+var bufPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
 
 func Init() {
 	logLevel := os.Getenv("LOG_LEVEL")
@@ -102,41 +107,38 @@ func (h *CleanHandler) WithGroup(_ string) slog.Handler {
 }
 
 func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
-	var buf bytes.Buffer
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufPool.Put(buf)
 
-	// Format timestamp
 	ts := r.Time.Format("2006-01-02 15:04:05")
-
-	// Level
 	level := strings.ToUpper(r.Level.String())
 
-	// Source (file:line)
+	// Base
+
 	if h.AddSource {
 		src := ""
 		if r.PC != 0 {
 			if fn := runtime.FuncForPC(r.PC); fn != nil {
-				file, line := fn.FileLine(r.PC - 1) // TODO:fix
-				src = fmt.Sprintf("%s:%d", filepath.Base(file), line)
+				if file, line := fn.FileLine(r.PC - 1); file != "" {
+					src = fmt.Sprintf("%s:%d", filepath.Base(file), line)
+				}
 			}
 		}
-
-		// Write header line: time level source > msg
-		fmt.Fprintf(&buf, "%s %-5s %-20s > %s", ts, level, src, r.Message)
-
+		fmt.Fprintf(buf, "%s %-5s %-20s > %s", ts, level, src, r.Message)
 	} else {
-		// Write header line: time level > msg
-		fmt.Fprintf(&buf, "%s %-5s > %s", ts, level, r.Message)
+		fmt.Fprintf(buf, "%s %-5s > %s", ts, level, r.Message)
 	}
 
 	// Append attributes as key=value
 
 	// Write handler-level attrs (from WithAttrs)
 	for _, attr := range h.attrs {
-		fmt.Fprintf(&buf, " %s=%v", attr.Key, attr.Value.Any())
+		fmt.Fprintf(buf, " %s=%v", attr.Key, attr.Value.Any())
 	}
 	// Write record-level attrs
 	r.Attrs(func(attr slog.Attr) bool {
-		fmt.Fprintf(&buf, " %s=%v", attr.Key, attr.Value.Any())
+		fmt.Fprintf(buf, " %s=%v", attr.Key, attr.Value.Any())
 		return true
 	})
 
