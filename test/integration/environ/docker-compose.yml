@@ -27,6 +27,7 @@ services:
     volumes:
       - pg-standby-data:/var/lib/postgresql/data
       - ./files/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./files/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     entrypoint: [
         "/bin/bash",
         "-c",
@@ -36,7 +37,10 @@ services:
         echo 'Waiting for primary...';
         sleep 2;
         done &&
-        exec docker-entrypoint.sh postgres -c hba_file=/etc/postgresql/pg_hba.conf -c log_replication_commands=on -c hot_standby=on
+        exec docker-entrypoint.sh postgres \
+          -c hba_file=/etc/postgresql/pg_hba.conf \
+          -c config_file=/etc/postgresql/postgresql.conf \
+          -c hot_standby=on
         ",
       ]
 
