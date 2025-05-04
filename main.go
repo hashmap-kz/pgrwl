@@ -157,7 +157,6 @@ func main() {
 		ConnStrRepl: connStrRepl,
 		SlotName:    opts.Slot,
 	}
-	pgrw.SetupSignalHandler()
 
 	// enter main streaming loop
 

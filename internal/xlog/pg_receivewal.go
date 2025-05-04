@@ -7,10 +7,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"sort"
-	"syscall"
 
 	"pgreceivewal5/internal/fsync"
 
@@ -27,29 +25,9 @@ type PgReceiveWal struct {
 	Conn        *pgconn.PgConn
 	ConnStrRepl string
 	SlotName    string
-
-	StopCh       chan struct{} // <- signal channel
-	endpos       pglogrepl.LSN
-	prevTimeline uint32
-	prevPos      pglogrepl.LSN
 }
-
-var _ StreamClient = &PgReceiveWal{}
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
-
-func (pgrw *PgReceiveWal) SetupSignalHandler() {
-	pgrw.StopCh = make(chan struct{})
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		s := <-sig
-		slog.Info("(pgrw) received signal", slog.String("signal", s.String()))
-		close(pgrw.StopCh)
-	}()
-}
 
 // StreamLog the main loop of WAL receiving, any error FATAL
 func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
@@ -135,7 +113,6 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	stream := NewStream(&StreamOpts{
 		StartPos:        streamStartLSN,
 		Timeline:        streamStartTimeline,
-		StreamClient:    pgrw,
 		ReplicationSlot: pgrw.SlotName,
 		WalSegSz:        pgrw.WalSegSz,
 		BaseDir:         pgrw.BaseDir,
@@ -257,42 +234,4 @@ func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
 		slog.String("wal", best.basename),
 	)
 	return startLSN, best.tli, nil
-}
-
-// stop_streaming
-func (pgrw *PgReceiveWal) StreamStop(xlogpos pglogrepl.LSN, timeline uint32, segmentFinished bool) bool {
-	if segmentFinished {
-		slog.Debug("finished segment",
-			slog.String("lsn", xlogpos.String()),
-			slog.Uint64("tli", uint64(timeline)),
-		)
-	}
-
-	if pgrw.endpos != 0 && pgrw.endpos < xlogpos {
-		slog.Debug("stopped log streaming",
-			slog.String("lsn", xlogpos.String()),
-			slog.Uint64("tli", uint64(timeline)),
-		)
-		return true
-	}
-
-	if pgrw.prevTimeline != 0 && pgrw.prevTimeline != timeline {
-		slog.Debug("switched to timeline",
-			slog.String("lsn", pgrw.prevPos.String()),
-			slog.Uint64("tli", uint64(timeline)),
-		)
-	}
-
-	pgrw.prevTimeline = timeline
-	pgrw.prevPos = xlogpos
-
-	// Stop if signal channel is closed
-	select {
-	case <-pgrw.StopCh:
-		slog.Debug("received termination signal, stopping streaming")
-		return true
-	default:
-	}
-
-	return false
 }

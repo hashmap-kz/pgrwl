@@ -19,14 +19,14 @@ func TestCalculateCopyStreamSleepTime(t *testing.T) {
 	}{
 		{
 			name:                  "No timeout configured",
-			stream:                &StreamCtl{stillSending: true},
+			stream:                &StreamCtl{},
 			standbyMessageTimeout: 0,
 			lastStatus:            now,
 			expected:              -1,
 		},
 		{
 			name:                  "Not still sending",
-			stream:                &StreamCtl{stillSending: false},
+			stream:                &StreamCtl{},
 			standbyMessageTimeout: 10 * time.Second,
 			lastStatus:            now,
 			expected:              -1,
