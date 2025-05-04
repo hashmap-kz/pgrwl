@@ -156,9 +156,9 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			stream.timeline = newTimeline
 			stream.startPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.walSegSz))
 
-			slog.Debug("end of timeline, continue",
+			slog.Info("end of timeline, continue",
 				slog.Uint64("new-tli", uint64(stream.timeline)),
-				slog.String("startPos", stream.startPos.String()),
+				slog.String("new-pos", stream.startPos.String()),
 			)
 
 			continue // restart streaming
