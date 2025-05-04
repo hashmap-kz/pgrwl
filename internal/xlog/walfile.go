@@ -53,6 +53,8 @@ func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) (int, error
 	return n, nil
 }
 
+// OpenWalFile open a new WAL file in the specified directory.
+// The file will be padded to 16Mb with zeroes.
 func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	var err error
 
@@ -68,6 +70,13 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	)
 
 	l.Debug("open WAL file for write")
+
+	/*
+	 * When streaming to files, if an existing file exists we verify that it's
+	 * either empty (just created), or a complete WalSegSz segment (in which
+	 * case it has been created and padded). Anything else indicates a corrupt
+	 * file.
+	 */
 
 	// Check if file already exists
 	stat, err := os.Stat(fullPath)
@@ -145,6 +154,8 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	return nil
 }
 
+// CloseWalFile close the current WAL file (if open), and rename it to the correct
+// filename if it's complete.
 func (stream *StreamCtl) CloseWalFile() error {
 	var err error
 	pos := stream.blockPos
