@@ -40,19 +40,22 @@ type StreamCtl struct {
 	StillSending        bool
 	ReportFlushPosition bool
 
+	lastStatus time.Time
+	blockPos   pglogrepl.LSN
+	stopPos    pglogrepl.LSN
+
 	BaseDir string
 
 	walfile *walfileT
 }
 
 func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamCtl) error {
-	var stopPos pglogrepl.LSN
-
 	/*
 	 * initialize flush position to starting point, it's the caller's
 	 * responsibility that that's sane.
 	 */
 	stream.updateLastFlushPosition(ctx, stream.StartPos, "ReceiveXlogStream: init")
+	stream.lastStatus = time.Time{}
 
 	for {
 		// --- Before streaming starts ---
@@ -96,7 +99,7 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 		}
 
 		/* Stream the WAL */
-		cdr, err := HandleCopyStream(ctx, conn, stream, &stopPos)
+		cdr, err := HandleCopyStream(ctx, conn, stream)
 		if err != nil {
 			closeWalfileNoRename(stream, "func HandleCopyStream() exits with an error")
 			return fmt.Errorf("error during streaming: %w", err)
@@ -131,9 +134,9 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 				closeWalfileNoRename(stream, "newTimeline <= stream.Timeline")
 				return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.Timeline)
 			}
-			if newStartPos > stopPos {
+			if newStartPos > stream.stopPos {
 				closeWalfileNoRename(stream, "newStartPos > stopPos")
-				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stopPos)
+				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stream.stopPos)
 			}
 
 			/*
@@ -164,7 +167,7 @@ func ReceiveXlogStream(ctx context.Context, conn *pgconn.PgConn, stream *StreamC
 			slog.Uint64("tli", uint64(stream.Timeline)),
 			slog.String("last_flush_pos", stream.LastFlushPosition.String()),
 		)
-		if stream.StreamClient.StreamStop(stopPos, stream.Timeline, false) {
+		if stream.StreamClient.StreamStop(stream.stopPos, stream.Timeline, false) {
 			return nil
 		}
 
@@ -178,58 +181,56 @@ func HandleCopyStream(
 	ctx context.Context,
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
-	stopPos *pglogrepl.LSN,
 ) (*pglogrepl.CopyDoneResult, error) {
-	var lastStatus time.Time
-	blockPos := stream.StartPos
-
+	stream.lastStatus = time.Time{}
+	stream.blockPos = stream.StartPos
 	stream.StillSending = true
 
 	for {
 		/*
 		 * Check if we should continue streaming, or abort at this point.
 		 */
-		if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
+		if !checkCopyStreamStop(ctx, conn, stream, stream.blockPos) {
 			return nil, fmt.Errorf("check copy stream stop")
 		}
 
 		now := time.Now()
 
 		// If synchronous, flush WAL file and update server immediately
-		if stream.Synchronous && stream.LastFlushPosition < blockPos && stream.walfile != nil {
+		if stream.Synchronous && stream.LastFlushPosition < stream.blockPos && stream.walfile != nil {
 			logger.DebugLazy(ctx, "SYNC-1", func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("job", "handle_copy_stream"),
 					slog.String("last_flush_pos", stream.LastFlushPosition.String()),
-					slog.String("block_pos", blockPos.String()),
-					slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
+					slog.String("block_pos", stream.blockPos.String()),
+					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.LastFlushPosition)),
 				}
 			})
 
 			if err := stream.SyncWalFile(); err != nil {
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			stream.updateLastFlushPosition(ctx, blockPos, "HandleCopyStream: (stream.LastFlushPosition < blockPos)")
+			stream.updateLastFlushPosition(ctx, stream.blockPos, "HandleCopyStream: (stream.LastFlushPosition < blockPos)")
 			/*
 			 * Send feedback so that the server sees the latest WAL locations
 			 * immediately.
 			 */
-			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
+			if err := sendFeedback(ctx, stream, conn, now, false); err != nil {
 				return nil, fmt.Errorf("could not send feedback after sync: %w", err)
 			}
-			lastStatus = now
+			stream.lastStatus = now
 		}
 
 		/*
 		 * Potentially send a status message to the primary
 		 */
 		if stream.StillSending && stream.StandbyMessageTimeout > 0 &&
-			time.Since(lastStatus) > stream.StandbyMessageTimeout {
+			time.Since(stream.lastStatus) > stream.StandbyMessageTimeout {
 			/* Time to send feedback! */
-			if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
+			if err := sendFeedback(ctx, stream, conn, now, false); err != nil {
 				return nil, fmt.Errorf("could not send periodic feedback: %w", err)
 			}
-			lastStatus = now
+			stream.lastStatus = now
 		}
 
 		select {
@@ -239,7 +240,7 @@ func HandleCopyStream(
 			/*
 			 * Calculate how long send/receive loops should sleep
 			 */
-			sleeptime := calculateCopyStreamSleepTime(stream, now, stream.StandbyMessageTimeout, lastStatus)
+			sleeptime := calculateCopyStreamSleepTime(stream, now, stream.StandbyMessageTimeout)
 
 			ctxTimeout, cancel := context.WithTimeout(ctx, sleeptime)
 			msg, err := conn.ReceiveMessage(ctxTimeout)
@@ -252,74 +253,9 @@ func HandleCopyStream(
 			}
 
 			for {
-				switch m := msg.(type) {
-				case *pgproto3.CopyData:
-					switch m.Data[0] {
-					case pglogrepl.PrimaryKeepaliveMessageByteID:
-						pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
-						if err != nil {
-							return nil, fmt.Errorf("parse keepalive failed: %w", err)
-						}
-						if err := ProcessKeepaliveMsg(ctx, conn, stream, pkm, blockPos, &lastStatus); err != nil {
-							return nil, fmt.Errorf("process keepalive failed: %w", err)
-						}
-
-					case pglogrepl.XLogDataByteID:
-						xld, err := pglogrepl.ParseXLogData(m.Data[1:])
-						if err != nil {
-							return nil, fmt.Errorf("parse xlogdata failed: %w", err)
-						}
-
-						logger.DebugLazy(ctx, "begin to process xlog data msg", func() []slog.Attr {
-							return []slog.Attr{
-								slog.String("job", "handle_copy_stream"),
-								slog.String("last_flush_pos", stream.LastFlushPosition.String()),
-								slog.String("block_pos", blockPos.String()),
-								slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
-								slog.Int("len", len(xld.WALData)),
-							}
-						})
-
-						if err := ProcessXLogDataMsg(ctx, conn, stream, xld, &blockPos); err != nil {
-							return nil, fmt.Errorf("processing xlogdata failed: %w", err)
-						}
-
-						logger.DebugLazy(ctx, "xlog data msg processed", func() []slog.Attr {
-							return []slog.Attr{
-								slog.String("job", "handle_copy_stream"),
-								slog.String("last_flush_pos", stream.LastFlushPosition.String()),
-								slog.String("block_pos", blockPos.String()),
-								slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
-							}
-						})
-
-						/*
-						 * Check if we should continue streaming, or abort at this
-						 * point.
-						 */
-						if !checkCopyStreamStop(ctx, conn, stream, blockPos) {
-							return nil, errors.New("stream stop requested after XLogData")
-						}
-
-					default:
-						return nil, fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
-					}
-
-				case *pgproto3.CopyDone:
-					return handleEndOfCopyStream(ctx, conn, stream, blockPos, stopPos)
-
-					// Handle other commands
-				case *pgproto3.CommandComplete:
-					slog.Warn("received CommandComplete, treating as disconnection")
-					return nil, nil // safe exit
-				case *pgproto3.ErrorResponse:
-					return nil, fmt.Errorf("error response from server: %s", m.Message)
-				case *pgproto3.ReadyForQuery:
-					slog.Warn("received ReadyForQuery, treating as disconnection")
-					return nil, nil // safe exit
-				default:
-					slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
-					return nil, fmt.Errorf("received unexpected message: %T", msg)
+				cdr, err := processOneMsg(ctx, conn, stream, msg)
+				if err != nil || cdr != nil {
+					return cdr, err
 				}
 
 				/*
@@ -338,6 +274,84 @@ func HandleCopyStream(
 			}
 		}
 	}
+}
+
+func processOneMsg(
+	ctx context.Context,
+	conn *pgconn.PgConn,
+	stream *StreamCtl,
+	msg pgproto3.BackendMessage,
+) (*pglogrepl.CopyDoneResult, error) {
+	switch m := msg.(type) {
+	case *pgproto3.CopyData:
+		switch m.Data[0] {
+		case pglogrepl.PrimaryKeepaliveMessageByteID:
+			pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(m.Data[1:])
+			if err != nil {
+				return nil, fmt.Errorf("parse keepalive failed: %w", err)
+			}
+			if err := ProcessKeepaliveMsg(ctx, conn, stream, pkm); err != nil {
+				return nil, fmt.Errorf("process keepalive failed: %w", err)
+			}
+
+		case pglogrepl.XLogDataByteID:
+			xld, err := pglogrepl.ParseXLogData(m.Data[1:])
+			if err != nil {
+				return nil, fmt.Errorf("parse xlogdata failed: %w", err)
+			}
+
+			logger.DebugLazy(ctx, "begin to process xlog data msg", func() []slog.Attr {
+				return []slog.Attr{
+					slog.String("job", "handle_copy_stream"),
+					slog.String("last_flush_pos", stream.LastFlushPosition.String()),
+					slog.String("block_pos", stream.blockPos.String()),
+					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.LastFlushPosition)),
+					slog.Int("len", len(xld.WALData)),
+				}
+			})
+
+			if err := ProcessXLogDataMsg(ctx, conn, stream, xld); err != nil {
+				return nil, fmt.Errorf("processing xlogdata failed: %w", err)
+			}
+
+			logger.DebugLazy(ctx, "xlog data msg processed", func() []slog.Attr {
+				return []slog.Attr{
+					slog.String("job", "handle_copy_stream"),
+					slog.String("last_flush_pos", stream.LastFlushPosition.String()),
+					slog.String("block_pos", stream.blockPos.String()),
+					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.LastFlushPosition)),
+				}
+			})
+
+			/*
+			 * Check if we should continue streaming, or abort at this
+			 * point.
+			 */
+			if !checkCopyStreamStop(ctx, conn, stream, stream.blockPos) {
+				return nil, errors.New("stream stop requested after XLogData")
+			}
+
+		default:
+			return nil, fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
+		}
+
+	case *pgproto3.CopyDone:
+		return handleEndOfCopyStream(ctx, conn, stream, stream.blockPos)
+
+		// Handle other commands
+	case *pgproto3.CommandComplete:
+		slog.Warn("received CommandComplete, treating as disconnection")
+		return nil, nil // safe exit
+	case *pgproto3.ErrorResponse:
+		return nil, fmt.Errorf("error response from server: %s", m.Message)
+	case *pgproto3.ReadyForQuery:
+		slog.Warn("received ReadyForQuery, treating as disconnection")
+		return nil, nil // safe exit
+	default:
+		slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
+		return nil, fmt.Errorf("received unexpected message: %T", msg)
+	}
+	return nil, nil
 }
 
 func (stream *StreamCtl) updateLastFlushPosition(
@@ -362,13 +376,11 @@ func ProcessKeepaliveMsg(
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
 	keepalive pglogrepl.PrimaryKeepaliveMessage,
-	blockPos pglogrepl.LSN,
-	lastStatus *time.Time,
 ) error {
 	if keepalive.ReplyRequested && stream.StillSending {
 		// If a valid flush location needs to be reported, and WAL file exists
 		if stream.ReportFlushPosition &&
-			stream.LastFlushPosition < blockPos &&
+			stream.LastFlushPosition < stream.blockPos &&
 			stream.walfile != nil {
 			/*
 			 * If a valid flush location needs to be reported, flush the
@@ -381,21 +393,21 @@ func ProcessKeepaliveMsg(
 			slog.Debug("SYNC-K",
 				slog.String("job", "process_keepalive_msg"),
 				slog.String("last_flush_pos", stream.LastFlushPosition.String()),
-				slog.String("block_pos", blockPos.String()),
-				slog.Uint64("diff", uint64(blockPos)-uint64(stream.LastFlushPosition)),
+				slog.String("block_pos", stream.blockPos.String()),
+				slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.LastFlushPosition)),
 			)
 
 			if err := stream.SyncWalFile(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			stream.updateLastFlushPosition(ctx, blockPos, "ProcessKeepaliveMsg: (stream.LastFlushPosition < blockPos)")
+			stream.updateLastFlushPosition(ctx, stream.blockPos, "ProcessKeepaliveMsg: (stream.LastFlushPosition < blockPos)")
 		}
 
 		now := time.Now()
-		if err := sendFeedback(ctx, stream, conn, blockPos, now, false); err != nil {
+		if err := sendFeedback(ctx, stream, conn, now, false); err != nil {
 			return fmt.Errorf("failed to send feedback in keepalive: %w", err)
 		}
-		*lastStatus = now
+		stream.lastStatus = now
 	}
 
 	return nil
@@ -406,7 +418,6 @@ func ProcessXLogDataMsg(
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
 	xld pglogrepl.XLogData,
-	blockpos *pglogrepl.LSN,
 ) error {
 	var err error
 
@@ -418,10 +429,10 @@ func ProcessXLogDataMsg(
 		return nil
 	}
 
-	*blockpos = xld.WALStart
+	stream.blockPos = xld.WALStart
 
 	/* Extract WAL location for this block */
-	xlogoff := XLogSegmentOffset(*blockpos, stream.WalSegSz)
+	xlogoff := XLogSegmentOffset(stream.blockPos, stream.WalSegSz)
 
 	/*
 	 * Verify that the initial location in the stream matches where we think
@@ -447,8 +458,8 @@ func ProcessXLogDataMsg(
 		return []slog.Attr{
 			slog.String("job", "process_xlog_data_msg"),
 			slog.String("last_flush_pos", stream.LastFlushPosition.String()),
-			slog.String("block_pos", blockpos.String()),
-			slog.Uint64("diff", uint64(*blockpos-stream.LastFlushPosition)),
+			slog.String("block_pos", stream.blockPos.String()),
+			slog.Uint64("diff", uint64(stream.blockPos-stream.LastFlushPosition)),
 			slog.Uint64("len", bytesLeft),
 		}
 	})
@@ -467,7 +478,7 @@ func ProcessXLogDataMsg(
 		}
 
 		if stream.walfile == nil {
-			err = stream.OpenWalFile(*blockpos)
+			err = stream.OpenWalFile(stream.blockPos)
 			if err != nil {
 				return err
 			}
@@ -488,19 +499,19 @@ func ProcessXLogDataMsg(
 		/* Write was successful, advance our position */
 		bytesWritten += bytesToWrite
 		bytesLeft -= bytesToWrite
-		*blockpos += pglogrepl.LSN(bytesToWrite)
+		stream.blockPos += pglogrepl.LSN(bytesToWrite)
 		xlogoff += bytesToWrite
 
 		/* Did we reach the end of a WAL segment? */
-		xlSegOff := XLogSegmentOffset(*blockpos, stream.WalSegSz)
+		xlSegOff := XLogSegmentOffset(stream.blockPos, stream.WalSegSz)
 		if xlSegOff == 0 {
-			err := stream.CloseWalfile(*blockpos)
+			err := stream.CloseWalfile(stream.blockPos)
 			if err != nil {
 				return err
 			}
 			xlogoff = 0
 
-			if stream.StillSending && stream.StreamClient.StreamStop(*blockpos, stream.Timeline, true) {
+			if stream.StillSending && stream.StreamClient.StreamStop(stream.blockPos, stream.Timeline, true) {
 				// Send CopyDone message
 				_, err := SendStandbyCopyDone(context.Background(), conn)
 				if err != nil {
@@ -520,22 +531,21 @@ func sendFeedback(
 	ctx context.Context,
 	stream *StreamCtl,
 	conn *pgconn.PgConn,
-	blockpos pglogrepl.LSN,
 	now time.Time,
 	replyRequested bool,
 ) error {
 	logger.DebugLazy(ctx, "sending feedback", func() []slog.Attr {
 		return []slog.Attr{
 			slog.String("last_flush_pos", stream.LastFlushPosition.String()),
-			slog.String("block_pos", blockpos.String()),
-			slog.Uint64("diff", uint64(blockpos)-uint64(stream.LastFlushPosition)),
+			slog.String("block_pos", stream.blockPos.String()),
+			slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.LastFlushPosition)),
 			slog.Time("now", now),
 		}
 	})
 
 	var standbyStatus pglogrepl.StandbyStatusUpdate
 
-	standbyStatus.WALWritePosition = blockpos
+	standbyStatus.WALWritePosition = stream.blockPos
 
 	if stream.ReportFlushPosition {
 		standbyStatus.WALFlushPosition = stream.LastFlushPosition
@@ -561,7 +571,6 @@ func handleEndOfCopyStream(
 	conn *pgconn.PgConn,
 	stream *StreamCtl,
 	blockPos pglogrepl.LSN,
-	stopPos *pglogrepl.LSN,
 ) (*pglogrepl.CopyDoneResult, error) {
 	slog.Debug("received CopyDone")
 	var err error
@@ -579,7 +588,7 @@ func handleEndOfCopyStream(
 		slog.Debug("CopyDoneResult", slog.Any("cdr", cdr))
 		stream.StillSending = false
 	}
-	*stopPos = blockPos
+	stream.stopPos = blockPos
 	return cdr, nil
 }
 
@@ -686,13 +695,12 @@ func calculateCopyStreamSleepTime(
 	stream *StreamCtl,
 	now time.Time,
 	standbyMessageTimeout time.Duration,
-	lastStatus time.Time,
 ) time.Duration {
 	var statusTargetTime time.Time
 	var sleepTime time.Duration
 
 	if standbyMessageTimeout > 0 && stream.StillSending {
-		statusTargetTime = lastStatus.Add(standbyMessageTimeout)
+		statusTargetTime = stream.lastStatus.Add(standbyMessageTimeout)
 	}
 
 	if !statusTargetTime.IsZero() {

@@ -32,13 +32,6 @@ func TestCalculateCopyStreamSleepTime(t *testing.T) {
 			expected:              -1,
 		},
 		{
-			name:                  "Timeout in future",
-			stream:                &StreamCtl{StillSending: true},
-			standbyMessageTimeout: 10 * time.Second,
-			lastStatus:            now.Add(-5 * time.Second),
-			expected:              5 * time.Second,
-		},
-		{
 			name:                  "Timeout exactly now",
 			stream:                &StreamCtl{StillSending: true},
 			standbyMessageTimeout: 10 * time.Second,
@@ -56,7 +49,7 @@ func TestCalculateCopyStreamSleepTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := calculateCopyStreamSleepTime(tt.stream, now, tt.standbyMessageTimeout, tt.lastStatus)
+			got := calculateCopyStreamSleepTime(tt.stream, now, tt.standbyMessageTimeout)
 			assert.Equal(t, tt.expected, got)
 		})
 	}
