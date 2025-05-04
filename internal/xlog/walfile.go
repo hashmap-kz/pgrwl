@@ -145,8 +145,9 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	return nil
 }
 
-func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
+func (stream *StreamCtl) CloseWalFile() error {
 	var err error
+	pos := stream.blockPos
 
 	if stream.walfile == nil {
 		return nil

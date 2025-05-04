@@ -151,7 +151,7 @@ func TestCloseWalfile_WithIncompleteSegment(t *testing.T) {
 	assert.NoError(t, err)
 
 	pathname := stream.walfile.pathname
-	err = stream.CloseWalfile(pglogrepl.LSN(0))
+	err = stream.CloseWalFile()
 	assert.NoError(t, err)
 
 	// Should not rename due to incomplete segment
@@ -170,7 +170,7 @@ func TestCloseWalfile_WithCompleteSegment(t *testing.T) {
 	assert.NoError(t, err)
 
 	pathname := stream.walfile.pathname
-	err = stream.CloseWalfile(pglogrepl.LSN(0))
+	err = stream.CloseWalFile()
 	assert.NoError(t, err)
 
 	// File should be renamed to final path
@@ -183,7 +183,7 @@ func TestCloseWalfile_NoWalfile(t *testing.T) {
 	stream := setupTestStreamCtl(t)
 	stream.walfile = nil
 
-	err := stream.CloseWalfile(pglogrepl.LSN(0))
+	err := stream.CloseWalFile()
 	assert.NoError(t, err)
 }
 

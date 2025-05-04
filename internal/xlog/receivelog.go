@@ -215,7 +215,7 @@ func (stream *StreamCtl) HandleCopyStream(
 		/*
 		 * Check if we should continue streaming, or abort at this point.
 		 */
-		if !stream.checkCopyStreamStop(ctx, stream.blockPos) {
+		if !stream.checkCopyStreamStop(ctx) {
 			return nil, fmt.Errorf("check copy stream stop")
 		}
 
@@ -265,7 +265,7 @@ func (stream *StreamCtl) HandleCopyStream(
 			/*
 			 * Calculate how long send/receive loops should sleep
 			 */
-			sleeptime := stream.calculateCopyStreamSleepTime(now, stream.standbyMessageTimeout)
+			sleeptime := stream.calculateCopyStreamSleepTime(now)
 
 			ctxTimeout, cancel := context.WithTimeout(ctx, sleeptime)
 			msg, err := stream.conn.ReceiveMessage(ctxTimeout)
@@ -350,7 +350,7 @@ func (stream *StreamCtl) processOneMsg(
 			 * Check if we should continue streaming, or abort at this
 			 * point.
 			 */
-			if !stream.checkCopyStreamStop(ctx, stream.blockPos) {
+			if !stream.checkCopyStreamStop(ctx) {
 				return nil, errors.New("stream stop requested after XLogData")
 			}
 
@@ -359,7 +359,7 @@ func (stream *StreamCtl) processOneMsg(
 		}
 
 	case *pgproto3.CopyDone:
-		return stream.handleEndOfCopyStream(ctx, stream.blockPos)
+		return stream.handleEndOfCopyStream(ctx)
 
 		// Handle other commands
 	case *pgproto3.CommandComplete:
@@ -524,7 +524,7 @@ func (stream *StreamCtl) ProcessXLogDataMsg(
 		/* Did we reach the end of a WAL segment? */
 		xlSegOff := XLogSegmentOffset(stream.blockPos, stream.walSegSz)
 		if xlSegOff == 0 {
-			err := stream.CloseWalfile(stream.blockPos)
+			err := stream.CloseWalFile()
 			if err != nil {
 				return err
 			}
@@ -583,16 +583,13 @@ func (stream *StreamCtl) sendFeedback(
 	return nil
 }
 
-func (stream *StreamCtl) handleEndOfCopyStream(
-	ctx context.Context,
-	blockPos pglogrepl.LSN,
-) (*pglogrepl.CopyDoneResult, error) {
+func (stream *StreamCtl) handleEndOfCopyStream(ctx context.Context) (*pglogrepl.CopyDoneResult, error) {
 	slog.Debug("received CopyDone")
 	var err error
 	var cdr *pglogrepl.CopyDoneResult
 
 	if stream.stillSending {
-		if err := stream.CloseWalfile(blockPos); err != nil {
+		if err := stream.CloseWalFile(); err != nil {
 			return nil, fmt.Errorf("failed to close WAL file: %w", err)
 		}
 
@@ -603,20 +600,17 @@ func (stream *StreamCtl) handleEndOfCopyStream(
 		slog.Debug("CopyDoneResult", slog.Any("cdr", cdr))
 		stream.stillSending = false
 	}
-	stream.stopPos = blockPos
+	stream.stopPos = stream.blockPos
 	return cdr, nil
 }
 
 /*
  * Check if we should continue streaming, or abort at this point.
  */
-func (stream *StreamCtl) checkCopyStreamStop(
-	ctx context.Context,
-	blockpos pglogrepl.LSN,
-) bool {
-	if stream.stillSending && stream.streamClient.StreamStop(blockpos, stream.timeline, false) {
+func (stream *StreamCtl) checkCopyStreamStop(ctx context.Context) bool {
+	if stream.stillSending && stream.streamClient.StreamStop(stream.blockPos, stream.timeline, false) {
 		// Close WAL file first
-		if err := stream.CloseWalfile(blockpos); err != nil {
+		if err := stream.CloseWalFile(); err != nil {
 			// Error already logged in closeWalFile
 			return false
 		}
@@ -694,15 +688,12 @@ func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) erro
 	return nil
 }
 
-func (stream *StreamCtl) calculateCopyStreamSleepTime(
-	now time.Time,
-	standbyMessageTimeout time.Duration,
-) time.Duration {
+func (stream *StreamCtl) calculateCopyStreamSleepTime(now time.Time) time.Duration {
 	var statusTargetTime time.Time
 	var sleepTime time.Duration
 
-	if standbyMessageTimeout > 0 && stream.stillSending {
-		statusTargetTime = stream.lastStatus.Add(standbyMessageTimeout)
+	if stream.standbyMessageTimeout > 0 && stream.stillSending {
+		statusTargetTime = stream.lastStatus.Add(stream.standbyMessageTimeout)
 	}
 
 	if !statusTargetTime.IsZero() {
