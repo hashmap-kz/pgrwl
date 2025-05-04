@@ -121,7 +121,11 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 
 	err = stream.ReceiveXlogStream(ctx)
 	if err != nil {
-		slog.Error("log streaming terminated", slog.Any("err", err))
+		if errors.Is(err, context.Canceled) {
+			slog.Warn("log streaming terminated: context canceled")
+		} else {
+			slog.Error("log streaming terminated", slog.Any("err", err))
+		}
 	}
 
 	// fsync dir
