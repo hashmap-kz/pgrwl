@@ -141,11 +141,11 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			newStartPos := cdr.LSN
 
 			if newTimeline <= stream.timeline {
-				stream.CloseWalFileIfPresentNoRename("newTimeline <= stream.Timeline")
+				stream.CloseWalFileIfPresentNoRename("(end-of-timeline) newTimeline <= stream.Timeline")
 				return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.timeline)
 			}
 			if newStartPos > stream.stopPos {
-				stream.CloseWalFileIfPresentNoRename("newStartPos > stopPos")
+				stream.CloseWalFileIfPresentNoRename("(end-of-timeline) newStartPos > stopPos")
 				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stream.stopPos)
 			}
 
