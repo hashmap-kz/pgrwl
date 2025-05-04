@@ -639,11 +639,6 @@ func (stream *StreamCtl) existsTimeLineHistoryFile() bool {
 	return fileExists(filepath.Join(stream.baseDir, histfname))
 }
 
-func fileExists(name string) bool {
-	info, err := os.Stat(name)
-	return err == nil && !info.IsDir()
-}
-
 func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) error {
 	expectedName := fmt.Sprintf("%08X.history", stream.timeline)
 
