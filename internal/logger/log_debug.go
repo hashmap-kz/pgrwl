@@ -9,16 +9,16 @@ import (
 
 // Usage (go build -tags=debug):
 //
-// mylog.Debug(ctx, "processing msg", func() []slog.Attr {
+// logger.DebugLazy(ctx, "processing msg", func() []slog.Attr {
 // 	return []slog.Attr{
 // 		slog.String("segment", expensiveSegment()),
 // 		slog.Int("size", computeHeavyValue()),
 // 	}
 // })
 
-func DebugLazy(ctx context.Context, msg string, build func() []slog.Attr) {
+func DebugLazy(ctx context.Context, msg string, buildAttrs func() []slog.Attr) {
 	l := slog.Default()
 	if l.Enabled(ctx, slog.LevelDebug) {
-		l.LogAttrs(ctx, slog.LevelDebug, msg, build()...)
+		l.LogAttrs(ctx, slog.LevelDebug, msg, buildAttrs()...)
 	}
 }
