@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"sort"
 	"syscall"
-	"time"
 
 	"pgreceivewal5/internal/fsync"
 
@@ -133,23 +132,17 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		slog.Uint64("tli", uint64(streamStartTimeline)),
 	)
 
-	stream := &StreamCtl{
-		StartPos:              streamStartLSN,
-		Timeline:              streamStartTimeline,
-		StandbyMessageTimeout: 10 * time.Second,
-		Synchronous:           true,
-		PartialSuffix:         ".partial",
-		StreamClient:          pgrw,
-		ReplicationSlot:       pgrw.SlotName,
-		SysIdentifier:         sysident.SystemID,
-		WalSegSz:              walSegSz,
-		LastFlushPosition:     pglogrepl.LSN(0),
-		StillSending:          true,
-		ReportFlushPosition:   true,
-		BaseDir:               pgrw.BaseDir,
-	}
+	stream := NewStream(&StreamOpts{
+		StartPos:        streamStartLSN,
+		Timeline:        streamStartTimeline,
+		StreamClient:    pgrw,
+		ReplicationSlot: pgrw.SlotName,
+		WalSegSz:        pgrw.WalSegSz,
+		BaseDir:         pgrw.BaseDir,
+		Conn:            pgrw.Conn,
+	})
 
-	err = ReceiveXlogStream(ctx, pgrw.Conn, stream)
+	err = stream.ReceiveXlogStream(ctx)
 	if err != nil {
 		slog.Error("ReceiveXlogStream() terminated", slog.Any("err", err))
 	}

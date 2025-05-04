@@ -56,9 +56,9 @@ func (stream *StreamCtl) WriteAtWalFile(data []byte, xlogoff uint64) (int, error
 func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	var err error
 
-	segno := XLByteToSeg(uint64(startpoint), stream.WalSegSz)
-	filename := XLogFileName(stream.Timeline, segno, stream.WalSegSz) + stream.PartialSuffix
-	fullPath := filepath.Join(stream.BaseDir, filename)
+	segno := XLByteToSeg(uint64(startpoint), stream.walSegSz)
+	filename := XLogFileName(stream.timeline, segno, stream.walSegSz) + stream.partialSuffix
+	fullPath := filepath.Join(stream.baseDir, filename)
 
 	l := slog.With(
 		slog.String("job", "open_wal_file"),
@@ -75,7 +75,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 		l.Debug("file exists, check size")
 
 		// File exists
-		if conv.ToUint64(stat.Size()) == stream.WalSegSz {
+		if conv.ToUint64(stat.Size()) == stream.walSegSz {
 			l.Debug("file exists and correctly sized, open")
 
 			// File already correctly sized, open it
@@ -108,7 +108,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 		if stat.Size() != 0 {
 			return fmt.Errorf("corrupt WAL file %s: expected size 0 or %d bytes, found %d",
 				fullPath,
-				stream.WalSegSz,
+				stream.walSegSz,
 				stat.Size(),
 			)
 		}
@@ -116,7 +116,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	}
 
 	l.Debug("file does not exists, creating",
-		slog.Uint64("size", stream.WalSegSz),
+		slog.Uint64("size", stream.walSegSz),
 	)
 
 	// Otherwise create new file and preallocate
@@ -126,7 +126,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	}
 
 	// Preallocate file with zeros up to 16 MiB
-	truncateSize, err := conv.Uint64ToInt64(stream.WalSegSz)
+	truncateSize, err := conv.Uint64ToInt64(stream.walSegSz)
 	if err != nil {
 		return err
 	}
@@ -159,8 +159,8 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 	)
 	l.Debug("close WAL file")
 
-	if strings.HasSuffix(stream.walfile.pathname, stream.PartialSuffix) {
-		if stream.walfile.currpos == stream.WalSegSz {
+	if strings.HasSuffix(stream.walfile.pathname, stream.partialSuffix) {
+		if stream.walfile.currpos == stream.walSegSz {
 			err = stream.closeAndRename()
 		} else {
 			err = stream.closeNoRename()
@@ -210,7 +210,7 @@ func (stream *StreamCtl) closeAndRename() error {
 	}
 
 	pathname := stream.walfile.pathname
-	finalName := strings.TrimSuffix(pathname, stream.PartialSuffix)
+	finalName := strings.TrimSuffix(pathname, stream.partialSuffix)
 	l := slog.With(
 		slog.String("job", "close_wal_file_with_rename"),
 		slog.String("src", filepath.ToSlash(pathname)),

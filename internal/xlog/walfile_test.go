@@ -16,10 +16,10 @@ func setupTestStreamCtl(t *testing.T) *StreamCtl {
 
 	tmpDir := t.TempDir()
 	return &StreamCtl{
-		BaseDir:       tmpDir,
-		Timeline:      1,
-		WalSegSz:      16 * 1024 * 1024, // 16 MiB
-		PartialSuffix: ".partial",
+		baseDir:       tmpDir,
+		timeline:      1,
+		walSegSz:      16 * 1024 * 1024, // 16 MiB
+		partialSuffix: ".partial",
 	}
 }
 
@@ -34,7 +34,7 @@ func TestOpenWalFile_CreateAndTruncate(t *testing.T) {
 
 	stat, err := os.Stat(stream.walfile.pathname)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(stream.WalSegSz), stat.Size()) //nolint:gosec
+	assert.Equal(t, int64(stream.walSegSz), stat.Size()) //nolint:gosec
 }
 
 func TestWriteAtWalFile(t *testing.T) {
@@ -155,7 +155,7 @@ func TestCloseWalfile_WithIncompleteSegment(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should not rename due to incomplete segment
-	finalName := strings.TrimSuffix(pathname, stream.PartialSuffix)
+	finalName := strings.TrimSuffix(pathname, stream.partialSuffix)
 	_, err = os.Stat(finalName)
 	assert.True(t, os.IsNotExist(err))
 }
@@ -165,7 +165,7 @@ func TestCloseWalfile_WithCompleteSegment(t *testing.T) {
 	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
 
 	// Write exactly segment size
-	data := make([]byte, stream.WalSegSz)
+	data := make([]byte, stream.walSegSz)
 	_, err := stream.WriteAtWalFile(data, 0)
 	assert.NoError(t, err)
 
@@ -174,7 +174,7 @@ func TestCloseWalfile_WithCompleteSegment(t *testing.T) {
 	assert.NoError(t, err)
 
 	// File should be renamed to final path
-	expectedFinal := filepath.Join(stream.BaseDir, strings.TrimSuffix(filepath.Base(pathname), stream.PartialSuffix))
+	expectedFinal := filepath.Join(stream.baseDir, strings.TrimSuffix(filepath.Base(pathname), stream.partialSuffix))
 	_, err = os.Stat(expectedFinal)
 	assert.NoError(t, err)
 }
