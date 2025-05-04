@@ -7,7 +7,7 @@ import (
 	"log/slog"
 )
 
-// Usage:
+// Usage (go build -tags=debug):
 //
 // mylog.Debug(ctx, "processing msg", func() []slog.Attr {
 // 	return []slog.Attr{
