@@ -124,7 +124,11 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		/* Stream the WAL */
 		cdr, err := stream.HandleCopyStream(ctx)
 		if err != nil {
-			closeWalfileNoRename(stream, "func HandleCopyStream() exits with an error")
+			errMsg := "func HandleCopyStream() exits with an error"
+			if errors.Is(err, context.Canceled) {
+				errMsg = "context canceled"
+			}
+			stream.closeNoRenameIfPresent(errMsg)
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
@@ -154,11 +158,11 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			newStartPos := cdr.LSN
 
 			if newTimeline <= stream.timeline {
-				closeWalfileNoRename(stream, "newTimeline <= stream.Timeline")
+				stream.closeNoRenameIfPresent("newTimeline <= stream.Timeline")
 				return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.timeline)
 			}
 			if newStartPos > stream.stopPos {
-				closeWalfileNoRename(stream, "newStartPos > stopPos")
+				stream.closeNoRenameIfPresent("newStartPos > stopPos")
 				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stream.stopPos)
 			}
 
@@ -195,7 +199,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		}
 
 		slog.Error("replication stream was terminated before stop point")
-		closeWalfileNoRename(stream, "controlled shutdown")
+		stream.closeNoRenameIfPresent("controlled shutdown")
 		return nil
 	}
 }
@@ -627,16 +631,6 @@ func (stream *StreamCtl) checkCopyStreamStop(
 		stream.stillSending = false
 	}
 	return true
-}
-
-func closeWalfileNoRename(stream *StreamCtl, notice string) {
-	slog.Warn("closing WAL file without renaming", slog.String("cause", notice))
-	if stream.walfile != nil {
-		err := stream.closeNoRename()
-		if err != nil {
-			slog.Error("could not close WAL file", slog.Any("err", err))
-		}
-	}
 }
 
 // timeline history file

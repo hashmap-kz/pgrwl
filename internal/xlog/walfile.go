@@ -178,6 +178,16 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 	return nil
 }
 
+func (stream *StreamCtl) closeNoRenameIfPresent(notice string) {
+	slog.Warn("closing WAL file without renaming", slog.String("cause", notice))
+	if stream.walfile != nil {
+		err := stream.closeNoRename()
+		if err != nil {
+			slog.Error("could not close WAL file", slog.Any("err", err))
+		}
+	}
+}
+
 func (stream *StreamCtl) closeNoRename() error {
 	if stream.walfile.fd == nil {
 		return fmt.Errorf("stream.walfile.fd is nil (closeNoRename)")
