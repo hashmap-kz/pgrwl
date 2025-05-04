@@ -190,7 +190,8 @@ func (stream *StreamCtl) CloseWalFile() error {
 	return nil
 }
 
-func (stream *StreamCtl) closeNoRenameIfPresent(notice string) {
+// CloseWalFileIfPresentNoRename if any error occurs during streaming, safely close and fsync partial segment
+func (stream *StreamCtl) CloseWalFileIfPresentNoRename(notice string) {
 	slog.Warn("closing WAL file without renaming", slog.String("cause", notice))
 	if stream.walfile != nil {
 		err := stream.closeNoRename()

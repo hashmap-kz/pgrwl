@@ -128,7 +128,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			if errors.Is(err, context.Canceled) {
 				errMsg = "context canceled"
 			}
-			stream.closeNoRenameIfPresent(errMsg)
+			stream.CloseWalFileIfPresentNoRename(errMsg)
 			return fmt.Errorf("error during streaming: %w", err)
 		}
 
@@ -158,11 +158,11 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			newStartPos := cdr.LSN
 
 			if newTimeline <= stream.timeline {
-				stream.closeNoRenameIfPresent("newTimeline <= stream.Timeline")
+				stream.CloseWalFileIfPresentNoRename("newTimeline <= stream.Timeline")
 				return fmt.Errorf("server reported unexpected next timeline %d <= %d", newTimeline, stream.timeline)
 			}
 			if newStartPos > stream.stopPos {
-				stream.closeNoRenameIfPresent("newStartPos > stopPos")
+				stream.CloseWalFileIfPresentNoRename("newStartPos > stopPos")
 				return fmt.Errorf("server reported next timeline startpos %s > stoppos %s", newStartPos, stream.stopPos)
 			}
 
@@ -199,7 +199,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		}
 
 		slog.Error("replication stream was terminated before stop point")
-		stream.closeNoRenameIfPresent("controlled shutdown")
+		stream.CloseWalFileIfPresentNoRename("controlled shutdown")
 		return nil
 	}
 }
