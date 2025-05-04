@@ -165,10 +165,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		}
 
 		/*
-		 * End of replication (ie. controlled shut down of the server).
-		 *
-		 * Check if the callback thinks it's OK to stop here. If not,
-		 * complain.
+		 * End of replication (i.e. controlled shut down of the server).
 		 */
 
 		slog.Debug("stream termination",
@@ -178,7 +175,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			slog.String("last_flush_pos", stream.lastFlushPosition.String()),
 		)
 
-		slog.Error("replication stream was terminated before stop point")
+		slog.Warn("replication stream was terminated")
 		stream.CloseWalFileIfPresentNoRename("controlled shutdown")
 		return nil
 	}
