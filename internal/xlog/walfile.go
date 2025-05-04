@@ -1,6 +1,7 @@
 package xlog
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -173,7 +174,7 @@ func (stream *StreamCtl) CloseWalfile(pos pglogrepl.LSN) error {
 		return fmt.Errorf("could not close file: %w", err)
 	}
 
-	stream.updateLastFlushPosition(pos, "CloseWalfile")
+	stream.updateLastFlushPosition(context.TODO(), pos, "CloseWalfile")
 	return nil
 }
 
