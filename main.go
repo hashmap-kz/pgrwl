@@ -91,16 +91,16 @@ func main() {
 
 	// parse flags
 
-	flag.StringVar(&opts.Directory, "D", "", "receive write-ahead log files into this directory")
-	flag.StringVar(&opts.Directory, "directory", "", "(same as -D)")
-	flag.StringVar(&opts.Slot, "S", "", "replication slot to use")
-	flag.StringVar(&opts.Slot, "slot", "", "(same as -S)")
-	flag.BoolVar(&opts.NoLoop, "n", false, "do not loop on connection lost")
-	flag.BoolVar(&opts.NoLoop, "no-loop", false, "(same as -n)")
-	flag.StringVar(&opts.LogLevel, "log-level", "info", "set log level (e.g., debug, info, warn, error)")
-	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "include source file and line in log output")
-	flag.BoolVar(&opts.Verbose, "v", false, "enable verbose trace output (--debug only; may generate massive amounts of logs)")
-	flag.BoolVar(&opts.Verbose, "verbose", false, "(same as -v)")
+	flag.StringVar(&opts.Directory, "D", "", "")
+	flag.StringVar(&opts.Directory, "directory", "", "")
+	flag.StringVar(&opts.Slot, "S", "", "")
+	flag.StringVar(&opts.Slot, "slot", "", "")
+	flag.BoolVar(&opts.NoLoop, "n", false, "")
+	flag.BoolVar(&opts.NoLoop, "no-loop", false, "")
+	flag.StringVar(&opts.LogLevel, "log-level", "info", "")
+	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "")
+	flag.BoolVar(&opts.Verbose, "v", false, "")
+	flag.BoolVar(&opts.Verbose, "verbose", false, "")
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, `Usage: x05 [OPTIONS]
 
