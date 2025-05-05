@@ -11,19 +11,25 @@ export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
 export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
 
-x_backup_restore() {
+x_remake_dirs() {
   # cleanup possible state
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
   rm -rf "${WAL_PATH_PG_RECEIVEWAL}" && mkdir -p "${WAL_PATH_PG_RECEIVEWAL}"
+}
+
+x_backup_restore() {
+  x_remake_dirs
 
   # rerun the cluster
+  echo_delim "init and run a cluster"
   xpg_rebuild
   xpg_start
 
+  # run wal-receivers
+  echo_delim "running wal-receivers"
   # run wal-receiver
   bash "/var/lib/postgresql/scripts/pg/run_receiver.sh" "start"
-
   # run pg_receivewal
   bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
 
@@ -108,6 +114,19 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+
+  # run receivers with a new timeline
+  echo_delim "cleanup wal-archives, run wal-receivers with a new timeline"
+  x_remake_dirs
+  # run wal-receiver
+  bash "/var/lib/postgresql/scripts/pg/run_receiver.sh" "start"
+  # run pg_receivewal
+  bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
+  sleep 5 # wait a little (feedback timeout, etc...)
+
+  # compare with pg_receivewal
+  echo_delim "compare wal-archive with pg_receivewal with a new timeline stream"
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 
