@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Compare that files in two given directories are the same (by names and content)
+
 DIR_A="$1"
 DIR_B="$2"
 

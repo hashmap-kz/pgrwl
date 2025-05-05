@@ -2,13 +2,9 @@ package logger
 
 import (
 	"bytes"
-	"context"
-	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 )
@@ -55,17 +51,11 @@ func Init() {
 			ReplaceAttr: replaceAttr,
 		})
 	} else {
-		//nolint:gocritic
-		// baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		// 	AddSource:   logAddSource != "",
-		// 	Level:       lvl,
-		// 	ReplaceAttr: replaceAttr,
-		// })
-		baseHandler = &CleanHandler{
-			Out:       os.Stderr,
-			Level:     lvl,
-			AddSource: logAddSource != "",
-		}
+		baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			AddSource:   logAddSource != "",
+			Level:       lvl,
+			ReplaceAttr: replaceAttr,
+		})
 	}
 
 	// Add global "pid" attribute to all logs
@@ -75,76 +65,4 @@ func Init() {
 
 	// Set it as the default logger for the project
 	slog.SetDefault(logger)
-}
-
-// clean
-
-type CleanHandler struct {
-	Out       io.Writer
-	Level     slog.Level
-	AddSource bool
-	attrs     []slog.Attr
-}
-
-func (h *CleanHandler) Enabled(_ context.Context, lvl slog.Level) bool {
-	return lvl >= h.Level
-}
-
-func (h *CleanHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	// Append new attrs to existing ones
-	newAttrs := make([]slog.Attr, 0, len(h.attrs)+len(attrs))
-	newAttrs = append(newAttrs, h.attrs...)
-	newAttrs = append(newAttrs, attrs...)
-	return &CleanHandler{
-		Level:     h.Level,
-		Out:       h.Out,
-		AddSource: h.AddSource,
-		attrs:     newAttrs,
-	}
-}
-
-func (h *CleanHandler) WithGroup(_ string) slog.Handler {
-	return h
-}
-
-//nolint:gocritic
-func (h *CleanHandler) Handle(_ context.Context, r slog.Record) error {
-	buf := bufPool.Get().(*bytes.Buffer) //nolint:errcheck
-	buf.Reset()
-	defer bufPool.Put(buf)
-
-	ts := r.Time.Format("2006-01-02 15:04:05")
-	level := strings.ToUpper(r.Level.String())
-
-	// Base
-
-	if h.AddSource {
-		src := ""
-		if r.PC != 0 {
-			if fn := runtime.FuncForPC(r.PC); fn != nil {
-				if file, line := fn.FileLine(r.PC - 1); file != "" {
-					src = fmt.Sprintf("%s:%d", filepath.Base(file), line)
-				}
-			}
-		}
-		fmt.Fprintf(buf, "%s %-5s %-20s > %s", ts, level, src, r.Message)
-	} else {
-		fmt.Fprintf(buf, "%s %-5s > %s", ts, level, r.Message)
-	}
-
-	// Append attributes as key=value
-
-	// Write handler-level attrs (from WithAttrs)
-	for _, attr := range h.attrs {
-		fmt.Fprintf(buf, " %s=%v", attr.Key, attr.Value.Any())
-	}
-	// Write record-level attrs
-	r.Attrs(func(attr slog.Attr) bool {
-		fmt.Fprintf(buf, " %s=%v", attr.Key, attr.Value.Any())
-		return true
-	})
-
-	buf.WriteByte('\n')
-	_, err := h.Out.Write(buf.Bytes())
-	return err
 }
