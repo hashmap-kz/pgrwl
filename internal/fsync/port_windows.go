@@ -5,7 +5,6 @@ package fsync
 
 import (
 	"os"
-	"path/filepath"
 	"syscall"
 )
 
@@ -38,8 +37,5 @@ func FsyncDir(dirPath string) error {
 //
 //nolint:revive
 func FsyncFnameAndDir(fname string) error {
-	if err := FsyncFname(fname); err != nil {
-		return err
-	}
-	return FsyncDir(filepath.Dir(fname))
+	return FsyncFname(fname)
 }
