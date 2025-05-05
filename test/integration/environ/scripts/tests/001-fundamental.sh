@@ -12,6 +12,11 @@ export WAL_PATH="/tmp/wal-archive"
 export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
 
 x_backup_restore() {
+  # cleanup possible state
+  rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
+  rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
+  rm -rf "${WAL_PATH_PG_RECEIVEWAL}" && mkdir -p "${WAL_PATH_PG_RECEIVEWAL}"
+
   # rerun the cluster
   xpg_rebuild
   xpg_start
@@ -24,8 +29,6 @@ x_backup_restore() {
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
-  rm -rf "${BASEBACKUP_PATH}"
-  mkdir -p "${BASEBACKUP_PATH}"
   pg_basebackup \
     --pgdata="${BASEBACKUP_PATH}/data" \
     --wal-method=none \
@@ -44,6 +47,14 @@ x_backup_restore() {
 
   # wait a little
   sleep 5
+
+  echo_delim "generate 512Mi of data"
+  psql -v ON_ERROR_STOP=1 -U postgres <<-EOSQL
+  -- 1Gi/2
+  CREATE TABLE bigdata AS
+  SELECT i, repeat('x', 1024) AS filler
+  FROM generate_series(1, (1 * 1024 * 1024)/2) AS t(i);
+EOSQL
 
   # stop inserts
   pkill -f inserts.sh
