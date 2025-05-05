@@ -256,6 +256,7 @@ func (stream *StreamCtl) closeNoRename() error {
 }
 
 func (stream *StreamCtl) closeAndRename() error {
+	var err error
 	if stream.walfile.fd == nil {
 		return fmt.Errorf("stream.walfile.fd is nil (closeAndRename)")
 	}
@@ -268,22 +269,24 @@ func (stream *StreamCtl) closeAndRename() error {
 		slog.String("dst", filepath.ToSlash(finalName)),
 	)
 
-	l.Debug("closing fd")
-	err := stream.walfile.fd.Close()
-	if err != nil {
+	l.Debug("closing fd (*.partial file)")
+	if err = stream.walfile.fd.Close(); err != nil {
 		return err
 	}
 
-	l.Debug("renaming complete segment")
-	err = os.Rename(pathname, finalName)
-	if err != nil {
+	l.Debug("fsync path (*.partial file)")
+	if err = fsync.FsyncFname(pathname); err != nil {
+		return err
+	}
+
+	l.Debug("renaming to complete segment")
+	if err = os.Rename(pathname, finalName); err != nil {
 		return err
 	}
 	stream.walfile = nil
 
 	l.Debug("fsync filename and parent-directory")
-	err = fsync.FsyncFnameAndDir(finalName)
-	if err != nil {
+	if err = fsync.FsyncFnameAndDir(finalName); err != nil {
 		return err
 	}
 
