@@ -15,6 +15,7 @@ set -euo pipefail
 # * Create a table, and insert the current timestamp every second (in the background)
 # * Run pgbench to populate the database with 1 million rows
 # * Generate additional data (~512 MiB)
+# * Concurrently create 100 tables with 10000 rows each.
 # * Terminate the insert-script job
 # * Run pg_dumpall and save the output as plain SQL
 # * Terminate all PostgreSQL processes and delete the PGDATA directory
