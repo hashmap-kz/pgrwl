@@ -4,24 +4,13 @@
 # APP_NAME
 # APP_PATH
 # ARGS
-# WAL_PATH
 
 : "${APP_NAME:?APP_NAME not set}"
 : "${APP_PATH:?APP_PATH not set}"
-: "${WAL_PATH:?WAL_PATH not set}"
 : "${ARGS[@]:?ARGS not set}"
 
 PID_FILE="/tmp/${APP_NAME}.pid"
 LOG_FILE="/tmp/${APP_NAME}.log"
-
-mkdir -p "${WAL_PATH}"
-chown -R postgres:postgres "${WAL_PATH}"
-
-# Default environment
-export PGHOST="${PGHOST:-localhost}"
-export PGPORT="${PGPORT:-5432}"
-export PGUSER="${PGUSER:-postgres}"
-export PGPASSWORD="${PGPASSWORD:-postgres}"
 
 start() {
   if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then

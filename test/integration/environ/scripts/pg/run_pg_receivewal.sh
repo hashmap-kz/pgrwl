@@ -14,6 +14,15 @@ ARGS=(
   "--dbname" "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal"
 )
 
+mkdir -p "${WAL_PATH}"
+chown -R postgres:postgres "${WAL_PATH}"
+
+# Default environment
+export PGHOST="${PGHOST:-localhost}"
+export PGPORT="${PGPORT:-5432}"
+export PGUSER="${PGUSER:-postgres}"
+export PGPASSWORD="${PGPASSWORD:-postgres}"
+
 # Slot creation (optional, only for pg_receivewal)
 pg_receivewal --no-password --slot=pg_receivewal --create-slot --if-not-exists
 

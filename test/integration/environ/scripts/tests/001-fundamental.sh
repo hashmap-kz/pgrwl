@@ -65,8 +65,7 @@ x_backup_restore() {
     --verbose
 
   # run inserts in a background
-  chmod +x "/var/lib/postgresql/scripts/pg/inserts.sh"
-  nohup "/var/lib/postgresql/scripts/pg/inserts.sh" &
+  bash "/var/lib/postgresql/scripts/pg/run_inserts.sh" start
 
   # fill with 1M rows
   echo_delim "running pgbench"
