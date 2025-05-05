@@ -1,6 +1,0 @@
-pg_receivewal: 2025-04-30 08:33:09 | 2025-04-30T08:33:09.668+05:00, starting-1
-pg_receivewal: starting log streaming at 4/42000000 (timeline 1)
-pg_receivewal: 2025-04-30T08:33:09.669+05:00 open_walfile
-pg_receivewal: 2025-04-30T08:33:31.651+05:00 close_walfile
-pg_receivewal: finished segment at 4/43000000 (timeline 1)
-pg_receivewal: 2025-04-30T08:33:39.880+05:00 open_walfile
