@@ -6,7 +6,7 @@ WAL_PATH="/tmp/wal-archive"
 
 ARGS=(
   "-D" "${WAL_PATH}"
-  "-S" "pg_recval_5"
+  "-S" "pg_recwal_5"
   "--log-add-source"
   "--no-loop"
   "--log-level" "debug"

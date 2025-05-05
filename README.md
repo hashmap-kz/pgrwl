@@ -16,7 +16,7 @@ PostgreSQL will block the client until the WAL is safely written to the standbys
 ```
 
 ```
-synchronous_standby_names = 'pg_receivewal,pg_recval_5'
+synchronous_standby_names = 'pg_receivewal,pg_recwal_5'
 
 # to 'force' keepalive messages
 wal_sender_timeout = 5000  # 5 seconds

@@ -12,7 +12,7 @@
         "-D",
         "wals",
         "-S",
-        "pg_recval_5",
+        "pg_recwal_5",
         "--log-level",
         "info"
       ],
