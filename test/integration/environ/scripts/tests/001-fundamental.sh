@@ -23,6 +23,7 @@ x_backup_restore() {
   bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
 
   # make a basebackup before doing anything
+  echo_delim "creating basebackup"
   rm -rf "${BASEBACKUP_PATH}"
   mkdir -p "${BASEBACKUP_PATH}"
   pg_basebackup \
@@ -38,6 +39,7 @@ x_backup_restore() {
   nohup "/var/lib/postgresql/scripts/pg/inserts.sh" &
 
   # fill with 1M rows
+  echo_delim "running pgbench"
   pgbench -i -s 10 postgres
 
   # wait a little
@@ -50,6 +52,7 @@ x_backup_restore() {
   pg_dumpall -f /tmp/pg_dumpall-before
 
   # stop cluster, cleanup data
+  echo_delim "teardown"
   xpg_teardown
 
   # restore from backup
