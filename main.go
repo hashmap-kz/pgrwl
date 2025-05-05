@@ -136,7 +136,7 @@ Main Options:
 		"PGUSER",
 		"PGPASSWORD",
 	}
-	empty := []string{}
+	var empty []string
 	for _, v := range requiredVars {
 		if os.Getenv(v) == "" {
 			empty = append(empty, v)
