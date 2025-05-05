@@ -9,10 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"pgreceivewal5/internal/fsync"
-	"pgreceivewal5/internal/logger"
-
 	"pgreceivewal5/internal/conv"
+	"pgreceivewal5/internal/fsync"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -28,6 +26,7 @@ type StreamOpts struct {
 	WalSegSz        uint64
 	BaseDir         string
 	Conn            *pgconn.PgConn
+	Verbose         bool
 }
 
 type StreamCtl struct {
@@ -46,6 +45,7 @@ type StreamCtl struct {
 	stopPos               pglogrepl.LSN
 	conn                  *pgconn.PgConn
 	walfile               *walfileT
+	verbose               bool
 }
 
 func NewStream(o *StreamOpts) *StreamCtl {
@@ -60,6 +60,7 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		walSegSz:              o.WalSegSz,
 		baseDir:               o.BaseDir,
 		conn:                  o.Conn,
+		verbose:               o.Verbose,
 	}
 }
 
@@ -168,12 +169,14 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		 * End of replication (i.e. controlled shut down of the server).
 		 */
 
-		slog.Debug("stream termination",
-			slog.String("job", "receive_xlog_stream"),
-			slog.String("reason", "controlled shutdown"),
-			slog.Uint64("tli", uint64(stream.timeline)),
-			slog.String("last_flush_pos", stream.lastFlushPosition.String()),
-		)
+		if stream.verbose {
+			slog.Debug("stream termination",
+				slog.String("job", "receive_xlog_stream"),
+				slog.String("reason", "controlled shutdown"),
+				slog.Uint64("tli", uint64(stream.timeline)),
+				slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+			)
+		}
 
 		slog.Warn("replication stream was terminated")
 		stream.CloseWalFileIfPresentNoRename("controlled shutdown")
@@ -192,14 +195,14 @@ func (stream *StreamCtl) HandleCopyStream(
 
 		// If synchronous, flush WAL file and update server immediately
 		if stream.synchronous && stream.lastFlushPosition < stream.blockPos && stream.walfile != nil {
-			logger.DebugLazy(ctx, "SYNC-1", func() []slog.Attr {
-				return []slog.Attr{
+			if stream.verbose {
+				slog.Debug("SYNC-1",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
 					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
-				}
-			})
+				)
+			}
 
 			if err := stream.SyncWalFile(); err != nil {
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
@@ -292,28 +295,28 @@ func (stream *StreamCtl) processOneMsg(
 				return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 			}
 
-			logger.DebugLazy(ctx, "begin to process xlog data msg", func() []slog.Attr {
-				return []slog.Attr{
+			if stream.verbose {
+				slog.Debug("begin to process xlog data msg",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
 					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
 					slog.Int("len", len(xld.WALData)),
-				}
-			})
+				)
+			}
 
 			if err := stream.ProcessXLogDataMsg(ctx, xld); err != nil {
 				return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 			}
 
-			logger.DebugLazy(ctx, "xlog data msg processed", func() []slog.Attr {
-				return []slog.Attr{
+			if stream.verbose {
+				slog.Debug("log data msg processed",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
 					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
-				}
-			})
+				)
+			}
 		default:
 			return nil, fmt.Errorf("unexpected CopyData message type: %c", m.Data[0])
 		}
@@ -338,18 +341,18 @@ func (stream *StreamCtl) processOneMsg(
 }
 
 func (stream *StreamCtl) updateLastFlushPosition(
-	ctx context.Context,
+	_ context.Context,
 	p pglogrepl.LSN,
 	reason string,
 ) {
-	logger.DebugLazy(ctx, "updating last-flush position", func() []slog.Attr {
-		return []slog.Attr{
+	if stream.verbose {
+		slog.Debug("updating last-flush position",
 			slog.String("prev", stream.lastFlushPosition.String()),
 			slog.String("next", p.String()),
 			slog.Uint64("diff", uint64(p-stream.lastFlushPosition)),
 			slog.String("reason", reason),
-		}
-	})
+		)
+	}
 
 	stream.lastFlushPosition = p
 }
@@ -371,12 +374,14 @@ func (stream *StreamCtl) ProcessKeepaliveMsg(
 			 * shutdown of the server.
 			 */
 
-			slog.Debug("SYNC-K",
-				slog.String("job", "process_keepalive_msg"),
-				slog.String("last_flush_pos", stream.lastFlushPosition.String()),
-				slog.String("block_pos", stream.blockPos.String()),
-				slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
-			)
+			if stream.verbose {
+				slog.Debug("SYNC-K",
+					slog.String("job", "process_keepalive_msg"),
+					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+					slog.String("block_pos", stream.blockPos.String()),
+					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
+				)
+			}
 
 			if err := stream.SyncWalFile(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
@@ -395,7 +400,7 @@ func (stream *StreamCtl) ProcessKeepaliveMsg(
 }
 
 func (stream *StreamCtl) ProcessXLogDataMsg(
-	ctx context.Context,
+	_ context.Context,
 	xld pglogrepl.XLogData,
 ) error {
 	var err error
@@ -424,15 +429,15 @@ func (stream *StreamCtl) ProcessXLogDataMsg(
 	bytesLeft := uint64(len(data))
 	bytesWritten := uint64(0)
 
-	logger.DebugLazy(ctx, "begin to write xlog data msg", func() []slog.Attr {
-		return []slog.Attr{
+	if stream.verbose {
+		slog.Debug("begin to write xlog data msg",
 			slog.String("job", "process_xlog_data_msg"),
 			slog.String("last_flush_pos", stream.lastFlushPosition.String()),
 			slog.String("block_pos", stream.blockPos.String()),
 			slog.Uint64("diff", uint64(stream.blockPos-stream.lastFlushPosition)),
 			slog.Uint64("len", bytesLeft),
-		}
-	})
+		)
+	}
 
 	for bytesLeft != 0 {
 		var bytesToWrite uint64
@@ -492,14 +497,14 @@ func (stream *StreamCtl) sendFeedback(
 	now time.Time,
 	replyRequested bool,
 ) error {
-	logger.DebugLazy(ctx, "sending feedback", func() []slog.Attr {
-		return []slog.Attr{
+	if stream.verbose {
+		slog.Debug("sending feedback",
 			slog.String("last_flush_pos", stream.lastFlushPosition.String()),
 			slog.String("block_pos", stream.blockPos.String()),
 			slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
 			slog.Time("now", now),
-		}
-	})
+		)
+	}
 
 	var standbyStatus pglogrepl.StandbyStatusUpdate
 
@@ -618,6 +623,10 @@ func (stream *StreamCtl) calculateCopyStreamSleepTime(now time.Time) time.Durati
 		}
 	} else {
 		sleepTime = -1
+	}
+
+	if stream.verbose {
+		slog.Debug("copy-stream sleep interval", slog.Duration("d", sleepTime))
 	}
 
 	return sleepTime

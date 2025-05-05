@@ -25,6 +25,7 @@ type PgReceiveWal struct {
 	Conn        *pgconn.PgConn
 	ConnStrRepl string
 	SlotName    string
+	Verbose     bool
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
@@ -117,6 +118,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		WalSegSz:        pgrw.WalSegSz,
 		BaseDir:         pgrw.BaseDir,
 		Conn:            pgrw.Conn,
+		Verbose:         pgrw.Verbose,
 	})
 
 	err = stream.ReceiveXlogStream(ctx)

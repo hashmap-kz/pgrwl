@@ -28,6 +28,7 @@ type Opts struct {
 	NoLoop       bool
 	LogLevel     string
 	LogAddSource bool
+	Verbose      bool
 }
 
 // socket for managing +
@@ -98,6 +99,8 @@ func main() {
 	flag.BoolVar(&opts.NoLoop, "no-loop", false, "(same as -n)")
 	flag.StringVar(&opts.LogLevel, "log-level", "info", "set log level (e.g., debug, info, warn, error)")
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "include source file and line in log output")
+	flag.BoolVar(&opts.Verbose, "v", false, "output verbose messages (tracing, for debug usage)")
+	flag.BoolVar(&opts.Verbose, "verbose", false, "(same as -v)")
 	flag.Parse()
 
 	if opts.Directory == "" {
@@ -156,6 +159,7 @@ func main() {
 		Conn:        conn,
 		ConnStrRepl: connStrRepl,
 		SlotName:    opts.Slot,
+		Verbose:     opts.Verbose,
 	}
 
 	// enter main streaming loop

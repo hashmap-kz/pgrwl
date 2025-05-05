@@ -69,7 +69,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 		slog.String("path", filepath.ToSlash(fullPath)),
 	)
 
-	l.Debug("open WAL file for write")
+	l.Debug("opening WAL file for write")
 
 	/*
 	 * When streaming to files, if an existing file exists we verify that it's
@@ -85,7 +85,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 
 		// File exists
 		if conv.ToUint64(stat.Size()) == stream.walSegSz {
-			l.Debug("file exists and correctly sized, open")
+			l.Debug("file exists and correctly sized, open and fsync")
 
 			// File already correctly sized, open it
 			fd, err := openFileAndFsync(fullPath)
@@ -256,7 +256,6 @@ func (stream *StreamCtl) closeNoRename() error {
 }
 
 func (stream *StreamCtl) closeAndRename() error {
-	var err error
 	if stream.walfile.fd == nil {
 		return fmt.Errorf("stream.walfile.fd is nil (closeAndRename)")
 	}
@@ -270,23 +269,23 @@ func (stream *StreamCtl) closeAndRename() error {
 	)
 
 	l.Debug("closing fd (*.partial file)")
-	if err = stream.walfile.fd.Close(); err != nil {
+	if err := stream.walfile.fd.Close(); err != nil {
 		return err
 	}
 
 	l.Debug("fsync path (*.partial file)")
-	if err = fsync.FsyncFname(pathname); err != nil {
+	if err := fsync.FsyncFname(pathname); err != nil {
 		return err
 	}
 
 	l.Debug("renaming to complete segment")
-	if err = os.Rename(pathname, finalName); err != nil {
+	if err := os.Rename(pathname, finalName); err != nil {
 		return err
 	}
 	stream.walfile = nil
 
 	l.Debug("fsync filename and parent-directory")
-	if err = fsync.FsyncFnameAndDir(finalName); err != nil {
+	if err := fsync.FsyncFnameAndDir(finalName); err != nil {
 		return err
 	}
 
