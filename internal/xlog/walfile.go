@@ -164,21 +164,20 @@ func openFileAndFsync(fullPath string) (*os.File, error) {
 	}
 
 	// fsync file in case of a previous crash
-	if err := fsync.Fsync(fd); err != nil {
-		slog.Error("could not fsync existing WAL file. exiting with status 1", slog.Any("err", err))
-		if err = fd.Close(); err != nil {
+	if errFsync := fsync.Fsync(fd); errFsync != nil {
+		if errClose := fd.Close(); errClose != nil {
 			slog.Warn("cannot close file",
 				slog.String("path", filepath.ToSlash(fullPath)),
-				slog.Any("err", err),
+				slog.Any("err", errClose),
 			)
 		}
-		if err = os.Remove(fullPath); err != nil {
+		if errUnlink := os.Remove(fullPath); errUnlink != nil {
 			slog.Warn("cannot unlink file",
 				slog.String("path", filepath.ToSlash(fullPath)),
-				slog.Any("err", err),
+				slog.Any("err", errUnlink),
 			)
 		}
-		return nil, err
+		return nil, errFsync
 	}
 	return fd, nil
 }
