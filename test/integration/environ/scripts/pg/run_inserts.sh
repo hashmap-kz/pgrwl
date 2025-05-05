@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_NAME="ts-inserts"
-APP_PATH="/var/lib/postgresql/scripts/pg/inserts.sh"
+APP_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
 
 ARGS=(
   "placeholder"

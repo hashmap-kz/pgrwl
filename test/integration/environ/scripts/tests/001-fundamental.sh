@@ -82,6 +82,10 @@ x_backup_restore() {
   FROM generate_series(1, (1 * 1024 * 1024)/2) AS t(i);
 EOSQL
 
+  # concurrently populate with random tables+data
+  echo_delim "concurrently populate with 100 tables, 10K rows each"
+  bash "/var/lib/postgresql/scripts/gendata/gendata.sh" >/dev/null 2>&1
+
   # stop inserts
   pkill -f inserts.sh
 
