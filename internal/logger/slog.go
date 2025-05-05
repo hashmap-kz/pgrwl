@@ -1,22 +1,16 @@
 package logger
 
 import (
-	"bytes"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 )
-
-var bufPool = sync.Pool{
-	New: func() any { return new(bytes.Buffer) },
-}
 
 func Init() {
 	logLevel := os.Getenv("LOG_LEVEL")
 	logFormat := os.Getenv("LOG_FORMAT")
-	logAddSource := os.Getenv("LOG_ADD_SOURCE")
+	logAddSource := os.Getenv("LOG_ADD_SOURCE") != ""
 
 	// Get logger level (INFO if not set)
 	levels := map[string]slog.Level{
@@ -32,11 +26,13 @@ func Init() {
 	}
 
 	replaceAttr := func(_ []string, attr slog.Attr) slog.Attr {
-		if attr.Key == slog.SourceKey {
-			if src, ok := attr.Value.Any().(*slog.Source); ok {
-				// Trim to basename
-				src.File = filepath.Base(src.File)
-				attr.Value = slog.AnyValue(src)
+		if logAddSource {
+			if attr.Key == slog.SourceKey {
+				if src, ok := attr.Value.Any().(*slog.Source); ok {
+					// Trim to basename
+					src.File = filepath.Base(src.File)
+					attr.Value = slog.AnyValue(src)
+				}
 			}
 		}
 		return attr
@@ -46,13 +42,13 @@ func Init() {
 	var baseHandler slog.Handler
 	if strings.EqualFold(logFormat, "json") {
 		baseHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			AddSource:   logAddSource != "",
+			AddSource:   logAddSource,
 			Level:       lvl,
 			ReplaceAttr: replaceAttr,
 		})
 	} else {
 		baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			AddSource:   logAddSource != "",
+			AddSource:   logAddSource,
 			Level:       lvl,
 			ReplaceAttr: replaceAttr,
 		})
