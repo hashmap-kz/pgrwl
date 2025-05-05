@@ -4,7 +4,7 @@ APP_NAME="pg_receivewal"
 APP_PATH="pg_receivewal" # compiled binary
 PID_FILE="/tmp/${APP_NAME}.pid"
 LOG_FILE="/tmp/${APP_NAME}.log"
-WAL_PATH="/tmp/wal-archive"
+WAL_PATH="/tmp/wal-archive-pg_receivewal"
 
 mkdir -p "${WAL_PATH}"
 chown -R postgres:postgres "${WAL_PATH}"

@@ -4,6 +4,7 @@ set -euo pipefail
 
 export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
+export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
 
 x_backup_restore() {
   # rerun the cluster
@@ -12,6 +13,9 @@ x_backup_restore() {
 
   # run wal-receiver
   bash "/var/lib/postgresql/scripts/pg/run_receiver.sh" "start"
+
+  # run pg_receivewal
+  bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
 
   # make a basebackup before doing anything
   rm -rf "${BASEBACKUP_PATH}"
@@ -35,7 +39,6 @@ x_backup_restore() {
   sleep 5
 
   # stop inserts
-  echo "$(date "+%Y-%m-%d %H:%M:%S.%6N")" >/tmp/before-drop.log
   pkill -f inserts.sh
 
   # remember the state
@@ -45,6 +48,7 @@ x_backup_restore() {
   xpg_teardown
 
   # restore from backup
+  echo_delim "restoring backup"
   mv "${BASEBACKUP_PATH}/data" "${PGDATA}"
   chmod 0750 "${PGDATA}"
   chown -R postgres:postgres "${PGDATA}"
@@ -52,6 +56,7 @@ x_backup_restore() {
 
   # prepare archive (all partial files contain valid wal-segments)
   find "${WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
+  find "${WAL_PATH_PG_RECEIVEWAL}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
 
   # fix configs
   xpg_config
@@ -63,6 +68,7 @@ EOF
   >/var/log/postgresql/pg.log
 
   # run restored cluster
+  echo_delim "running cluster"
   xpg_start
 
   # wait until is in recovery, check logs, etc...
@@ -70,11 +76,18 @@ EOF
   cat /var/log/postgresql/pg.log
 
   # check diffs
+  echo_delim "running diff on pg_dumpall dumps (before vs after)"
   pg_dumpall -f /tmp/pg_dumpall-arter
   diff /tmp/pg_dumpall-before /tmp/pg_dumpall-arter
 
   # read the latest rec
+  echo_delim "read latest applied records"
+  echo "table content:"
   psql -c "select * from public.tslog;"
+  echo "insert log content:"
   tail /tmp/insert-ts.log
-  cat /tmp/before-drop.log
+
+  # compare with pg_receivewal
+  echo_delim "compare wal-archive with pg_receivewal"
+  bash "/var/lib/postgresql/scripts/utils/util-dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
 }
