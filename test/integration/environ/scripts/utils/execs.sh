@@ -34,12 +34,14 @@ x_backup_restore() {
   # wait a little
   sleep 5
 
+  # stop inserts
+  echo "$(date "+%Y-%m-%d %H:%M:%S.%6N")" >/tmp/before-drop.log
+  pkill -f inserts.sh
+
   # remember the state
   pg_dumpall -f /tmp/pg_dumpall-before
 
   # stop cluster, cleanup data
-  echo "$(date "+%Y-%m-%d %H:%M:%S.%6N")" >/tmp/before-drop.log
-  pkill -f inserts.sh
   xpg_teardown
 
   # restore from backup
