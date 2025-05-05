@@ -99,7 +99,7 @@ func main() {
 	flag.BoolVar(&opts.NoLoop, "no-loop", false, "(same as -n)")
 	flag.StringVar(&opts.LogLevel, "log-level", "info", "set log level (e.g., debug, info, warn, error)")
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "include source file and line in log output")
-	flag.BoolVar(&opts.Verbose, "v", false, "output verbose messages (tracing, for debug usage)")
+	flag.BoolVar(&opts.Verbose, "v", false, "enable verbose trace output (--debug only; may generate massive amounts of logs)")
 	flag.BoolVar(&opts.Verbose, "verbose", false, "(same as -v)")
 	flag.Parse()
 

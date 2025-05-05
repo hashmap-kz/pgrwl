@@ -625,9 +625,5 @@ func (stream *StreamCtl) calculateCopyStreamSleepTime(now time.Time) time.Durati
 		sleepTime = -1
 	}
 
-	if stream.verbose {
-		slog.Debug("copy-stream sleep interval", slog.Duration("d", sleepTime))
-	}
-
 	return sleepTime
 }
