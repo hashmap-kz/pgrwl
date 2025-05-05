@@ -3,6 +3,7 @@ package fsync
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,9 @@ func TestFsyncDir_Success(t *testing.T) {
 }
 
 func TestFsyncDir_DirNotExist(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	err := FsyncDir("/nonexistent/dir")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot open dir")

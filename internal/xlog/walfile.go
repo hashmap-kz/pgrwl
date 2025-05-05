@@ -80,7 +80,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 
 	// Check if file already exists
 	stat, err := os.Stat(fullPath)
-	if err == nil {
+	if err == nil && stat.Mode().IsRegular() {
 		l.Debug("file exists, check size")
 
 		// File exists
@@ -88,20 +88,9 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 			l.Debug("file exists and correctly sized, open")
 
 			// File already correctly sized, open it
-			fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
+			fd, err := openFileAndFsync(fullPath)
 			if err != nil {
-				return fmt.Errorf("could not open existing WAL file %s: %w", fullPath, err)
-			}
-
-			// fsync file in case of a previous crash
-			if err := fsync.Fsync(fd); err != nil {
-				l.Error("could not fsync existing WAL file. exiting with status 1", slog.Any("err", err))
-				if err = fd.Close(); err != nil {
-					l.Warn("cannot close file", slog.Any("err", err))
-				}
-				if err = os.Remove(fullPath); err != nil {
-					l.Warn("cannot unlink file", slog.Any("err", err))
-				}
+				slog.Error("cannot open and fsync existing file, exiting", slog.Any("err", err))
 				// MARK:exit
 				os.Exit(1)
 			}
@@ -129,19 +118,9 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	)
 
 	// Otherwise create new file and preallocate
-	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
+	fd, err := createFileAndTruncate(fullPath, stream.walSegSz)
 	if err != nil {
 		return fmt.Errorf("could not create WAL file %s: %w", fullPath, err)
-	}
-
-	// Preallocate file with zeros up to 16 MiB
-	truncateSize, err := conv.Uint64ToInt64(stream.walSegSz)
-	if err != nil {
-		return err
-	}
-	if err := fd.Truncate(truncateSize); err != nil {
-		_ = fd.Close()
-		return fmt.Errorf("could not preallocate WAL file %s: %w", fullPath, err)
 	}
 
 	stream.walfile = &walfileT{
@@ -152,6 +131,56 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 
 	l.Info("starting new WAL segment")
 	return nil
+}
+
+func createFileAndTruncate(fullPath string, initSize uint64) (*os.File, error) {
+	// Create new file
+	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
+	if err != nil {
+		return nil, fmt.Errorf("could not create file %s: %w", fullPath, err)
+	}
+
+	// Preallocate file with zeros up to initSize
+	truncateSize, err := conv.Uint64ToInt64(initSize)
+	if err != nil {
+		_ = fd.Close()
+		return nil, err
+	}
+	if err := fd.Truncate(truncateSize); err != nil {
+		_ = fd.Close()
+		return nil, fmt.Errorf("could not preallocate file %s: %w", fullPath, err)
+	}
+	return fd, nil
+}
+
+func openFileAndFsync(fullPath string) (*os.File, error) {
+	fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
+	if err != nil {
+		slog.Warn("could not open file",
+			slog.String("path", filepath.ToSlash(fullPath)),
+			slog.Any("err", err),
+		)
+		return nil, err
+	}
+
+	// fsync file in case of a previous crash
+	if err := fsync.Fsync(fd); err != nil {
+		slog.Error("could not fsync existing WAL file. exiting with status 1", slog.Any("err", err))
+		if err = fd.Close(); err != nil {
+			slog.Warn("cannot close file",
+				slog.String("path", filepath.ToSlash(fullPath)),
+				slog.Any("err", err),
+			)
+		}
+		if err = os.Remove(fullPath); err != nil {
+			slog.Warn("cannot unlink file",
+				slog.String("path", filepath.ToSlash(fullPath)),
+				slog.Any("err", err),
+			)
+		}
+		return nil, err
+	}
+	return fd, nil
 }
 
 // CloseWalFile close the current WAL file (if open), and rename it to the correct
