@@ -101,6 +101,18 @@ func main() {
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "include source file and line in log output")
 	flag.BoolVar(&opts.Verbose, "v", false, "enable verbose trace output (--debug only; may generate massive amounts of logs)")
 	flag.BoolVar(&opts.Verbose, "verbose", false, "(same as -v)")
+	flag.Usage = func() {
+		_, _ = fmt.Fprintf(os.Stderr, `Usage: x05 [OPTIONS]
+
+Main Options:
+  -D, --directory         receive write-ahead log files into this directory (required)
+  -S, --slot              replication slot to use (required)
+  -n, --no-loop           do not loop on connection lost
+      --log-level         set log level (e.g., debug, info, warn, error) (default: info)
+      --log-add-source    include source file and line in log output (default: false)
+  -v, --verbose           enable verbose trace output (--debug only; may generate massive amounts of logs)
+`)
+	}
 	flag.Parse()
 
 	if opts.Directory == "" {
