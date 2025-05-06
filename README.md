@@ -1,4 +1,8 @@
-**XXX** is a fully functional clone of PostgreSQL’s `pg_receivewal`, written in Go.
+_`pgreceivewal` is a fully functional clone of PostgreSQL’s `pg_receivewal`, written in Go._
+
+---
+
+## 🚀 About
 
 The project serves as a research platform to explore streaming WAL archiving with a target of **RPO=0** during recovery.
 
@@ -7,39 +11,38 @@ streaming into partial files, and extensive error checking.
 
 ---
 
-## 📦 Requirements
-
-Make sure the following PostgreSQL environment variables are **explicitly set** before running the utility:
-
-- `PGHOST` – PostgreSQL host
-- `PGPORT` – PostgreSQL port
-- `PGUSER` – Replication user
-- `PGPASSWORD` – Replication password
-
-These are used to establish a replication connection to PostgreSQL.
-
----
-
 ## 🛠️ Usage
 
 ```bash
-XXX [OPTIONS]
+export PGHOST='localhost'
+export PGPORT='5432'
+export PGUSER='postgres'
+export PGPASSWORD='postgres'
+
+pgreceivewal -D /mnt/wal-archive -S bookstore_app 
 ```
 
 ### 🔐 Required Flags
 
-| Flag                | Description                                                         |
-|---------------------|---------------------------------------------------------------------|
-| `-D`, `--directory` | Directory to store WAL segments (it will be created automatically)  |
-| `-S`, `--slot`      | Replication slot name to use (a slot will be created automatically) |
+```
+-D, --directory  Directory to store WAL segments
+                 (will be created automatically)
+
+-S, --slot       Replication slot name to use
+                 (a slot will be created automatically)
+```
 
 ### ⚙️ Optional Flags
 
-| Flag               | Description                                                                |
-|--------------------|----------------------------------------------------------------------------|
-| `-n`, `--no-loop`  | Do not retry connection if it is lost                                      |
-| `--log-level`      | Logging level: `trace`, `debug`, `info`, `warn`, `error` (default: `info`) |
-| `--log-add-source` | Include source file and line number in log output (default: `false`)       |
+```
+-n, --no-loop         Do not retry connection if it is lost
+
+    --log-level       Logging level: trace, debug, info,
+                      warn, error (default: info)
+
+    --log-add-source  Include source file and line number in
+                      log output (default: false)
+```
 
 ---
 
@@ -61,7 +64,7 @@ It also checks that the WAL files generated are byte-for-byte identical to those
 ### Test Steps:
 
 * Initialize and start a PostgreSQL cluster
-* Run WAL receivers (`XXX` and `pg_receivewal`)
+* Run WAL receivers (`pgreceivewal` and `pg_receivewal`)
 * Create a base backup
 * Create a table, and insert the current timestamp every second (in the background)
 * Run pgbench to populate the database with 1 million rows
@@ -137,3 +140,16 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 - [Streaming Replication Protocol](https://www.postgresql.org/docs/current/protocol-replication.html)
 - [Continuous Archiving and Point-in-Time Recovery](https://www.postgresql.org/docs/current/continuous-archiving.html)
 - [Setting Up WAL Archiving](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-ARCHIVING-WAL)
+
+---
+
+## 🛠 Planned Features
+
+- Optional compression/encryption for completed WAL segments
+- Optional metrics and alerting
+
+---
+
+## 📜 License
+
+MIT License. See [LICENSE](./LICENSE) for details.
