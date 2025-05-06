@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	LevelTrace = slog.LevelDebug - 4
+	LevelFatal = slog.LevelError + 4
+)
+
 func Init() {
 	logLevel := os.Getenv("LOG_LEVEL")
 	logFormat := os.Getenv("LOG_FORMAT")
@@ -14,7 +19,7 @@ func Init() {
 
 	// Get logger level (INFO if not set)
 	levels := map[string]slog.Level{
-		"trace": slog.LevelDebug,
+		"trace": LevelTrace,
 		"debug": slog.LevelDebug,
 		"info":  slog.LevelInfo,
 		"warn":  slog.LevelWarn,
@@ -26,12 +31,27 @@ func Init() {
 	}
 
 	replaceAttr := func(_ []string, attr slog.Attr) slog.Attr {
+		// print basename of a source. short-circuit: only when --log-add-source is enabled
 		if logAddSource {
 			if attr.Key == slog.SourceKey {
 				if src, ok := attr.Value.Any().(*slog.Source); ok {
 					// Trim to basename
 					src.File = filepath.Base(src.File)
 					attr.Value = slog.AnyValue(src)
+				}
+			}
+		}
+		// custom levels. short-circuit: replace only when the given --log-level not a slog one.
+		if lvl <= slog.LevelDebug || lvl >= slog.LevelError {
+			if attr.Key == slog.LevelKey {
+				recLvl := attr.Value.Any().(slog.Level)
+				switch recLvl {
+				case LevelTrace:
+					return slog.String(slog.LevelKey, "TRACE")
+				case LevelFatal:
+					return slog.String(slog.LevelKey, "FATAL")
+				default:
+					return attr // Keep default
 				}
 			}
 		}

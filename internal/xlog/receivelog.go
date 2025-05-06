@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"pgreceivewal5/internal/logger"
+
 	"pgreceivewal5/internal/conv"
 	"pgreceivewal5/internal/fsync"
 
@@ -170,11 +172,11 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		 */
 
 		if stream.verbose {
-			slog.Debug("stream termination",
+			slog.LogAttrs(ctx, logger.LevelTrace, "stream termination",
 				slog.String("job", "receive_xlog_stream"),
 				slog.String("reason", "controlled shutdown"),
 				slog.Uint64("tli", uint64(stream.timeline)),
-				slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+				slog.String("flush_pos", stream.lastFlushPosition.String()),
 			)
 		}
 
@@ -196,9 +198,9 @@ func (stream *StreamCtl) HandleCopyStream(
 		// If synchronous, flush WAL file and update server immediately
 		if stream.synchronous && stream.lastFlushPosition < stream.blockPos && stream.walfile != nil {
 			if stream.verbose {
-				slog.Debug("SYNC-1",
+				slog.LogAttrs(ctx, logger.LevelTrace, "SYNC-1",
 					slog.String("job", "handle_copy_stream"),
-					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
 					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
 				)
@@ -296,9 +298,9 @@ func (stream *StreamCtl) processOneMsg(
 			}
 
 			if stream.verbose {
-				slog.Debug("begin to process xlog data msg",
+				slog.LogAttrs(ctx, logger.LevelTrace, "begin to process xlog data msg",
 					slog.String("job", "handle_copy_stream"),
-					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
 					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
 					slog.Int("len", len(xld.WALData)),
@@ -310,9 +312,9 @@ func (stream *StreamCtl) processOneMsg(
 			}
 
 			if stream.verbose {
-				slog.Debug("log data msg processed",
+				slog.LogAttrs(ctx, logger.LevelTrace, "log data msg processed",
 					slog.String("job", "handle_copy_stream"),
-					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
 					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
 				)
@@ -341,12 +343,12 @@ func (stream *StreamCtl) processOneMsg(
 }
 
 func (stream *StreamCtl) updateLastFlushPosition(
-	_ context.Context,
+	ctx context.Context,
 	p pglogrepl.LSN,
 	reason string,
 ) {
 	if stream.verbose {
-		slog.Debug("updating last-flush position",
+		slog.LogAttrs(ctx, logger.LevelTrace, "updating last-flush position",
 			slog.String("prev", stream.lastFlushPosition.String()),
 			slog.String("next", p.String()),
 			slog.Uint64("diff", uint64(p-stream.lastFlushPosition)),
@@ -375,9 +377,9 @@ func (stream *StreamCtl) ProcessKeepaliveMsg(
 			 */
 
 			if stream.verbose {
-				slog.Debug("SYNC-K",
+				slog.LogAttrs(ctx, logger.LevelTrace, "SYNC-K",
 					slog.String("job", "process_keepalive_msg"),
-					slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
 					slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
 				)
@@ -400,7 +402,7 @@ func (stream *StreamCtl) ProcessKeepaliveMsg(
 }
 
 func (stream *StreamCtl) ProcessXLogDataMsg(
-	_ context.Context,
+	ctx context.Context,
 	xld pglogrepl.XLogData,
 ) error {
 	var err error
@@ -430,9 +432,9 @@ func (stream *StreamCtl) ProcessXLogDataMsg(
 	bytesWritten := uint64(0)
 
 	if stream.verbose {
-		slog.Debug("begin to write xlog data msg",
+		slog.LogAttrs(ctx, logger.LevelTrace, "begin to write xlog data msg",
 			slog.String("job", "process_xlog_data_msg"),
-			slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+			slog.String("flush_pos", stream.lastFlushPosition.String()),
 			slog.String("block_pos", stream.blockPos.String()),
 			slog.Uint64("diff", uint64(stream.blockPos-stream.lastFlushPosition)),
 			slog.Uint64("len", bytesLeft),
@@ -498,8 +500,8 @@ func (stream *StreamCtl) sendFeedback(
 	replyRequested bool,
 ) error {
 	if stream.verbose {
-		slog.Debug("sending feedback",
-			slog.String("last_flush_pos", stream.lastFlushPosition.String()),
+		slog.LogAttrs(ctx, logger.LevelTrace, "sending feedback",
+			slog.String("flush_pos", stream.lastFlushPosition.String()),
 			slog.String("block_pos", stream.blockPos.String()),
 			slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
 			slog.Time("now", now),

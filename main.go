@@ -28,7 +28,6 @@ type Opts struct {
 	NoLoop       bool
 	LogLevel     string
 	LogAddSource bool
-	Verbose      bool
 }
 
 // socket for managing +
@@ -99,8 +98,6 @@ func main() {
 	flag.BoolVar(&opts.NoLoop, "no-loop", false, "")
 	flag.StringVar(&opts.LogLevel, "log-level", "info", "")
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "")
-	flag.BoolVar(&opts.Verbose, "v", false, "")
-	flag.BoolVar(&opts.Verbose, "verbose", false, "")
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, `Usage: x05 [OPTIONS]
 
@@ -108,9 +105,8 @@ Main Options:
   -D, --directory         receive write-ahead log files into this directory (required)
   -S, --slot              replication slot to use (required)
   -n, --no-loop           do not loop on connection lost
-      --log-level         set log level (e.g., debug, info, warn, error) (default: info)
+      --log-level         set log level (e.g., trace, debug, info, warn, error) (default: info)
       --log-add-source    include source file and line in log output (default: false)
-  -v, --verbose           enable verbose trace output (--debug only; may generate massive amounts of logs)
 `)
 	}
 	flag.Parse()
@@ -171,7 +167,8 @@ Main Options:
 		Conn:        conn,
 		ConnStrRepl: connStrRepl,
 		SlotName:    opts.Slot,
-		Verbose:     opts.Verbose,
+		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
+		Verbose: strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace"),
 	}
 
 	// enter main streaming loop
