@@ -169,6 +169,21 @@ In contrast, streaming WAL archiving—when used with replication slots and the 
 parameter—ensures that the system can be restored to the latest committed transaction.
 This approach provides true zero data loss (**RPO=0**), making it ideal for high-durability requirements.
 
+---
+
+## 👷 Developer Notes
+
+To contribute or verify the project locally, the following `make` targets should all pass:
+
+```
+  make build               # Compile the project
+  make lint                # Run linter (should pass without errors)
+  make test                # Run unit tests (should all pass)
+  make test-integ-scripts  # Run integration tests (slow, but critical)
+```
+
+✅ All targets should complete successfully before submitting changes or opening a PR.
+
 ## ⏮️ Links
 
 - [pg_receivewal Documentation](https://www.postgresql.org/docs/current/app-pgreceivewal.html)
