@@ -1,4 +1,4 @@
-_`pgreceivewal` is a fully functional clone of PostgreSQL’s `pg_receivewal`, written in Go._
+_`pgreceivewal` stream write-ahead logs from a PostgreSQL server_
 
 [![License](https://img.shields.io/github/license/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgreceivewal)](https://goreportcard.com/report/github.com/hashmap-kz/pgreceivewal)
@@ -47,6 +47,7 @@ pgreceivewal -D /mnt/wal-archive -S bookstore_app
 
 ```
 -n, --no-loop         Do not retry connection if it is lost
+                      (default: false)
 
     --log-level       Logging level: trace, debug, info, warn, error 
                       (default: info)
