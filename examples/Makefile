@@ -46,6 +46,7 @@ clean:
 basebackup:
 	@docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/01-basebackup.sh
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary bash -c "su postgres -c '/var/lib/postgresql/scripts/tests/01-basebackup.sh'"
+	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary psql -U postgres -p 5432 -c "SELECT pg_switch_wal();"
 	@echo "🎉 Basebackup created!"
 
 # Tearwown cluster

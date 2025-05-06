@@ -19,6 +19,7 @@ services:
       context: .
       dockerfile: ./Dockerfile_pgreceivewal
     container_name: pgreceivewal
+    restart: unless-stopped
     environment:
       PGHOST: pg-primary
       PGPORT: 5432
@@ -27,7 +28,6 @@ services:
     command: -D /mnt/wal-archive -S example_slot --no-loop
     volumes:
       - shared-data:/mnt
-    restart: unless-stopped
     depends_on:
       - pg-primary
 

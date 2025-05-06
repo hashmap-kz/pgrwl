@@ -74,6 +74,9 @@ RUN chmod +x /entrypoint.sh
 COPY scripts /var/lib/postgresql/scripts
 RUN chown -R postgres:postgres /var/lib/postgresql
 
+# Setup shared volume
+RUN mkdir -p /mnt/wal-archive && chown -R postgres:postgres /mnt/wal-archive
+
 ######################################################################
 # Run container
 
