@@ -1,20 +1,18 @@
 services:
   pg-primary:
-    image: postgres:17
+    build:
+      context: .
+      dockerfile: Dockerfile_postgresql
     container_name: pg-primary
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      TZ: "Asia/Aqtau"
     ports:
       - "15432:5432"
+      - "2323:22"
     volumes:
-      - pg-primary-data:/var/lib/postgresql/data
-      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-    command: -c max_wal_senders=10
-      -c wal_keep_size=64MB
-      -c listen_addresses=*
-      -c log_replication_commands=on
-      -c hba_file=/etc/postgresql/pg_hba.conf
+      - pg-primary-data:/var/lib/postgresql/17/main
+      - shared-data:/mnt
 
   pgreceivewal:
     build:
@@ -26,13 +24,13 @@ services:
       PGPORT: 5432
       PGUSER: postgres
       PGPASSWORD: postgres
-    command: -D /tmp/wal-archive -S example_slot
+    command: -D /mnt/wal-archive -S example_slot --no-loop
     volumes:
-      - ./wals:/tmp/wal-archive
+      - shared-data:/mnt
     restart: unless-stopped
     depends_on:
       - pg-primary
 
 volumes:
   pg-primary-data:
-
+  shared-data:

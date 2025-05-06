@@ -1,9 +1,11 @@
 FROM alpine:latest
 
-RUN apk update && apk add --no-cache bash
+RUN apk update && apk add --no-cache bash vim mc
 
-WORKDIR /app
+# Setup 'root' user
+RUN echo "root:root" | chpasswd
+COPY files/dotfiles/ /root
 
-COPY bin/pgreceivewal /app/pgreceivewal
+COPY bin/pgreceivewal /usr/local/bin/pgreceivewal
 
-ENTRYPOINT ["./pgreceivewal"]
+ENTRYPOINT ["/usr/local/bin/pgreceivewal"]
