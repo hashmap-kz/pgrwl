@@ -3,7 +3,7 @@ COMPOSE_FILE = docker-compose.yml
 
 # Targets
 
-.PHONY: build up down ps logs clean restart basebackup teardown restore
+.PHONY: build up down ps logs clean restart basebackup gendata teardown restore
 
 # Build images, up containers
 build:
@@ -49,7 +49,13 @@ basebackup:
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary psql -U postgres -p 5432 -c "SELECT pg_switch_wal();"
 	@echo "🎉 Basebackup created!"
 
-# Tearwown cluster
+# Gen data
+gendata:
+	@docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/02-gendata.sh
+	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary bash -c "su postgres -c '/var/lib/postgresql/scripts/tests/02-gendata.sh'"
+	@echo "🎉 Cluster populated with data!"
+
+# Teardown cluster
 teardown:
 	@docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/04-teardown.sh
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary bash -c "su postgres -c '/var/lib/postgresql/scripts/tests/04-teardown.sh'"

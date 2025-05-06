@@ -18,6 +18,18 @@ make logs
 make basebackup
 ```
 
+### Add some data
+
+```
+make gendata
+```
+
+### Examine result
+
+```
+docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigdata;'
+```
+
 ### Teardown PostgreSQL cluster inside container
 
 ```
@@ -33,5 +45,5 @@ make restore
 ### Exec into container, examine result
 
 ```
-docker exec -it pg-primary psql -U postgres
+docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigdata;'
 ```
