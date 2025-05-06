@@ -16,6 +16,23 @@ services:
       -c log_replication_commands=on
       -c hba_file=/etc/postgresql/pg_hba.conf
 
+  pgreceivewal:
+    build:
+      context: .
+      dockerfile: ./Dockerfile_pgreceivewal
+    container_name: pgreceivewal
+    environment:
+      PGHOST: pg-primary
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    command: -D /tmp/wal-archive -S example_slot
+    volumes:
+      - ./wals:/tmp/wal-archive
+    restart: unless-stopped
+    depends_on:
+      - pg-primary
+
 volumes:
   pg-primary-data:
 
