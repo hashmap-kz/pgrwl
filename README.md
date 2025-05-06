@@ -28,10 +28,10 @@ XXX [OPTIONS]
 
 ### 🔐 Required Flags
 
-| Flag                | Description                                                        |
-|---------------------|--------------------------------------------------------------------|
-| `-D`, `--directory` | Directory to store WAL segments (it will be created automatically) |
-| `-S`, `--slot`      | Replication slot name to use (a slot will be create automatically) |
+| Flag                | Description                                                         |
+|---------------------|---------------------------------------------------------------------|
+| `-D`, `--directory` | Directory to store WAL segments (it will be created automatically)  |
+| `-S`, `--slot`      | Replication slot name to use (a slot will be created automatically) |
 
 ### ⚙️ Optional Flags
 
@@ -45,10 +45,10 @@ XXX [OPTIONS]
 
 ## 💾 Notes on `fsync` (since the utility works in synchronous mode **only**):
 
-* After each WAL segment is written, an fsync is performed on the currently open WAL file to ensure durability.
-* An fsync is triggered when a WAL segment is completed and the `*.partial` file is renamed to its final form.
-* An fsync is triggered when we receive a keepalive msg from then server with 'reply_requested' option set.
-* Additionally, fsync is called whenever an error occurs during the receive-copy loop.
+* After each WAL segment is written, an `fsync` is performed on the currently open WAL file to ensure durability.
+* An `fsync` is triggered when a WAL segment is completed and the `*.partial` file is renamed to its final form.
+* An `fsync` is triggered when a keepalive message is received from the server with the `reply_requested` option set.
+* Additionally, `fsync` is called whenever an error occurs during the receive-copy loop.
 
 ---
 
@@ -94,8 +94,7 @@ phase (after simply removing the `*.partial` suffix).
 
 I'm considering adding support for compression and encryption as optional features for completed WAL files.
 However, streaming `*.partial` files to any location other than the local filesystem can introduce numerous
-unpredictable
-issues.
+unpredictable issues.
 
 In short: PostgreSQL waits for the replica to confirm commits, so we cannot afford to depend on external systems in such
 critical paths.
@@ -107,8 +106,7 @@ If any of those subsystems were to crash, it could bring down the main WAL recei
 of failure we aim to avoid.
 
 Handling retention, remote uploads, and other lifecycle operations should be the responsibility of **separate tools**
-that
-consume the WAL files archived by this utility.
+that consume the WAL files archived by this utility.
 This is the same design philosophy used by `pg_receivewal` and other official PostgreSQL tools.
 
 ---
@@ -125,7 +123,7 @@ This means that in a crash scenario, you could lose up to 16 MiB of data.
 You can mitigate this by setting a lower `archive_timeout` (e.g., 1 minute), but even then, in a worst-case scenario,
 you risk losing up to 1 minute of data.
 Also, it’s important to note that PostgreSQL preallocates WAL files to the configured `wal_segment_size`, so they are
-created with full size regardless of how much data has been written (quote from documentation:
+created with full size regardless of how much data has been written. (Quote from documentation:
 _It is therefore unwise to set a very short `archive_timeout` — it will bloat your archive storage._).
 
 In contrast, streaming WAL archiving—when used with replication slots and the `synchronous_standby_names`
@@ -139,14 +137,3 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 - [Streaming Replication Protocol](https://www.postgresql.org/docs/current/protocol-replication.html)
 - [Continuous Archiving and Point-in-Time Recovery](https://www.postgresql.org/docs/current/continuous-archiving.html)
 - [Setting Up WAL Archiving](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-ARCHIVING-WAL)
-
-
-
-
-
-
-
-
-
-
-
