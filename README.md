@@ -44,11 +44,14 @@ pgreceivewal -D /mnt/wal-archive -S bookstore_app
 ```
 -n, --no-loop         Do not retry connection if it is lost
 
-    --log-level       Logging level: trace, debug, info,
-                      warn, error (default: info)
+    --log-level       Logging level: trace, debug, info, warn, error 
+                      (default: info)
 
-    --log-add-source  Include source file and line number in
-                      log output (default: false)
+    --log-format      Specify log formatter (e.g., json, text) 
+                      (default: text)
+    
+    --log-add-source  Include source file and line number in log output 
+                      (default: false)
 ```
 
 ---

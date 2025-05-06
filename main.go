@@ -24,6 +24,7 @@ type Opts struct {
 	NoLoop       bool
 	LogLevel     string
 	LogAddSource bool
+	LogFormat    string
 }
 
 func main() {
@@ -76,6 +77,7 @@ func parseFlags() Opts {
 	flag.BoolVar(&opts.NoLoop, "no-loop", false, "")
 	flag.StringVar(&opts.LogLevel, "log-level", "info", "")
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "")
+	flag.StringVar(&opts.LogFormat, "log-format", "json", "")
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, `Usage: pgreceivewal [OPTIONS]
 
@@ -84,6 +86,7 @@ Main Options:
   -S, --slot              replication slot to use (required)
   -n, --no-loop           do not loop on connection lost
       --log-level         set log level (e.g., trace, debug, info, warn, error) (default: info)
+      --log-format        specify log formatter (e.g., json, text) (default: text)
       --log-add-source    include source file and line in log output (default: false)
 `)
 	}
@@ -98,6 +101,7 @@ Main Options:
 
 	// set env-vars
 	_ = os.Setenv("LOG_LEVEL", opts.LogLevel)
+	_ = os.Setenv("LOG_FORMAT", opts.LogFormat)
 	if opts.LogAddSource {
 		_ = os.Setenv("LOG_ADD_SOURCE", "1")
 	}
