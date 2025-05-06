@@ -108,9 +108,9 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		}
 
 		/* Stream the WAL */
-		cdr, err := stream.HandleCopyStream(ctx)
+		cdr, err := stream.handleCopyStream(ctx)
 		if err != nil {
-			errMsg := "func HandleCopyStream() exits with an error"
+			errMsg := "func handleCopyStream() exits with an error"
 			if errors.Is(err, context.Canceled) {
 				errMsg = "context canceled"
 			}
@@ -186,9 +186,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 	}
 }
 
-func (stream *StreamCtl) HandleCopyStream(
-	ctx context.Context,
-) (*pglogrepl.CopyDoneResult, error) {
+func (stream *StreamCtl) handleCopyStream(ctx context.Context) (*pglogrepl.CopyDoneResult, error) {
 	stream.lastStatus = time.Time{}
 	stream.blockPos = stream.startPos
 
@@ -209,7 +207,7 @@ func (stream *StreamCtl) HandleCopyStream(
 			if err := stream.SyncWalFile(); err != nil {
 				return nil, fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			stream.updateLastFlushPosition(ctx, stream.blockPos, "HandleCopyStream: (stream.LastFlushPosition < blockPos)")
+			stream.updateLastFlushPosition(ctx, stream.blockPos, "handleCopyStream: (stream.LastFlushPosition < blockPos)")
 			/*
 			 * Send feedback so that the server sees the latest WAL locations
 			 * immediately.
@@ -275,10 +273,7 @@ func (stream *StreamCtl) HandleCopyStream(
 	}
 }
 
-func (stream *StreamCtl) processOneMsg(
-	ctx context.Context,
-	msg pgproto3.BackendMessage,
-) (*pglogrepl.CopyDoneResult, error) {
+func (stream *StreamCtl) processOneMsg(ctx context.Context, msg pgproto3.BackendMessage) (*pglogrepl.CopyDoneResult, error) {
 	switch m := msg.(type) {
 	case *pgproto3.CopyData:
 		switch m.Data[0] {
@@ -287,7 +282,7 @@ func (stream *StreamCtl) processOneMsg(
 			if err != nil {
 				return nil, fmt.Errorf("parse keepalive failed: %w", err)
 			}
-			if err := stream.ProcessKeepaliveMsg(ctx, pkm); err != nil {
+			if err := stream.processKeepaliveMsg(ctx, pkm); err != nil {
 				return nil, fmt.Errorf("process keepalive failed: %w", err)
 			}
 
@@ -307,7 +302,7 @@ func (stream *StreamCtl) processOneMsg(
 				)
 			}
 
-			if err := stream.ProcessXLogDataMsg(ctx, xld); err != nil {
+			if err := stream.processXLogDataMsg(ctx, xld); err != nil {
 				return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 			}
 
@@ -342,27 +337,7 @@ func (stream *StreamCtl) processOneMsg(
 	return nil, nil
 }
 
-func (stream *StreamCtl) updateLastFlushPosition(
-	ctx context.Context,
-	p pglogrepl.LSN,
-	reason string,
-) {
-	if stream.verbose {
-		slog.LogAttrs(ctx, logger.LevelTrace, "updating last-flush position",
-			slog.String("prev", stream.lastFlushPosition.String()),
-			slog.String("next", p.String()),
-			slog.Uint64("diff", uint64(p-stream.lastFlushPosition)),
-			slog.String("reason", reason),
-		)
-	}
-
-	stream.lastFlushPosition = p
-}
-
-func (stream *StreamCtl) ProcessKeepaliveMsg(
-	ctx context.Context,
-	keepalive pglogrepl.PrimaryKeepaliveMessage,
-) error {
+func (stream *StreamCtl) processKeepaliveMsg(ctx context.Context, keepalive pglogrepl.PrimaryKeepaliveMessage) error {
 	if keepalive.ReplyRequested {
 		// If a valid flush location needs to be reported, and WAL file exists
 		if stream.reportFlushPosition &&
@@ -388,7 +363,7 @@ func (stream *StreamCtl) ProcessKeepaliveMsg(
 			if err := stream.SyncWalFile(); err != nil {
 				return fmt.Errorf("could not fsync WAL file: %w", err)
 			}
-			stream.updateLastFlushPosition(ctx, stream.blockPos, "ProcessKeepaliveMsg: (stream.LastFlushPosition < blockPos)")
+			stream.updateLastFlushPosition(ctx, stream.blockPos, "processKeepaliveMsg: (stream.LastFlushPosition < blockPos)")
 		}
 
 		now := time.Now()
@@ -401,10 +376,7 @@ func (stream *StreamCtl) ProcessKeepaliveMsg(
 	return nil
 }
 
-func (stream *StreamCtl) ProcessXLogDataMsg(
-	ctx context.Context,
-	xld pglogrepl.XLogData,
-) error {
+func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.XLogData) error {
 	var err error
 	stream.blockPos = xld.WALStart
 
@@ -494,11 +466,7 @@ func (stream *StreamCtl) ProcessXLogDataMsg(
 	return nil
 }
 
-func (stream *StreamCtl) sendFeedback(
-	ctx context.Context,
-	now time.Time,
-	replyRequested bool,
-) error {
+func (stream *StreamCtl) sendFeedback(ctx context.Context, now time.Time, replyRequested bool) error {
 	if stream.verbose {
 		slog.LogAttrs(ctx, logger.LevelTrace, "sending feedback",
 			slog.String("flush_pos", stream.lastFlushPosition.String()),
@@ -548,6 +516,19 @@ func (stream *StreamCtl) handleEndOfCopyStream(ctx context.Context) (*pglogrepl.
 
 	stream.stopPos = stream.blockPos
 	return cdr, nil
+}
+
+func (stream *StreamCtl) updateLastFlushPosition(ctx context.Context, p pglogrepl.LSN, reason string) {
+	if stream.verbose {
+		slog.LogAttrs(ctx, logger.LevelTrace, "updating last-flush position",
+			slog.String("prev", stream.lastFlushPosition.String()),
+			slog.String("next", p.String()),
+			slog.Uint64("diff", uint64(p-stream.lastFlushPosition)),
+			slog.String("reason", reason),
+		)
+	}
+
+	stream.lastFlushPosition = p
 }
 
 // timeline history file

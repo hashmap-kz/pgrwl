@@ -74,7 +74,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	}
 
 	// 4
-	streamStartLSN, streamStartTimeline, err := pgrw.FindStreamingStart()
+	streamStartLSN, streamStartTimeline, err := pgrw.findStreamingStart()
 	if err != nil {
 		if !errors.Is(err, ErrNoWalEntries) {
 			// just log an error and continue, stream-start-lsn and timeline
@@ -150,8 +150,8 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	return nil
 }
 
-// FindStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
-func (pgrw *PgReceiveWal) FindStreamingStart() (pglogrepl.LSN, uint32, error) {
+// findStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
+func (pgrw *PgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
 	// ensure dir exists
 	if err := os.MkdirAll(pgrw.BaseDir, 0o750); err != nil {
 		return 0, 0, err

@@ -27,7 +27,7 @@ func TestFindStreamingStart_PartialAndComplete(t *testing.T) {
 		WalSegSz: segSize,
 	}
 
-	lsn, tli, err := pgrw.FindStreamingStart()
+	lsn, tli, err := pgrw.findStreamingStart()
 	assert.NoError(t, err)
 
 	// partial = segNo 2 -> startLSN = 2
@@ -49,7 +49,7 @@ func TestFindStreamingStart_OnlyComplete(t *testing.T) {
 		WalSegSz: segSize,
 	}
 
-	lsn, tli, err := pgrw.FindStreamingStart()
+	lsn, tli, err := pgrw.findStreamingStart()
 	assert.NoError(t, err)
 
 	// segNo = 10 -> startLSN = 11
@@ -65,7 +65,7 @@ func TestFindStreamingStart_EmptyDir(t *testing.T) {
 		WalSegSz: 16 * 1024 * 1024,
 	}
 
-	_, _, err := pgrw.FindStreamingStart()
+	_, _, err := pgrw.findStreamingStart()
 	assert.ErrorIs(t, err, ErrNoWalEntries)
 }
 
@@ -86,7 +86,7 @@ func TestFindStreamingStart_DifferentTimelines(t *testing.T) {
 		WalSegSz: segSize,
 	}
 
-	lsn, tli, err := pgrw.FindStreamingStart()
+	lsn, tli, err := pgrw.findStreamingStart()
 	assert.NoError(t, err)
 
 	expectedLSN := XLogSegNoToRecPtr(10, segSize) // segNo = 10
@@ -148,7 +148,7 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 		WalSegSz: segSize,
 	}
 
-	lsn, tli, err := pgrw.FindStreamingStart()
+	lsn, tli, err := pgrw.findStreamingStart()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTLI, tli)
 	assert.Equal(t, expectedLSN, lsn)
