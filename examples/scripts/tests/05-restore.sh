@@ -23,10 +23,16 @@ x_backup_restore() {
 restore_command = 'cp ${WAL_PATH}/%f %p'
 EOF
 
+  # cleanup logs
+  >/var/log/postgresql/pg.log
+
   # run restored cluster
   echo_delim "running cluster"
   xpg_start
+
+  # wait until is in recovery, check logs, etc...
   xpg_wait_is_in_recovery
+  cat /var/log/postgresql/pg.log
 }
 
 x_backup_restore "${@}"
