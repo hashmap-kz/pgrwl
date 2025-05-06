@@ -4,7 +4,7 @@ set -euo pipefail
 # build binary
 rm -rf bin
 (
-  cd ../../
+  cd ../
   make build
   mv bin examples
 )
@@ -13,12 +13,18 @@ rm -rf bin
 docker compose down -v
 docker compose up -d --build
 
-# wait pg_isready
+# wait until cluster is ready
 until docker exec pg-primary pg_isready -U postgres >/dev/null 2>&1; do
   echo "Waiting for PostgreSQL to be ready..."
   sleep 1
 done
 
+# setup env-vars
+export PGHOST='localhost'
+export PGPORT='5432'
+export PGUSER='postgres'
+export PGPASSWORD='postgres'
+
 # run wal-receiver
 chmod +x bin/pgreceivewal
-./bin/pgreceivewal -D wals -S example_slot --log-devel=debug
+./bin/pgreceivewal -D wals -S example_slot

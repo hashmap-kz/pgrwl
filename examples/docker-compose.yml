@@ -1,6 +1,7 @@
 services:
   pg-primary:
     image: postgres:17
+    container_name: pg-primary
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
