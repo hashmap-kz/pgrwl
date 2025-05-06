@@ -91,7 +91,10 @@ log_timezone             = 'Asia/Aqtau'
 log_line_prefix          = '%t [%p-%l] %r %q%u@%d '
 wal_level                = replica
 max_wal_senders          = 10
+max_replication_slots    = 10
 wal_keep_size            = 64MB
 log_replication_commands = on
+datestyle                = 'iso, mdy'
+timezone                 = 'Asia/Aqtau'
 EOF
 }
