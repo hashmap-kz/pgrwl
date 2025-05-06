@@ -44,14 +44,15 @@ func Init() {
 		// custom levels. short-circuit: replace only when the given --log-level not a slog one.
 		if lvl <= slog.LevelDebug || lvl >= slog.LevelError {
 			if attr.Key == slog.LevelKey {
-				recLvl := attr.Value.Any().(slog.Level)
-				switch recLvl {
-				case LevelTrace:
-					return slog.String(slog.LevelKey, "TRACE")
-				case LevelFatal:
-					return slog.String(slog.LevelKey, "FATAL")
-				default:
-					return attr // Keep default
+				if recLvl, ok := attr.Value.Any().(slog.Level); ok {
+					switch recLvl {
+					case LevelTrace:
+						return slog.String(slog.LevelKey, "TRACE")
+					case LevelFatal:
+						return slog.String(slog.LevelKey, "FATAL")
+					default:
+						return attr // Keep default
+					}
 				}
 			}
 		}

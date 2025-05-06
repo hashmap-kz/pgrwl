@@ -37,7 +37,7 @@ func main() {
 	logger.Init()
 
 	// setup wal-receiver
-	pgrw := setupPgReceiver(opts, ctx)
+	pgrw := setupPgReceiver(ctx, opts)
 
 	// enter main streaming loop
 	for {
@@ -46,6 +46,7 @@ func main() {
 			slog.Error("an error occurred in StreamLog(), exiting",
 				slog.Any("err", err),
 			)
+			//nolint:gocritic
 			os.Exit(1)
 		}
 
@@ -66,7 +67,7 @@ func main() {
 	}
 }
 
-func parseFlags() Opts {
+func parseFlags() *Opts {
 	opts := Opts{}
 
 	flag.StringVar(&opts.Directory, "D", "", "")
@@ -123,15 +124,14 @@ Main Options:
 	if len(empty) > 0 {
 		log.Fatalf("required vars are empty: [%s]", strings.Join(empty, " "))
 	}
-	return opts
+	return &opts
 }
 
-func setupPgReceiver(opts Opts, ctx context.Context) *xlog.PgReceiveWal {
+func setupPgReceiver(ctx context.Context, opts *Opts) *xlog.PgReceiveWal {
 	connStrRepl := fmt.Sprintf("application_name=%s replication=yes", opts.Slot)
 	conn, err := pgconn.Connect(ctx, connStrRepl)
 	if err != nil {
 		slog.Error("cannot establish connection", slog.Any("err", err))
-		//nolint:gocritic
 		os.Exit(1)
 	}
 	startupInfo, err := xlog.GetStartupInfo(conn)
