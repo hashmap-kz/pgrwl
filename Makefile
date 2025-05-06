@@ -40,3 +40,8 @@ snapshot:
 test-cov:
 	go test -coverprofile=$(COV_REPORT) ./...
 	go tool cover -html=$(COV_REPORT)
+
+# Slow tests (that runs inside containers)
+.PHONY: test-integ-scripts
+test-integ-scripts:
+	@currdir=$$(pwd) && cd test/integration/environ && bash run-tests.sh | tee $$currdir/test-integ-scripts.log
