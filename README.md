@@ -176,10 +176,21 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 To contribute or verify the project locally, the following `make` targets should all pass:
 
 ```
-  make build               # Compile the project
-  make lint                # Run linter (should pass without errors)
-  make test                # Run unit tests (should all pass)
-  make test-integ-scripts  # Run integration tests (slow, but critical)
+# Compile the project
+make build
+
+# Run linter (should pass without errors)
+make lint
+
+# Run unit tests (should all pass)
+make test
+
+# Run integration tests (slow, but critical)
+# Requires Docker and Docker Compose to be installed
+make test-integ-scripts
+
+# Run GoReleaser builds locally
+make snapshot
 ```
 
 ✅ All targets should complete successfully before submitting changes or opening a PR.
