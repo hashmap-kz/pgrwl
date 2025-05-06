@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"pgreceivewal5/internal/logger"
-	"pgreceivewal5/internal/xlog"
+	"github.com/hashmap-kz/pgreceivewal/internal/logger"
+	"github.com/hashmap-kz/pgreceivewal/internal/xlog"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -77,7 +77,7 @@ func parseFlags() Opts {
 	flag.StringVar(&opts.LogLevel, "log-level", "info", "")
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "")
 	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, `Usage: x05 [OPTIONS]
+		_, _ = fmt.Fprintf(os.Stderr, `Usage: pgreceivewal [OPTIONS]
 
 Main Options:
   -D, --directory         receive write-ahead log files into this directory (required)

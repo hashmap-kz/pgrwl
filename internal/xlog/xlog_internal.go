@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"pgreceivewal5/internal/conv"
+	"github.com/hashmap-kz/pgreceivewal/internal/conv"
 
 	"github.com/jackc/pglogrepl"
 )

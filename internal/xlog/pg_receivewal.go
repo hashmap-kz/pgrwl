@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"sort"
 
-	"pgreceivewal5/internal/fsync"
+	"github.com/hashmap-kz/pgreceivewal/internal/fsync"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"pgreceivewal5/internal/conv"
+	"github.com/hashmap-kz/pgreceivewal/internal/conv"
 
 	"github.com/jackc/pglogrepl"
 )

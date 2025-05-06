@@ -1,7 +1,7 @@
 #!/bin/bash
 
-APP_NAME="x05"
-APP_PATH="/usr/local/bin/x05"
+APP_NAME="pgreceivewal"
+APP_PATH="/usr/local/bin/pgreceivewal"
 WAL_PATH="/tmp/wal-archive"
 
 ARGS=(

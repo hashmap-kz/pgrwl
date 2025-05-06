@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgproto3"
 
-	"pgreceivewal5/internal/conv"
+	"github.com/hashmap-kz/pgreceivewal/internal/conv"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"

@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"pgreceivewal5/internal/logger"
+	"github.com/hashmap-kz/pgreceivewal/internal/logger"
 
-	"pgreceivewal5/internal/conv"
-	"pgreceivewal5/internal/fsync"
+	"github.com/hashmap-kz/pgreceivewal/internal/conv"
+	"github.com/hashmap-kz/pgreceivewal/internal/fsync"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
