@@ -61,7 +61,7 @@ pgreceivewal -D /mnt/wal-archive -S bookstore_app
 
 ---
 
-## Installation
+## 🚀 Installation
 
 ### Manual Installation
 
@@ -69,7 +69,7 @@ pgreceivewal -D /mnt/wal-archive -S bookstore_app
    the [Releases page](https://github.com/hashmap-kz/pgreceivewal/releases).
 2. Place the binary in your system's `PATH` (e.g., `/usr/local/bin`).
 
-#### Example installation script for Unix-Based OS _(requirements: tar, curl, jq)_:
+### Installation script for Unix-Based OS _(requires: tar, curl, jq)_:
 
 ```bash
 (
@@ -84,6 +84,18 @@ tar -xzf - -C /usr/local/bin && \
 chmod +x /usr/local/bin/pgreceivewal
 )
 ```
+
+--- 
+
+## 🗃️ Usage In Backup Process
+
+_The full process may look like this (a typical, rough, and simplified example):_
+
+- You have a cron job that performs a base backup of your cluster every three days.
+- You run pgreceivewal as a systemd unit or a Kubernetes pod (depending on your infrastructure).
+- You have a cron job that prunes WAL files older than three days.
+- With this setup, you're able to restore your cluster - in the event of a crash - to any second within the past three
+  days.
 
 ---
 
