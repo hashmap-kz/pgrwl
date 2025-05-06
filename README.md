@@ -11,7 +11,7 @@ _`pgreceivewal` is a fully functional clone of PostgreSQL’s `pg_receivewal`, w
 
 ## 🚀 About
 
-The project serves as a research platform to explore streaming WAL archiving with a target of **RPO=0** during recovery.
+The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during recovery.
 
 The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
 streaming into partial files, and extensive error checking.
@@ -173,7 +173,7 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 
 ## 👷 Developer Notes
 
-To contribute or verify the project locally, the following `make` targets should all pass:
+### To contribute or verify the project locally, the following `make` targets should all pass:
 
 ```
 # Compile the project
@@ -194,6 +194,35 @@ make snapshot
 ```
 
 ✅ All targets should complete successfully before submitting changes or opening a PR.
+
+### 🗂️ Source Code Structure
+
+```
+internal/xlog/pg_receivewal.go
+  → Entry point for WAL receiving logic.
+    Based on the logic found in PostgreSQL:
+    https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/pg_receivewal.c
+
+internal/xlog/receivelog.go
+  → Core streaming loop and replication logic.
+    Based on the logic found in PostgreSQL: 
+    https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
+
+internal/xlog/xlog_internal.go
+  → Helpers for LSN math, WAL file naming, segment calculations.
+    Based on the logic found in PostgreSQL:
+    https://github.com/postgres/postgres/blob/master/src/include/access/xlog_internal.h
+
+internal/xlog/walfile.go
+  → Manages WAL file descriptors: open, write, close, sync.
+
+internal/xlog/streamutil.go
+  → Utilities for querying server parameters (e.g. wal_segment_size),
+    replication slot info, and streaming setup.
+
+internal/xlog/fsync/
+  → Optimized wrappers for safe and efficient `fsync` system calls.
+```
 
 ## ⏮️ Links
 
