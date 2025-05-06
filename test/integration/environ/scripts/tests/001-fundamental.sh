@@ -21,7 +21,7 @@ set -euo pipefail
 # * Terminate all PostgreSQL processes and delete the PGDATA directory
 # * Restore PGDATA from the base backup, add recovery.signal, and configure restore_command
 # * Rename all *.partial WAL files in the WAL archive directories
-# * Start the PostgreSQL cluster
+# * Start the PostgreSQL cluster (cluster should recover to the latest committed transaction)
 # * Run pg_dumpall after the cluster is ready
 # * Diff the pg_dumpall results (before and after)
 # * Check the insert-script logs and verify that the table contains the last inserted row
