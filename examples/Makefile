@@ -3,7 +3,7 @@ COMPOSE_FILE = docker-compose.yml
 
 # Targets
 
-.PHONY: build up down ps logs clean restart basebackup gendata teardown restore
+.PHONY: build up down ps logs clean restart basebackup gendata show-archive teardown restore
 
 # Build images, up containers
 build:
@@ -53,6 +53,10 @@ gendata:
 	@docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/02-gendata.sh
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary bash -c "su postgres -c '/var/lib/postgresql/scripts/tests/02-gendata.sh'"
 	@echo "🎉 Cluster populated with data!"
+
+# Show wal-archive
+show-archive:
+	@docker exec -it pgreceivewal bash -c 'ls -lah /mnt/wal-archive'
 
 # Teardown cluster
 teardown:
