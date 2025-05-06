@@ -30,10 +30,13 @@ make teardown
 make restore
 
 # Exec into the container and examine the result after restoration
+
 # 1) Tail the log of background inserts and get the latest record:
 docker exec -it pg-primary tail /tmp/insert-ts.log | grep -i record | sort -r
+
 # 2) Retrieve the restored data from background inserts, ordered by timestamp:
 docker exec -it pg-primary psql -U postgres -c 'select * from public.tslog order by 1 desc limit 10;'
+
 # 3) Check the row count of the 512MiB test table:
 docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigdata;'
 
