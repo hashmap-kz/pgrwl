@@ -11,10 +11,14 @@ _`pgreceivewal` is a fully functional clone of PostgreSQL’s `pg_receivewal`, w
 
 ## 🚀 About
 
-The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during recovery.
+The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
+recovery.
 
 The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
-streaming into partial files, and extensive error checking.
+streaming into partial files, extensive error checking and more.
+
+The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
+container running PostgreSQL.
 
 ---
 
