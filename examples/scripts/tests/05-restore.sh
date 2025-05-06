@@ -31,6 +31,7 @@ EOF
   xpg_start
 
   # wait until is in recovery, check logs, etc...
+  echo_delim "cluster logs"
   xpg_wait_is_in_recovery
   cat /var/log/postgresql/pg.log
 }

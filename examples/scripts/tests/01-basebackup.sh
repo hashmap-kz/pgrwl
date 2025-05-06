@@ -6,6 +6,8 @@ export PG_BASEBACKUP_PATH="/tmp/basebackup"
 
 xpg_wait_is_ready
 
+echo_delim "creating basebackup"
+
 rm -rf "${PG_BASEBACKUP_PATH}"
 mkdir -p "${PG_BASEBACKUP_PATH}"
 pg_basebackup \

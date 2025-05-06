@@ -4,9 +4,6 @@
 # Run compose services (postgres, wal-receiver)
 make restart
 
-# Examine logs output
-make logs
-
 # Create basebackup
 make basebackup
 
@@ -28,4 +25,7 @@ make restore
 
 # Exec into container, examine result after restoration
 docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigdata;'
+
+# Explore wal-receiver logs
+docker logs --tail 10 pgreceivewal
 ```
