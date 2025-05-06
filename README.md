@@ -1,5 +1,12 @@
 _`pgreceivewal` is a fully functional clone of PostgreSQL’s `pg_receivewal`, written in Go._
 
+[![License](https://img.shields.io/github/license/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/blob/master/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgreceivewal)](https://goreportcard.com/report/github.com/hashmap-kz/pgreceivewal)
+[![Workflow Status](https://img.shields.io/github/actions/workflow/status/hashmap-kz/pgreceivewal/ci.yml?branch=master)](https://github.com/hashmap-kz/pgreceivewal/actions/workflows/ci.yml?query=branch:master)
+[![GitHub Issues](https://img.shields.io/github/issues/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/issues)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/blob/master/go.mod#L3)
+[![Latest Release](https://img.shields.io/github/v/release/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/releases/latest)
+
 ---
 
 ## 🚀 About
@@ -42,6 +49,32 @@ pgreceivewal -D /mnt/wal-archive -S bookstore_app
 
     --log-add-source  Include source file and line number in
                       log output (default: false)
+```
+
+---
+
+## Installation
+
+### Manual Installation
+
+1. Download the latest binary for your platform from
+   the [Releases page](https://github.com/hashmap-kz/pgreceivewal/releases).
+2. Place the binary in your system's `PATH` (e.g., `/usr/local/bin`).
+
+#### Example installation script for Unix-Based OS _(requirements: tar, curl, jq)_:
+
+```bash
+(
+set -euo pipefail
+
+OS="$(uname | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')"
+TAG="$(curl -s https://api.github.com/repos/hashmap-kz/pgreceivewal/releases/latest | jq -r .tag_name)"
+
+curl -L "https://github.com/hashmap-kz/pgreceivewal/releases/download/${TAG}/pgreceivewal_${TAG}_${OS}_${ARCH}.tar.gz" |
+tar -xzf - -C /usr/local/bin && \
+chmod +x /usr/local/bin/pgreceivewal
+)
 ```
 
 ---
