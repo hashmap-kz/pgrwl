@@ -87,7 +87,7 @@ Main Options:
   -S, --slot              replication slot to use (required)
   -n, --no-loop           do not loop on connection lost
       --log-level         set log level (e.g., trace, debug, info, warn, error) (default: info)
-      --log-format        specify log formatter (e.g., json, text) (default: text)
+      --log-format        specify log formatter (e.g., json, text) (default: json)
       --log-add-source    include source file and line in log output (default: false)
 `)
 	}
