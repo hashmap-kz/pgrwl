@@ -1,4 +1,4 @@
-# Usage
+### Usage
 
 ```
 # Run compose services (postgres, wal-receiver)
@@ -42,4 +42,28 @@ docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigd
 
 # Explore WAL receiver logs
 docker logs --tail 10 pgreceivewal
+```
+
+### Expected result
+
+The cluster was restored to the last successfully inserted record (`2025-05-06 20:57:22.743069` in this example).
+
+```
+# 1) Logs produced by the cluster (tail output, latest message indicating the database is restored):
+#
+# 2025-05-06 20:57:26 +05 [234-8]  LOG:  database system is ready to accept connections
+#
+# 2) Logs produced by the background insert script (tail output, ordered descending):
+#
+# RECORD ADDED: 2025-05-06 20:57:22.743069
+# RECORD ADDED: 2025-05-06 20:57:21.715736
+# RECORD ADDED: 2025-05-06 20:57:20.692507
+#
+# 3) Corresponding database rows (tail output, ordered descending):
+#
+#              ts             
+# ----------------------------
+#  2025-05-06 20:57:22.743069
+#  2025-05-06 20:57:21.715736
+#  2025-05-06 20:57:20.692507
 ```
