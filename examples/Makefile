@@ -3,7 +3,7 @@ COMPOSE_FILE = docker-compose.yml
 
 # Targets
 
-.PHONY: build up down ps logs clean restart basebackup gendata show-archive teardown restore
+.PHONY: build up down ps logs clean restart basebackup gendata background-inserts show-archive teardown restore
 
 # Build images, up containers
 build:
@@ -53,6 +53,12 @@ gendata:
 	@docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/02-gendata.sh
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-primary bash -c "su postgres -c '/var/lib/postgresql/scripts/tests/02-gendata.sh'"
 	@echo "🎉 Cluster populated with data!"
+
+# Run inserts in the background
+background-inserts:
+	@docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/03-inserts.sh
+	@$(COMPOSE) -f $(COMPOSE_FILE) exec -T pg-primary bash -c "nohup su - postgres -c '/var/lib/postgresql/scripts/tests/03-inserts.sh' &"
+	@echo "🎉 Background inserts are running!"
 
 # Show wal-archive
 show-archive:
