@@ -13,6 +13,11 @@ services:
     volumes:
       - pg-primary-data:/var/lib/postgresql/17/main
       - shared-data:/mnt
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
 
   pgreceivewal:
     build:
@@ -21,6 +26,7 @@ services:
     container_name: pgreceivewal
     restart: unless-stopped
     environment:
+      TZ: "Asia/Aqtau"
       PGHOST: pg-primary
       PGPORT: 5432
       PGUSER: postgres
@@ -29,7 +35,8 @@ services:
     volumes:
       - shared-data:/mnt
     depends_on:
-      - pg-primary
+      pg-primary:
+        condition: service_healthy
 
 volumes:
   pg-primary-data:
