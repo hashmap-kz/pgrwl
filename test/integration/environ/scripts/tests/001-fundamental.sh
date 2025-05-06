@@ -26,7 +26,7 @@ set -euo pipefail
 # * Diff the pg_dumpall results (before and after)
 # * Check the insert-script logs and verify that the table contains the last inserted row
 # * Compare WAL directories (filenames and contents must match 100%)
-# * Clean up WAL directories and rerun the WAL archivers on a new timeline
+# * Clean up WAL directories and rerun the WAL archivers on a new timeline (cleanup is necessary since we run receivers with --no-loop option)
 # * Compare the WAL directories again
 
 export BASEBACKUP_PATH="/tmp/basebackup"
