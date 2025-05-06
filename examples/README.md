@@ -4,37 +4,39 @@
 # Run compose services (postgres, wal-receiver)
 make restart
 
-# Create basebackup
+# Create a base backup  
+# Note: The backup is created *before* any schema or data modifications performed below.  
+# Note: The backup does not include WAL files (--wal-method=none)  
 make basebackup
 
-# Add some data
+# Generate sample data
 make gendata
 
 # Run inserts in a background
 make background-inserts
 
-# Examine result
+# Examine the result
 docker exec -it pg-primary psql -U postgres -c 'select * from public.tslog order by 1 desc limit 10;'
 docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigdata;'
 
-# Examine wal-archive
+# Examine the WAL archive
 make show-archive
 
-# Teardown PostgreSQL cluster inside container 
-# It is a force operation, it terminates all postgres processes, and removes data directory.
+# Tear down the PostgreSQL cluster inside the container  
+# This is a forceful operation: it terminates all PostgreSQL processes and removes the data directory.
 make teardown
 
-# Restore cluster from basebackup and a wal-archive
+# Restore the cluster from the base backup and WAL archive
 make restore
 
 # Exec into container, examine result after restoration
-# 1) Tail a log of background inserts, get the latest one:
+# 1) Tail the log of background inserts and get the latest record:
 docker exec -it pg-primary tail /tmp/insert-ts.log | grep -i record | sort -r
-# 2) Get the restored data from background inserts, order by latest
+# 2) Retrieve the restored data from background inserts, ordered by timestamp:
 docker exec -it pg-primary psql -U postgres -c 'select * from public.tslog order by 1 desc limit 10;'
-# 3) Examine the count of a 512Mi table: 
+# 3) Check the row count of the 512MiB test table:
 docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigdata;'
 
-# Explore wal-receiver logs
+# Explore WAL receiver logs
 docker logs --tail 10 pgreceivewal
 ```
