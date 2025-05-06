@@ -23,13 +23,13 @@ docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigd
 make show-archive
 
 # Tear down the PostgreSQL cluster inside the container  
-# This is a forceful operation: it terminates all PostgreSQL processes and removes the data directory.
+# This is a forceful operation: it terminates all PostgreSQL processes abruptly and removes the data directory.
 make teardown
 
 # Restore the cluster from the base backup and WAL archive
 make restore
 
-# Exec into container, examine result after restoration
+# Exec into the container and examine the result after restoration
 # 1) Tail the log of background inserts and get the latest record:
 docker exec -it pg-primary tail /tmp/insert-ts.log | grep -i record | sort -r
 # 2) Retrieve the restored data from background inserts, ordered by timestamp:
