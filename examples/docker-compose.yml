@@ -1,0 +1,20 @@
+services:
+  pg-primary:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "15432:5432"
+    volumes:
+      - pg-primary-data:/var/lib/postgresql/data
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    command: -c max_wal_senders=10
+      -c wal_keep_size=64MB
+      -c listen_addresses=*
+      -c log_replication_commands=on
+      -c hba_file=/etc/postgresql/pg_hba.conf
+
+volumes:
+  pg-primary-data:
+
