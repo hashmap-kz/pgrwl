@@ -58,12 +58,21 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 ### ⚙️ Flags
 
 ```
--D, --directory       receive write-ahead log files into this directory (required)
--S, --slot            replication slot to use (required)
--n, --no-loop         do not loop on connection lost
-    --log-level       set log level (trace, debug, info, warn, error) (default: info)
-    --log-format      specify log formatter (json, text) (default: json)
-    --log-add-source  include source file and line in log output (default: false)
+CLI:
+  -D, --directory       receive write-ahead log files into this directory (required)
+  -S, --slot            replication slot to use (required)
+  -n, --no-loop         do not loop on connection lost
+      --log-level       set log level (trace, debug, info, warn, error) (default: info)
+      --log-format      specify log formatter (json, text) (default: json)
+      --log-add-source  include source file and line in log output (default: false)
+    
+Corresponded env-vars:
+  PGRWL_DIRECTORY
+  PGRWL_SLOT
+  PGRWL_NO_LOOP
+  PGRWL_LOG_LEVEL
+  PGRWL_LOG_FORMAT
+  PGRWL_LOG_ADD_SOURCE
 ```
 
 ---
