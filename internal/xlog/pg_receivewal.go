@@ -149,7 +149,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		Conn:            pgrw.Conn,
 		Verbose:         pgrw.Verbose,
 	})
-	pgrw.setStream(stream)
+	pgrw.SetStream(stream)
 
 	err = stream.ReceiveXlogStream(ctx)
 	if err != nil {
@@ -180,7 +180,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	return nil
 }
 
-func (pgrw *PgReceiveWal) setStream(s *StreamCtl) {
+func (pgrw *PgReceiveWal) SetStream(s *StreamCtl) {
 	pgrw.streamMu.Lock()
 	defer pgrw.streamMu.Unlock()
 	pgrw.stream = s

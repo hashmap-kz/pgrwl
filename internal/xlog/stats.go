@@ -3,10 +3,10 @@ package xlog
 import "time"
 
 type StreamStatus struct {
-	Slot         string `json:"slot"`
-	Timeline     uint32 `json:"timeline"`
-	LastFlushLSN string `json:"last_flush_lsn"`
-	Uptime       string `json:"uptime"`
+	Slot         string `json:"slot,omitempty"`
+	Timeline     uint32 `json:"timeline,omitempty"`
+	LastFlushLSN string `json:"last_flush_lsn,omitempty"`
+	Uptime       string `json:"uptime,omitempty"`
 	Running      bool   `json:"running"`
 }
 

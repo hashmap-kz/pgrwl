@@ -69,6 +69,7 @@ func main() {
 			os.Exit(1)
 		}
 
+		pgrw.SetStream(nil)
 		slog.Info("disconnected; waiting 5 seconds to try again")
 		time.Sleep(5 * time.Second)
 	}
