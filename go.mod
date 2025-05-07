@@ -6,6 +6,7 @@ require (
 	github.com/jackc/pglogrepl v0.0.0-20250331215543-51ad596ee12f
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/time v0.11.0
 )
 
 require (
