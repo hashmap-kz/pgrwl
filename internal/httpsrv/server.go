@@ -34,6 +34,7 @@ func StartHTTPServer(_ context.Context) *http.Server {
 		tokenAuthMiddleware,
 	)
 	mux.Handle("/status", secureChain(http.HandlerFunc(statusHandler)))
+	mux.Handle("POST /retention", secureChain(http.HandlerFunc(walRetentionHandler)))
 
 	srv := &http.Server{
 		Addr:              "127.0.0.1:8080",
