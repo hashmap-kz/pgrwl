@@ -11,11 +11,16 @@ import (
 
 // TODO: stat: skipped by permission issues, or vanished
 
-func DirSize(path string) (int64, error) {
+type DirSizeOpts struct {
+	IgnoreErrPermission bool
+	IgnoreErrNotExist   bool
+}
+
+func DirSize(path string, opts *DirSizeOpts) (int64, error) {
 	var size int64
 	err := filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if errors.Is(err, os.ErrPermission) {
+			if errors.Is(err, os.ErrPermission) && opts.IgnoreErrPermission {
 				slog.Warn("permission denied, skipping",
 					slog.String("job", "dir-size-walk"),
 					slog.String("path", filepath.Join(path, d.Name())),
@@ -29,7 +34,7 @@ func DirSize(path string) (int64, error) {
 		}
 		info, err := d.Info() // calls os.Lstat() once
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
+			if errors.Is(err, os.ErrNotExist) && opts.IgnoreErrNotExist {
 				slog.Warn("not exist, skipping",
 					slog.String("job", "dir-size-walk"),
 					slog.String("path", filepath.Join(path, d.Name())),

@@ -26,7 +26,10 @@ type WALArchiveSize struct {
 }
 
 func (s *ControlService) WALArchiveSize() (*WALArchiveSize, error) {
-	size, err := DirSize(s.PGRW.BaseDir)
+	size, err := DirSize(s.PGRW.BaseDir, &DirSizeOpts{
+		IgnoreErrPermission: true,
+		IgnoreErrNotExist:   true,
+	})
 	if err != nil {
 		return nil, err
 	}
