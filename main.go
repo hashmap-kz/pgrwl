@@ -41,7 +41,7 @@ func main() {
 
 	// TODO: should be optional
 	// managing
-	httpSrv := httpsrv.NewHTTPServer(ctx, ":8080")
+	httpSrv := httpsrv.NewHTTPServer(ctx, ":8080", pgrw)
 	httpSrv.Start(ctx)
 
 	// enter main streaming loop

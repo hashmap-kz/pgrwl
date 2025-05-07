@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/logger"
@@ -48,6 +49,8 @@ type StreamCtl struct {
 	conn                  *pgconn.PgConn
 	walfile               *walfileT
 	verbose               bool
+	startedAt             time.Time
+	mu                    sync.RWMutex
 }
 
 func NewStream(o *StreamOpts) *StreamCtl {
@@ -63,6 +66,7 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		baseDir:               o.BaseDir,
 		conn:                  o.Conn,
 		verbose:               o.Verbose,
+		startedAt:             time.Now(),
 	}
 }
 

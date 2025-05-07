@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/hashmap-kz/pgrwl/internal/utils"
 
@@ -29,6 +30,9 @@ type PgReceiveWal struct {
 	ConnStrRepl string
 	SlotName    string
 	Verbose     bool
+
+	streamMu sync.RWMutex
+	stream   *StreamCtl // current active stream (or nil)
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
@@ -145,6 +149,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		Conn:            pgrw.Conn,
 		Verbose:         pgrw.Verbose,
 	})
+	pgrw.setStream(stream)
 
 	err = stream.ReceiveXlogStream(ctx)
 	if err != nil {
@@ -173,6 +178,12 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (pgrw *PgReceiveWal) setStream(s *StreamCtl) {
+	pgrw.streamMu.Lock()
+	defer pgrw.streamMu.Unlock()
+	pgrw.stream = s
 }
 
 // findStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)

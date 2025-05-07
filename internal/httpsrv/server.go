@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/xlog"
+
 	"golang.org/x/time/rate"
 )
 
@@ -24,16 +26,16 @@ var (
 type HTTPServer struct {
 	srv    *http.Server
 	logger *slog.Logger
+	pgrw   *xlog.PgReceiveWal
 }
 
 // ---- Constructor ----
 
-func NewHTTPServer(_ context.Context, addr string) *HTTPServer {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTTPServer {
+	h := &HTTPServer{
+		logger: slog.With("component", "http-server"),
+		pgrw:   pgrw,
+	}
 
 	// Build middleware chain
 	secureChain := MiddlewareChain(
@@ -43,10 +45,15 @@ func NewHTTPServer(_ context.Context, addr string) *HTTPServer {
 		tokenAuthMiddleware,
 	)
 
-	mux.Handle("/status", secureChain(http.HandlerFunc(statusHandler)))
+	// Init handlers
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.Handle("/status", secureChain(http.HandlerFunc(h.statusHandler)))
 	mux.Handle("POST /retention", secureChain(http.HandlerFunc(walRetentionHandler)))
 
-	srv := &http.Server{
+	h.srv = &http.Server{
 		Addr:              addr,
 		Handler:           mux,
 		ReadTimeout:       5 * time.Second,
@@ -54,10 +61,7 @@ func NewHTTPServer(_ context.Context, addr string) *HTTPServer {
 		WriteTimeout:      10 * time.Second,
 	}
 
-	return &HTTPServer{
-		srv:    srv,
-		logger: slog.With("component", "http-server"),
-	}
+	return h
 }
 
 func (h *HTTPServer) Start(_ context.Context) {
@@ -95,10 +99,8 @@ func safeHandlerMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func statusHandler(w http.ResponseWriter, _ *http.Request) {
-	WriteJSON(w, http.StatusOK, map[string]string{
-		"status": "UP",
-	})
+func (h *HTTPServer) statusHandler(w http.ResponseWriter, _ *http.Request) {
+	WriteJSON(w, http.StatusOK, h.pgrw.Status())
 }
 
 // ---- Middlewares ----
