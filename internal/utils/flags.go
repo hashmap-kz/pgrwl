@@ -113,6 +113,7 @@ func setBoolFromFlagOrEnv(setFlags map[string]bool, flagNames []string, target *
 	if env == "" {
 		return // no override
 	}
+	//nolint:errcheck
 	v, _ := parseBool(env)
 	*target = v
 }

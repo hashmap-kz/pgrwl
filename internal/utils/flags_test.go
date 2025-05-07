@@ -2,9 +2,10 @@ package utils
 
 import (
 	"flag"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func resetFlags() {

@@ -9,6 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+
+	"github.com/hashmap-kz/pgrwl/internal/utils"
 
 	"github.com/hashmap-kz/pgrwl/internal/fsync"
 
@@ -29,6 +32,28 @@ type PgReceiveWal struct {
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
+
+func NewPgReceiver(ctx context.Context, opts *utils.Opts) (*PgReceiveWal, error) {
+	connStrRepl := fmt.Sprintf("application_name=%s replication=yes", opts.Slot)
+	conn, err := pgconn.Connect(ctx, connStrRepl)
+	if err != nil {
+		slog.Error("cannot establish connection", slog.Any("err", err))
+		return nil, err
+	}
+	startupInfo, err := GetStartupInfo(conn)
+	if err != nil {
+		return nil, err
+	}
+	return &PgReceiveWal{
+		BaseDir:     opts.Directory,
+		WalSegSz:    startupInfo.WalSegSz,
+		Conn:        conn,
+		ConnStrRepl: connStrRepl,
+		SlotName:    opts.Slot,
+		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
+		Verbose: strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace"),
+	}, nil
+}
 
 // StreamLog the main loop of WAL receiving, any error FATAL
 func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
