@@ -55,30 +55,15 @@ export PGPASSWORD='postgres'
 pgreceivewal -D /mnt/wal-archive -S bookstore_app 
 ```
 
-### 🔐 Required Flags
+### ⚙️ Flags
 
 ```
--D, --directory  Directory to store WAL segments
-                 (will be created automatically)
-
--S, --slot       Replication slot name to use
-                 (a slot will be created automatically)
-```
-
-### ⚙️ Optional Flags
-
-```
--n, --no-loop         Do not retry connection if it is lost
-                      (default: false)
-
-    --log-level       Logging level: trace, debug, info, warn, error 
-                      (default: info)
-
-    --log-format      Specify log formatter (e.g., json, text) 
-                      (default: text)
-    
-    --log-add-source  Include source file and line number in log output 
-                      (default: false)
+-D, --directory       receive write-ahead log files into this directory (required)
+-S, --slot            replication slot to use (required)
+-n, --no-loop         do not loop on connection lost
+    --log-level       set log level (trace, debug, info, warn, error) (default: info)
+    --log-format      specify log formatter (json, text) (default: json)
+    --log-add-source  include source file and line in log output (default: false)
 ```
 
 ---

@@ -83,12 +83,12 @@ func parseFlags() *Opts {
 		_, _ = fmt.Fprintf(os.Stderr, `Usage: pgreceivewal [OPTIONS]
 
 Main Options:
-  -D, --directory         receive write-ahead log files into this directory (required)
-  -S, --slot              replication slot to use (required)
-  -n, --no-loop           do not loop on connection lost
-      --log-level         set log level (e.g., trace, debug, info, warn, error) (default: info)
-      --log-format        specify log formatter (e.g., json, text) (default: json)
-      --log-add-source    include source file and line in log output (default: false)
+  -D, --directory       receive write-ahead log files into this directory (required)
+  -S, --slot            replication slot to use (required)
+  -n, --no-loop         do not loop on connection lost
+      --log-level       set log level (trace, debug, info, warn, error) (default: info)
+      --log-format      specify log formatter (json, text) (default: json)
+      --log-add-source  include source file and line in log output (default: false)
 `)
 	}
 	flag.Parse()
