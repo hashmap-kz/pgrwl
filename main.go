@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/hashmap-kz/pgrwl/internal/utils"
 	"log"
 	"log/slog"
 	"os"
@@ -18,18 +18,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Opts struct {
-	Directory    string
-	Slot         string
-	NoLoop       bool
-	LogLevel     string
-	LogAddSource bool
-	LogFormat    string
-}
-
 func main() {
 	// parse CLI (it sets env-vars, checks required args, so it's need to be executed at the top)
-	opts := parseFlags()
+	opts, err := utils.ParseFlags()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// setup context
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -67,67 +61,7 @@ func main() {
 	}
 }
 
-func parseFlags() *Opts {
-	opts := Opts{}
-
-	flag.StringVar(&opts.Directory, "D", "", "")
-	flag.StringVar(&opts.Directory, "directory", "", "")
-	flag.StringVar(&opts.Slot, "S", "", "")
-	flag.StringVar(&opts.Slot, "slot", "", "")
-	flag.BoolVar(&opts.NoLoop, "n", false, "")
-	flag.BoolVar(&opts.NoLoop, "no-loop", false, "")
-	flag.StringVar(&opts.LogLevel, "log-level", "info", "")
-	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "")
-	flag.StringVar(&opts.LogFormat, "log-format", "json", "")
-	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, `Usage: pgrwl [OPTIONS]
-
-Main Options:
-  -D, --directory       receive write-ahead log files into this directory (required)
-  -S, --slot            replication slot to use (required)
-  -n, --no-loop         do not loop on connection lost
-      --log-level       set log level (trace, debug, info, warn, error) (default: info)
-      --log-format      specify log formatter (json, text) (default: json)
-      --log-add-source  include source file and line in log output (default: false)
-`)
-	}
-	flag.Parse()
-
-	if opts.Directory == "" {
-		log.Fatal("directory is not specified")
-	}
-	if opts.Slot == "" {
-		log.Fatal("replication slot name is not specified")
-	}
-
-	// set env-vars
-	_ = os.Setenv("LOG_LEVEL", opts.LogLevel)
-	_ = os.Setenv("LOG_FORMAT", opts.LogFormat)
-	if opts.LogAddSource {
-		_ = os.Setenv("LOG_ADD_SOURCE", "1")
-	}
-
-	// check connstr vars are set
-
-	requiredVars := []string{
-		"PGHOST",
-		"PGPORT",
-		"PGUSER",
-		"PGPASSWORD",
-	}
-	var empty []string
-	for _, v := range requiredVars {
-		if os.Getenv(v) == "" {
-			empty = append(empty, v)
-		}
-	}
-	if len(empty) > 0 {
-		log.Fatalf("required vars are empty: [%s]", strings.Join(empty, " "))
-	}
-	return &opts
-}
-
-func setupPgReceiver(ctx context.Context, opts *Opts) *xlog.PgReceiveWal {
+func setupPgReceiver(ctx context.Context, opts *utils.Opts) *xlog.PgReceiveWal {
 	connStrRepl := fmt.Sprintf("application_name=%s replication=yes", opts.Slot)
 	conn, err := pgconn.Connect(ctx, connStrRepl)
 	if err != nil {
@@ -146,19 +80,5 @@ func setupPgReceiver(ctx context.Context, opts *Opts) *xlog.PgReceiveWal {
 		SlotName:    opts.Slot,
 		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
 		Verbose: strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace"),
-	}
-}
-
-// parseBool parses a string into a boolean value.
-// 1, true, t, yes, on (case-insensitive) -> true
-// 0, false, f, no, off (case-insensitive) -> false
-func parseBool(s string) (bool, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "1", "true", "t", "yes", "on":
-		return true, nil
-	case "0", "false", "f", "no", "off":
-		return false, nil
-	default:
-		return false, fmt.Errorf("invalid boolean value: %q", s)
 	}
 }

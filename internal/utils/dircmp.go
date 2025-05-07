@@ -1,4 +1,4 @@
-package testutils
+package utils
 
 import (
 	"bytes"
@@ -16,6 +16,7 @@ type FileDiff struct {
 	Different  bool
 }
 
+// CompareDirs compares two given dirs: files+content should match 100%
 func CompareDirs(dirA, dirB string) ([]FileDiff, error) {
 	var diffs []FileDiff
 	filesA := make(map[string]string)
