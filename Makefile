@@ -1,5 +1,5 @@
 # Variables
-APP_NAME 	:= pgreceivewal
+APP_NAME 	:= pgrwl
 OUTPUT   	:= $(APP_NAME)
 COV_REPORT 	:= coverage.txt
 TEST_FLAGS 	:= -v -race -timeout 30s

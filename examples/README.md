@@ -41,7 +41,7 @@ docker exec -it pg-primary psql -U postgres -c 'select * from public.tslog order
 docker exec -it pg-primary psql -U postgres -c 'select count(*) from public.bigdata;'
 
 # Explore WAL receiver logs
-docker logs --tail 10 pgreceivewal
+docker logs --tail 10 pgrwl
 ```
 
 ### Expected result

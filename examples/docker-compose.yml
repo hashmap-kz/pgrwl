@@ -19,11 +19,11 @@ services:
       timeout: 2s
       retries: 10
 
-  pgreceivewal:
+  pgrwl:
     build:
       context: .
-      dockerfile: ./Dockerfile_pgreceivewal
-    container_name: pgreceivewal
+      dockerfile: ./Dockerfile_pgrwl
+    container_name: pgrwl
     environment:
       TZ: "Asia/Aqtau"
       PGHOST: pg-primary

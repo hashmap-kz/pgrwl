@@ -1,4 +1,4 @@
-module github.com/hashmap-kz/pgreceivewal
+module github.com/hashmap-kz/pgrwl
 
 go 1.24.1
 

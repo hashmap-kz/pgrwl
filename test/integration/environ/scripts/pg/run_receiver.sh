@@ -1,7 +1,7 @@
 #!/bin/bash
 
-APP_NAME="pgreceivewal"
-APP_PATH="/usr/local/bin/pgreceivewal"
+APP_NAME="pgrwl"
+APP_PATH="/usr/local/bin/pgrwl"
 WAL_PATH="/tmp/wal-archive"
 
 ARGS=(

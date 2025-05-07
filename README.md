@@ -1,11 +1,11 @@
-_`pgreceivewal` stream write-ahead logs from a PostgreSQL server_
+_`pgrwl` stream write-ahead logs from a PostgreSQL server_
 
-[![License](https://img.shields.io/github/license/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/blob/master/LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgreceivewal)](https://goreportcard.com/report/github.com/hashmap-kz/pgreceivewal)
-[![Workflow Status](https://img.shields.io/github/actions/workflow/status/hashmap-kz/pgreceivewal/ci.yml?branch=master)](https://github.com/hashmap-kz/pgreceivewal/actions/workflows/ci.yml?query=branch:master)
-[![GitHub Issues](https://img.shields.io/github/issues/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/issues)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/blob/master/go.mod#L3)
-[![Latest Release](https://img.shields.io/github/v/release/hashmap-kz/pgreceivewal)](https://github.com/hashmap-kz/pgreceivewal/releases/latest)
+[![License](https://img.shields.io/github/license/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgrwl)](https://goreportcard.com/report/github.com/hashmap-kz/pgrwl)
+[![Workflow Status](https://img.shields.io/github/actions/workflow/status/hashmap-kz/pgrwl/ci.yml?branch=master)](https://github.com/hashmap-kz/pgrwl/actions/workflows/ci.yml?query=branch:master)
+[![GitHub Issues](https://img.shields.io/github/issues/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/issues)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/go.mod#L3)
+[![Latest Release](https://img.shields.io/github/v/release/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/releases/latest)
 
 ---
 
@@ -52,7 +52,7 @@ export PGPORT='5432'
 export PGUSER='postgres'
 export PGPASSWORD='postgres'
 
-pgreceivewal -D /mnt/wal-archive -S bookstore_app 
+pgrwl -D /mnt/wal-archive -S bookstore_app 
 ```
 
 ### ⚙️ Flags
@@ -73,7 +73,7 @@ pgreceivewal -D /mnt/wal-archive -S bookstore_app
 ### Manual Installation
 
 1. Download the latest binary for your platform from
-   the [Releases page](https://github.com/hashmap-kz/pgreceivewal/releases).
+   the [Releases page](https://github.com/hashmap-kz/pgrwl/releases).
 2. Place the binary in your system's `PATH` (e.g., `/usr/local/bin`).
 
 ### Installation script for Unix-Based OS _(requires: tar, curl, jq)_:
@@ -84,11 +84,11 @@ set -euo pipefail
 
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')"
-TAG="$(curl -s https://api.github.com/repos/hashmap-kz/pgreceivewal/releases/latest | jq -r .tag_name)"
+TAG="$(curl -s https://api.github.com/repos/hashmap-kz/pgrwl/releases/latest | jq -r .tag_name)"
 
-curl -L "https://github.com/hashmap-kz/pgreceivewal/releases/download/${TAG}/pgreceivewal_${TAG}_${OS}_${ARCH}.tar.gz" |
+curl -L "https://github.com/hashmap-kz/pgrwl/releases/download/${TAG}/pgrwl_${TAG}_${OS}_${ARCH}.tar.gz" |
 tar -xzf - -C /usr/local/bin && \
-chmod +x /usr/local/bin/pgreceivewal
+chmod +x /usr/local/bin/pgrwl
 )
 ```
 
@@ -98,8 +98,8 @@ chmod +x /usr/local/bin/pgreceivewal
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
-- You have a cron job that performs a base backup of your cluster every three days.
-- You run pgreceivewal as a systemd unit or a Kubernetes pod (depending on your infrastructure).
+- You have a cron job that performs a _base backup_ of your cluster every three days.
+- You run `pgrwl` as a systemd unit or a Kubernetes pod (depending on your infrastructure).
 - You have a cron job that prunes WAL files older than three days.
 - With this setup, you're able to restore your cluster - in the event of a crash - to any second within the past three
   days.
@@ -173,7 +173,7 @@ It also checks that the WAL files generated are byte-for-byte identical to those
 #### Test Steps:
 
 * Initialize and start a PostgreSQL cluster
-* Run WAL receivers (`pgreceivewal` and `pg_receivewal`)
+* Run WAL receivers (`pgrwl` and `pg_receivewal`)
 * Create a base backup
 * Create a table, and insert the current timestamp every second (in the background)
 * Run pgbench to populate the database with 1 million rows
@@ -246,7 +246,7 @@ internal/xlog/fsync/
 
 ### ⏮️ Links
 
-- [pg_receivewal Documentation](https://www.postgresql.org/docs/current/app-pgreceivewal.html)
+- [pg_receivewal Documentation](https://www.postgresql.org/docs/current/app-pgrwl.html)
 - [pg_receivewal Source Code](https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/pg_receivewal.c)
 - [Streaming Replication Protocol](https://www.postgresql.org/docs/current/protocol-replication.html)
 - [Continuous Archiving and Point-in-Time Recovery](https://www.postgresql.org/docs/current/continuous-archiving.html)

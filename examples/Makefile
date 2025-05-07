@@ -62,7 +62,7 @@ background-inserts:
 
 # Show wal-archive
 show-archive:
-	@docker exec -it pgreceivewal bash -c 'ls -lah /mnt/wal-archive'
+	@docker exec -it pgrwl bash -c 'ls -lah /mnt/wal-archive'
 
 # Teardown cluster
 teardown:

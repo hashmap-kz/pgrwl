@@ -5,8 +5,8 @@ before:
     - go mod download
 
 builds:
-  - id: pgreceivewal
-    binary: pgreceivewal
+  - id: pgrwl
+    binary: pgrwl
     ldflags:
       - -s -w
     env:
@@ -27,7 +27,7 @@ checksum:
 
 archives:
   - builds:
-      - pgreceivewal
+      - pgrwl
     name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: "false"
     formats: [ "tar.gz" ]
@@ -44,7 +44,7 @@ changelog:
 nfpms:
   - file_name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     maintainer: alexey.zh
-    homepage: "https://github.com/hashmap-kz/pgreceivewal"
+    homepage: "https://github.com/hashmap-kz/pgrwl"
     description: "Durable PostgreSQL WAL streaming"
     license: "Apache-2.0"
     formats:
@@ -55,6 +55,6 @@ nfpms:
     section: utils
     contents:
       - src: ./LICENSE
-        dst: /usr/share/doc/pgreceivewal/copyright
+        dst: /usr/share/doc/pgrwl/copyright
         file_info:
           mode: 0644
