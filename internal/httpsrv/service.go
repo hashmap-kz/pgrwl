@@ -19,3 +19,19 @@ func (s *ControlService) RetainWALs() error {
 	time.Sleep(5 * time.Second)
 	return nil
 }
+
+type WALArchiveSize struct {
+	Bytes int64  `json:"bytes,omitempty"`
+	IEC   string `json:"iec,omitempty"`
+}
+
+func (s *ControlService) WALArchiveSize() (*WALArchiveSize, error) {
+	size, err := DirSize(s.PGRW.BaseDir)
+	if err != nil {
+		return nil, err
+	}
+	return &WALArchiveSize{
+		Bytes: size,
+		IEC:   ByteCountIEC(size),
+	}, nil
+}

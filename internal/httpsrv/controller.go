@@ -21,6 +21,16 @@ func (c *ControlController) StatusHandler(w http.ResponseWriter, _ *http.Request
 	WriteJSON(w, http.StatusOK, status)
 }
 
+func (c *ControlController) ArchiveSizeHandler(w http.ResponseWriter, _ *http.Request) {
+	sizeInfo, err := c.Service.WALArchiveSize()
+	if err != nil {
+		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, sizeInfo)
+}
+
 func (c *ControlController) RetentionHandler(w http.ResponseWriter, _ *http.Request) {
 	select {
 	case c.lock <- struct{}{}:
