@@ -19,50 +19,65 @@ var (
 
 // ---- Server ----
 
-// TODO: NewHTTPServer, struct, logger, etc...
+// ---- Struct ----
 
-func StartHTTPServer(_ context.Context) *http.Server {
+type HTTPServer struct {
+	srv    *http.Server
+	logger *slog.Logger
+}
+
+// ---- Constructor ----
+
+func NewHTTPServer(_ context.Context, addr string) *HTTPServer {
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// Build middleware chain
 	secureChain := MiddlewareChain(
 		safeHandlerMiddleware,
 		loggingMiddleware,
 		rateLimitMiddleware,
 		tokenAuthMiddleware,
 	)
+
 	mux.Handle("/status", secureChain(http.HandlerFunc(statusHandler)))
 	mux.Handle("POST /retention", secureChain(http.HandlerFunc(walRetentionHandler)))
 
 	srv := &http.Server{
-		Addr:              "127.0.0.1:8080",
+		Addr:              addr,
 		Handler:           mux,
 		ReadTimeout:       5 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      10 * time.Second,
 	}
 
-	go func() {
-		slog.Info("HTTP server listening", slog.String("addr", srv.Addr))
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("HTTP server error", slog.Any("err", err))
-		}
-	}()
-
-	return srv
+	return &HTTPServer{
+		srv:    srv,
+		logger: slog.With("component", "http-server"),
+	}
 }
 
-func ShutdownHTTPServer(srv *http.Server) {
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (h *HTTPServer) Start(_ context.Context) {
+	go func() {
+		h.logger.Info("HTTP server listening", slog.String("addr", h.srv.Addr))
+		if err := h.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			h.logger.Error("HTTP server error", slog.Any("err", err))
+		}
+	}()
+}
+
+func (h *HTTPServer) Shutdown(ctx context.Context) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	slog.Info("shutting down HTTP server")
-	if err := srv.Shutdown(ctxTimeout); err != nil {
-		slog.Error("error during HTTP server shutdown", slog.Any("err", err))
+	h.logger.Info("shutting down HTTP server")
+	if err := h.srv.Shutdown(timeoutCtx); err != nil {
+		h.logger.Error("error during HTTP server shutdown", slog.Any("err", err))
 	} else {
-		slog.Info("HTTP server shut down cleanly")
+		h.logger.Info("HTTP server shut down cleanly")
 	}
 }
 
