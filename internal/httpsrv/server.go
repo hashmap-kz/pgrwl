@@ -37,6 +37,9 @@ func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTT
 		pgrw:   pgrw,
 	}
 
+	service := &ControlService{PGRW: pgrw}
+	controller := NewController(service)
+
 	// Build middleware chain
 	secureChain := MiddlewareChain(
 		safeHandlerMiddleware,
@@ -50,8 +53,8 @@ func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTT
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	mux.Handle("/status", secureChain(http.HandlerFunc(h.statusHandler)))
-	mux.Handle("POST /retention", secureChain(http.HandlerFunc(walRetentionHandler)))
+	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
+	mux.Handle("POST /retention", secureChain(http.HandlerFunc(controller.RetentionHandler)))
 
 	h.srv = &http.Server{
 		Addr:              addr,
@@ -85,7 +88,7 @@ func (h *HTTPServer) Shutdown(ctx context.Context) {
 	}
 }
 
-// ---- Handler ----
+// ---- Middlewares ----
 
 func safeHandlerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -98,12 +101,6 @@ func safeHandlerMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-func (h *HTTPServer) statusHandler(w http.ResponseWriter, _ *http.Request) {
-	WriteJSON(w, http.StatusOK, h.pgrw.Status())
-}
-
-// ---- Middlewares ----
 
 func rateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
