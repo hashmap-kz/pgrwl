@@ -148,3 +148,17 @@ func setupPgReceiver(ctx context.Context, opts *Opts) *xlog.PgReceiveWal {
 		Verbose: strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace"),
 	}
 }
+
+// parseBool parses a string into a boolean value.
+// 1, true, t, yes, on (case-insensitive) -> true
+// 0, false, f, no, off (case-insensitive) -> false
+func parseBool(s string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "true", "t", "yes", "on":
+		return true, nil
+	case "0", "false", "f", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value: %q", s)
+	}
+}
