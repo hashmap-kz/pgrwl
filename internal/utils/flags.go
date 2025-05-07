@@ -8,13 +8,13 @@ import (
 )
 
 type Opts struct {
-	Directory    string
-	Slot         string
-	NoLoop       bool
-	LogLevel     string
-	LogAddSource bool
-	LogFormat    string
-	setFlags     map[string]bool // tracks explicitly set flags
+	Directory    string `json:"directory"`
+	Slot         string `json:"slot"`
+	NoLoop       bool   `json:"no_loop"`
+	LogLevel     string `json:"log_level"`
+	LogAddSource bool   `json:"log_add_source"`
+	LogFormat    string `json:"log_format"`
+	setFlags     map[string]bool
 }
 
 func ParseFlags() (*Opts, error) {

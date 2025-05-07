@@ -27,6 +27,9 @@ func main() {
 	defer cancel()
 	logger.Init()
 
+	// print options
+	slog.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
+
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, opts)
 	if err != nil {
