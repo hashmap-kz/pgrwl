@@ -3,6 +3,8 @@ package service
 import (
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"
+
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 )
@@ -21,12 +23,7 @@ func (s *ControlService) RetainWALs() error {
 	return nil
 }
 
-type WALArchiveSize struct {
-	Bytes int64  `json:"bytes,omitempty"`
-	IEC   string `json:"iec,omitempty"`
-}
-
-func (s *ControlService) WALArchiveSize() (*WALArchiveSize, error) {
+func (s *ControlService) WALArchiveSize() (*model.WALArchiveSize, error) {
 	size, err := optutils.DirSize(s.PGRW.BaseDir, &optutils.DirSizeOpts{
 		IgnoreErrPermission: true,
 		IgnoreErrNotExist:   true,
@@ -34,7 +31,7 @@ func (s *ControlService) WALArchiveSize() (*WALArchiveSize, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &WALArchiveSize{
+	return &model.WALArchiveSize{
 		Bytes: size,
 		IEC:   optutils.ByteCountIEC(size),
 	}, nil
