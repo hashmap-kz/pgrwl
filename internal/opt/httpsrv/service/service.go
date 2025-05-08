@@ -1,8 +1,8 @@
 package service
 
 import (
-	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"
@@ -10,8 +10,6 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 )
-
-var ErrAnotherOperationInProgress = errors.New("another control method is currently running")
 
 type ControlService interface {
 	Status() *xlog.StreamStatus
@@ -24,41 +22,45 @@ type lockInfo struct {
 }
 
 type constrolSvc struct {
-	PGRW      *xlog.PgReceiveWal // direct access to running state
-	opRunning chan lockInfo      // acts like a lock
+	PGRW *xlog.PgReceiveWal // direct access to running state
+
+	mu   sync.Mutex // protects access to `lock`
+	held bool       // is the lock currently held?
+	info lockInfo   // metadata about the lock
 }
 
 var _ ControlService = &constrolSvc{}
 
 func NewControlService(PGRW *xlog.PgReceiveWal) ControlService {
 	return &constrolSvc{
-		PGRW:      PGRW,
-		opRunning: make(chan lockInfo, 1),
+		PGRW: PGRW,
 	}
 }
 
-// lock attempts to acquire the operation lock
-func (s *constrolSvc) lock(task string) (ok bool, current *lockInfo) {
-	select {
-	case s.opRunning <- lockInfo{task: task, acquired: time.Now()}:
-		return true, nil
-	default:
-		var info lockInfo
-		select {
-		case info = <-s.opRunning:
-			// Put it back
-			s.opRunning <- info
-		default:
-		}
+// tryLock attempts to acquire the operation lock
+func (s *constrolSvc) tryLock(task string) (bool, *lockInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.held {
+		// Copy so caller can safely read
+		info := s.info
 		return false, &info
 	}
+
+	s.held = true
+	s.info = lockInfo{
+		task:     task,
+		acquired: time.Now(),
+	}
+	return true, nil
 }
 
 func (s *constrolSvc) unlock() {
-	select {
-	case <-s.opRunning:
-	default:
-	}
+	s.mu.Lock()
+	s.held = false
+	s.info = lockInfo{} // clear metadata
+	s.mu.Unlock()
 }
 
 func (s *constrolSvc) Status() *xlog.StreamStatus {
@@ -67,13 +69,10 @@ func (s *constrolSvc) Status() *xlog.StreamStatus {
 }
 
 func (s *constrolSvc) RetainWALs() error {
-	ok, current := s.lock("RetainWALs")
+	ok, current := s.tryLock("RetainWALs")
 	if !ok {
-		return fmt.Errorf(
-			"cannot run RetainWALs: %s is already in progress since %s",
-			current.task,
-			current.acquired.Format(time.RFC3339),
-		)
+		return fmt.Errorf("cannot run RetainWALs: %s is already running since %s",
+			current.task, current.acquired.Format(time.RFC3339))
 	}
 	defer s.unlock()
 
