@@ -1,9 +1,10 @@
-package httpsrv
+package service
 
 import (
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/xlog"
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 )
 
 type ControlService struct {
@@ -26,7 +27,7 @@ type WALArchiveSize struct {
 }
 
 func (s *ControlService) WALArchiveSize() (*WALArchiveSize, error) {
-	size, err := DirSize(s.PGRW.BaseDir, &DirSizeOpts{
+	size, err := optutils.DirSize(s.PGRW.BaseDir, &optutils.DirSizeOpts{
 		IgnoreErrPermission: true,
 		IgnoreErrNotExist:   true,
 	})
@@ -35,6 +36,6 @@ func (s *ControlService) WALArchiveSize() (*WALArchiveSize, error) {
 	}
 	return &WALArchiveSize{
 		Bytes: size,
-		IEC:   ByteCountIEC(size),
+		IEC:   optutils.ByteCountIEC(size),
 	}, nil
 }

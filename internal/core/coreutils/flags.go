@@ -1,4 +1,4 @@
-package utils
+package coreutils
 
 import (
 	"flag"
@@ -14,7 +14,12 @@ type Opts struct {
 	LogLevel     string `json:"log_level"`
 	LogAddSource bool   `json:"log_add_source"`
 	LogFormat    string `json:"log_format"`
-	setFlags     map[string]bool
+
+	// Optional
+	HTTPServerAddr  string `json:"http_server_addr"`
+	HTTPServerToken string `json:"http_server_token"`
+
+	setFlags map[string]bool
 }
 
 func ParseFlags() (*Opts, error) {
@@ -31,6 +36,8 @@ func ParseFlags() (*Opts, error) {
 	flag.StringVar(&opts.LogLevel, "log-level", "info", "")
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "")
 	flag.StringVar(&opts.LogFormat, "log-format", "json", "")
+	flag.StringVar(&opts.HTTPServerAddr, "http-server-addr", "", "")
+	flag.StringVar(&opts.HTTPServerToken, "http-server-token", "", "")
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, `Usage: pgrwl [OPTIONS]
 
@@ -41,6 +48,12 @@ Main Options:
       --log-level       set log level (trace, debug, info, warn, error) (default: info)
       --log-format      specify log formatter (json, text) (default: json)
       --log-add-source  include source file and line in log output (default: false)
+
+Optional features:
+  --http-server-addr    If set, runs an HTTP server in the background (for management, stats, etc.)
+                        Example: "--http-server-addr=:8080"
+  --http-server-token   Required when the HTTP server is enabled (treat this as a password)
+                        Example: "--http-server-token=${MY_SECRET_PASS}"
 `)
 	}
 	flag.Parse()
@@ -55,6 +68,9 @@ Main Options:
 	setStringFromFlagOrEnv(opts.setFlags, []string{"log-level"}, &opts.LogLevel, "PGRWL_LOG_LEVEL")
 	setStringFromFlagOrEnv(opts.setFlags, []string{"log-format"}, &opts.LogFormat, "PGRWL_LOG_FORMAT")
 	setBoolFromFlagOrEnv(opts.setFlags, []string{"log-add-source"}, &opts.LogAddSource, "PGRWL_LOG_ADD_SOURCE")
+
+	setStringFromFlagOrEnv(opts.setFlags, []string{"http-server-addr"}, &opts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
+	setStringFromFlagOrEnv(opts.setFlags, []string{"http-server-token"}, &opts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
 
 	if opts.Directory == "" {
 		return nil, fmt.Errorf("directory is not specified")

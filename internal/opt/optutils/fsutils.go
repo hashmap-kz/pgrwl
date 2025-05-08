@@ -1,4 +1,4 @@
-package httpsrv
+package optutils
 
 import (
 	"errors"

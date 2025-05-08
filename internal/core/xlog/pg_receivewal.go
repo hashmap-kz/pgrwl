@@ -12,13 +12,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashmap-kz/pgrwl/internal/utils"
-
-	"github.com/hashmap-kz/pgrwl/internal/fsync"
+	"github.com/hashmap-kz/pgrwl/internal/core/conv"
+	"github.com/hashmap-kz/pgrwl/internal/core/coreutils"
+	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
 
 	"github.com/jackc/pgx/v5/pgconn"
-
-	"github.com/hashmap-kz/pgrwl/internal/conv"
 
 	"github.com/jackc/pglogrepl"
 )
@@ -37,7 +35,7 @@ type PgReceiveWal struct {
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 
-func NewPgReceiver(ctx context.Context, opts *utils.Opts) (*PgReceiveWal, error) {
+func NewPgReceiver(ctx context.Context, opts *coreutils.Opts) (*PgReceiveWal, error) {
 	connStrRepl := fmt.Sprintf("application_name=%s replication=yes", opts.Slot)
 	conn, err := pgconn.Connect(ctx, connStrRepl)
 	if err != nil {

@@ -9,17 +9,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/httpsrv"
-
-	"github.com/hashmap-kz/pgrwl/internal/utils"
-
-	"github.com/hashmap-kz/pgrwl/internal/logger"
-	"github.com/hashmap-kz/pgrwl/internal/xlog"
+	"github.com/hashmap-kz/pgrwl/internal/core/coreutils"
+	"github.com/hashmap-kz/pgrwl/internal/core/logger"
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
 func main() {
 	// parse CLI (it sets env-vars, checks required args, so it's need to be executed at the top)
-	opts, err := utils.ParseFlags()
+	opts, err := coreutils.ParseFlags()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,10 +37,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO: should be optional
-	// managing
-	srv := httpsrv.NewHTTPServer(ctx, ":8080", pgrw)
-	httpsrv.Start(ctx, srv)
+	// optionally run HTTP server for managing purpose
+	var srv *httpsrv.HTTPServer
+	if opts.HTTPServerAddr != "" {
+		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", opts.HTTPServerToken)
+		srv = httpsrv.NewHTTPServer(ctx, opts.HTTPServerAddr, pgrw)
+		httpsrv.Start(ctx, srv)
+	}
 
 	// enter main streaming loop
 	for {

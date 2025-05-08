@@ -1,4 +1,4 @@
-package httputils
+package optutils
 
 import (
 	"encoding/json"

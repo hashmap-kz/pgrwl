@@ -8,9 +8,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/httpsrv/middleware"
+	controlCrt "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/controller"
+	controlSvc "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
 
-	"github.com/hashmap-kz/pgrwl/internal/xlog"
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/middleware"
 
 	"golang.org/x/time/rate"
 )
@@ -33,15 +35,15 @@ func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTT
 		verbose: pgrw.Verbose,
 	}
 
-	service := &ControlService{PGRW: pgrw}
-	controller := NewController(service)
+	service := &controlSvc.ControlService{PGRW: pgrw}
+	controller := controlCrt.NewController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
 		Logger:  h.logger,
 		Verbose: pgrw.Verbose,
 	}
-	tokenAuthMiddleware := middleware.AuthMiddleware{Token: os.Getenv("PGRWL_AUTH_TOKEN")}
+	tokenAuthMiddleware := middleware.AuthMiddleware{Token: os.Getenv("PGRWL_HTTP_SERVER_TOKEN")}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
 
 	// Build middleware chain

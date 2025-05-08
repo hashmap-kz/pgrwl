@@ -1,4 +1,4 @@
-package utils
+package coreutils
 
 import (
 	"os"

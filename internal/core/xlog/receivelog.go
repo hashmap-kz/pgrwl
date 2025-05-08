@@ -10,10 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/logger"
-
-	"github.com/hashmap-kz/pgrwl/internal/conv"
-	"github.com/hashmap-kz/pgrwl/internal/fsync"
+	"github.com/hashmap-kz/pgrwl/internal/core/conv"
+	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
+	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
