@@ -39,7 +39,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		wrapped := wrapResponseWriter(w)
 		next.ServeHTTP(wrapped, r)
 
-		slog.Info("HTTP",
+		slog.Debug("HTTP",
 			slog.Int("status", wrapped.status),
 			slog.String("method", r.Method),
 			slog.String("path", r.URL.EscapedPath()),
