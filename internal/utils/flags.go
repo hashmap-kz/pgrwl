@@ -32,15 +32,47 @@ func ParseFlags() (*Opts, error) {
 	flag.BoolVar(&opts.LogAddSource, "log-add-source", false, "")
 	flag.StringVar(&opts.LogFormat, "log-format", "json", "")
 	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, `Usage: pgrwl [OPTIONS]
+		_, _ = fmt.Fprintf(os.Stderr, `Run WAL-receiver
+
+Examples:
+  # Set PostgreSQL connection parameters
+  export PGHOST='localhost'
+  export PGPORT='5432'
+  export PGUSER='postgres'
+  export PGPASSWORD='postgres'
+
+  # Start receiving WAL files into local directory '/mnt/wal-archive'
+  # using the replication slot named 'bookstore_app'
+  pgrwl -D /mnt/wal-archive -S bookstore_app
 
 Main Options:
-  -D, --directory       receive write-ahead log files into this directory (required)
-  -S, --slot            replication slot to use (required)
-  -n, --no-loop         do not loop on connection lost
-      --log-level       set log level (trace, debug, info, warn, error) (default: info)
-      --log-format      specify log formatter (json, text) (default: json)
-      --log-add-source  include source file and line in log output (default: false)
+  -D, --directory='':
+      Target directory to store WAL files. Required.
+      ENV: PGRWL_DIRECTORY
+
+  -S, --slot='':
+      Replication slot to use. Required.
+      ENV: PGRWL_SLOT
+
+  -n, --no-loop=false:
+      If set, do not loop on connection loss.
+      ENV: PGRWL_NO_LOOP
+
+Logging:
+  --log-level=info:
+      Set log verbosity: trace, debug, info, warn, error.
+      ENV: PGRWL_LOG_LEVEL
+
+  --log-format=json:
+      Specify log formatter: json or text.
+      ENV: PGRWL_LOG_FORMAT
+
+  --log-add-source=false:
+      Include file and line info in logs if set.
+      ENV: PGRWL_LOG_ADD_SOURCE
+
+Usage:
+  pgrwl -D DIRECTORY -S SLOT [options]
 `)
 	}
 	flag.Parse()

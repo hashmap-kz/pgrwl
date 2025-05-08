@@ -9,8 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/httpsrv"
-
 	"github.com/hashmap-kz/pgrwl/internal/utils"
 
 	"github.com/hashmap-kz/pgrwl/internal/logger"
@@ -39,11 +37,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO: should be optional
-	// managing
-	httpSrv := httpsrv.NewHTTPServer(ctx, ":8080")
-	httpSrv.Start(ctx)
-
 	// enter main streaming loop
 	for {
 		err := pgrw.StreamLog(ctx)
@@ -51,21 +44,18 @@ func main() {
 			slog.Error("an error occurred in StreamLog(), exiting",
 				slog.Any("err", err),
 			)
-			httpSrv.Shutdown(ctx)
 			os.Exit(1)
 		}
 
 		select {
 		case <-ctx.Done():
 			slog.Info("(main) received termination signal, exiting...")
-			httpSrv.Shutdown(ctx)
 			os.Exit(0)
 		default:
 		}
 
 		if opts.NoLoop {
 			slog.Error("disconnected")
-			httpSrv.Shutdown(ctx)
 			os.Exit(1)
 		}
 
