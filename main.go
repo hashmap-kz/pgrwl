@@ -41,8 +41,8 @@ func main() {
 
 	// TODO: should be optional
 	// managing
-	httpSrv := httpsrv.NewHTTPServer(ctx, ":8080", pgrw)
-	httpSrv.Start(ctx)
+	srv := httpsrv.NewHTTPServer(ctx, ":8080", pgrw)
+	httpsrv.Start(ctx, srv)
 
 	// enter main streaming loop
 	for {
@@ -51,21 +51,21 @@ func main() {
 			slog.Error("an error occurred in StreamLog(), exiting",
 				slog.Any("err", err),
 			)
-			httpSrv.Shutdown(ctx)
+			httpsrv.Shutdown(ctx, srv)
 			os.Exit(1)
 		}
 
 		select {
 		case <-ctx.Done():
 			slog.Info("(main) received termination signal, exiting...")
-			httpSrv.Shutdown(ctx)
+			httpsrv.Shutdown(ctx, srv)
 			os.Exit(0)
 		default:
 		}
 
 		if opts.NoLoop {
 			slog.Error("disconnected")
-			httpSrv.Shutdown(ctx)
+			httpsrv.Shutdown(ctx, srv)
 			os.Exit(1)
 		}
 
