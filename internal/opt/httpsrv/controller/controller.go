@@ -8,14 +8,12 @@ import (
 )
 
 type ControlController struct {
-	Service *service.ControlService
-	lock    chan struct{}
+	Service service.ControlService
 }
 
-func NewController(s *service.ControlService) *ControlController {
+func NewController(s service.ControlService) *ControlController {
 	return &ControlController{
 		Service: s,
-		lock:    make(chan struct{}, 1),
 	}
 }
 
@@ -35,16 +33,6 @@ func (c *ControlController) ArchiveSizeHandler(w http.ResponseWriter, _ *http.Re
 }
 
 func (c *ControlController) RetentionHandler(w http.ResponseWriter, _ *http.Request) {
-	select {
-	case c.lock <- struct{}{}:
-		defer func() { <-c.lock }()
-	default:
-		optutils.WriteJSON(w, http.StatusConflict, map[string]string{
-			"error": "retention already in progress",
-		})
-		return
-	}
-
 	if err := c.Service.RetainWALs(); err != nil {
 		optutils.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

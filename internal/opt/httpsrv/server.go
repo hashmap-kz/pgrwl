@@ -35,7 +35,7 @@ func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTT
 		verbose: pgrw.Verbose,
 	}
 
-	service := &controlSvc.ControlService{PGRW: pgrw}
+	service := controlSvc.NewControlService(pgrw)
 	controller := controlCrt.NewController(service)
 
 	// init middlewares
