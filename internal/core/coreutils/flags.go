@@ -52,6 +52,16 @@ Examples:
   # using the replication slot named 'bookstore_app'
   pgrwl -D /mnt/wal-archive -S bookstore_app
 
+  # Start receiving WALs with a management HTTP server
+  export SECRET_PASS=mySecretPass
+  pgrwl -D /mnt/wal-archive -S bookstore_app \
+    --http-server-addr=:8080 \
+    --http-server-token=${SECRET_PASS}
+
+  # Get a status (when running with HTTP server):
+  curl --location 'http://localhost:8080/status' \
+    --header "Authorization: Bearer ${SECRET_PASS}"
+
 Main Options:
   -D, --directory='':
       Target directory to store WAL files. Required.
