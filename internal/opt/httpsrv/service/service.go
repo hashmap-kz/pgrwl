@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"
@@ -17,10 +18,14 @@ type ControlService interface {
 	RetainWALs() error
 	WALArchiveSize() (*model.WALArchiveSize, error)
 }
+type lockInfo struct {
+	task     string
+	acquired time.Time
+}
 
 type constrolSvc struct {
 	PGRW      *xlog.PgReceiveWal // direct access to running state
-	opRunning chan struct{}      // acts like a lock
+	opRunning chan lockInfo      // acts like a lock
 }
 
 var _ ControlService = &constrolSvc{}
@@ -28,17 +33,24 @@ var _ ControlService = &constrolSvc{}
 func NewControlService(PGRW *xlog.PgReceiveWal) ControlService {
 	return &constrolSvc{
 		PGRW:      PGRW,
-		opRunning: make(chan struct{}, 1),
+		opRunning: make(chan lockInfo, 1),
 	}
 }
 
 // lock attempts to acquire the operation lock
-func (s *constrolSvc) lock() bool {
+func (s *constrolSvc) lock(task string) (ok bool, current *lockInfo) {
 	select {
-	case s.opRunning <- struct{}{}:
-		return true
+	case s.opRunning <- lockInfo{task: task, acquired: time.Now()}:
+		return true, nil
 	default:
-		return false
+		var info lockInfo
+		select {
+		case info = <-s.opRunning:
+			// Put it back
+			s.opRunning <- info
+		default:
+		}
+		return false, &info
 	}
 }
 
@@ -55,8 +67,13 @@ func (s *constrolSvc) Status() *xlog.StreamStatus {
 }
 
 func (s *constrolSvc) RetainWALs() error {
-	if !s.lock() {
-		return ErrAnotherOperationInProgress
+	ok, current := s.lock("RetainWALs")
+	if !ok {
+		return fmt.Errorf(
+			"cannot run RetainWALs: %s is already in progress since %s",
+			current.task,
+			current.acquired.Format(time.RFC3339),
+		)
 	}
 	defer s.unlock()
 
