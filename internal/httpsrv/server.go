@@ -21,20 +21,20 @@ var (
 
 // ---- Server ----
 
-// ---- Struct ----
-
 type HTTPServer struct {
-	srv    *http.Server
-	logger *slog.Logger
-	pgrw   *xlog.PgReceiveWal
+	srv     *http.Server
+	logger  *slog.Logger
+	pgrw    *xlog.PgReceiveWal
+	verbose bool
 }
 
 // ---- Constructor ----
 
 func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTTPServer {
 	h := &HTTPServer{
-		logger: slog.With("component", "http-server"),
-		pgrw:   pgrw,
+		logger:  slog.With("component", "http-server"),
+		pgrw:    pgrw,
+		verbose: pgrw.Verbose,
 	}
 
 	service := &ControlService{PGRW: pgrw}
@@ -43,7 +43,7 @@ func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTT
 	// Build middleware chain
 	secureChain := MiddlewareChain(
 		safeHandlerMiddleware,
-		loggingMiddleware,
+		loggingMiddleware(h.logger, h.verbose),
 		rateLimitMiddleware,
 		tokenAuthMiddleware,
 	)
