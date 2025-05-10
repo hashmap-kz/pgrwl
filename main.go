@@ -4,16 +4,28 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/coreutils"
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
+
+func startMetricsServer() {
+	go func() {
+		metrics.Init()
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":9090", nil) // or configurable
+	}()
+}
 
 func main() {
 	// parse CLI (it sets env-vars, checks required args, so it's need to be executed at the top)
@@ -44,6 +56,7 @@ func main() {
 		srv = httpsrv.NewHTTPServer(ctx, opts.HTTPServerAddr, pgrw)
 		httpsrv.Start(ctx, srv)
 	}
+	startMetricsServer()
 
 	// enter main streaming loop
 	for {
@@ -71,6 +84,7 @@ func main() {
 		}
 
 		pgrw.SetStream(nil)
+		metrics.StreamingActive.Set(0)
 		slog.Info("disconnected; waiting 5 seconds to try again")
 		time.Sleep(5 * time.Second)
 	}

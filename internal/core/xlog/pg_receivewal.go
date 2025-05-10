@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/coreutils"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
@@ -148,6 +150,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		Verbose:         pgrw.Verbose,
 	})
 	pgrw.SetStream(stream)
+	metrics.StreamingActive.Set(1)
 
 	err = stream.ReceiveXlogStream(ctx)
 	if err != nil {
