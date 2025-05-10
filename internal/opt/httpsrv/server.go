@@ -80,6 +80,11 @@ func Start(_ context.Context, h *HTTPServer) {
 		return
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("goroutine recovered", slog.Any("r", r))
+			}
+		}()
 		h.logger.Info("HTTP server listening", slog.String("addr", h.srv.Addr))
 		if err := h.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			h.logger.Error("HTTP server error", slog.Any("err", err))
