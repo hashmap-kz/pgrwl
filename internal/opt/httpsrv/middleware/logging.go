@@ -40,11 +40,10 @@ func (rw *responseWriter) WriteHeader(code int) {
 // Middleware logs the incoming HTTP request & its duration.
 func (m *LoggingMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		wrapped := wrapResponseWriter(w)
+		next.ServeHTTP(wrapped, r)
 		if m.Verbose {
-			start := time.Now()
-			wrapped := wrapResponseWriter(w)
-			next.ServeHTTP(wrapped, r)
-
 			m.Logger.Debug("HTTP request",
 				slog.Int("status", wrapped.status),
 				slog.String("method", r.Method),
