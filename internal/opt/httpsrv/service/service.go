@@ -21,24 +21,24 @@ type lockInfo struct {
 	acquired time.Time
 }
 
-type constrolSvc struct {
-	PGRW *xlog.PgReceiveWal // direct access to running state
+type controlSvc struct {
+	pgrw *xlog.PgReceiveWal // direct access to running state
 
 	mu   sync.Mutex // protects access to `lock`
 	held bool       // is the lock currently held?
 	info lockInfo   // metadata about the lock
 }
 
-var _ ControlService = &constrolSvc{}
+var _ ControlService = &controlSvc{}
 
-func NewControlService(PGRW *xlog.PgReceiveWal) ControlService {
-	return &constrolSvc{
-		PGRW: PGRW,
+func NewControlService(pgrw *xlog.PgReceiveWal) ControlService {
+	return &controlSvc{
+		pgrw: pgrw,
 	}
 }
 
 // tryLock attempts to acquire the operation lock
-func (s *constrolSvc) tryLock(task string) (bool, *lockInfo) {
+func (s *controlSvc) tryLock(task string) (bool, *lockInfo) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -56,19 +56,19 @@ func (s *constrolSvc) tryLock(task string) (bool, *lockInfo) {
 	return true, nil
 }
 
-func (s *constrolSvc) unlock() {
+func (s *controlSvc) unlock() {
 	s.mu.Lock()
 	s.held = false
 	s.info = lockInfo{} // clear metadata
 	s.mu.Unlock()
 }
 
-func (s *constrolSvc) Status() *xlog.StreamStatus {
+func (s *controlSvc) Status() *xlog.StreamStatus {
 	// read-only; doesn’t need to block
-	return s.PGRW.Status()
+	return s.pgrw.Status()
 }
 
-func (s *constrolSvc) RetainWALs() error {
+func (s *controlSvc) RetainWALs() error {
 	ok, current := s.tryLock("RetainWALs")
 	if !ok {
 		return fmt.Errorf("cannot run RetainWALs: %s is already running since %s",
@@ -81,10 +81,10 @@ func (s *constrolSvc) RetainWALs() error {
 	return nil
 }
 
-func (s *constrolSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
+func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
 	// read-only; doesn’t need to block
 
-	size, err := optutils.DirSize(s.PGRW.BaseDir, &optutils.DirSizeOpts{
+	size, err := optutils.DirSize(s.pgrw.BaseDir, &optutils.DirSizeOpts{
 		IgnoreErrPermission: true,
 		IgnoreErrNotExist:   true,
 	})

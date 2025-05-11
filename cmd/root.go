@@ -17,10 +17,11 @@ var rootCmd = &cobra.Command{
 	Use:          "pgrwl",
 	Short:        "Stream and manage write-ahead logs from a PostgreSQL server",
 	SilenceUsage: false,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
+		//nolint:errcheck
 		_ = cmd.Help() // print help if no subcommand
 	},
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		f := cmd.Flags()
 
 		applyStringFallback(f, "log-level", &rootOpts.LogLevel, "PGRWL_LOG_LEVEL")

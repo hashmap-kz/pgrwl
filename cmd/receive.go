@@ -34,17 +34,13 @@ func init() {
 	// Optional HTTP server
 	receiveCmd.Flags().StringVar(&receiveOpts.HTTPServerAddr, "http-server-addr", "", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
 	receiveCmd.Flags().StringVar(&receiveOpts.HTTPServerToken, "http-server-token", "", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
-
-	// Mark required flags
-	//_ = receiveCmd.MarkFlagRequired("directory")
-	//_ = receiveCmd.MarkFlagRequired("slot")
 }
 
 var receiveCmd = &cobra.Command{
 	Use:          "receive",
 	Short:        "Start the WAL receiver",
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		f := cmd.Flags()
 
 		applyStringFallback(f, "directory", &receiveOpts.Directory, "PGRWL_DIRECTORY")
