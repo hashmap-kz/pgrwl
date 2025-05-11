@@ -21,44 +21,35 @@ var receiveOpts struct {
 	Directory       string
 	Slot            string
 	NoLoop          bool
-	LogLevel        string
-	LogFormat       string
-	LogAddSource    bool
 	HTTPServerAddr  string
 	HTTPServerToken string
 }
 
 func init() {
-	rootCmd.AddCommand(receiveCmd)
-
 	// Primary flags with env fallbacks
 	receiveCmd.Flags().StringVarP(&receiveOpts.Directory, "directory", "D", "", "Target directory (ENV: PGRWL_DIRECTORY)")
 	receiveCmd.Flags().StringVarP(&receiveOpts.Slot, "slot", "S", "", "Replication slot (ENV: PGRWL_SLOT)")
 	receiveCmd.Flags().BoolVarP(&receiveOpts.NoLoop, "no-loop", "n", false, "Do not reconnect (ENV: PGRWL_NO_LOOP)")
 
-	// Logging
-	receiveCmd.Flags().StringVar(&receiveOpts.LogLevel, "log-level", "", "Log level (ENV: PGRWL_LOG_LEVEL)")
-	receiveCmd.Flags().StringVar(&receiveOpts.LogFormat, "log-format", "", "Log format (ENV: PGRWL_LOG_FORMAT)")
-	receiveCmd.Flags().BoolVar(&receiveOpts.LogAddSource, "log-add-source", false, "Include source info in logs (ENV: PGRWL_LOG_ADD_SOURCE)")
-
 	// Optional HTTP server
 	receiveCmd.Flags().StringVar(&receiveOpts.HTTPServerAddr, "http-server-addr", "", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
 	receiveCmd.Flags().StringVar(&receiveOpts.HTTPServerToken, "http-server-token", "", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
+
+	// Mark required flags
+	//_ = receiveCmd.MarkFlagRequired("directory")
+	//_ = receiveCmd.MarkFlagRequired("slot")
 }
 
 var receiveCmd = &cobra.Command{
-	Use:   "receive",
-	Short: "Start the WAL receiver",
+	Use:          "receive",
+	Short:        "Start the WAL receiver",
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		f := cmd.Flags()
 
 		applyStringFallback(f, "directory", &receiveOpts.Directory, "PGRWL_DIRECTORY")
 		applyStringFallback(f, "slot", &receiveOpts.Slot, "PGRWL_SLOT")
 		applyBoolFallback(f, "no-loop", &receiveOpts.NoLoop, "PGRWL_NO_LOOP")
-
-		applyStringFallback(f, "log-level", &receiveOpts.LogLevel, "PGRWL_LOG_LEVEL")
-		applyStringFallback(f, "log-format", &receiveOpts.LogFormat, "PGRWL_LOG_FORMAT")
-		applyBoolFallback(f, "log-add-source", &receiveOpts.LogAddSource, "PGRWL_LOG_ADD_SOURCE")
 
 		applyStringFallback(f, "http-server-addr", &receiveOpts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
 		applyStringFallback(f, "http-server-token", &receiveOpts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
@@ -76,13 +67,6 @@ var receiveCmd = &cobra.Command{
 			if os.Getenv(name) == "" {
 				return fmt.Errorf("required env var %s is not set", name)
 			}
-		}
-
-		// Set log envs
-		_ = os.Setenv("LOG_LEVEL", receiveOpts.LogLevel)
-		_ = os.Setenv("LOG_FORMAT", receiveOpts.LogFormat)
-		if receiveOpts.LogAddSource {
-			_ = os.Setenv("LOG_ADD_SOURCE", "1")
 		}
 
 		// Run the actual service (streaming + HTTP)
