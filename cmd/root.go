@@ -55,4 +55,5 @@ func Execute() error {
 func init() {
 	// Add subcommands
 	rootCmd.AddCommand(receiveCmd)
+	rootCmd.AddCommand(statusCmd)
 }
