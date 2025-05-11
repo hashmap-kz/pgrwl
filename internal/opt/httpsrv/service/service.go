@@ -2,6 +2,9 @@ package service
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -15,6 +18,7 @@ type ControlService interface {
 	Status() *xlog.StreamStatus
 	RetainWALs() error
 	WALArchiveSize() (*model.WALArchiveSize, error)
+	GetWalFile(filename string) (io.ReadCloser, error)
 }
 type lockInfo struct {
 	task     string
@@ -22,11 +26,22 @@ type lockInfo struct {
 }
 
 type controlSvc struct {
+	// TODO: if we're in a 'restore' state -> this one is nil, so we need to hold all 'opts' parameters
+	// TODO: for query baseDir, etc...
 	pgrw *xlog.PgReceiveWal // direct access to running state
 
 	mu   sync.Mutex // protects access to `lock`
 	held bool       // is the lock currently held?
 	info lockInfo   // metadata about the lock
+}
+
+func (s *controlSvc) GetWalFile(filename string) (io.ReadCloser, error) {
+	path := filepath.Join(s.pgrw.BaseDir, filename)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 var _ ControlService = &controlSvc{}

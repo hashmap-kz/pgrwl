@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
@@ -39,4 +41,24 @@ func (c *ControlController) RetentionHandler(w http.ResponseWriter, _ *http.Requ
 	}
 
 	optutils.WriteJSON(w, http.StatusOK, map[string]string{"status": "cleanup done"})
+}
+
+func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: path-params
+	filename := strings.TrimPrefix(r.URL.Path, "/wal/")
+	if filename == "" || strings.Contains(filename, "/") {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+
+	f, err := c.Service.GetWalFile(filename)
+	if err != nil {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, f)
 }

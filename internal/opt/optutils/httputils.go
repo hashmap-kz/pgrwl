@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 func ReadJSON(r *http.Request, v any) error {
@@ -20,4 +21,28 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func PathValueString(r *http.Request, name string) (string, error) {
+	pathValue := r.PathValue(name)
+	if pathValue == "" {
+		return "", fmt.Errorf("empty path value for name: %s", name)
+	}
+	return pathValue, nil
+}
+
+func PathValueI32(r *http.Request, name string) (int, error) {
+	pathValue := r.PathValue(name)
+	if pathValue == "" {
+		return 0, fmt.Errorf("empty path value for name: %s", name)
+	}
+	return strconv.Atoi(pathValue)
+}
+
+func PathValueI64(r *http.Request, name string) (int64, error) {
+	pathValue := r.PathValue(name)
+	if pathValue == "" {
+		return 0, fmt.Errorf("empty path value for name: %s", name)
+	}
+	return strconv.ParseInt(pathValue, 10, 64)
 }

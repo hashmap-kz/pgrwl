@@ -56,4 +56,5 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(getWalCmd)
 }

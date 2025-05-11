@@ -62,6 +62,7 @@ func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTT
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("POST /retention", secureChain(http.HandlerFunc(controller.RetentionHandler)))
 	mux.Handle("/archive/size", secureChain(http.HandlerFunc(controller.ArchiveSizeHandler)))
+	mux.Handle("/wal/{filename}", secureChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
 	h.srv = &http.Server{
 		Addr:              addr,
