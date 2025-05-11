@@ -86,11 +86,11 @@ var receiveCmd = &cobra.Command{
 		}
 
 		// Run the actual service (streaming + HTTP)
-		return runService() // you'll implement this
+		return runWalReceiver()
 	},
 }
 
-func runService() error {
+func runWalReceiver() error {
 	opts := &xlog.Opts{
 		Directory: receiveOpts.Directory,
 		Slot:      receiveOpts.Slot,

@@ -5,9 +5,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "pgrwl",
+	Use:   "pgrwl",
+	Short: "Stream and manage write-ahead logs from a PostgreSQL server",
 	// TODO:
-	Short:        "",
 	Long:         ``,
 	SilenceUsage: true,
 }
