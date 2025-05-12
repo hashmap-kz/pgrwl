@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(statusCmd)
+}
+
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Get WAL receiver status",

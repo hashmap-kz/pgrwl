@@ -26,6 +26,8 @@ var receiveOpts struct {
 }
 
 func init() {
+	rootCmd.AddCommand(receiveCmd)
+
 	// Primary flags with env fallbacks
 	receiveCmd.Flags().StringVarP(&receiveOpts.Directory, "directory", "D", "", "Target directory (ENV: PGRWL_DIRECTORY)")
 	receiveCmd.Flags().StringVarP(&receiveOpts.Slot, "slot", "S", "", "Replication slot (ENV: PGRWL_SLOT)")
