@@ -18,7 +18,7 @@ import (
 func InitHTTPHandlersStreaming(pgrw *xlog.PgReceiveWal) http.Handler {
 	verbose := strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace")
 
-	service := controlSvc.NewControlService(pgrw)
+	service := controlSvc.NewControlService(pgrw, pgrw.BaseDir)
 	controller := controlCrt.NewController(service)
 
 	// init middlewares
@@ -50,11 +50,11 @@ func InitHTTPHandlersStreaming(pgrw *xlog.PgReceiveWal) http.Handler {
 	return mux
 }
 
-func InitHTTPHandlersStandalone() http.Handler {
+func InitHTTPHandlersStandalone(baseDir string) http.Handler {
 	verbose := strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace")
 
 	// TODO: this should be a specific service
-	service := controlSvc.NewControlService(nil)
+	service := controlSvc.NewControlService(nil, baseDir)
 	controller := controlCrt.NewController(service)
 
 	// init middlewares

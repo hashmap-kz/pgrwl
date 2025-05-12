@@ -76,8 +76,12 @@ func runHTTPServer(ctx context.Context, router http.Handler) error {
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			slog.Error("HTTP server shutdown error", slog.Any("err", err))
+		} else {
+			slog.Debug("HTTP server shut down")
 		}
 	}()
+
+	slog.Info("starting HTTP server", slog.String("addr", srv.Addr))
 
 	// Start the server (blocking)
 	err := srv.ListenAndServe()

@@ -28,7 +28,8 @@ type lockInfo struct {
 type controlSvc struct {
 	// TODO: if we're in a 'restore' state -> this one is nil, so we need to hold all 'opts' parameters
 	// TODO: for query baseDir, etc...
-	pgrw *xlog.PgReceiveWal // direct access to running state
+	pgrw    *xlog.PgReceiveWal // direct access to running state
+	baseDir string
 
 	mu   sync.Mutex // protects access to `lock`
 	held bool       // is the lock currently held?
@@ -36,7 +37,7 @@ type controlSvc struct {
 }
 
 func (s *controlSvc) GetWalFile(filename string) (io.ReadCloser, error) {
-	path := filepath.Join(s.pgrw.BaseDir, filename)
+	path := filepath.Join(s.baseDir, filename)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -46,9 +47,10 @@ func (s *controlSvc) GetWalFile(filename string) (io.ReadCloser, error) {
 
 var _ ControlService = &controlSvc{}
 
-func NewControlService(pgrw *xlog.PgReceiveWal) ControlService {
+func NewControlService(pgrw *xlog.PgReceiveWal, baseDir string) ControlService {
 	return &controlSvc{
-		pgrw: pgrw,
+		pgrw:    pgrw,
+		baseDir: baseDir,
 	}
 }
 
