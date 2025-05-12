@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -54,12 +55,24 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 		if walReceiveOpts.Slot == "" {
 			return fmt.Errorf("missing required flag: --slot or $PGRWL_SLOT")
 		}
+		if rootOpts.HTTPServerAddr == "" {
+			return fmt.Errorf("missing required flag: --http-server-addr or $PGRWL_HTTP_SERVER_ADDR")
+		}
+		if rootOpts.HTTPServerToken == "" {
+			return fmt.Errorf("missing required flag: --http-server-token or $PGRWL_HTTP_SERVER_TOKEN")
+		}
+
+		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", rootOpts.HTTPServerToken)
 
 		// Validate required PG env vars
+		var emptyEnvs []string
 		for _, name := range []string{"PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"} {
 			if os.Getenv(name) == "" {
-				return fmt.Errorf("required env var %s is not set", name)
+				emptyEnvs = append(emptyEnvs, name)
 			}
+		}
+		if len(emptyEnvs) > 0 {
+			return fmt.Errorf("required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
 		}
 
 		// Run the actual service (streaming + HTTP)
@@ -89,13 +102,9 @@ func runWalReceiver() error {
 		log.Fatal(err)
 	}
 
-	// optionally run HTTP server for managing purpose
-	var srv *httpsrv.HTTPServer
-	if rootOpts.HTTPServerAddr != "" {
-		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", rootOpts.HTTPServerToken)
-		srv = httpsrv.NewHTTPServer(ctx, rootOpts.HTTPServerAddr, pgrw)
-		httpsrv.Start(ctx, srv)
-	}
+	// run HTTP server for managing purpose
+	srv := httpsrv.NewHTTPServer(ctx, rootOpts.HTTPServerAddr, pgrw)
+	httpsrv.Start(ctx, srv)
 
 	// enter main streaming loop
 	for {
