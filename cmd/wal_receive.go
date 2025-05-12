@@ -149,6 +149,16 @@ func runWalReceiver() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("http server panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "http-server"),
+				)
+			}
+		}()
+
 		if err := runHTTPServer(ctx, httpsrv.InitHTTPHandlersStreaming(pgrw)); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 		}
