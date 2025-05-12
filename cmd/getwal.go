@@ -2,26 +2,27 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/spf13/cobra"
 )
 
-var getWalOpts struct {
+var walRestoreOpts struct {
 	HTTPServerAddr  string
 	HTTPServerToken string
 }
 
 func init() {
-	rootCmd.AddCommand(getWalCmd)
-	getWalCmd.Flags().StringVar(&getWalOpts.HTTPServerAddr, "http-server-addr", "", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
-	getWalCmd.Flags().StringVar(&getWalOpts.HTTPServerToken, "http-server-token", "", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
+	rootCmd.AddCommand(walRestoreCmd)
+	walRestoreCmd.Flags().StringVar(&walRestoreOpts.HTTPServerAddr, "http-server-addr", "", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
+	walRestoreCmd.Flags().StringVar(&walRestoreOpts.HTTPServerToken, "http-server-token", "", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
 }
 
 // restore_command = 'pgrwl wal-restore %f %p'
-var getWalCmd = &cobra.Command{
+var walRestoreCmd = &cobra.Command{
 	Use:   "wal-restore",
 	Short: "Download a WAL file from the running receiver",
 	Long: `
@@ -31,11 +32,15 @@ restore_command = 'pgrwl wal-restore %f %p'
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		f := cmd.Flags()
+		applyStringFallback(f, "http-server-addr", &walRestoreOpts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
+		applyStringFallback(f, "http-server-token", &walRestoreOpts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
+
 		walFileName := args[0]
 		walFilePath := args[1]
 
 		slog.Debug("wal-restore",
-			slog.Any("opts", getWalOpts),
+			slog.Any("opts", walRestoreOpts),
 			slog.String("f", walFileName),
 			slog.String("p", walFilePath),
 		)
@@ -46,8 +51,8 @@ restore_command = 'pgrwl wal-restore %f %p'
 		if err != nil {
 			return err
 		}
-		if getWalOpts.HTTPServerToken != "" {
-			req.Header.Set("Authorization", "Bearer "+getWalOpts.HTTPServerToken)
+		if walRestoreOpts.HTTPServerToken != "" {
+			req.Header.Set("Authorization", "Bearer "+walRestoreOpts.HTTPServerToken)
 		}
 
 		client := http.Client{}
