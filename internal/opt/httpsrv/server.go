@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	controlCrt "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/controller"
@@ -29,10 +30,12 @@ type HTTPServer struct {
 // ---- Constructor ----
 
 func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTTPServer {
+	verbose := strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace")
+
 	h := &HTTPServer{
 		logger:  slog.With("component", "http-server"),
 		pgrw:    pgrw,
-		verbose: pgrw.Verbose,
+		verbose: verbose,
 	}
 
 	service := controlSvc.NewControlService(pgrw)
@@ -41,7 +44,7 @@ func NewHTTPServer(_ context.Context, addr string, pgrw *xlog.PgReceiveWal) *HTT
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
 		Logger:  h.logger,
-		Verbose: pgrw.Verbose,
+		Verbose: verbose,
 	}
 	tokenAuthMiddleware := middleware.AuthMiddleware{Token: os.Getenv("PGRWL_HTTP_SERVER_TOKEN")}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}

@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 
@@ -90,7 +89,6 @@ func runWalReceiver() error {
 	// setup context
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	logger.Init()
 
 	// print options
 	slog.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))

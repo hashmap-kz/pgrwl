@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
@@ -19,7 +20,7 @@ var rootCmd = &cobra.Command{
 	Use:          "pgrwl",
 	Short:        "Stream and manage write-ahead logs from a PostgreSQL server",
 	SilenceUsage: false,
-	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		f := cmd.Flags()
 
 		applyStringFallback(f, "log-level", &rootOpts.LogLevel, "PGRWL_LOG_LEVEL")
@@ -33,11 +34,20 @@ var rootCmd = &cobra.Command{
 			_ = os.Setenv("LOG_ADD_SOURCE", "1")
 		}
 
+		// check required
 		applyStringFallback(f, "http-server-addr", &rootOpts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
 		applyStringFallback(f, "http-server-token", &rootOpts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
+		if rootOpts.HTTPServerAddr == "" {
+			return fmt.Errorf("missing required flag: --http-server-addr or $PGRWL_HTTP_SERVER_ADDR")
+		}
+		if rootOpts.HTTPServerToken == "" {
+			return fmt.Errorf("missing required flag: --http-server-token or $PGRWL_HTTP_SERVER_TOKEN")
+		}
+		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", rootOpts.HTTPServerToken)
 
 		// Initialize logger
 		logger.Init()
+		return nil
 	},
 }
 
