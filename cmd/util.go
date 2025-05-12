@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -45,6 +46,17 @@ func parseBool(s string) (bool, error) {
 }
 
 // HTTP
+
+func addr(from string) (string, error) {
+	host, port, err := net.SplitHostPort(from)
+	if err != nil {
+		return "", err
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return fmt.Sprintf("http://%s:%s", host, port), nil
+}
 
 func runHTTPServer(ctx context.Context, addr string, router http.Handler) error {
 	srv := &http.Server{
