@@ -33,13 +33,29 @@ metadata:
     app: *app
 data:
   TZ: "Asia/Aqtau"
-  PGHOST: "10.40.240.189"
+  PGHOST: "postgres"
   PGPORT: "5432"
   PGUSER: "postgres"
   PGPASSWORD: "postgres"
   PGRWL_DIRECTORY: "/wals"
   PGRWL_SLOT: "pg_recwal_5"
   PGRWL_LOG_LEVEL: "trace"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgrwl-data
+  namespace: pgrwl-test
+spec:
+  # NOTE: replace with pvc you're using in your infra.
+  storageClassName: csi-rbd-sc-rc2-delete
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
 
 ---
 apiVersion: apps/v1
@@ -58,11 +74,27 @@ spec:
       labels:
         app: *app
     spec:
-      # for example purpose.
-      # replace with pvc you're using in your infra.
+      # NOTE: replace with pvc you're using in your infra.
       volumes:
         - name: storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: pgrwl-data
+            readOnly: false
+
+      initContainers:
+        - name: wait-db
+          image: "busybox:latest"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -euc
+            - |
+              while ! nc -z postgres 5432; do
+                echo "Waiting for PostgreSQL to boot";
+                sleep 5;
+              done;
+              echo "PostgreSQL is ready";
+
       containers:
         - name: *app
           image: "mailboxsq7/pgrwl:latest"
