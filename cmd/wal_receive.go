@@ -159,7 +159,7 @@ func runWalReceiver() {
 			}
 		}()
 
-		if err := runHTTPServer(ctx, httpsrv.InitHTTPHandlersStreaming(pgrw)); err != nil {
+		if err := runHTTPServer(ctx, rootOpts.HTTPServerAddr, httpsrv.InitHTTPHandlersStreaming(pgrw)); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 		}
 	}()

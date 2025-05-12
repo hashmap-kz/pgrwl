@@ -37,11 +37,7 @@ func runWalRestore(walFileName, walFilePath string) error {
 		slog.String("p", walFilePath),
 	)
 
-	addr, err := addr(rootOpts.HTTPServerAddr)
-	if err != nil {
-		return err
-	}
-	baseURL := fmt.Sprintf("%s/wal/%s", addr, walFileName)
+	baseURL := fmt.Sprintf("http://%s/wal/%s", rootOpts.HTTPServerAddr, walFileName)
 
 	req, err := http.NewRequest("GET", baseURL, nil)
 	if err != nil {

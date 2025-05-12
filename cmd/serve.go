@@ -65,7 +65,7 @@ func runHTTPSrv() {
 			}
 		}()
 
-		if err := runHTTPServer(ctx, httpsrv.InitHTTPHandlersStandalone(serveOpts.Directory)); err != nil {
+		if err := runHTTPServer(ctx, rootOpts.HTTPServerAddr, httpsrv.InitHTTPHandlersStandalone(serveOpts.Directory)); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 			cancel()
 		}
