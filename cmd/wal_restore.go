@@ -10,21 +10,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var walRestoreOpts struct {
-	HTTPServerAddr  string
-	HTTPServerToken string
-}
-
 func init() {
 	rootCmd.AddCommand(walRestoreCmd)
-	walRestoreCmd.Flags().StringVar(&walRestoreOpts.HTTPServerAddr, "http-server-addr", "", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
-	walRestoreCmd.Flags().StringVar(&walRestoreOpts.HTTPServerToken, "http-server-token", "", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
 }
 
 // restore_command = 'pgrwl wal-restore %f %p'
 var walRestoreCmd = &cobra.Command{
 	Use:   "wal-restore",
-	Short: "Download a WAL file from the running receiver",
+	Short: "Download a WAL file from the server",
 	Long: `
 Implements PostgreSQL restore_command, example usage in postgresql.conf:
 restore_command = 'pgrwl wal-restore %f %p'
@@ -32,10 +25,6 @@ restore_command = 'pgrwl wal-restore %f %p'
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		f := cmd.Flags()
-		applyStringFallback(f, "http-server-addr", &walRestoreOpts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
-		applyStringFallback(f, "http-server-token", &walRestoreOpts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
-
 		walFileName := args[0]
 		walFilePath := args[1]
 		return runWalRestore(walFileName, walFilePath)
@@ -44,12 +33,11 @@ restore_command = 'pgrwl wal-restore %f %p'
 
 func runWalRestore(walFileName, walFilePath string) error {
 	slog.Debug("wal-restore",
-		slog.Any("opts", walRestoreOpts),
 		slog.String("f", walFileName),
 		slog.String("p", walFilePath),
 	)
 
-	addr, err := addr(walRestoreOpts.HTTPServerAddr)
+	addr, err := addr(rootOpts.HTTPServerAddr)
 	if err != nil {
 		return err
 	}
@@ -59,8 +47,8 @@ func runWalRestore(walFileName, walFilePath string) error {
 	if err != nil {
 		return err
 	}
-	if walRestoreOpts.HTTPServerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+walRestoreOpts.HTTPServerToken)
+	if rootOpts.HTTPServerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+rootOpts.HTTPServerToken)
 	}
 
 	client := http.Client{}

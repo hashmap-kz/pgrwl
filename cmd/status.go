@@ -25,9 +25,6 @@ var statusCmd = &cobra.Command{
 		// Set auth header
 		req.Header.Set("Authorization", "Bearer "+os.Getenv("PGRWL_HTTP_SERVER_TOKEN"))
 
-		// Optional: Set content type or other headers
-		// req.Header.Set("Accept", "application/json")
-
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {

@@ -12,4 +12,4 @@ export PGRWL_HTTP_SERVER_TOKEN=1024
 
 # PGHOST=localhost;PGPASSWORD=postgres;PGPORT=5432;PGUSER=postgres;PGRWL_HTTP_SERVER_ADDR=:5080;PGRWL_HTTP_SERVER_TOKEN=1024;PGRWL_LOG_LEVEL=trace;
 
-go run ../main.go receive -D wals -S pg_recwal_5
+go run ../main.go wal-receive -D wals -S pg_recwal_5

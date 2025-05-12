@@ -17,29 +17,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var receiveOpts struct {
-	Directory       string
-	Slot            string
-	NoLoop          bool
-	HTTPServerAddr  string
-	HTTPServerToken string
+var walReceiveOpts struct {
+	Directory string
+	Slot      string
+	NoLoop    bool
 }
 
 func init() {
-	rootCmd.AddCommand(receiveCmd)
+	rootCmd.AddCommand(walReceiveCmd)
 
 	// Primary flags with env fallbacks
-	receiveCmd.Flags().StringVarP(&receiveOpts.Directory, "directory", "D", "", "Target directory (ENV: PGRWL_DIRECTORY)")
-	receiveCmd.Flags().StringVarP(&receiveOpts.Slot, "slot", "S", "", "Replication slot (ENV: PGRWL_SLOT)")
-	receiveCmd.Flags().BoolVarP(&receiveOpts.NoLoop, "no-loop", "n", false, "Do not reconnect (ENV: PGRWL_NO_LOOP)")
-
-	// Optional HTTP server
-	receiveCmd.Flags().StringVar(&receiveOpts.HTTPServerAddr, "http-server-addr", "", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
-	receiveCmd.Flags().StringVar(&receiveOpts.HTTPServerToken, "http-server-token", "", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
+	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Directory, "directory", "D", "", "Target directory (ENV: PGRWL_DIRECTORY)")
+	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Slot, "slot", "S", "", "Replication slot (ENV: PGRWL_SLOT)")
+	walReceiveCmd.Flags().BoolVarP(&walReceiveOpts.NoLoop, "no-loop", "n", false, "Do not reconnect (ENV: PGRWL_NO_LOOP)")
 }
 
-var receiveCmd = &cobra.Command{
-	Use:   "receive",
+var walReceiveCmd = &cobra.Command{
+	Use:   "wal-receive",
 	Short: "Start the WAL receiver",
 	Long: ` 
 Example:
@@ -49,18 +43,15 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		f := cmd.Flags()
 
-		applyStringFallback(f, "directory", &receiveOpts.Directory, "PGRWL_DIRECTORY")
-		applyStringFallback(f, "slot", &receiveOpts.Slot, "PGRWL_SLOT")
-		applyBoolFallback(f, "no-loop", &receiveOpts.NoLoop, "PGRWL_NO_LOOP")
-
-		applyStringFallback(f, "http-server-addr", &receiveOpts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
-		applyStringFallback(f, "http-server-token", &receiveOpts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
+		applyStringFallback(f, "directory", &walReceiveOpts.Directory, "PGRWL_DIRECTORY")
+		applyStringFallback(f, "slot", &walReceiveOpts.Slot, "PGRWL_SLOT")
+		applyBoolFallback(f, "no-loop", &walReceiveOpts.NoLoop, "PGRWL_NO_LOOP")
 
 		// Validate required options
-		if receiveOpts.Directory == "" {
+		if walReceiveOpts.Directory == "" {
 			return fmt.Errorf("missing required flag: --directory or $PGRWL_DIRECTORY")
 		}
-		if receiveOpts.Slot == "" {
+		if walReceiveOpts.Slot == "" {
 			return fmt.Errorf("missing required flag: --slot or $PGRWL_SLOT")
 		}
 
@@ -78,9 +69,9 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 
 func runWalReceiver() error {
 	opts := &xlog.Opts{
-		Directory: receiveOpts.Directory,
-		Slot:      receiveOpts.Slot,
-		NoLoop:    receiveOpts.NoLoop,
+		Directory: walReceiveOpts.Directory,
+		Slot:      walReceiveOpts.Slot,
+		NoLoop:    walReceiveOpts.NoLoop,
 	}
 
 	// setup context
@@ -100,9 +91,9 @@ func runWalReceiver() error {
 
 	// optionally run HTTP server for managing purpose
 	var srv *httpsrv.HTTPServer
-	if receiveOpts.HTTPServerAddr != "" {
-		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", receiveOpts.HTTPServerToken)
-		srv = httpsrv.NewHTTPServer(ctx, receiveOpts.HTTPServerAddr, pgrw)
+	if rootOpts.HTTPServerAddr != "" {
+		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", rootOpts.HTTPServerToken)
+		srv = httpsrv.NewHTTPServer(ctx, rootOpts.HTTPServerAddr, pgrw)
 		httpsrv.Start(ctx, srv)
 	}
 
