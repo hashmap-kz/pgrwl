@@ -39,8 +39,12 @@ func init() {
 }
 
 var receiveCmd = &cobra.Command{
-	Use:          "receive",
-	Short:        "Start the WAL receiver",
+	Use:   "receive",
+	Short: "Start the WAL receiver",
+	Long: ` 
+Example:
+pgrwl -D /mnt/wal-archive -S bookstore_app 
+`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		f := cmd.Flags()

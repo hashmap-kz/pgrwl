@@ -17,10 +17,6 @@ var rootCmd = &cobra.Command{
 	Use:          "pgrwl",
 	Short:        "Stream and manage write-ahead logs from a PostgreSQL server",
 	SilenceUsage: false,
-	Run: func(cmd *cobra.Command, _ []string) {
-		//nolint:errcheck
-		_ = cmd.Help() // print help if no subcommand
-	},
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		f := cmd.Flags()
 
