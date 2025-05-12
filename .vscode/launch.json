@@ -9,12 +9,15 @@
       "program": "${workspaceFolder}/main.go",
       "buildFlags": "-tags=debug",
       "args": [
-        "-D",
-        "wals",
-        "-S",
-        "pg_recwal_5",
+        "wal-restore",
+        "--http-server-addr",
+        ":8080",
+        "--http-server-token",
+        "1024",
         "--log-level",
-        "info"
+        "debug",
+        "0000000100000005000000F6",
+        "."
       ],
       "env": {
         "PGHOST": "localhost",

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 )
@@ -27,11 +28,19 @@ var getWalCmd = &cobra.Command{
 Implements PostgreSQL restore_command, example usage in postgresql.conf:
 restore_command = 'pgrwl wal-restore %f %p'
 `,
-	Args: cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		walFileName := args[0]
 		walFilePath := args[1]
-		url := fmt.Sprintf("http://localhost:5080/wal/%s", walFileName)
+
+		slog.Debug("wal-restore",
+			slog.Any("opts", getWalOpts),
+			slog.String("f", walFileName),
+			slog.String("p", walFilePath),
+		)
+
+		url := fmt.Sprintf("http://%s/wal/%s", getWalOpts.HTTPServerAddr, walFileName)
 
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
