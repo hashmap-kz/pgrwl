@@ -2,18 +2,18 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ Example:
 pgrwl -D /mnt/wal-archive -S bookstore_app 
 `,
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, _ []string) error {
+	Run: func(cmd *cobra.Command, _ []string) {
 		f := cmd.Flags()
 
 		applyStringFallback(f, "directory", &walReceiveOpts.Directory, "PGRWL_DIRECTORY")
@@ -49,16 +49,16 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 
 		// Validate required options
 		if walReceiveOpts.Directory == "" {
-			return fmt.Errorf("missing required flag: --directory or $PGRWL_DIRECTORY")
+			log.Fatal("missing required flag: --directory or $PGRWL_DIRECTORY")
 		}
 		if walReceiveOpts.Slot == "" {
-			return fmt.Errorf("missing required flag: --slot or $PGRWL_SLOT")
+			log.Fatal("missing required flag: --slot or $PGRWL_SLOT")
 		}
 		if rootOpts.HTTPServerAddr == "" {
-			return fmt.Errorf("missing required flag: --http-server-addr or $PGRWL_HTTP_SERVER_ADDR")
+			log.Fatal("missing required flag: --http-server-addr or $PGRWL_HTTP_SERVER_ADDR")
 		}
 		if rootOpts.HTTPServerToken == "" {
-			return fmt.Errorf("missing required flag: --http-server-token or $PGRWL_HTTP_SERVER_TOKEN")
+			log.Fatal("missing required flag: --http-server-token or $PGRWL_HTTP_SERVER_TOKEN")
 		}
 
 		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", rootOpts.HTTPServerToken)
@@ -71,15 +71,45 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 			}
 		}
 		if len(emptyEnvs) > 0 {
-			return fmt.Errorf("required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
+			log.Fatalf("required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
 		}
 
 		// Run the actual service (streaming + HTTP)
-		return runWalReceiver()
+		runWalReceiver()
 	},
 }
 
-func runWalReceiver() error {
+func runStreamingLoop(ctx context.Context, pgrw *xlog.PgReceiveWal, opts *xlog.Opts) error {
+	for {
+		err := pgrw.StreamLog(ctx)
+		if err != nil {
+			slog.Error("StreamLog() returned error", slog.Any("err", err))
+
+			if ctx.Err() != nil {
+				slog.Info("context canceled, exiting streaming loop")
+				return ctx.Err()
+			}
+
+			if opts.NoLoop {
+				slog.Info("not retrying due to --no-loop")
+				return nil
+			}
+
+			slog.Info("retrying in 5 seconds...")
+			select {
+			case <-time.After(5 * time.Second):
+			case <-ctx.Done():
+				slog.Info("shutdown during retry wait")
+				return nil
+			}
+		} else {
+			slog.Info("streaming finished without error")
+			return nil
+		}
+	}
+}
+
+func runWalReceiver() {
 	opts := &xlog.Opts{
 		Directory: walReceiveOpts.Directory,
 		Slot:      walReceiveOpts.Slot,
@@ -87,8 +117,9 @@ func runWalReceiver() error {
 	}
 
 	// setup context
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer signalCancel()
 
 	// print options
 	slog.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
@@ -100,37 +131,34 @@ func runWalReceiver() error {
 		log.Fatal(err)
 	}
 
-	// run HTTP server for managing purpose
-	srv := httpsrv.NewHTTPServer(ctx, rootOpts.HTTPServerAddr, pgrw)
-	httpsrv.Start(ctx, srv)
+	// Use WaitGroup to wait for all goroutines to finish
+	var wg sync.WaitGroup
 
-	// enter main streaming loop
-	for {
-		err := pgrw.StreamLog(ctx)
-		if err != nil {
-			slog.Error("an error occurred in StreamLog(), exiting",
-				slog.Any("err", err),
-			)
-			httpsrv.Shutdown(ctx, srv)
-			os.Exit(1)
+	// main streaming loop
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := runStreamingLoop(ctx, pgrw, opts); err != nil {
+			slog.Error("streaming failed", slog.Any("err", err))
+			cancel() // cancel everything on error
 		}
+	}()
 
-		select {
-		case <-ctx.Done():
-			slog.Info("(main) received termination signal, exiting...")
-			httpsrv.Shutdown(ctx, srv)
-			os.Exit(0)
-		default:
+	// HTTP server
+	// It shouldn't cancel() the main streaming loop even on error.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := runHTTPServer(ctx, httpsrv.InitHTTPHandlersStreaming(pgrw)); err != nil {
+			slog.Error("http server failed", slog.Any("err", err))
 		}
+	}()
 
-		if opts.NoLoop {
-			slog.Error("disconnected")
-			httpsrv.Shutdown(ctx, srv)
-			os.Exit(1)
-		}
+	// Wait for signal (context cancellation)
+	<-ctx.Done()
+	slog.Info("shutting down, waiting for goroutines...")
 
-		pgrw.SetStream(nil)
-		slog.Info("disconnected; waiting 5 seconds to try again")
-		time.Sleep(5 * time.Second)
-	}
+	// Wait for all goroutines to finish
+	wg.Wait()
+	slog.Info("all components shut down cleanly")
 }

@@ -1,13 +1,20 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 )
+
+// CLI
 
 func applyStringFallback(f *pflag.FlagSet, name string, target *string, envKey string) {
 	if !f.Changed(name) {
@@ -38,6 +45,8 @@ func parseBool(s string) (bool, error) {
 	}
 }
 
+// HTTP
+
 func addr(from string) (string, error) {
 	host, port, err := net.SplitHostPort(from)
 	if err != nil {
@@ -47,4 +56,33 @@ func addr(from string) (string, error) {
 		host = "127.0.0.1"
 	}
 	return fmt.Sprintf("http://%s:%s", host, port), nil
+}
+
+func runHTTPServer(ctx context.Context, router http.Handler) error {
+	srv := &http.Server{
+		// TODO: cfg
+		Addr:              ":5080",
+		Handler:           router,
+		ReadTimeout:       5 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+	}
+
+	go func() {
+		<-ctx.Done()
+		// Context was cancelled, shut down the HTTP server gracefully
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			slog.Error("HTTP server shutdown error", slog.Any("err", err))
+		}
+	}()
+
+	// Start the server (blocking)
+	err := srv.ListenAndServe()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err // real error
+	}
+	return nil
 }

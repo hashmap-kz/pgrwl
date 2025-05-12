@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"log"
+	"log/slog"
 	"os/signal"
+	"sync"
 	"syscall"
-	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 
@@ -28,35 +28,44 @@ var serveCmd = &cobra.Command{
 	Use:          "serve",
 	Short:        "Start HTTP server (for restore ops)",
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, _ []string) error {
+	Run: func(cmd *cobra.Command, _ []string) {
 		f := cmd.Flags()
 
 		applyStringFallback(f, "directory", &serveOpts.Directory, "PGRWL_DIRECTORY")
 
 		// Validate required options
 		if serveOpts.Directory == "" {
-			return fmt.Errorf("missing required flag: --directory or $PGRWL_DIRECTORY")
+			log.Fatal("missing required flag: --directory or $PGRWL_DIRECTORY")
 		}
 
-		return runHTTPSrv()
+		runHTTPSrv()
 	},
 }
 
-func runHTTPSrv() error {
+func runHTTPSrv() {
 	// setup context
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer signalCancel()
 
-	// run HTTP server for managing purpose
-	srv := httpsrv.NewHTTPServer(ctx, rootOpts.HTTPServerAddr, nil)
-	httpsrv.Start(ctx, srv)
+	// Use WaitGroup to wait for all goroutines to finish
+	var wg sync.WaitGroup
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	ctx, shutdown := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdown()
-	httpsrv.Shutdown(ctx, srv)
+	// HTTP server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := runHTTPServer(ctx, httpsrv.InitHTTPHandlersStandalone()); err != nil {
+			slog.Error("http server failed", slog.Any("err", err))
+			cancel()
+		}
+	}()
 
-	return nil
+	// Wait for signal (context cancellation)
+	<-ctx.Done()
+	slog.Info("shutting down, waiting for goroutines...")
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+	slog.Info("all components shut down cleanly")
 }
