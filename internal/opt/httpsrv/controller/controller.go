@@ -3,7 +3,6 @@ package controller
 import (
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
@@ -44,10 +43,9 @@ func (c *ControlController) RetentionHandler(w http.ResponseWriter, _ *http.Requ
 }
 
 func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: path-params
-	filename := strings.TrimPrefix(r.URL.Path, "/wal/")
-	if filename == "" || strings.Contains(filename, "/") {
-		http.Error(w, "invalid filename", http.StatusBadRequest)
+	filename, err := optutils.PathValueString(r, "filename")
+	if err != nil {
+		http.Error(w, "expect filename path-param", http.StatusBadRequest)
 		return
 	}
 

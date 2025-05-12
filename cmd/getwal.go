@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 
@@ -38,42 +39,52 @@ restore_command = 'pgrwl wal-restore %f %p'
 
 		walFileName := args[0]
 		walFilePath := args[1]
-
-		slog.Debug("wal-restore",
-			slog.Any("opts", walRestoreOpts),
-			slog.String("f", walFileName),
-			slog.String("p", walFilePath),
-		)
-
-		url := fmt.Sprintf("http://localhost:8080/wal/%s", walFileName)
-
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return err
-		}
-		if walRestoreOpts.HTTPServerToken != "" {
-			req.Header.Set("Authorization", "Bearer "+walRestoreOpts.HTTPServerToken)
-		}
-
-		client := http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("server error: %s", resp.Status)
-		}
-
-		// Save to file
-		fileDst, err := os.OpenFile(walFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0o666)
-		if err != nil {
-			return err
-		}
-		defer fileDst.Close()
-
-		_, err = io.Copy(fileDst, resp.Body)
-		return err
+		return runWalRestore(walFileName, walFilePath)
 	},
+}
+
+func runWalRestore(walFileName, walFilePath string) error {
+	slog.Debug("wal-restore",
+		slog.Any("opts", walRestoreOpts),
+		slog.String("f", walFileName),
+		slog.String("p", walFilePath),
+	)
+
+	host, port, err := net.SplitHostPort(walRestoreOpts.HTTPServerAddr)
+	if err != nil {
+		return err
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	baseURL := fmt.Sprintf("http://%s:%s/wal/%s", host, port, walFileName)
+
+	req, err := http.NewRequest("GET", baseURL, nil)
+	if err != nil {
+		return err
+	}
+	if walRestoreOpts.HTTPServerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+walRestoreOpts.HTTPServerToken)
+	}
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server error: %s", resp.Status)
+	}
+
+	// Save to file
+	fileDst, err := os.OpenFile(walFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0o666)
+	if err != nil {
+		return err
+	}
+	defer fileDst.Close()
+
+	_, err = io.Copy(fileDst, resp.Body)
+	return err
 }
