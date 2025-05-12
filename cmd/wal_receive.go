@@ -18,9 +18,11 @@ import (
 )
 
 var walReceiveOpts struct {
-	Directory string
-	Slot      string
-	NoLoop    bool
+	Directory       string
+	Slot            string
+	NoLoop          bool
+	HTTPServerAddr  string
+	HTTPServerToken string
 }
 
 func init() {
@@ -30,6 +32,9 @@ func init() {
 	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Directory, "directory", "D", "", "Target directory (ENV: PGRWL_DIRECTORY)")
 	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Slot, "slot", "S", "", "Replication slot (ENV: PGRWL_SLOT)")
 	walReceiveCmd.Flags().BoolVarP(&walReceiveOpts.NoLoop, "no-loop", "n", false, "Do not reconnect (ENV: PGRWL_NO_LOOP)")
+
+	walReceiveCmd.Flags().StringVar(&walReceiveOpts.HTTPServerAddr, "http-server-addr", ":5080", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
+	walReceiveCmd.Flags().StringVar(&walReceiveOpts.HTTPServerToken, "http-server-token", "pgrwladmin", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
 }
 
 var walReceiveCmd = &cobra.Command{
@@ -54,14 +59,17 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 		if walReceiveOpts.Slot == "" {
 			log.Fatal("missing required flag: --slot or $PGRWL_SLOT")
 		}
-		if rootOpts.HTTPServerAddr == "" {
+
+		// Check HTTP server args
+		applyStringFallback(f, "http-server-addr", &walReceiveOpts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
+		applyStringFallback(f, "http-server-token", &walReceiveOpts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
+		if walReceiveOpts.HTTPServerAddr == "" {
 			log.Fatal("missing required flag: --http-server-addr or $PGRWL_HTTP_SERVER_ADDR")
 		}
-		if rootOpts.HTTPServerToken == "" {
+		if walReceiveOpts.HTTPServerToken == "" {
 			log.Fatal("missing required flag: --http-server-token or $PGRWL_HTTP_SERVER_TOKEN")
 		}
-
-		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", rootOpts.HTTPServerToken)
+		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", walReceiveOpts.HTTPServerToken)
 
 		// Validate required PG env vars
 		var emptyEnvs []string
@@ -159,7 +167,7 @@ func runWalReceiver() {
 			}
 		}()
 
-		if err := runHTTPServer(ctx, rootOpts.HTTPServerAddr, httpsrv.InitHTTPHandlersStreaming(pgrw)); err != nil {
+		if err := runHTTPServer(ctx, walReceiveOpts.HTTPServerAddr, httpsrv.InitHTTPHandlersStreaming(pgrw)); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 		}
 	}()

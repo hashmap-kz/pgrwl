@@ -12,6 +12,14 @@ import (
 
 func init() {
 	rootCmd.AddCommand(walRestoreCmd)
+
+	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Addr, "addr", "localhost:5080", "HTTP server addr")
+	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Token, "token", "pgrwladmin", "HTTP server token")
+}
+
+var walRestoreOpts struct {
+	Addr  string
+	Token string
 }
 
 // restore_command = 'pgrwl wal-restore %f %p'
@@ -20,7 +28,7 @@ var walRestoreCmd = &cobra.Command{
 	Short: "Download a WAL file from the server",
 	Long: `
 Implements PostgreSQL restore_command, example usage in postgresql.conf:
-restore_command = 'pgrwl wal-restore %f %p'
+restore_command = 'pgrwl wal-restore --addr=localhost:5080 --token=${SECRET_PASS} %f %p'
 `,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
@@ -37,7 +45,7 @@ func runWalRestore(walFileName, walFilePath string) error {
 		slog.String("p", walFilePath),
 	)
 
-	addr, err := addr(rootOpts.HTTPServerAddr)
+	addr, err := addr(walRestoreOpts.Addr)
 	if err != nil {
 		return err
 	}
@@ -47,8 +55,8 @@ func runWalRestore(walFileName, walFilePath string) error {
 	if err != nil {
 		return err
 	}
-	if rootOpts.HTTPServerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+rootOpts.HTTPServerToken)
+	if walRestoreOpts.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+walRestoreOpts.Token)
 	}
 
 	client := http.Client{}
