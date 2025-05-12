@@ -1,0 +1,85 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pgrwl-test
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: &app pgrwl
+  namespace: pgrwl-test
+  labels:
+    app: *app
+spec:
+  type: NodePort
+  ports:
+    - port: 5080
+      targetPort: 5080
+      # dev/tst/preprod/master
+      nodePort: 30265
+      name: http
+  selector:
+    app: *app
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: &app pgrwl
+  namespace: pgrwl-test
+  labels:
+    app: *app
+data:
+  TZ: "Asia/Aqtau"
+  PGHOST: "10.40.240.189"
+  PGPORT: "5432"
+  PGUSER: "postgres"
+  PGPASSWORD: "postgres"
+  PGRWL_DIRECTORY: "/wals"
+  PGRWL_SLOT: "pg_recwal_5"
+  PGRWL_LOG_LEVEL: "trace"
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: &app pgrwl
+  namespace: pgrwl-test
+spec:
+  replicas: 1
+  serviceName: *app
+  selector:
+    matchLabels:
+      app: *app
+  template:
+    metadata:
+      labels:
+        app: *app
+    spec:
+      # for example purpose.
+      # replace with pvc you're using in your infra.
+      volumes:
+        - name: storage
+          emptyDir: {}
+      containers:
+        - name: *app
+          image: "mailboxsq7/pgrwl:latest"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: *app
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "32m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          volumeMounts:
+            - mountPath: /wals
+              name: storage
