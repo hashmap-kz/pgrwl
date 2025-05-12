@@ -9,10 +9,10 @@ name: "pgrwl"
 nodes:
   - role: control-plane
     extraPortMappings:
-      - containerPort: 5432
+      - containerPort: 30265
         hostPort: 30265
         protocol: TCP
-      - containerPort: 5080
+      - containerPort: 30266
         hostPort: 30266
         protocol: TCP
 EOF
