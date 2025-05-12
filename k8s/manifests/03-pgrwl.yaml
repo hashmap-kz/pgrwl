@@ -34,6 +34,7 @@ data:
   PGRWL_DIRECTORY: "/wals/wal-archive"
   PGRWL_SLOT: "pg_recwal_5"
   PGRWL_LOG_LEVEL: "info"
+  PGRWL_LOG_FORMAT: "json"
 
 ---
 apiVersion: v1
