@@ -88,32 +88,30 @@ pgrwl -D /mnt/wal-archive -S bookstore_app
 }
 
 func runStreamingLoop(ctx context.Context, pgrw *xlog.PgReceiveWal, opts *xlog.Opts) error {
+	// enter main streaming loop
 	for {
 		err := pgrw.StreamLog(ctx)
 		if err != nil {
-			slog.Error("StreamLog() returned error", slog.Any("err", err))
-
-			if ctx.Err() != nil {
-				slog.Info("context canceled, exiting streaming loop")
-				return ctx.Err()
-			}
-
-			if opts.NoLoop {
-				slog.Info("not retrying due to --no-loop")
-				return nil
-			}
-
-			slog.Info("retrying in 5 seconds...")
-			select {
-			case <-time.After(5 * time.Second):
-			case <-ctx.Done():
-				slog.Info("shutdown during retry wait")
-				return nil
-			}
-		} else {
-			slog.Info("streaming finished without error")
-			return nil
+			slog.Error("an error occurred in StreamLog(), exiting",
+				slog.Any("err", err),
+			)
+			os.Exit(1)
 		}
+
+		select {
+		case <-ctx.Done():
+			slog.Info("(main) received termination signal, exiting...")
+			os.Exit(0)
+		default:
+		}
+
+		if opts.NoLoop {
+			slog.Error("disconnected")
+			os.Exit(1)
+		}
+
+		slog.Info("disconnected; waiting 5 seconds to try again")
+		time.Sleep(5 * time.Second)
 	}
 }
 
