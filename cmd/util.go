@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -35,4 +36,15 @@ func parseBool(s string) (bool, error) {
 	default:
 		return false, fmt.Errorf("invalid bool: %q", s)
 	}
+}
+
+func addr(from string) (string, error) {
+	host, port, err := net.SplitHostPort(from)
+	if err != nil {
+		return "", err
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return fmt.Sprintf("http://%s:%s", host, port), nil
 }

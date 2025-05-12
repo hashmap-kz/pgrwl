@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 
@@ -50,14 +49,11 @@ func runWalRestore(walFileName, walFilePath string) error {
 		slog.String("p", walFilePath),
 	)
 
-	host, port, err := net.SplitHostPort(walRestoreOpts.HTTPServerAddr)
+	addr, err := addr(walRestoreOpts.HTTPServerAddr)
 	if err != nil {
 		return err
 	}
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	baseURL := fmt.Sprintf("http://%s:%s/wal/%s", host, port, walFileName)
+	baseURL := fmt.Sprintf("%s/wal/%s", addr, walFileName)
 
 	req, err := http.NewRequest("GET", baseURL, nil)
 	if err != nil {
