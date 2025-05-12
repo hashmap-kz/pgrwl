@@ -67,6 +67,7 @@ spec:
         - name: *app
           image: "mailboxsq7/pgrwl:latest"
           imagePullPolicy: Always
+          args: ["wal-receive"]
           ports:
             - containerPort: 5080
               name: http
