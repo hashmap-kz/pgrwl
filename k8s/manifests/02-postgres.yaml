@@ -82,7 +82,7 @@ spec:
       port: 5432
       protocol: TCP
       # dev/tst/preprod/master
-      nodePort: 30266
+      nodePort: 30265
   selector:
     app: *app
 
@@ -94,7 +94,7 @@ metadata:
   namespace: pgrwl-test
 spec:
   # NOTE: replace with pvc you're using in your infra.
-  storageClassName: csi-rbd-sc-rc2-delete
+  storageClassName: standard
   volumeMode: Filesystem
   accessModes:
     - ReadWriteOnce
