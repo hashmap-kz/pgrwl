@@ -40,7 +40,7 @@ restore_command = 'pgrwl wal-restore %f %p'
 			slog.String("p", walFilePath),
 		)
 
-		url := fmt.Sprintf("http://%s/wal/%s", getWalOpts.HTTPServerAddr, walFileName)
+		url := fmt.Sprintf("http://localhost:8080/wal/%s", walFileName)
 
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
