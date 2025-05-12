@@ -16,3 +16,7 @@ bash 01-deploy.sh
 ```
 
 ### Verification:
+
+```
+curl --location 'http://localhost:30266/status' --header 'Authorization: Bearer pgrwladmin'
+```

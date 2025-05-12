@@ -45,3 +45,8 @@ test-cov:
 .PHONY: test-integ-scripts
 test-integ-scripts:
 	@currdir=$$(pwd) && cd test/integration/environ && bash run-tests.sh | tee $$currdir/test-integ-scripts.log
+
+.PHONY: image
+image:
+	docker buildx build -t mailboxsq7/pgrwl .
+	docker push mailboxsq7/pgrwl

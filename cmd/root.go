@@ -56,7 +56,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&rootOpts.LogLevel, "log-level", "", "Log level (ENV: PGRWL_LOG_LEVEL)")
 	rootCmd.PersistentFlags().StringVar(&rootOpts.LogFormat, "log-format", "", "Log format (ENV: PGRWL_LOG_FORMAT)")
 	rootCmd.PersistentFlags().BoolVar(&rootOpts.LogAddSource, "log-add-source", false, "Include source info in logs (ENV: PGRWL_LOG_ADD_SOURCE)")
-	rootCmd.PersistentFlags().StringVar(&rootOpts.HTTPServerAddr, "http-server-addr", "127.0.0.1:5080", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
+	rootCmd.PersistentFlags().StringVar(&rootOpts.HTTPServerAddr, "http-server-addr", ":5080", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
 	rootCmd.PersistentFlags().StringVar(&rootOpts.HTTPServerToken, "http-server-token", "pgrwladmin", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
 }
 

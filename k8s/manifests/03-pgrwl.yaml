@@ -31,9 +31,9 @@ data:
   PGPORT: "5432"
   PGUSER: "postgres"
   PGPASSWORD: "postgres"
-  PGRWL_DIRECTORY: "/wals"
+  PGRWL_DIRECTORY: "/wals/wal-archive"
   PGRWL_SLOT: "pg_recwal_5"
-  PGRWL_LOG_LEVEL: "trace"
+  PGRWL_LOG_LEVEL: "info"
 
 ---
 apiVersion: v1
