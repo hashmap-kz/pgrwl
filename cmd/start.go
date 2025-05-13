@@ -185,10 +185,11 @@ func runWalReceiver() {
 			}
 		}()
 
-		if err := runHTTPServer(ctx, walReceiveOpts.ListenPort, httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
+		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
 			PGRW:    pgrw,
 			BaseDir: opts.Directory,
-		})); err != nil {
+		})
+		if err := runHTTPServer(ctx, walReceiveOpts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 		}
 	}()
@@ -227,9 +228,10 @@ func runHTTPSrv() {
 			}
 		}()
 
-		if err := runHTTPServer(ctx, walReceiveOpts.ListenPort, httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
+		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
 			BaseDir: walReceiveOpts.Directory,
-		})); err != nil {
+		})
+		if err := runHTTPServer(ctx, walReceiveOpts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 			cancel()
 		}
