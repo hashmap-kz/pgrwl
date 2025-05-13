@@ -12,10 +12,16 @@ const (
 	LevelFatal = slog.LevelError + 4
 )
 
-func Init() {
-	logLevel := os.Getenv("LOG_LEVEL")
-	logFormat := os.Getenv("LOG_FORMAT")
-	logAddSource := os.Getenv("LOG_ADD_SOURCE") != ""
+type Opts struct {
+	Level     string
+	Format    string
+	AddSource bool
+}
+
+func Init(o *Opts) {
+	logLevel := o.Level
+	logFormat := o.Format
+	logAddSource := o.AddSource
 
 	// Get logger level (INFO if not set)
 	levels := map[string]slog.Level{
