@@ -26,8 +26,6 @@ type lockInfo struct {
 }
 
 type controlSvc struct {
-	// TODO: if we're in a 'restore' state -> this one is nil, so we need to hold all 'opts' parameters
-	// TODO: for query baseDir, etc...
 	pgrw    *xlog.PgReceiveWal // direct access to running state
 	baseDir string
 
