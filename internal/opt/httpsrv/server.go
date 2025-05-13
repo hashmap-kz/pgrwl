@@ -15,10 +15,15 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func InitHTTPHandlersStreaming(pgrw *xlog.PgReceiveWal) http.Handler {
+type HTTPHandlersDeps struct {
+	PGRW    *xlog.PgReceiveWal
+	BaseDir string
+}
+
+func InitHTTPHandlers(deps *HTTPHandlersDeps) http.Handler {
 	verbose := strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace")
 
-	service := controlSvc.NewControlService(pgrw, pgrw.BaseDir)
+	service := controlSvc.NewControlService(deps.PGRW, deps.BaseDir)
 	controller := controlCrt.NewController(service)
 
 	// init middlewares
@@ -26,7 +31,6 @@ func InitHTTPHandlersStreaming(pgrw *xlog.PgReceiveWal) http.Handler {
 		Logger:  slog.With("component", "http-server"),
 		Verbose: verbose,
 	}
-	tokenAuthMiddleware := middleware.AuthMiddleware{Token: os.Getenv("PGRWL_HTTP_SERVER_TOKEN")}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
 
 	// Build middleware chain
@@ -34,7 +38,6 @@ func InitHTTPHandlersStreaming(pgrw *xlog.PgReceiveWal) http.Handler {
 		middleware.SafeHandlerMiddleware,
 		loggingMiddleware.Middleware,
 		rateLimitMiddleware.Middleware,
-		tokenAuthMiddleware.Middleware,
 	)
 
 	// Init handlers
@@ -46,38 +49,6 @@ func InitHTTPHandlersStreaming(pgrw *xlog.PgReceiveWal) http.Handler {
 	// Streaming mode (requires that wal-streaming process is running)
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("POST /retention", secureChain(http.HandlerFunc(controller.RetentionHandler)))
-
-	return mux
-}
-
-func InitHTTPHandlersStandalone(baseDir string) http.Handler {
-	verbose := strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace")
-
-	// TODO: this should be a specific service
-	service := controlSvc.NewControlService(nil, baseDir)
-	controller := controlCrt.NewController(service)
-
-	// init middlewares
-	loggingMiddleware := middleware.LoggingMiddleware{
-		Logger:  slog.With("component", "http-server"),
-		Verbose: verbose,
-	}
-	tokenAuthMiddleware := middleware.AuthMiddleware{Token: os.Getenv("PGRWL_HTTP_SERVER_TOKEN")}
-	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
-
-	// Build middleware chain
-	secureChain := middleware.MiddlewareChain(
-		middleware.SafeHandlerMiddleware,
-		loggingMiddleware.Middleware,
-		rateLimitMiddleware.Middleware,
-		tokenAuthMiddleware.Middleware,
-	)
-
-	// Init handlers
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
 
 	// Standalone mode (i.e. just serving wal-archive during restore)
 	mux.Handle("/archive/size", secureChain(http.HandlerFunc(controller.ArchiveSizeHandler)))

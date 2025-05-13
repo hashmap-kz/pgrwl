@@ -82,6 +82,11 @@ func (s *controlSvc) unlock() {
 
 func (s *controlSvc) Status() *xlog.StreamStatus {
 	// read-only; doesn’t need to block
+	if s.pgrw == nil {
+		return &xlog.StreamStatus{
+			Running: false,
+		}
+	}
 	return s.pgrw.Status()
 }
 

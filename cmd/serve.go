@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"log/slog"
-	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -15,19 +14,14 @@ import (
 )
 
 var serveOpts struct {
-	Directory       string
-	HTTPServerAddr  string
-	HTTPServerToken string
+	Directory  string
+	ListenPort int
 }
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
-
-	// Primary flags with env fallbacks
 	serveCmd.Flags().StringVarP(&serveOpts.Directory, "directory", "D", "", "Target directory (ENV: PGRWL_DIRECTORY)")
-
-	serveCmd.Flags().StringVar(&serveOpts.HTTPServerAddr, "http-server-addr", ":5080", "Run HTTP server (ENV: PGRWL_HTTP_SERVER_ADDR)")
-	serveCmd.Flags().StringVar(&serveOpts.HTTPServerToken, "http-server-token", "pgrwladmin", "HTTP server token (ENV: PGRWL_HTTP_SERVER_TOKEN)")
+	serveCmd.Flags().IntVar(&serveOpts.ListenPort, "listen-port", 5080, "HTTP server port (ENV: PGRWL_LISTEN_PORT)")
 }
 
 var serveCmd = &cobra.Command{
@@ -45,15 +39,10 @@ var serveCmd = &cobra.Command{
 		}
 
 		// Check HTTP server args
-		applyStringFallback(f, "http-server-addr", &serveOpts.HTTPServerAddr, "PGRWL_HTTP_SERVER_ADDR")
-		applyStringFallback(f, "http-server-token", &serveOpts.HTTPServerToken, "PGRWL_HTTP_SERVER_TOKEN")
-		if serveOpts.HTTPServerAddr == "" {
-			log.Fatal("missing required flag: --http-server-addr or $PGRWL_HTTP_SERVER_ADDR")
+		applyIntFallback(f, "listen-port", &serveOpts.ListenPort, "PGRWL_LISTEN_PORT")
+		if serveOpts.ListenPort == 0 {
+			log.Fatal("missing required flag: --listen-port or $PGRWL_LISTEN_PORT")
 		}
-		if serveOpts.HTTPServerToken == "" {
-			log.Fatal("missing required flag: --http-server-token or $PGRWL_HTTP_SERVER_TOKEN")
-		}
-		_ = os.Setenv("PGRWL_HTTP_SERVER_TOKEN", serveOpts.HTTPServerToken)
 
 		runHTTPSrv()
 	},
@@ -82,7 +71,9 @@ func runHTTPSrv() {
 			}
 		}()
 
-		if err := runHTTPServer(ctx, serveOpts.HTTPServerAddr, httpsrv.InitHTTPHandlersStandalone(serveOpts.Directory)); err != nil {
+		if err := runHTTPServer(ctx, serveOpts.ListenPort, httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
+			BaseDir: serveOpts.Directory,
+		})); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 			cancel()
 		}

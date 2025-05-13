@@ -3,7 +3,6 @@ set -euo pipefail
 
 export PGRWL_LOG_LEVEL=trace
 
-#export PGRWL_HTTP_SERVER_ADDR=127.0.0.1:5080
-#export PGRWL_HTTP_SERVER_TOKEN=pgrwladmin
+#export PGRWL_LISTEN_PORT=5080
 
 go run ../main.go serve -D wals

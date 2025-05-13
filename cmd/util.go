@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,15 @@ func applyStringFallback(f *pflag.FlagSet, name string, target *string, envKey s
 	if !f.Changed(name) {
 		if val := os.Getenv(envKey); val != "" {
 			*target = val
+		}
+	}
+}
+
+func applyIntFallback(f *pflag.FlagSet, name string, target *int, envKey string) {
+	if !f.Changed(name) {
+		if val := os.Getenv(envKey); val != "" {
+			i, _ := strconv.Atoi(val)
+			*target = i
 		}
 	}
 }
@@ -58,9 +68,9 @@ func addr(from string) (string, error) {
 	return fmt.Sprintf("http://%s:%s", host, port), nil
 }
 
-func runHTTPServer(ctx context.Context, addr string, router http.Handler) error {
+func runHTTPServer(ctx context.Context, port int, router http.Handler) error {
 	srv := &http.Server{
-		Addr:              addr,
+		Addr:              fmt.Sprintf(":%d", port),
 		Handler:           router,
 		ReadTimeout:       5 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,

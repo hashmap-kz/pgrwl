@@ -12,9 +12,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(walRestoreCmd)
-
 	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Addr, "addr", "localhost:5080", "HTTP server addr")
-	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Token, "token", "pgrwladmin", "HTTP server token")
 }
 
 var walRestoreOpts struct {
