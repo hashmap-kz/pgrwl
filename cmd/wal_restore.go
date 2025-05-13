@@ -12,12 +12,11 @@ import (
 
 func init() {
 	rootCmd.AddCommand(walRestoreCmd)
-	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Addr, "addr", "127.0.0.1:5080", "HTTP server addr")
+	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Addr, "addr", "127.0.0.1:5080", "The address of 'pgrwl' running in a restore mode")
 }
 
 var walRestoreOpts struct {
-	Addr  string
-	Token string
+	Addr string
 }
 
 // restore_command = 'pgrwl wal-restore %f %p'
@@ -52,9 +51,6 @@ func runWalRestore(walFileName, walFilePath string) error {
 	req, err := http.NewRequest("GET", baseURL, nil)
 	if err != nil {
 		return err
-	}
-	if walRestoreOpts.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+walRestoreOpts.Token)
 	}
 
 	client := http.Client{}
