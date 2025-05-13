@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,7 +17,7 @@ type ControlService interface {
 	Status() *xlog.StreamStatus
 	RetainWALs() error
 	WALArchiveSize() (*model.WALArchiveSize, error)
-	GetWalFile(filename string) (io.ReadCloser, error)
+	GetWalFile(filename string) (*os.File, error)
 }
 type lockInfo struct {
 	task     string
@@ -34,7 +33,7 @@ type controlSvc struct {
 	info lockInfo   // metadata about the lock
 }
 
-func (s *controlSvc) GetWalFile(filename string) (io.ReadCloser, error) {
+func (s *controlSvc) GetWalFile(filename string) (*os.File, error) {
 	path := filepath.Join(s.baseDir, filename)
 	f, err := os.Open(path)
 	if err != nil {

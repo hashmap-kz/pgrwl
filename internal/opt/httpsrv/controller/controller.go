@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
@@ -49,19 +49,34 @@ func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	f, err := c.Service.GetWalFile(filename)
+	file, err := c.Service.GetWalFile(filename)
 	if err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
-	defer f.Close()
+	defer file.Close()
 
-	_, err = io.Copy(w, f)
-	if err != nil {
-		http.Error(w, "cannot read file", http.StatusInternalServerError)
+	// Get file info
+	stat, err := file.Stat()
+	if err != nil || stat.IsDir() {
+		http.Error(w, "file stat error", http.StatusBadRequest)
 		return
 	}
 
+	// Set headers
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+stat.Name()+"\"")
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
+
+	// Serve content (efficient zero-copy if possible)
+	http.ServeContent(w, r, stat.Name(), stat.ModTime(), file)
+
+	//_, err = io.Copy(w, file)
+	//if err != nil {
+	//	http.Error(w, "cannot read file", http.StatusInternalServerError)
+	//	return
+	//}
+	//
+	//w.Header().Set("Content-Type", "application/octet-stream")
+	//w.WriteHeader(http.StatusOK)
 }
