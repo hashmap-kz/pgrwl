@@ -12,7 +12,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(walRestoreCmd)
-	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Addr, "addr", "localhost:5080", "HTTP server addr")
+	walRestoreCmd.Flags().StringVar(&walRestoreOpts.Addr, "addr", "127.0.0.1:5080", "HTTP server addr")
 }
 
 var walRestoreOpts struct {
