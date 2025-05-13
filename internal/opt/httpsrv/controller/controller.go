@@ -70,13 +70,4 @@ func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *htt
 
 	// Serve content (efficient zero-copy if possible)
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), file)
-
-	//_, err = io.Copy(w, file)
-	//if err != nil {
-	//	http.Error(w, "cannot read file", http.StatusInternalServerError)
-	//	return
-	//}
-	//
-	//w.Header().Set("Content-Type", "application/octet-stream")
-	//w.WriteHeader(http.StatusOK)
 }
