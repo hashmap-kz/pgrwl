@@ -106,7 +106,7 @@ func (s *controlSvc) RetainWALs() error {
 func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
 	// read-only; doesn’t need to block
 
-	size, err := optutils.DirSize(s.pgrw.BaseDir, &optutils.DirSizeOpts{
+	size, err := optutils.DirSize(s.baseDir, &optutils.DirSizeOpts{
 		IgnoreErrPermission: true,
 		IgnoreErrNotExist:   true,
 	})
