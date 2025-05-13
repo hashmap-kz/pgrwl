@@ -58,6 +58,9 @@ func parseBool(s string) (bool, error) {
 // HTTP
 
 func addr(from string) (string, error) {
+	if strings.HasPrefix(from, "http://") || strings.HasPrefix(from, "https://") {
+		return from, nil
+	}
 	host, port, err := net.SplitHostPort(from)
 	if err != nil {
 		return "", err
