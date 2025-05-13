@@ -144,6 +144,15 @@ func runWalReceiver() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("wal-receiver panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "wal-receiver"),
+				)
+			}
+		}()
+
 		if err := runStreamingLoop(ctx, pgrw, opts); err != nil {
 			slog.Error("streaming failed", slog.Any("err", err))
 			cancel() // cancel everything on error
@@ -155,7 +164,6 @@ func runWalReceiver() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("http server panicked",
