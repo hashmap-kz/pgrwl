@@ -3,10 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
-
 	"github.com/spf13/cobra"
+	"net/http"
 )
 
 func init() {
@@ -14,16 +12,15 @@ func init() {
 }
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Get WAL receiver status",
+	Use:           "status",
+	Short:         "Get WAL receiver status",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		req, err := http.NewRequest("GET", "http://localhost:5080/status", nil)
 		if err != nil {
 			return err
 		}
-
-		// Set auth header
-		req.Header.Set("Authorization", "Bearer "+os.Getenv("PGRWL_HTTP_SERVER_TOKEN"))
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
