@@ -56,7 +56,12 @@ func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *htt
 	}
 	defer f.Close()
 
+	_, err = io.Copy(w, f)
+	if err != nil {
+		http.Error(w, "cannot read file", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
-	io.Copy(w, f)
 }

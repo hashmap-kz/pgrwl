@@ -26,7 +26,7 @@ var walRestoreCmd = &cobra.Command{
 	Short: "Download a WAL file from the server",
 	Long: `
 Implements PostgreSQL restore_command, example usage in postgresql.conf:
-restore_command = 'pgrwl wal-restore --addr=localhost:5080 --token=${SECRET_PASS} %f %p'
+restore_command = 'pgrwl wal-restore --addr=k8s-worker5:30266 %f %p'
 `,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
