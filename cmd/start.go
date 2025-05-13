@@ -17,7 +17,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	ModeReceive = "receive"
+	ModeRestore = "restore"
+)
+
 var walReceiveOpts struct {
+	Mode       string
 	Directory  string
 	Slot       string
 	NoLoop     bool
@@ -27,58 +33,71 @@ var walReceiveOpts struct {
 func init() {
 	rootCmd.AddCommand(walReceiveCmd)
 
-	// Primary flags with env fallbacks
+	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Mode, "mode", "m", "receive", "Working mode: receive/restore (ENV: PGRWL_MODE)")
 	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Directory, "directory", "D", "", "Target directory (ENV: PGRWL_DIRECTORY)")
-	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Slot, "slot", "S", "", "Replication slot (ENV: PGRWL_SLOT)")
-	walReceiveCmd.Flags().BoolVarP(&walReceiveOpts.NoLoop, "no-loop", "n", false, "Do not reconnect (ENV: PGRWL_NO_LOOP)")
-
 	walReceiveCmd.Flags().IntVar(&walReceiveOpts.ListenPort, "listen-port", 5080, "HTTP server port (ENV: PGRWL_LISTEN_PORT)")
+
+	walReceiveCmd.Flags().StringVarP(&walReceiveOpts.Slot, "slot", "S", "pgrwl_v5", "Replication slot (ENV: PGRWL_SLOT)")
+	walReceiveCmd.Flags().BoolVarP(&walReceiveOpts.NoLoop, "no-loop", "n", false, "Do not reconnect (ENV: PGRWL_NO_LOOP)")
 }
 
 var walReceiveCmd = &cobra.Command{
-	Use:   "wal-receive",
+	Use:   "start",
 	Short: "Start the WAL receiver",
 	Long: ` 
 Example:
-pgrwl -D /mnt/wal-archive -S bookstore_app 
+pgrwl start -D /mnt/wal-archive -S bookstore_app 
 `,
 	SilenceUsage: true,
 	Run: func(cmd *cobra.Command, _ []string) {
 		f := cmd.Flags()
 
+		applyStringFallback(f, "mode", &walReceiveOpts.Mode, "PGRWL_MODE")
 		applyStringFallback(f, "directory", &walReceiveOpts.Directory, "PGRWL_DIRECTORY")
-		applyStringFallback(f, "slot", &walReceiveOpts.Slot, "PGRWL_SLOT")
-		applyBoolFallback(f, "no-loop", &walReceiveOpts.NoLoop, "PGRWL_NO_LOOP")
+		applyIntFallback(f, "listen-port", &walReceiveOpts.ListenPort, "PGRWL_LISTEN_PORT")
 
 		// Validate required options
+		if walReceiveOpts.Mode == "" {
+			log.Fatal("missing required flag: --mode or $PGRWL_MODE")
+		}
 		if walReceiveOpts.Directory == "" {
 			log.Fatal("missing required flag: --directory or $PGRWL_DIRECTORY")
 		}
-		if walReceiveOpts.Slot == "" {
-			log.Fatal("missing required flag: --slot or $PGRWL_SLOT")
-		}
-
-		// Check HTTP server args
-		applyIntFallback(f, "listen-port", &walReceiveOpts.ListenPort, "PGRWL_LISTEN_PORT")
 		if walReceiveOpts.ListenPort == 0 {
 			log.Fatal("missing required flag: --listen-port or $PGRWL_LISTEN_PORT")
 		}
 
-		// Validate required PG env vars
-		var emptyEnvs []string
-		for _, name := range []string{"PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"} {
-			if os.Getenv(name) == "" {
-				emptyEnvs = append(emptyEnvs, name)
+		if walReceiveOpts.Mode == ModeReceive {
+			applyStringFallback(f, "slot", &walReceiveOpts.Slot, "PGRWL_SLOT")
+			applyBoolFallback(f, "no-loop", &walReceiveOpts.NoLoop, "PGRWL_NO_LOOP")
+
+			if walReceiveOpts.Slot == "" {
+				log.Fatal("missing required flag: --slot or $PGRWL_SLOT")
+			}
+
+			// Validate required PG env vars
+			var emptyEnvs []string
+			for _, name := range []string{"PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"} {
+				if os.Getenv(name) == "" {
+					emptyEnvs = append(emptyEnvs, name)
+				}
+			}
+			if len(emptyEnvs) > 0 {
+				log.Fatalf("required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
 			}
 		}
-		if len(emptyEnvs) > 0 {
-			log.Fatalf("required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
-		}
 
-		// Run the actual service (streaming + HTTP)
-		runWalReceiver()
+		if walReceiveOpts.Mode == ModeReceive {
+			runWalReceiver()
+		} else if walReceiveOpts.Mode == ModeRestore {
+			runHTTPSrv()
+		} else {
+			log.Fatalf("unknown mode: %s", walReceiveOpts.Mode)
+		}
 	},
 }
+
+// mode = receive
 
 func runStreamingLoop(ctx context.Context, pgrw *xlog.PgReceiveWal, opts *xlog.Opts) error {
 	// enter main streaming loop
@@ -171,6 +190,48 @@ func runWalReceiver() {
 			BaseDir: opts.Directory,
 		})); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
+		}
+	}()
+
+	// Wait for signal (context cancellation)
+	<-ctx.Done()
+	slog.Info("shutting down, waiting for goroutines...")
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+	slog.Info("all components shut down cleanly")
+}
+
+// mode = restore
+
+func runHTTPSrv() {
+	// setup context
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer signalCancel()
+
+	// Use WaitGroup to wait for all goroutines to finish
+	var wg sync.WaitGroup
+
+	// HTTP server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("http server panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "http-server"),
+				)
+			}
+		}()
+
+		if err := runHTTPServer(ctx, walReceiveOpts.ListenPort, httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
+			BaseDir: walReceiveOpts.Directory,
+		})); err != nil {
+			slog.Error("http server failed", slog.Any("err", err))
+			cancel()
 		}
 	}()
 

@@ -2,7 +2,6 @@
 set -euo pipefail
 
 export PGRWL_LOG_LEVEL=trace
+export PGRWL_MODE=restore
 
-#export PGRWL_LISTEN_PORT=5080
-
-go run ../main.go serve -D wals
+go run ../main.go start -D wals
