@@ -5,6 +5,8 @@ APP_PATH="/usr/local/bin/pgrwl"
 WAL_PATH="/tmp/wal-archive"
 
 ARGS=(
+  "start"
+  "-m" "receive"
   "-D" "${WAL_PATH}"
   "-S" "pg_recwal_5"
   "--log-add-source"

@@ -30,7 +30,7 @@ services:
       PGPORT: 5432
       PGUSER: postgres
       PGPASSWORD: postgres
-    command: -D /mnt/wal-archive -S example_slot --no-loop --log-level=debug
+    command: start -D /mnt/wal-archive -S example_slot --no-loop --log-level=debug
     volumes:
       - shared-data:/mnt
     depends_on:
