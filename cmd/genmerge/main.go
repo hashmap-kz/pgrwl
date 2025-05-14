@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/hashmap-kz/pgrwl/config"
 	"go/format"
 	"log"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/hashmap-kz/pgrwl/config"
 )
 
 func main() {
@@ -50,10 +51,10 @@ import (
 
 	// Write to output file
 	out := "config_merge_env.go"
-	if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.WriteFile(out, formatted, 0644); err != nil {
+	if err := os.WriteFile(out, formatted, 0o644); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Generated:", out)
@@ -64,8 +65,7 @@ func GenerateMergeFuncCode(structVal any, structName string) string {
 	t := reflect.TypeOf(structVal)
 
 	b.WriteString(fmt.Sprintf("func mergeEnvIfUnset(cfg *%s) {\n", structName))
-	b.WriteString(`
-		if cfg == nil {
+	b.WriteString(`if cfg == nil {
 			return
 		}
 `)
@@ -80,46 +80,42 @@ func GenerateMergeFuncCode(structVal any, structName string) string {
 
 		switch {
 		case f.Type == reflect.TypeOf(time.Duration(0)):
-			b.WriteString(fmt.Sprintf(`	
-		if cfg.%s == 0 {
-			if v, ok := os.LookupEnv("%s"); ok && v != "" {
+			b.WriteString(fmt.Sprintf(`if cfg.%[1]s == 0 {
+			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
 				if d, err := time.ParseDuration(v); err == nil {
-					cfg.%s = d
+					cfg.%[1]s = d
 				}
 			}
 		}
-`, fieldName, envKey, fieldName))
+`, fieldName, envKey))
 
 		case f.Type.Kind() == reflect.String:
-			b.WriteString(fmt.Sprintf(`	
-		if cfg.%s == "" {
-			if v, ok := os.LookupEnv("%s"); ok && v != "" {
-				cfg.%s = v
+			b.WriteString(fmt.Sprintf(`if cfg.%[1]s == "" {
+			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
+				cfg.%[1]s = v
 			}
 		}
-`, fieldName, envKey, fieldName))
+`, fieldName, envKey))
 
 		case f.Type.Kind() == reflect.Int:
-			b.WriteString(fmt.Sprintf(`	
-		if cfg.%s == 0 {
-			if v, ok := os.LookupEnv("%s"); ok && v != "" {
+			b.WriteString(fmt.Sprintf(`if cfg.%[1]s == 0 {
+			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
 				if i, err := strconv.Atoi(v); err == nil {
-					cfg.%s = i
+					cfg.%[1]s = i
 				}
 			}
 		}
-`, fieldName, envKey, fieldName))
+`, fieldName, envKey))
 
 		case f.Type.Kind() == reflect.Bool:
-			b.WriteString(fmt.Sprintf(`	
-		if !cfg.%s {
-			if v, ok := os.LookupEnv("%s"); ok && v != "" {
+			b.WriteString(fmt.Sprintf(`if !cfg.%[1]s {
+			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
 				if b, err := strconv.ParseBool(v); err == nil {
-					cfg.%s = b
+					cfg.%[1]s = b
 				}
 			}
 		}
-`, fieldName, envKey, fieldName))
+`, fieldName, envKey))
 		}
 	}
 
@@ -130,7 +126,12 @@ func GenerateMergeFuncCode(structVal any, structName string) string {
 	formatted, err := format.Source([]byte(src))
 	if err != nil {
 		// fallback to unformatted version if broken (helpful for debugging)
-		return "// ERROR: could not format\n" + src
+		fmt.Printf(`
+// ERROR in format+
+%s
+// ERROR in format-
+`, src)
+		log.Fatal(err)
 	}
 
 	return string(formatted)

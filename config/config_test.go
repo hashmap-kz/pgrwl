@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +19,39 @@ func writeTempConfigFile(t *testing.T, content string) string {
 	return tmpFile
 }
 
+func cleanenvs(t *testing.T) {
+	t.Helper()
+	_ = os.Unsetenv("PGRWL_MODE")
+	_ = os.Unsetenv("PGRWL_DIRECTORY")
+	_ = os.Unsetenv("PGRWL_LOG_LEVEL")
+	_ = os.Unsetenv("PGRWL_LOG_FORMAT")
+	_ = os.Unsetenv("PGRWL_LOG_ADD_SOURCE")
+	_ = os.Unsetenv("PGRWL_SLOT")
+	_ = os.Unsetenv("PGRWL_NO_LOOP")
+	_ = os.Unsetenv("PGRWL_LISTEN_PORT")
+	_ = os.Unsetenv("PGRWL_RESTORE_ADDR")
+	_ = os.Unsetenv("PGRWL_STORAGE_TYPE")
+	_ = os.Unsetenv("PGRWL_COMPRESSION_ALGO")
+	_ = os.Unsetenv("PGRWL_ENCRYPTION_ALGO")
+	_ = os.Unsetenv("PGRWL_ENCRYPTION_PASS")
+	_ = os.Unsetenv("PGRWL_SFTP_HOST")
+	_ = os.Unsetenv("PGRWL_SFTP_PORT")
+	_ = os.Unsetenv("PGRWL_SFTP_USER")
+	_ = os.Unsetenv("PGRWL_SFTP_PASS")
+	_ = os.Unsetenv("PGRWL_SFTP_PKEY_PATH")
+	_ = os.Unsetenv("PGRWL_SFTP_PKEY_PASS")
+	_ = os.Unsetenv("PGRWL_S3_URL")
+	_ = os.Unsetenv("PGRWL_S3_ACCESS_KEY_ID")
+	_ = os.Unsetenv("PGRWL_S3_SECRET_ACCESS_KEY")
+	_ = os.Unsetenv("PGRWL_S3_BUCKET")
+	_ = os.Unsetenv("PGRWL_S3_REGION")
+	_ = os.Unsetenv("PGRWL_S3_USE_PATH_STYLE")
+	_ = os.Unsetenv("PGRWL_S3_DISABLE_SSL")
+}
+
 func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
+	cleanenvs(t)
+
 	// Set env vars that will override or fill missing values
 	_ = os.Setenv("PGRWL_SLOT", "env_slot")
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "6000")
@@ -51,6 +85,8 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 }
 
 func TestLoadCfg_NoFile_OnlyEnv(t *testing.T) {
+	cleanenvs(t)
+
 	_ = os.Setenv("PGRWL_MODE", "env_mode")
 	_ = os.Setenv("PGRWL_NO_LOOP", "true")
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "7777")
@@ -64,6 +100,8 @@ func TestLoadCfg_NoFile_OnlyEnv(t *testing.T) {
 }
 
 func TestLoadCfg_FromFile(t *testing.T) {
+	cleanenvs(t)
+
 	jsonData := `{
 		"PGRWL_MODE": "receive",
 		"PGRWL_DIRECTORY": "/tmp/test",
@@ -76,10 +114,8 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	}`
 	path := writeTempConfigFile(t, jsonData)
 
-	// Reset singleton for testing
-	reset()
-
-	cfg := Read(path)
+	cfg, err := loadCfg(path)
+	require.NoError(t, err)
 
 	assert.Equal(t, "receive", cfg.Mode)
 	assert.Equal(t, "/tmp/test", cfg.Directory)
@@ -92,15 +128,13 @@ func TestLoadCfg_FromFile(t *testing.T) {
 }
 
 func TestLoadCfg_FromEnvFallback(t *testing.T) {
-	os.Clearenv()
+	cleanenvs(t)
 
 	_ = os.Setenv("PGRWL_SLOT", "fallback_slot")
 	_ = os.Setenv("PGRWL_LOG_ADD_SOURCE", "true")
 
-	// Reset singleton for testing
-	reset()
-
-	cfg := Read("") // No file
+	cfg, err := loadCfg("") // No file
+	require.NoError(t, err)
 
 	assert.Equal(t, "fallback_slot", cfg.Slot)
 	assert.Equal(t, true, cfg.LogAddSource)
@@ -108,6 +142,8 @@ func TestLoadCfg_FromEnvFallback(t *testing.T) {
 }
 
 func TestMergeEnvIfUnset(t *testing.T) {
+	cleanenvs(t)
+
 	_ = os.Setenv("PGRWL_MODE", "env-mode")
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "1234")
 

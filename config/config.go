@@ -15,15 +15,24 @@ var (
 )
 
 type Config struct {
-	Mode         string `json:"PGRWL_MODE"`
-	Directory    string `json:"PGRWL_DIRECTORY"`
-	Slot         string `json:"PGRWL_SLOT"`
-	NoLoop       bool   `json:"PGRWL_NO_LOOP"`
-	ListenPort   int    `json:"PGRWL_LISTEN_PORT"`
+	// Core options, always required
+	Mode      string `json:"PGRWL_MODE"`
+	Directory string `json:"PGRWL_DIRECTORY"`
+
+	// Logging
 	LogLevel     string `json:"PGRWL_LOG_LEVEL"`
 	LogFormat    string `json:"PGRWL_LOG_FORMAT"`
 	LogAddSource bool   `json:"PGRWL_LOG_ADD_SOURCE"`
 
+	// Receive MODE required args
+	Slot       string `json:"PGRWL_SLOT"`
+	NoLoop     bool   `json:"PGRWL_NO_LOOP"`
+	ListenPort int    `json:"PGRWL_LISTEN_PORT"`
+
+	// Restore MODE required args
+	RestoreAddr string `json:"PGRWL_RESTORE_ADDR"`
+
+	// If any remote storage is used (default local)
 	StorageType string `json:"PGRWL_STORAGE_TYPE"` // "local", "sftp", "s3"
 
 	// Compression, Encryption
@@ -57,6 +66,7 @@ func init() {
 	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
 	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
 	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
+	_ = os.Setenv("PGRWL_RESTORE_ADDR", "http://127.0.0.1:7070")
 }
 
 func Cfg() *Config {
@@ -92,10 +102,4 @@ func loadCfg(path string) (*Config, error) {
 	// fill from env if JSON did not provide values
 	mergeEnvIfUnset(&c)
 	return &c, nil
-}
-
-// reset resets the singleton for test reuse
-func reset() {
-	once = sync.Once{}
-	config = nil
 }
