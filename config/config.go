@@ -12,16 +12,24 @@ import (
 var (
 	once   sync.Once
 	config *Config
+
+	DefaultValues = map[string]string{
+		"PGRWL_MODE":        "receive",
+		"PGRWL_SLOT":        "pgrwl_v5",
+		"PGRWL_LISTEN_PORT": "7070",
+		"PGRWL_LOG_LEVEL":   "info",
+		"PGRWL_LOG_FORMAT":  "json",
+	}
 )
 
 type Config struct {
-	Mode         string `json:"PGRWL_MODE"`
+	Mode         string `json:"PGRWL_MODE" envDefault:"receive"`
 	Directory    string `json:"PGRWL_DIRECTORY"`
-	Slot         string `json:"PGRWL_SLOT"`
+	Slot         string `json:"PGRWL_SLOT" envDefault:"pgrwl_v5"`
 	NoLoop       bool   `json:"PGRWL_NO_LOOP"`
-	ListenPort   int    `json:"PGRWL_LISTEN_PORT"`
-	LogLevel     string `json:"PGRWL_LOG_LEVEL"`
-	LogFormat    string `json:"PGRWL_LOG_FORMAT"`
+	ListenPort   int    `json:"PGRWL_LISTEN_PORT" envDefault:"7070"`
+	LogLevel     string `json:"PGRWL_LOG_LEVEL" envDefault:"info"`
+	LogFormat    string `json:"PGRWL_LOG_FORMAT" envDefault:"json"`
 	LogAddSource bool   `json:"PGRWL_LOG_ADD_SOURCE"`
 
 	// S3 Storage config
@@ -44,7 +52,7 @@ func Cfg() *Config {
 func Read(path string) *Config {
 	once.Do(func() {
 		var err error
-		config, err = loadCfg(path)
+		config, err = loadCfg(path, DefaultValues)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -52,7 +60,7 @@ func Read(path string) *Config {
 	return config
 }
 
-func loadCfg(path string) (*Config, error) {
+func loadCfg(path string, defaults map[string]string) (*Config, error) {
 	var c Config
 	// if path is set, must read from file
 	if path != "" {
@@ -65,12 +73,6 @@ func loadCfg(path string) (*Config, error) {
 		}
 	}
 	// fill from env if JSON did not provide values
-	mergeEnvIfUnset(&c)
+	mergeEnvIfUnset(&c, defaults)
 	return &c, nil
-}
-
-// reset resets the singleton for test reuse
-func reset() {
-	once = sync.Once{}
-	config = nil
 }
