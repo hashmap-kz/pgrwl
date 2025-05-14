@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+// Brief comparison with and without reflect
+//
+// goos: linux
+// goarch: amd64
+// pkg: github.com/hashmap-kz/pgrwl/config
+// cpu: Intel(R) Xeon(R) Gold 5317 CPU @ 3.00GHz
+// BenchmarkDirectSet-10            1976619               610.9 ns/op             0 B/op          0 allocs/op
+// BenchmarkReflectSet-10            375691              3064 ns/op             384 B/op          1 allocs/op
+
 // Prepare env vars for benchmark
 func init() {
 	_ = os.Setenv("PGRWL_MODE", "receive")
