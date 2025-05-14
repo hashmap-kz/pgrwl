@@ -14,9 +14,13 @@ endif
 lint:
 	golangci-lint run --output.tab.path=stdout
 
+.PHONY: gen
+gen:
+	go generate ./...
+
 # Build the binary
 .PHONY: build
-build:
+build: gen
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(OUTPUT) main.go
 
 # Install the binary to /usr/local/bin
