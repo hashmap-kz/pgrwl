@@ -34,6 +34,15 @@ type Config struct {
 	S3DisableSSL      bool   `json:"PGRWL_S3_DISABLE_SSL"`
 }
 
+func init() {
+	// default values
+	_ = os.Setenv("PGRWL_MODE", "receive")
+	_ = os.Setenv("PGRWL_SLOT", "pgrwl_v5")
+	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
+	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
+	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
+}
+
 func Cfg() *Config {
 	if config == nil {
 		log.Fatal("config was not loaded in main")
