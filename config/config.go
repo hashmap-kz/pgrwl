@@ -24,6 +24,21 @@ type Config struct {
 	LogFormat    string `json:"PGRWL_LOG_FORMAT"`
 	LogAddSource bool   `json:"PGRWL_LOG_ADD_SOURCE"`
 
+	StorageType string `json:"PGRWL_STORAGE_TYPE"` // "local", "sftp", "s3"
+
+	// Compression, Encryption
+	CompressionAlgo string `json:"PGRWL_COMPRESSION_ALGO"` // gzip, zstd
+	EncryptionAlgo  string `json:"PGRWL_ENCRYPTION_ALGO"`  // aes-256-gcm
+	EncryptionPass  string `json:"PGRWL_ENCRYPTION_PASS"`
+
+	// SFTP Storage config
+	SFTPHost     string `json:"PGRWL_SFTP_HOST"`
+	SFTPPort     int    `json:"PGRWL_SFTP_PORT"`
+	SFTPUser     string `json:"PGRWL_SFTP_USER"`
+	SFTPPass     string `json:"PGRWL_SFTP_PASS"`
+	SFTPPkeyPath string `json:"PGRWL_SFTP_PKEY_PATH"`
+	SFTPPkeyPass string `json:"PGRWL_SFTP_PKEY_PASS"`
+
 	// S3 Storage config
 	S3URL             string `json:"PGRWL_S3_URL"`
 	S3AccessKeyID     string `json:"PGRWL_S3_ACCESS_KEY_ID"`
@@ -41,6 +56,7 @@ func init() {
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
 	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
 	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
+	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
 }
 
 func Cfg() *Config {
