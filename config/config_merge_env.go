@@ -7,45 +7,31 @@ import (
 	"strconv"
 )
 
-func mergeEnvIfUnset(cfg *Config, defaults map[string]string) {
-	// Override priority: config -> defaults -> envs
+func mergeEnvIfUnset(cfg *Config) {
+
 	if cfg == nil {
 		return
 	}
 
 	if cfg.Mode == "" {
-		if v, ok := defaults["PGRWL_MODE"]; ok && v != "" {
-			cfg.Mode = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_MODE"); ok && v != "" {
 			cfg.Mode = v
 		}
 	}
 
 	if cfg.Directory == "" {
-		if v, ok := defaults["PGRWL_DIRECTORY"]; ok && v != "" {
-			cfg.Directory = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_DIRECTORY"); ok && v != "" {
 			cfg.Directory = v
 		}
 	}
 
 	if cfg.Slot == "" {
-		if v, ok := defaults["PGRWL_SLOT"]; ok && v != "" {
-			cfg.Slot = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_SLOT"); ok && v != "" {
 			cfg.Slot = v
 		}
 	}
 
 	if !cfg.NoLoop {
-		if v, ok := defaults["PGRWL_NO_LOOP"]; ok && v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
-				cfg.NoLoop = b
-			}
-		}
 		if v, ok := os.LookupEnv("PGRWL_NO_LOOP"); ok && v != "" {
 			if b, err := strconv.ParseBool(v); err == nil {
 				cfg.NoLoop = b
@@ -54,11 +40,6 @@ func mergeEnvIfUnset(cfg *Config, defaults map[string]string) {
 	}
 
 	if cfg.ListenPort == 0 {
-		if v, ok := defaults["PGRWL_LISTEN_PORT"]; ok && v != "" {
-			if i, err := strconv.Atoi(v); err == nil {
-				cfg.ListenPort = i
-			}
-		}
 		if v, ok := os.LookupEnv("PGRWL_LISTEN_PORT"); ok && v != "" {
 			if i, err := strconv.Atoi(v); err == nil {
 				cfg.ListenPort = i
@@ -67,29 +48,18 @@ func mergeEnvIfUnset(cfg *Config, defaults map[string]string) {
 	}
 
 	if cfg.LogLevel == "" {
-		if v, ok := defaults["PGRWL_LOG_LEVEL"]; ok && v != "" {
-			cfg.LogLevel = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_LOG_LEVEL"); ok && v != "" {
 			cfg.LogLevel = v
 		}
 	}
 
 	if cfg.LogFormat == "" {
-		if v, ok := defaults["PGRWL_LOG_FORMAT"]; ok && v != "" {
-			cfg.LogFormat = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_LOG_FORMAT"); ok && v != "" {
 			cfg.LogFormat = v
 		}
 	}
 
 	if !cfg.LogAddSource {
-		if v, ok := defaults["PGRWL_LOG_ADD_SOURCE"]; ok && v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
-				cfg.LogAddSource = b
-			}
-		}
 		if v, ok := os.LookupEnv("PGRWL_LOG_ADD_SOURCE"); ok && v != "" {
 			if b, err := strconv.ParseBool(v); err == nil {
 				cfg.LogAddSource = b
@@ -98,56 +68,36 @@ func mergeEnvIfUnset(cfg *Config, defaults map[string]string) {
 	}
 
 	if cfg.S3URL == "" {
-		if v, ok := defaults["PGRWL_S3_URL"]; ok && v != "" {
-			cfg.S3URL = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_S3_URL"); ok && v != "" {
 			cfg.S3URL = v
 		}
 	}
 
 	if cfg.S3AccessKeyID == "" {
-		if v, ok := defaults["PGRWL_S3_ACCESS_KEY_ID"]; ok && v != "" {
-			cfg.S3AccessKeyID = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_S3_ACCESS_KEY_ID"); ok && v != "" {
 			cfg.S3AccessKeyID = v
 		}
 	}
 
 	if cfg.S3SecretAccessKey == "" {
-		if v, ok := defaults["PGRWL_S3_SECRET_ACCESS_KEY"]; ok && v != "" {
-			cfg.S3SecretAccessKey = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_S3_SECRET_ACCESS_KEY"); ok && v != "" {
 			cfg.S3SecretAccessKey = v
 		}
 	}
 
 	if cfg.S3Bucket == "" {
-		if v, ok := defaults["PGRWL_S3_BUCKET"]; ok && v != "" {
-			cfg.S3Bucket = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_S3_BUCKET"); ok && v != "" {
 			cfg.S3Bucket = v
 		}
 	}
 
 	if cfg.S3Region == "" {
-		if v, ok := defaults["PGRWL_S3_REGION"]; ok && v != "" {
-			cfg.S3Region = v
-		}
 		if v, ok := os.LookupEnv("PGRWL_S3_REGION"); ok && v != "" {
 			cfg.S3Region = v
 		}
 	}
 
 	if !cfg.S3UsePathStyle {
-		if v, ok := defaults["PGRWL_S3_USE_PATH_STYLE"]; ok && v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
-				cfg.S3UsePathStyle = b
-			}
-		}
 		if v, ok := os.LookupEnv("PGRWL_S3_USE_PATH_STYLE"); ok && v != "" {
 			if b, err := strconv.ParseBool(v); err == nil {
 				cfg.S3UsePathStyle = b
@@ -156,11 +106,6 @@ func mergeEnvIfUnset(cfg *Config, defaults map[string]string) {
 	}
 
 	if !cfg.S3DisableSSL {
-		if v, ok := defaults["PGRWL_S3_DISABLE_SSL"]; ok && v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
-				cfg.S3DisableSSL = b
-			}
-		}
 		if v, ok := os.LookupEnv("PGRWL_S3_DISABLE_SSL"); ok && v != "" {
 			if b, err := strconv.ParseBool(v); err == nil {
 				cfg.S3DisableSSL = b

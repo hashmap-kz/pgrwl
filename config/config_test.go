@@ -17,28 +17,7 @@ func writeTempConfigFile(t *testing.T, content string) string {
 	return tmpFile
 }
 
-func unsetEnvs(t *testing.T) {
-	t.Helper()
-	_ = os.Unsetenv("PGRWL_MODE")
-	_ = os.Unsetenv("PGRWL_DIRECTORY")
-	_ = os.Unsetenv("PGRWL_SLOT")
-	_ = os.Unsetenv("PGRWL_NO_LOOP")
-	_ = os.Unsetenv("PGRWL_LISTEN_PORT")
-	_ = os.Unsetenv("PGRWL_LOG_LEVEL")
-	_ = os.Unsetenv("PGRWL_LOG_FORMAT")
-	_ = os.Unsetenv("PGRWL_LOG_ADD_SOURCE")
-	_ = os.Unsetenv("PGRWL_S3_URL")
-	_ = os.Unsetenv("PGRWL_S3_ACCESS_KEY_ID")
-	_ = os.Unsetenv("PGRWL_S3_SECRET_ACCESS_KEY")
-	_ = os.Unsetenv("PGRWL_S3_BUCKET")
-	_ = os.Unsetenv("PGRWL_S3_REGION")
-	_ = os.Unsetenv("PGRWL_S3_USE_PATH_STYLE")
-	_ = os.Unsetenv("PGRWL_S3_DISABLE_SSL")
-}
-
 func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
-	unsetEnvs(t)
-
 	// Set env vars that will override or fill missing values
 	_ = os.Setenv("PGRWL_SLOT", "env_slot")
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "6000")
@@ -55,7 +34,7 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 
 	path := writeTempConfigFile(t, json)
 
-	cfg, err := loadCfg(path, map[string]string{})
+	cfg, err := loadCfg(path)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "receive", cfg.Mode)
@@ -72,13 +51,11 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 }
 
 func TestLoadCfg_NoFile_OnlyEnv(t *testing.T) {
-	unsetEnvs(t)
-
 	_ = os.Setenv("PGRWL_MODE", "env_mode")
 	_ = os.Setenv("PGRWL_NO_LOOP", "true")
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "7777")
 
-	cfg, err := loadCfg("", map[string]string{}) // no file
+	cfg, err := loadCfg("") // no file
 	assert.NoError(t, err)
 
 	assert.Equal(t, "env_mode", cfg.Mode)
@@ -87,8 +64,6 @@ func TestLoadCfg_NoFile_OnlyEnv(t *testing.T) {
 }
 
 func TestLoadCfg_FromFile(t *testing.T) {
-	unsetEnvs(t)
-
 	jsonData := `{
 		"PGRWL_MODE": "receive",
 		"PGRWL_DIRECTORY": "/tmp/test",
@@ -101,8 +76,10 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	}`
 	path := writeTempConfigFile(t, jsonData)
 
-	cfg, err := loadCfg(path, map[string]string{})
-	assert.NoError(t, err)
+	// Reset singleton for testing
+	reset()
+
+	cfg := Read(path)
 
 	assert.Equal(t, "receive", cfg.Mode)
 	assert.Equal(t, "/tmp/test", cfg.Directory)
@@ -114,20 +91,33 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	assert.True(t, cfg.LogAddSource)
 }
 
-// defaults
+func TestLoadCfg_FromEnvFallback(t *testing.T) {
+	os.Clearenv()
 
-func TestLoadCfg_NoFile_OnlyEnvWithDefaults(t *testing.T) {
-	unsetEnvs(t)
+	_ = os.Setenv("PGRWL_SLOT", "fallback_slot")
+	_ = os.Setenv("PGRWL_LOG_ADD_SOURCE", "true")
 
-	_ = os.Setenv("PGRWL_MODE", "env_mode")
-	_ = os.Setenv("PGRWL_NO_LOOP", "true")
+	// Reset singleton for testing
+	reset()
 
-	cfg, err := loadCfg("", map[string]string{
-		"PGRWL_LISTEN_PORT": "7070",
-	})
-	assert.NoError(t, err)
+	cfg := Read("") // No file
 
-	assert.Equal(t, "env_mode", cfg.Mode)
-	assert.True(t, cfg.NoLoop)
-	assert.Equal(t, 7070, cfg.ListenPort)
+	assert.Equal(t, "fallback_slot", cfg.Slot)
+	assert.Equal(t, true, cfg.LogAddSource)
+	assert.Equal(t, "", cfg.Mode) // not set in env or file
+}
+
+func TestMergeEnvIfUnset(t *testing.T) {
+	_ = os.Setenv("PGRWL_MODE", "env-mode")
+	_ = os.Setenv("PGRWL_LISTEN_PORT", "1234")
+
+	cfg := Config{
+		LogLevel: "warn", // should not be overwritten
+	}
+
+	mergeEnvIfUnset(&cfg)
+
+	assert.Equal(t, "env-mode", cfg.Mode)
+	assert.Equal(t, 1234, cfg.ListenPort)
+	assert.Equal(t, "warn", cfg.LogLevel)
 }

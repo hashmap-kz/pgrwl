@@ -32,7 +32,7 @@ func init() {
 func BenchmarkDirectSet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		cfg := &Config{}
-		mergeEnvIfUnset(cfg, DefaultValues)
+		mergeEnvIfUnset(cfg)
 	}
 }
 
@@ -60,12 +60,8 @@ func fillUnsetFieldsFromEnv(cfg any) {
 		}
 
 		envVal, ok := os.LookupEnv(jsonKey)
-		val := envVal
-		if !ok || val == "" {
-			val = structField.Tag.Get("envDefault")
-			if val == "" {
-				continue // no env, no default — skip
-			}
+		if !ok || envVal == "" {
+			continue
 		}
 
 		// Assign value based on kind

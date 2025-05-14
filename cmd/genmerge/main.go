@@ -63,8 +63,8 @@ func GenerateMergeFuncCode(structVal any, structName string) string {
 	var b strings.Builder
 	t := reflect.TypeOf(structVal)
 
-	b.WriteString(fmt.Sprintf("func mergeEnvIfUnset(cfg *%s, defaults map[string]string) {\n", structName))
-	b.WriteString(`// Override priority: config -> defaults -> envs
+	b.WriteString(fmt.Sprintf("func mergeEnvIfUnset(cfg *%s) {\n", structName))
+	b.WriteString(`
 		if cfg == nil {
 			return
 		}
@@ -81,63 +81,45 @@ func GenerateMergeFuncCode(structVal any, structName string) string {
 		switch {
 		case f.Type == reflect.TypeOf(time.Duration(0)):
 			b.WriteString(fmt.Sprintf(`	
-		if cfg.%[1]s == 0 {
-			if v, ok := defaults["%[2]s"]; ok && v != "" {
+		if cfg.%s == 0 {
+			if v, ok := os.LookupEnv("%s"); ok && v != "" {
 				if d, err := time.ParseDuration(v); err == nil {
-					cfg.%[1]s = d
-				}
-			}
-			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
-				if d, err := time.ParseDuration(v); err == nil {
-					cfg.%[1]s = d
+					cfg.%s = d
 				}
 			}
 		}
-`, fieldName, envKey))
+`, fieldName, envKey, fieldName))
 
 		case f.Type.Kind() == reflect.String:
 			b.WriteString(fmt.Sprintf(`	
-		if cfg.%[1]s == "" {
-			if v, ok := defaults["%[2]s"]; ok && v != "" {
-				cfg.%[1]s = v
-			}
-			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
-				cfg.%[1]s = v
+		if cfg.%s == "" {
+			if v, ok := os.LookupEnv("%s"); ok && v != "" {
+				cfg.%s = v
 			}
 		}
-`, fieldName, envKey))
+`, fieldName, envKey, fieldName))
 
 		case f.Type.Kind() == reflect.Int:
 			b.WriteString(fmt.Sprintf(`	
-		if cfg.%[1]s == 0 {
-			if v, ok := defaults["%[2]s"]; ok && v != "" {
+		if cfg.%s == 0 {
+			if v, ok := os.LookupEnv("%s"); ok && v != "" {
 				if i, err := strconv.Atoi(v); err == nil {
-					cfg.%[1]s = i
-				}
-			}
-			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
-				if i, err := strconv.Atoi(v); err == nil {
-					cfg.%[1]s = i
+					cfg.%s = i
 				}
 			}
 		}
-`, fieldName, envKey))
+`, fieldName, envKey, fieldName))
 
 		case f.Type.Kind() == reflect.Bool:
 			b.WriteString(fmt.Sprintf(`	
-		if !cfg.%[1]s {
-			if v, ok := defaults["%[2]s"]; ok && v != "" {
+		if !cfg.%s {
+			if v, ok := os.LookupEnv("%s"); ok && v != "" {
 				if b, err := strconv.ParseBool(v); err == nil {
-					cfg.%[1]s = b
-				}
-			}
-			if v, ok := os.LookupEnv("%[2]s"); ok && v != "" {
-				if b, err := strconv.ParseBool(v); err == nil {
-					cfg.%[1]s = b
+					cfg.%s = b
 				}
 			}
 		}
-`, fieldName, envKey))
+`, fieldName, envKey, fieldName))
 		}
 	}
 
