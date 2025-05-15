@@ -56,7 +56,7 @@ func main() {
 					ListenPort: cfg.Mode.Receive.ListenPort,
 					Slot:       cfg.Mode.Receive.Slot,
 					NoLoop:     cfg.Mode.Receive.NoLoop,
-					Verbose:    strings.EqualFold(c.String(cfg.Log.Level), "trace"),
+					Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
 				})
 			} else if cfg.Mode.Name == config.ModeServe {
 				cmd.RunServeMode(&cmd.ServeModeOpts{
