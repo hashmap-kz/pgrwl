@@ -95,6 +95,29 @@ func main() {
 			{
 				Name:  "receive",
 				Usage: "Stream and archive WALs",
+				Description: optutils.HeredocTrim(`
+				The receive command connects to a PostgreSQL server using 
+				the streaming replication protocol and continuously receives 
+				WAL (Write-Ahead Log) files in real time. 
+				It is typically used for archiving WAL segments to support 
+				continuous backup and point-in-time recovery.
+				
+				The tool uses a replication slot to avoid missing data during restarts 
+				and can optionally compress and encrypt the received WAL files. 
+				It is designed to run continuously and ensures that all WAL data 
+				is archived safely outside the database instance.
+				
+				This command is usually run on a separate host or backup node 
+				and configured with proper replication credentials. 
+
+				Usage example:
+
+				$ export PGHOST=localhost
+				$ export PGPORT=5432
+				$ export PGUSER=postgres
+				$ export PGPASSWORD=postgres
+				$ pgrwl receive -D wals
+				`),
 				Flags: []cli.Flag{
 					dirFlag,
 					listenPortFlag,
@@ -128,6 +151,10 @@ func main() {
 			{
 				Name:  "serve",
 				Usage: "Serve WAL files for restore",
+				Description: optutils.HeredocTrim(`
+				Typical usage: You're running the server in serve mode, and then you're able to fetch 
+				WAL files using the restore_command configured in the PostgreSQL instance.
+				`),
 				Flags: []cli.Flag{
 					dirFlag,
 					listenPortFlag,
@@ -146,7 +173,9 @@ func main() {
 				Usage: "Fetch a single WAL file by name",
 
 				Description: optutils.HeredocTrim(`
-				Implements PostgreSQL restore_command, example usage in postgresql.conf:
+				Implements PostgreSQL restore_command.
+
+				Example usage in postgresql.conf:
 				restore_command = 'pgrwl restore-command --addr=k8s-worker5:30266 -f %f -p %p'
 				`),
 
