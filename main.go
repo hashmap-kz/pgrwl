@@ -32,6 +32,9 @@ func main() {
 		},
 		Before: func(_ context.Context, c *cli.Command) (context.Context, error) {
 			configPath := c.String("config")
+			if configPath == "" {
+				log.Fatal("config path is not defined")
+			}
 			cfg = config.MustLoad(configPath)
 			_, _ = fmt.Fprintln(os.Stderr, cfg.String()) // debug config (NOTE: sensitive fields are hidden)
 			logger.Init(&logger.Opts{
