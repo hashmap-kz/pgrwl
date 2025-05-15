@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
+	"text/template"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
@@ -17,6 +19,7 @@ import (
 
 func main() {
 	var cfg *config.Config
+	setupUsage()
 
 	app := &cli.Command{
 		Name:  "pgrwl",
@@ -108,6 +111,54 @@ func main() {
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func setupUsage() {
+	customHelpTemplate := `
+NAME:
+   {{.Name}} - {{.Usage}}
+
+USAGE:
+  # RECEIVE/SERVE MODE (requires appropriate sections in config.json)
+  pgrwl -c config.json
+  
+  # basic config for 'receive' mode:
+  {
+    "mode": {
+      "name": "receive",
+      "receive": {
+        "listen_port": 7070,
+        "directory": "wals",
+        "slot": "pgrwl_v5"
+      }
+    }
+  }
+
+  # basic config fot 'serve' mode:
+  {
+    "mode": {
+      "name": "serve",
+      "serve": {
+        "listen_port": 7070,
+        "directory": "wals"
+      }
+    }
+  }
+
+  # RESTORE MODE (example usage in postgresql.conf):
+  restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
+
+GLOBAL OPTIONS:
+{{range .VisibleFlags}}{{.}}
+{{end}}
+`
+
+	cli.HelpPrinter = func(w io.Writer, templ string, data any) {
+		t := template.Must(template.New("help").Parse(customHelpTemplate))
+		if err := t.Execute(w, data); err != nil {
+			_, _ = fmt.Fprintln(w, "failed to render help:", err)
+		}
 	}
 }
 

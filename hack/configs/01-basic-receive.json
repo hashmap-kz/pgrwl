@@ -4,7 +4,7 @@
     "receive": {
       "listen_port": 7070,
       "directory": "wals",
-      "slot": "recwal_v5"
+      "slot": "pgrwl_v5"
     }
   },
   "log": {
