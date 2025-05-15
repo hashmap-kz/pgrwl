@@ -208,16 +208,6 @@ unpredictable issues.
 In short: PostgreSQL waits for the replica to confirm commits, so we cannot afford to depend on external systems in such
 critical paths.
 
-This utility focuses on doing one thing well: robustly streaming WAL segments.
-In my strong opinion, combining this core responsibility with other concerns—such as retention policies, remote uploads,
-or additional processing - risks introducing failure modes.
-If any of those subsystems were to crash, it could bring down the main WAL receiving loop, which is precisely the kind
-of failure we aim to avoid.
-
-Handling retention, remote uploads, and other lifecycle operations should be the responsibility of **separate tools**
-that consume the WAL files archived by this utility.
-This is the same design philosophy used by `pg_receivewal` and other official PostgreSQL tools.
-
 ### 💾 Notes on `fsync` (since the utility works in synchronous mode **only**):
 
 * After each WAL segment is written, an `fsync` is performed on the currently open WAL file to ensure durability.
