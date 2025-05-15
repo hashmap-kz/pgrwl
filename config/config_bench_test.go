@@ -19,7 +19,6 @@ import (
 
 // Prepare env vars for benchmark
 func init() {
-	_ = os.Setenv("PGRWL_MODE", "receive")
 	_ = os.Setenv("PGRWL_DIRECTORY", "/tmp/test")
 	_ = os.Setenv("PGRWL_SLOT", "slot")
 	_ = os.Setenv("PGRWL_NO_LOOP", "true")

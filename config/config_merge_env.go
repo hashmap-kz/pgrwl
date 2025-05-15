@@ -11,11 +11,6 @@ func mergeEnvIfUnset(cfg *Config) {
 	if cfg == nil {
 		return
 	}
-	if cfg.Mode == "" {
-		if v, ok := os.LookupEnv("PGRWL_MODE"); ok && v != "" {
-			cfg.Mode = v
-		}
-	}
 	if cfg.Directory == "" {
 		if v, ok := os.LookupEnv("PGRWL_DIRECTORY"); ok && v != "" {
 			cfg.Directory = v

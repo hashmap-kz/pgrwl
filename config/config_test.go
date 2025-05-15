@@ -21,7 +21,6 @@ func writeTempConfigFile(t *testing.T, content string) string {
 
 func cleanenvs(t *testing.T) {
 	t.Helper()
-	_ = os.Unsetenv("PGRWL_MODE")
 	_ = os.Unsetenv("PGRWL_DIRECTORY")
 	_ = os.Unsetenv("PGRWL_RECEIVE_SLOT")
 	_ = os.Unsetenv("PGRWL_RECEIVE_NO_LOOP")
@@ -60,7 +59,6 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 	_ = os.Setenv("PGRWL_S3_URL", "http://env-url")
 
 	json := `{
-		"PGRWL_MODE": "receive",
 		"PGRWL_DIRECTORY": "/var/lib/test",
 		"PGRWL_RECEIVE_NO_LOOP": true,
 		"PGRWL_LOG_LEVEL": "info"
@@ -71,7 +69,6 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 	cfg, err := loadCfg(path)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "receive", cfg.Mode)
 	assert.Equal(t, "/var/lib/test", cfg.Directory)
 	assert.Equal(t, true, cfg.ReceiveNoLoop)
 	assert.Equal(t, "info", cfg.LogLevel)
@@ -87,14 +84,12 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 func TestLoadCfg_NoFile_OnlyEnv(t *testing.T) {
 	cleanenvs(t)
 
-	_ = os.Setenv("PGRWL_MODE", "env_mode")
 	_ = os.Setenv("PGRWL_RECEIVE_NO_LOOP", "true")
 	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "7777")
 
 	cfg, err := loadCfg("") // no file
 	assert.NoError(t, err)
 
-	assert.Equal(t, "env_mode", cfg.Mode)
 	assert.True(t, cfg.ReceiveNoLoop)
 	assert.Equal(t, 7777, cfg.ReceiveListenPort)
 }
@@ -103,7 +98,6 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	cleanenvs(t)
 
 	jsonData := `{
-		"PGRWL_MODE": "receive",
 		"PGRWL_DIRECTORY": "/tmp/test",
 		"PGRWL_RECEIVE_SLOT": "myslot",
 		"PGRWL_RECEIVE_NO_LOOP": true,
@@ -117,7 +111,6 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	cfg, err := loadCfg(path)
 	require.NoError(t, err)
 
-	assert.Equal(t, "receive", cfg.Mode)
 	assert.Equal(t, "/tmp/test", cfg.Directory)
 	assert.Equal(t, "myslot", cfg.ReceiveSlot)
 	assert.True(t, cfg.ReceiveNoLoop)
@@ -138,13 +131,11 @@ func TestLoadCfg_FromEnvFallback(t *testing.T) {
 
 	assert.Equal(t, "fallback_slot", cfg.ReceiveSlot)
 	assert.Equal(t, true, cfg.LogAddSource)
-	assert.Equal(t, "", cfg.Mode) // not set in env or file
 }
 
 func TestMergeEnvIfUnset(t *testing.T) {
 	cleanenvs(t)
 
-	_ = os.Setenv("PGRWL_MODE", "env-mode")
 	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "1234")
 
 	cfg := Config{
@@ -153,7 +144,6 @@ func TestMergeEnvIfUnset(t *testing.T) {
 
 	mergeEnvIfUnset(&cfg)
 
-	assert.Equal(t, "env-mode", cfg.Mode)
 	assert.Equal(t, 1234, cfg.ReceiveListenPort)
 	assert.Equal(t, "warn", cfg.LogLevel)
 }

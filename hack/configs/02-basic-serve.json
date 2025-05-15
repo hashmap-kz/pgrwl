@@ -1,0 +1,6 @@
+{
+  "PGRWL_DIRECTORY": "wals",
+  "PGRWL_LOG_LEVEL": "debug",
+  "PGRWL_LOG_FORMAT": "text",
+  "PGRWL_LOG_ADD_SOURCE": true
+}

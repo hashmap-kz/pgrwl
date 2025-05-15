@@ -15,7 +15,6 @@ var (
 )
 
 type Config struct {
-	Mode                   string `json:"PGRWL_MODE"`
 	Directory              string `json:"PGRWL_DIRECTORY"`
 	ReceiveSlot            string `json:"PGRWL_RECEIVE_SLOT"`
 	ReceiveNoLoop          bool   `json:"PGRWL_RECEIVE_NO_LOOP"`
@@ -46,7 +45,6 @@ type Config struct {
 
 func init() {
 	// default values
-	_ = os.Setenv("PGRWL_MODE", "receive")
 	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "pgrwl_v5")
 	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "7070")
 	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
@@ -56,9 +54,27 @@ func init() {
 	_ = os.Setenv("PGRWL_RESTORE_FETCH_ADDR", "http://127.0.0.1:7070")
 }
 
-// TODO: hide sensitive
 func (c *Config) String() string {
-	b, err := json.MarshalIndent(c, "", "  ")
+	// Step 1: Make a shallow copy
+	cp := *c
+
+	// Step 2: Redact sensitive fields (distinct between empty and filled)
+	const redacted = "[REDACTED]"
+	if cp.StorageEncryptionPass != "" {
+		cp.StorageEncryptionPass = redacted
+	}
+	if cp.SFTPPass != "" {
+		cp.SFTPPass = redacted
+	}
+	if cp.SFTPPkeyPass != "" {
+		cp.SFTPPkeyPass = redacted
+	}
+	if cp.S3SecretAccessKey != "" {
+		cp.S3SecretAccessKey = redacted
+	}
+
+	// Step 3: Marshal the copy
+	b, err := json.MarshalIndent(cp, "", "  ")
 	if err != nil {
 		return ""
 	}
