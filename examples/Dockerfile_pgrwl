@@ -19,5 +19,6 @@ RUN echo "root:root" | chpasswd
 COPY files/dotfiles/ /root
 
 COPY bin/pgrwl /usr/local/bin/pgrwl
+COPY files/configs /tmp/configs
 
 ENTRYPOINT ["/usr/local/bin/pgrwl"]
