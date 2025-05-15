@@ -72,32 +72,30 @@ func main() {
 				Implements PostgreSQL restore_command.
 
 				Example usage in postgresql.conf:
-				restore_command = 'pgrwl restore-command --addr=k8s-worker5:30266 -f %f -p %p'
+				restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 				`),
 
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     "addr",
+						Name:     "serve-addr",
 						Required: true,
 						Usage:    "The address of pgrwl running in a serve mode",
 					},
-					&cli.StringFlag{
-						Name:     "f",
-						Required: true,
-						Usage:    "WAL file name to fetch",
-					},
-					&cli.StringFlag{
-						Name:     "p",
-						Required: true,
-						Usage:    "Output path for the fetched WAL",
-					},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
+					args := c.Args()
+					if args.Len() != 2 {
+						return fmt.Errorf("usage: restore-command <WAL_FILE_NAME> <DEST_PATH>")
+					}
+
+					walFile := args.Get(0)
+					destPath := args.Get(1)
+
 					return cmd.ExecRestoreCommand(
-						c.String("f"),
-						c.String("p"),
+						walFile,
+						destPath,
 						&cmd.RestoreCommandOpts{
-							Addr: c.String("addr"),
+							Addr: c.String("serve-addr"),
 						},
 					)
 				},
