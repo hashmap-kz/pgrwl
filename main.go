@@ -1,23 +1,26 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"os"
-
-	"github.com/hashmap-kz/pgrwl/config"
+	"log"
 
 	"github.com/hashmap-kz/pgrwl/cmd"
 )
 
 func main() {
-	configPath := flag.String("c", "", "config file path")
-	flag.Parse()
-	cfg := config.Read(*configPath)
-	fmt.Println(cfg.String())
-
-	if err := cmd.Execute(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	cfg := cmd.ReadConfig()
+	if cfg.Mode == cmd.ModeReceive {
+		cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
+			Directory:  cfg.Directory,
+			Slot:       cfg.ReceiveSlot,
+			NoLoop:     cfg.ReceiveNoLoop,
+			ListenPort: cfg.ReceiveListenPort,
+		})
+	} else if cfg.Mode == cmd.ModeRestore {
+		cmd.RunRestoreMode(&cmd.RestoreModeOpts{
+			Directory:  cfg.Directory,
+			ListenPort: cfg.RestoreListenPort,
+		})
+	} else {
+		log.Fatalf("unknown mode: %s", cfg.Mode)
 	}
 }

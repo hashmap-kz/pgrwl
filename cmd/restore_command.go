@@ -1,0 +1,52 @@
+package cmd
+
+import (
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+)
+
+type RestoreCommandOpts struct {
+	Addr string
+}
+
+func ExecRestoreCommand(walFileName, walFilePath string, opts *RestoreCommandOpts) error {
+	slog.Debug("wal-restore",
+		slog.String("f", walFileName),
+		slog.String("p", walFilePath),
+	)
+
+	addr, err := addr(opts.Addr)
+	if err != nil {
+		return err
+	}
+	baseURL := fmt.Sprintf("%s/wal/%s", addr, walFileName)
+
+	req, err := http.NewRequest("GET", baseURL, nil)
+	if err != nil {
+		return err
+	}
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server error: %s", resp.Status)
+	}
+
+	// Save to file
+	fileDst, err := os.OpenFile(walFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0o666)
+	if err != nil {
+		return err
+	}
+	defer fileDst.Close()
+
+	_, err = io.Copy(fileDst, resp.Body)
+	return err
+}

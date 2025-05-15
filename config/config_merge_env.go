@@ -40,9 +40,16 @@ func mergeEnvIfUnset(cfg *Config) {
 			}
 		}
 	}
-	if cfg.RestoreAddr == "" {
-		if v, ok := os.LookupEnv("PGRWL_RESTORE_ADDR"); ok && v != "" {
-			cfg.RestoreAddr = v
+	if cfg.RestoreListenPort == 0 {
+		if v, ok := os.LookupEnv("PGRWL_RESTORE_LISTEN_PORT"); ok && v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				cfg.RestoreListenPort = i
+			}
+		}
+	}
+	if cfg.RestoreFetchAddr == "" {
+		if v, ok := os.LookupEnv("PGRWL_RESTORE_FETCH_ADDR"); ok && v != "" {
+			cfg.RestoreFetchAddr = v
 		}
 	}
 	if cfg.LogLevel == "" {

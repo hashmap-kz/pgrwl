@@ -26,7 +26,7 @@ func cleanenvs(t *testing.T) {
 	_ = os.Unsetenv("PGRWL_RECEIVE_SLOT")
 	_ = os.Unsetenv("PGRWL_RECEIVE_NO_LOOP")
 	_ = os.Unsetenv("PGRWL_RECEIVE_LISTEN_PORT")
-	_ = os.Unsetenv("PGRWL_RESTORE_ADDR")
+	_ = os.Unsetenv("PGRWL_RESTORE_FETCH_ADDR")
 	_ = os.Unsetenv("PGRWL_LOG_LEVEL")
 	_ = os.Unsetenv("PGRWL_LOG_FORMAT")
 	_ = os.Unsetenv("PGRWL_LOG_ADD_SOURCE")

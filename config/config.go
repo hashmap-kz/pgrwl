@@ -20,7 +20,8 @@ type Config struct {
 	ReceiveSlot            string `json:"PGRWL_RECEIVE_SLOT"`
 	ReceiveNoLoop          bool   `json:"PGRWL_RECEIVE_NO_LOOP"`
 	ReceiveListenPort      int    `json:"PGRWL_RECEIVE_LISTEN_PORT"`
-	RestoreAddr            string `json:"PGRWL_RESTORE_ADDR"`
+	RestoreListenPort      int    `json:"PGRWL_RESTORE_LISTEN_PORT"`
+	RestoreFetchAddr       string `json:"PGRWL_RESTORE_FETCH_ADDR"`
 	LogLevel               string `json:"PGRWL_LOG_LEVEL"`
 	LogFormat              string `json:"PGRWL_LOG_FORMAT"`
 	LogAddSource           bool   `json:"PGRWL_LOG_ADD_SOURCE"`
@@ -51,7 +52,8 @@ func init() {
 	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
 	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
 	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
-	_ = os.Setenv("PGRWL_RESTORE_ADDR", "http://127.0.0.1:7070")
+	_ = os.Setenv("PGRWL_RESTORE_LISTEN_PORT", "7070")
+	_ = os.Setenv("PGRWL_RESTORE_FETCH_ADDR", "http://127.0.0.1:7070")
 }
 
 // TODO: hide sensitive
