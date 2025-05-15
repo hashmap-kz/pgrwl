@@ -38,6 +38,7 @@ func main() {
 		Usage:    "WAL-archive directory",
 		Aliases:  []string{"D"},
 		Required: true,
+		Sources:  cli.EnvVars("PGRWL_DIRECTORY"),
 	}
 	listenPortFlag := &cli.IntFlag{
 		Name:     flagListenPort,

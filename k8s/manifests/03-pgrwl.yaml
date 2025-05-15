@@ -31,9 +31,8 @@ data:
   PGPORT: "5432"
   PGUSER: "postgres"
   PGPASSWORD: "postgres"
-  PGRWL_MODE: "receive"
   PGRWL_DIRECTORY: "/wals/wal-archive"
-  PGRWL_SLOT: "pg_recwal_5"
+  PGRWL_RECEIVE_SLOT: "pg_recwal_5"
   PGRWL_LOG_LEVEL: "info"
   PGRWL_LOG_FORMAT: "json"
 
@@ -95,7 +94,7 @@ spec:
         - name: *app
           image: "mailboxsq7/pgrwl:latest"
           imagePullPolicy: Always
-          args: ["start"]
+          args: ["receive"]
           ports:
             - containerPort: 5080
               name: http
