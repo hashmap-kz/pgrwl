@@ -10,12 +10,12 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
-type RestoreModeOpts struct {
+type ServeModeOpts struct {
 	Directory  string
 	ListenPort int
 }
 
-func RunRestoreMode(opts *RestoreModeOpts) {
+func RunServeMode(opts *ServeModeOpts) {
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)

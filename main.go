@@ -58,9 +58,10 @@ func main() {
 				Name:  "serve",
 				Usage: "Serve WAL files for restore",
 				Action: func(ctx context.Context, c *cli.Command) error {
-					cmd.RunRestoreMode(&cmd.RestoreModeOpts{
+					checkServeCfg(cfg)
+					cmd.RunServeMode(&cmd.ServeModeOpts{
 						Directory:  cfg.Directory,
-						ListenPort: cfg.RestoreListenPort,
+						ListenPort: cfg.ServeListenPort,
 					})
 					return nil
 				},
@@ -89,6 +90,15 @@ func main() {
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func checkServeCfg(cfg *config.Config) {
+	if cfg.Directory == "" {
+		log.Fatal("[FATAL] serve: directory is not defined")
+	}
+	if cfg.ServeListenPort == 0 {
+		log.Fatal("[FATAL] serve: listen-port is not defined")
 	}
 }
 
