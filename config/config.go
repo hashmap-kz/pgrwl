@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -100,4 +101,14 @@ func mustLoadCfg(path string) (*Config, error) {
 	// fill from env if JSON did not provide values
 	mergeEnvIfUnset(&c)
 	return &c, nil
+}
+
+func expandEnvsWithPrefix(input, prefix string) string {
+	return os.Expand(input, func(key string) string {
+		if strings.HasPrefix(key, prefix) {
+			return os.Getenv(key)
+		}
+		// Leave unexpanded
+		return "${" + key + "}"
+	})
 }
