@@ -5,11 +5,17 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 )
 
 const (
 	ModeReceive = "receive"
 	ModeServe   = "serve"
+)
+
+var (
+	once   sync.Once
+	config *Config
 )
 
 type Config struct {
@@ -125,7 +131,21 @@ func expand(d []byte) []byte {
 	return []byte(expandEnvsWithPrefix(string(d), "PGRWL_"))
 }
 
+func Cfg() *Config {
+	if config == nil {
+		log.Fatal("config was not loaded in main")
+	}
+	return config
+}
+
 func MustLoad(path string) *Config {
+	once.Do(func() {
+		config = mustLoadCfg(path)
+	})
+	return config
+}
+
+func mustLoadCfg(path string) *Config {
 	var cfg Config
 	configData, err := os.ReadFile(path)
 	if err != nil {
