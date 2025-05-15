@@ -73,6 +73,7 @@ RUN chmod +x /entrypoint.sh
 # Copy test scripts (these files are frequently changed, so it's better to make this layer as late as possible)
 
 COPY scripts /var/lib/postgresql/scripts
+COPY files/configs /var/lib/postgresql/configs
 RUN chown -R postgres:postgres /var/lib/postgresql
 
 ######################################################################
