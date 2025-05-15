@@ -21,13 +21,6 @@ func writeTempConfigFile(t *testing.T, content string) string {
 
 func cleanenvs(t *testing.T) {
 	t.Helper()
-	_ = os.Unsetenv("PGRWL_DIRECTORY")
-	_ = os.Unsetenv("PGRWL_RECEIVE_SLOT")
-	_ = os.Unsetenv("PGRWL_RECEIVE_NO_LOOP")
-	_ = os.Unsetenv("PGRWL_LISTEN_PORT")
-	_ = os.Unsetenv("PGRWL_LOG_LEVEL")
-	_ = os.Unsetenv("PGRWL_LOG_FORMAT")
-	_ = os.Unsetenv("PGRWL_LOG_ADD_SOURCE")
 	_ = os.Unsetenv("PGRWL_STORAGE_TYPE")
 	_ = os.Unsetenv("PGRWL_STORAGE_COMPRESSION_ALGO")
 	_ = os.Unsetenv("PGRWL_STORAGE_ENCRYPTION_ALGO")
@@ -68,14 +61,7 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 	cfg, err := mustLoadCfg(path)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "/var/lib/test", cfg.Directory)
-	assert.Equal(t, true, cfg.ReceiveNoLoop)
-	assert.Equal(t, "info", cfg.LogLevel)
-
 	// These come from env
-	assert.Equal(t, "env_slot", cfg.ReceiveSlot)
-	assert.Equal(t, 6000, cfg.ListenPort)
-	assert.Equal(t, true, cfg.LogAddSource)
 	assert.Equal(t, true, cfg.S3DisableSSL)
 	assert.Equal(t, "http://env-url", cfg.S3URL)
 }
@@ -94,14 +80,6 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	}`
 	path := writeTempConfigFile(t, jsonData)
 
-	cfg, err := mustLoadCfg(path)
+	_, err := mustLoadCfg(path)
 	require.NoError(t, err)
-
-	assert.Equal(t, "/tmp/test", cfg.Directory)
-	assert.Equal(t, "myslot", cfg.ReceiveSlot)
-	assert.True(t, cfg.ReceiveNoLoop)
-	assert.Equal(t, 5432, cfg.ListenPort)
-	assert.Equal(t, "debug", cfg.LogLevel)
-	assert.Equal(t, "text", cfg.LogFormat)
-	assert.True(t, cfg.LogAddSource)
 }

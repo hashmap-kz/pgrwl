@@ -13,8 +13,42 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+const (
+	flagDirectory    = "directory"
+	flagListenPort   = "listen-port"
+	flagSlot         = "slot"
+	flagNoLoop       = "no-loop"
+	flagLogLevel     = "log-level"
+	flagLogFormat    = "log-format"
+	flagLogAddSource = "log-add-source"
+)
+
+func init() {
+	// default values
+	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
+	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "pgrwl_v5")
+	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
+	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
+	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
+}
+
 func main() {
 	var cfg *config.Config
+
+	dirFlag := &cli.StringFlag{
+		Name:     flagDirectory,
+		Usage:    "WAL-archive directory",
+		Aliases:  []string{"D"},
+		Required: true,
+		Sources:  cli.EnvVars("PGRWL_DIRECTORY"),
+	}
+	listenPortFlag := &cli.IntFlag{
+		Name:     flagListenPort,
+		Usage:    "HTTP port",
+		Aliases:  []string{"p"},
+		Required: true,
+		Sources:  cli.EnvVars("PGRWL_LISTEN_PORT"),
+	}
 
 	app := &cli.Command{
 		Name:  "pgrwl",
@@ -25,6 +59,24 @@ func main() {
 				Usage:    "Path to config file (*.json)",
 				Aliases:  []string{"c"},
 				Required: true,
+				Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
+			},
+			&cli.StringFlag{
+				Name:    flagLogLevel,
+				Value:   "info",
+				Usage:   "Log level (e.g. trace, debug, info, warn, error)",
+				Sources: cli.EnvVars("PGRWL_LOG_LEVEL"),
+			},
+			&cli.StringFlag{
+				Name:    flagLogFormat,
+				Value:   "json",
+				Usage:   "Log format (e.g. text, json)",
+				Sources: cli.EnvVars("PGRWL_LOG_FORMAT"),
+			},
+			&cli.BoolFlag{
+				Name:    flagLogAddSource,
+				Usage:   "Enable source field in logs",
+				Sources: cli.EnvVars("PGRWL_LOG_ADD_SOURCE"),
 			},
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
@@ -35,9 +87,9 @@ func main() {
 			cfg = config.Read(configPath)
 			_, _ = fmt.Fprintln(os.Stderr, cfg.String()) // debug config (NOTE: sensitive fields are hidden)
 			logger.Init(&logger.Opts{
-				Level:     cfg.LogLevel,
-				Format:    cfg.LogFormat,
-				AddSource: cfg.LogAddSource,
+				Level:     c.String(flagLogLevel),
+				Format:    c.String(flagLogFormat),
+				AddSource: c.Bool(flagLogAddSource),
 			})
 			return nil, nil
 		},
@@ -45,13 +97,31 @@ func main() {
 			{
 				Name:  "receive",
 				Usage: "Stream and archive WALs",
+				Flags: []cli.Flag{
+					dirFlag,
+					listenPortFlag,
+					&cli.StringFlag{
+						Name:     flagSlot,
+						Aliases:  []string{"S"},
+						Value:    "pgrwl_v5",
+						Usage:    "Replication slot name",
+						Required: true,
+						Sources:  cli.EnvVars("PGRWL_RECEIVE_SLOT"),
+					},
+					&cli.BoolFlag{
+						Name:    flagNoLoop,
+						Aliases: []string{"n"},
+						Usage:   "Disable loop after file stream ends",
+						Sources: cli.EnvVars("PGRWL_RECEIVE_NO_LOOP"),
+					},
+				},
 				Action: func(ctx context.Context, c *cli.Command) error {
-					checkReceiveCfg(cfg)
+					checkPgEnvsAreSet()
 					cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
-						Directory:  cfg.Directory,
-						Slot:       cfg.ReceiveSlot,
-						NoLoop:     cfg.ReceiveNoLoop,
-						ListenPort: cfg.ListenPort,
+						Directory:  c.String(flagDirectory),
+						ListenPort: c.Int(flagListenPort),
+						Slot:       c.String(flagSlot),
+						NoLoop:     c.Bool(flagNoLoop),
 					})
 					return nil
 				},
@@ -59,11 +129,14 @@ func main() {
 			{
 				Name:  "serve",
 				Usage: "Serve WAL files for restore",
+				Flags: []cli.Flag{
+					dirFlag,
+					listenPortFlag,
+				},
 				Action: func(ctx context.Context, c *cli.Command) error {
-					checkServeCfg(cfg)
 					cmd.RunServeMode(&cmd.ServeModeOpts{
-						Directory:  cfg.Directory,
-						ListenPort: cfg.ListenPort,
+						Directory:  c.String(flagDirectory),
+						ListenPort: c.Int(flagListenPort),
 					})
 					return nil
 				},
@@ -100,27 +173,8 @@ func main() {
 	}
 }
 
-func checkServeCfg(cfg *config.Config) {
-	if cfg.Directory == "" {
-		log.Fatal("[FATAL] serve: directory is not defined")
-	}
-	if cfg.ListenPort == 0 {
-		log.Fatal("[FATAL] serve: listen-port is not defined")
-	}
-}
-
-func checkReceiveCfg(cfg *config.Config) {
-	if cfg.Directory == "" {
-		log.Fatal("[FATAL] receive: directory is not defined")
-	}
-	if cfg.ListenPort == 0 {
-		log.Fatal("[FATAL] receive: listen-port is not defined")
-	}
-	if cfg.ReceiveSlot == "" {
-		log.Fatal("[FATAL] receive: slot is not defined")
-	}
-
-	// Validate required PG env vars
+func checkPgEnvsAreSet() {
+	// TODO: PGPASSFILE, etc...
 	var emptyEnvs []string
 	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"} {
 		if os.Getenv(name) == "" {

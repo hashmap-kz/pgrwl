@@ -15,13 +15,6 @@ var (
 )
 
 type Config struct {
-	Directory              string `json:"PGRWL_DIRECTORY,omitempty"`
-	ListenPort             int    `json:"PGRWL_LISTEN_PORT,omitempty"`
-	ReceiveSlot            string `json:"PGRWL_RECEIVE_SLOT,omitempty"`
-	ReceiveNoLoop          bool   `json:"PGRWL_RECEIVE_NO_LOOP,omitempty"`
-	LogLevel               string `json:"PGRWL_LOG_LEVEL,omitempty"`
-	LogFormat              string `json:"PGRWL_LOG_FORMAT,omitempty"`
-	LogAddSource           bool   `json:"PGRWL_LOG_ADD_SOURCE,omitempty"`
 	StorageType            string `json:"PGRWL_STORAGE_TYPE,omitempty"`
 	StorageCompressionAlgo string `json:"PGRWL_STORAGE_COMPRESSION_ALGO,omitempty"`
 	StorageEncryptionAlgo  string `json:"PGRWL_STORAGE_ENCRYPTION_ALGO,omitempty"`
@@ -39,15 +32,6 @@ type Config struct {
 	S3Region               string `json:"PGRWL_S3_REGION,omitempty"`
 	S3UsePathStyle         bool   `json:"PGRWL_S3_USE_PATH_STYLE,omitempty"`
 	S3DisableSSL           bool   `json:"PGRWL_S3_DISABLE_SSL,omitempty"`
-}
-
-func init() {
-	// default values
-	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "pgrwl_v5")
-	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
-	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
-	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
-	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
 }
 
 func (c *Config) String() string {

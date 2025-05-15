@@ -11,133 +11,92 @@ func mergeEnvIfUnset(cfg *Config) {
 	if cfg == nil {
 		return
 	}
-	if cfg.Directory == "" {
-		if v, ok := os.LookupEnv("PGRWL_DIRECTORY"); ok && v != "" {
-			cfg.Directory = v
-		}
-	}
-	if cfg.ReceiveSlot == "" {
-		if v, ok := os.LookupEnv("PGRWL_RECEIVE_SLOT"); ok && v != "" {
-			cfg.ReceiveSlot = v
-		}
-	}
-	if !cfg.ReceiveNoLoop {
-		if v, ok := os.LookupEnv("PGRWL_RECEIVE_NO_LOOP"); ok && v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
-				cfg.ReceiveNoLoop = b
-			}
-		}
-	}
-	if cfg.ListenPort == 0 {
-		if v, ok := os.LookupEnv("PGRWL_LISTEN_PORT"); ok && v != "" {
-			if i, err := strconv.Atoi(v); err == nil {
-				cfg.ListenPort = i
-			}
-		}
-	}
-	if cfg.LogLevel == "" {
-		if v, ok := os.LookupEnv("PGRWL_LOG_LEVEL"); ok && v != "" {
-			cfg.LogLevel = v
-		}
-	}
-	if cfg.LogFormat == "" {
-		if v, ok := os.LookupEnv("PGRWL_LOG_FORMAT"); ok && v != "" {
-			cfg.LogFormat = v
-		}
-	}
-	if !cfg.LogAddSource {
-		if v, ok := os.LookupEnv("PGRWL_LOG_ADD_SOURCE"); ok && v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
-				cfg.LogAddSource = b
-			}
-		}
-	}
 	if cfg.StorageType == "" {
-		if v, ok := os.LookupEnv("PGRWL_STORAGE_TYPE"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_STORAGE_TYPE,omitempty"); ok && v != "" {
 			cfg.StorageType = v
 		}
 	}
 	if cfg.StorageCompressionAlgo == "" {
-		if v, ok := os.LookupEnv("PGRWL_STORAGE_COMPRESSION_ALGO"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_STORAGE_COMPRESSION_ALGO,omitempty"); ok && v != "" {
 			cfg.StorageCompressionAlgo = v
 		}
 	}
 	if cfg.StorageEncryptionAlgo == "" {
-		if v, ok := os.LookupEnv("PGRWL_STORAGE_ENCRYPTION_ALGO"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_STORAGE_ENCRYPTION_ALGO,omitempty"); ok && v != "" {
 			cfg.StorageEncryptionAlgo = v
 		}
 	}
 	if cfg.StorageEncryptionPass == "" {
-		if v, ok := os.LookupEnv("PGRWL_STORAGE_ENCRYPTION_PASS"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_STORAGE_ENCRYPTION_PASS,omitempty"); ok && v != "" {
 			cfg.StorageEncryptionPass = v
 		}
 	}
 	if cfg.SFTPHost == "" {
-		if v, ok := os.LookupEnv("PGRWL_SFTP_HOST"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_SFTP_HOST,omitempty"); ok && v != "" {
 			cfg.SFTPHost = v
 		}
 	}
 	if cfg.SFTPPort == 0 {
-		if v, ok := os.LookupEnv("PGRWL_SFTP_PORT"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_SFTP_PORT,omitempty"); ok && v != "" {
 			if i, err := strconv.Atoi(v); err == nil {
 				cfg.SFTPPort = i
 			}
 		}
 	}
 	if cfg.SFTPUser == "" {
-		if v, ok := os.LookupEnv("PGRWL_SFTP_USER"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_SFTP_USER,omitempty"); ok && v != "" {
 			cfg.SFTPUser = v
 		}
 	}
 	if cfg.SFTPPass == "" {
-		if v, ok := os.LookupEnv("PGRWL_SFTP_PASS"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_SFTP_PASS,omitempty"); ok && v != "" {
 			cfg.SFTPPass = v
 		}
 	}
 	if cfg.SFTPPkeyPath == "" {
-		if v, ok := os.LookupEnv("PGRWL_SFTP_PKEY_PATH"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_SFTP_PKEY_PATH,omitempty"); ok && v != "" {
 			cfg.SFTPPkeyPath = v
 		}
 	}
 	if cfg.SFTPPkeyPass == "" {
-		if v, ok := os.LookupEnv("PGRWL_SFTP_PKEY_PASS"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_SFTP_PKEY_PASS,omitempty"); ok && v != "" {
 			cfg.SFTPPkeyPass = v
 		}
 	}
 	if cfg.S3URL == "" {
-		if v, ok := os.LookupEnv("PGRWL_S3_URL"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_S3_URL,omitempty"); ok && v != "" {
 			cfg.S3URL = v
 		}
 	}
 	if cfg.S3AccessKeyID == "" {
-		if v, ok := os.LookupEnv("PGRWL_S3_ACCESS_KEY_ID"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_S3_ACCESS_KEY_ID,omitempty"); ok && v != "" {
 			cfg.S3AccessKeyID = v
 		}
 	}
 	if cfg.S3SecretAccessKey == "" {
-		if v, ok := os.LookupEnv("PGRWL_S3_SECRET_ACCESS_KEY"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_S3_SECRET_ACCESS_KEY,omitempty"); ok && v != "" {
 			cfg.S3SecretAccessKey = v
 		}
 	}
 	if cfg.S3Bucket == "" {
-		if v, ok := os.LookupEnv("PGRWL_S3_BUCKET"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_S3_BUCKET,omitempty"); ok && v != "" {
 			cfg.S3Bucket = v
 		}
 	}
 	if cfg.S3Region == "" {
-		if v, ok := os.LookupEnv("PGRWL_S3_REGION"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_S3_REGION,omitempty"); ok && v != "" {
 			cfg.S3Region = v
 		}
 	}
 	if !cfg.S3UsePathStyle {
-		if v, ok := os.LookupEnv("PGRWL_S3_USE_PATH_STYLE"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_S3_USE_PATH_STYLE,omitempty"); ok && v != "" {
 			if b, err := strconv.ParseBool(v); err == nil {
 				cfg.S3UsePathStyle = b
 			}
 		}
 	}
 	if !cfg.S3DisableSSL {
-		if v, ok := os.LookupEnv("PGRWL_S3_DISABLE_SSL"); ok && v != "" {
+		if v, ok := os.LookupEnv("PGRWL_S3_DISABLE_SSL,omitempty"); ok && v != "" {
 			if b, err := strconv.ParseBool(v); err == nil {
 				cfg.S3DisableSSL = b
 			}
