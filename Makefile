@@ -14,9 +14,13 @@ endif
 lint:
 	golangci-lint run --output.tab.path=stdout
 
+.PHONY: gen
+gen:
+	go generate ./...
+
 # Build the binary
 .PHONY: build
-build:
+build: gen
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(OUTPUT) main.go
 
 # Install the binary to /usr/local/bin
@@ -45,3 +49,8 @@ test-cov:
 .PHONY: test-integ-scripts
 test-integ-scripts:
 	@currdir=$$(pwd) && cd test/integration/environ && bash run-tests.sh | tee $$currdir/test-integ-scripts.log
+
+.PHONY: image
+image:
+	docker buildx build -t mailboxsq7/pgrwl .
+	docker push mailboxsq7/pgrwl

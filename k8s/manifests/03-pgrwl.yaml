@@ -1,0 +1,140 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: &app pgrwl
+  namespace: pgrwl-test
+  labels:
+    app: *app
+spec:
+  type: NodePort
+  ports:
+    - port: 7070
+      targetPort: 7070
+      # dev/tst/preprod/master
+      nodePort: 30266
+      name: http
+  selector:
+    app: *app
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: &app pgrwl
+  namespace: pgrwl-test
+  labels:
+    app: *app
+data:
+  TZ: "Asia/Aqtau"
+  PGHOST: "postgres"
+  PGPORT: "5432"
+  PGUSER: "postgres"
+  PGPASSWORD: "postgres"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgrwl-receive-config
+  namespace: pgrwl-test
+data:
+  config.json: |
+    {
+      "mode": {
+        "name": "receive",
+        "receive": {
+          "listen_port": 7070,
+          "directory": "wals",
+          "slot": "pgrwl_v5"
+        }
+      },
+      "log": {
+        "level": "trace",
+        "format": "text",
+        "add_source": true
+      }
+    }
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgrwl-data
+  namespace: pgrwl-test
+spec:
+  # NOTE: replace with pvc you're using in your infra.
+  storageClassName: standard
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: &app pgrwl
+  namespace: pgrwl-test
+spec:
+  replicas: 1
+  serviceName: *app
+  selector:
+    matchLabels:
+      app: *app
+  template:
+    metadata:
+      labels:
+        app: *app
+    spec:
+      # NOTE: replace with pvc you're using in your infra.
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: pgrwl-data
+            readOnly: false
+        - name: pgrwl-receive-config
+          configMap:
+            name: pgrwl-receive-config
+
+      # Wait logic is handled by the service itself.
+      #
+      # initContainers:
+      #   - name: wait-db
+      #     image: "busybox:latest"
+      #     imagePullPolicy: IfNotPresent
+      #     command:
+      #       - /bin/sh
+      #       - -euc
+      #       - |
+      #         while ! nc -z postgres 5432; do
+      #           echo "Waiting for PostgreSQL to boot";
+      #           sleep 5;
+      #         done;
+      #         echo "PostgreSQL is ready";
+
+      containers:
+        - name: *app
+          image: "mailboxsq7/pgrwl:latest"
+          imagePullPolicy: Always
+          args: ["-c", "/tmp/configs/config.json"]
+          ports:
+            - containerPort: 7070
+              name: http
+          envFrom:
+            - configMapRef:
+                name: *app
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "32m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          volumeMounts:
+            - mountPath: /wals
+              name: storage
+            - mountPath: /tmp/configs
+              name: pgrwl-receive-config

@@ -5,11 +5,7 @@ APP_PATH="/usr/local/bin/pgrwl"
 WAL_PATH="/tmp/wal-archive"
 
 ARGS=(
-  "-D" "${WAL_PATH}"
-  "-S" "pg_recwal_5"
-  "--log-add-source"
-  "--no-loop"
-  "--log-level" "debug"
+  "-c" "/var/lib/postgresql/configs/01-basic-receive.json"
 )
 
 mkdir -p "${WAL_PATH}"

@@ -9,15 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
+	"sync"
+	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/utils"
-
-	"github.com/hashmap-kz/pgrwl/internal/fsync"
+	"github.com/hashmap-kz/pgrwl/internal/core/conv"
+	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
 
 	"github.com/jackc/pgx/v5/pgconn"
-
-	"github.com/hashmap-kz/pgrwl/internal/conv"
 
 	"github.com/jackc/pglogrepl"
 )
@@ -29,12 +27,53 @@ type PgReceiveWal struct {
 	ConnStrRepl string
 	SlotName    string
 	Verbose     bool
+
+	streamMu sync.RWMutex
+	stream   *StreamCtl // current active stream (or nil)
+}
+
+type Opts struct {
+	Directory string
+	Slot      string
+	NoLoop    bool
+	Verbose   bool
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 
-func NewPgReceiver(ctx context.Context, opts *utils.Opts) (*PgReceiveWal, error) {
+func waitForPostgresIsReady(ctx context.Context, dsn string, maxWaitTimeout, sleepInterval time.Duration) error {
+	var err error
+	var conn *pgconn.PgConn
+
+	deadline := time.Now().Add(maxWaitTimeout)
+	for {
+		slog.Info("waiting while pg_isready",
+			slog.Duration("maxWaitTimeout", maxWaitTimeout),
+			slog.Duration("sleepInterval", sleepInterval),
+		)
+
+		conn, err = pgconn.Connect(ctx, dsn)
+		if err == nil {
+			conn.Close(ctx) // explicitly close
+			slog.Info("pg_isready", slog.String("status", "ok"))
+			return nil
+		}
+
+		if time.Now().After(deadline) {
+			return errors.New("timeout: postgres is not ready")
+		}
+		time.Sleep(sleepInterval)
+	}
+}
+
+func NewPgReceiver(ctx context.Context, opts *Opts) (*PgReceiveWal, error) {
 	connStrRepl := fmt.Sprintf("application_name=%s replication=yes", opts.Slot)
+
+	err := waitForPostgresIsReady(ctx, connStrRepl, 5*time.Minute, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
 	conn, err := pgconn.Connect(ctx, connStrRepl)
 	if err != nil {
 		slog.Error("cannot establish connection", slog.Any("err", err))
@@ -51,7 +90,7 @@ func NewPgReceiver(ctx context.Context, opts *utils.Opts) (*PgReceiveWal, error)
 		ConnStrRepl: connStrRepl,
 		SlotName:    opts.Slot,
 		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
-		Verbose: strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace"),
+		Verbose: opts.Verbose,
 	}, nil
 }
 
@@ -145,6 +184,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		Conn:            pgrw.Conn,
 		Verbose:         pgrw.Verbose,
 	})
+	pgrw.SetStream(stream)
 
 	err = stream.ReceiveXlogStream(ctx)
 	if err != nil {
@@ -173,6 +213,12 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (pgrw *PgReceiveWal) SetStream(s *StreamCtl) {
+	pgrw.streamMu.Lock()
+	defer pgrw.streamMu.Unlock()
+	pgrw.stream = s
 }
 
 // findStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)

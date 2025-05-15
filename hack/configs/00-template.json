@@ -1,0 +1,47 @@
+{
+  "mode": {
+    "name": "receive",
+    "receive": {
+      "listen_port": 7070,
+      "directory": "/var/lib/pgwal",
+      "slot": "replication_slot",
+      "no_loop": false
+    },
+    "serve": {
+      "listen_port": 7070,
+      "directory": "/var/lib/pgwal"
+    }
+  },
+  "log": {
+    "level": "info",
+    "format": "text",
+    "add_source": true
+  },
+  "storage": {
+    "name": "s3",
+    "compression": {
+      "algo": "gzip"
+    },
+    "encryption": {
+      "algo": "aesgcm",
+      "pass": "${PGRWL_ENCRYPT_PASSWD}"
+    },
+    "sftp": {
+      "host": "sftp.example.com",
+      "port": 22,
+      "user": "backupuser",
+      "pass": "${PGRWL_VM_PASSWORD}",
+      "pkey_path": "/home/user/.ssh/id_rsa",
+      "pkey_pass": "${PGRWL_SSH_PKEY_PASSPHRASE}"
+    },
+    "s3": {
+      "url": "https://s3.example.com",
+      "access_key_id": "AKIAEXAMPLE",
+      "secret_access_key": "${PGRWL_SECRET_ACCESS_KEY}",
+      "bucket": "postgres-backups",
+      "region": "us-east-1",
+      "use_path_style": true,
+      "disable_ssl": false
+    }
+  }
+}

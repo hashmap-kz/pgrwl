@@ -46,33 +46,108 @@ container running PostgreSQL.
 
 ## 🛠️ Usage
 
+### `Receive` mode
+
 ```bash
-export PGHOST='localhost'
-export PGPORT='5432'
-export PGUSER='postgres'
-export PGPASSWORD='postgres'
+cat <<EOF >config.json
+{
+  "mode": {
+    "name": "receive",
+    "receive": {
+      "listen_port": 7070,
+      "directory": "wals",
+      "slot": "pgrwl_v5"
+    }
+  }
+}
+EOF
 
-pgrwl -D /mnt/wal-archive -S bookstore_app 
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=postgres
+
+pgrwl -c config.json
 ```
 
-### ⚙️ Flags
+### `Serve` mode
+
+```bash
+cat <<EOF >config.json
+{
+  "mode": {
+    "name": "serve",
+    "serve": {
+      "listen_port": 7070,
+      "directory": "wals"
+    }
+  }
+}
+EOF
+
+pgrwl -c config.json
+```
+
+--- 
+
+## ⚙️ Configuration Reference
+
+The configuration file is in JSON format only. It supports environment variable placeholders like
+`${PGRWL_SECRET_ACCESS_KEY}`.
 
 ```
-CLI:
-  -D, --directory       receive write-ahead log files into this directory (required)
-  -S, --slot            replication slot to use (required)
-  -n, --no-loop         do not loop on connection lost
-      --log-level       set log level (trace, debug, info, warn, error) (default: info)
-      --log-format      specify log formatter (json, text) (default: json)
-      --log-add-source  include source file and line in log output (default: false)
-    
-Corresponded env-vars:
-  PGRWL_DIRECTORY
-  PGRWL_SLOT
-  PGRWL_NO_LOOP
-  PGRWL_LOG_LEVEL
-  PGRWL_LOG_FORMAT
-  PGRWL_LOG_ADD_SOURCE
+-----------------------------
+REQUIRED SECTIONS
+-----------------------------
+
+[mode]
+  name            string   Mode of operation: "receive" or "serve"
+
+  [mode.receive]  Used when mode.name is "receive"
+    listen_port   int      Port for HTTP status/metrics (e.g., 7070)
+    directory     string   Directory to archive WAL files
+    slot          string   Replication slot name
+    no_loop       bool     Disable reconnect loop on failure
+
+  [mode.serve]    Used when mode.name is "serve"
+    listen_port   int      Port to serve WAL files (e.g., 7070)
+    directory     string   Directory from which WAL files are served
+
+-----------------------------
+OPTIONAL SECTIONS
+-----------------------------
+
+[log]
+  level           string   Log level: "trace", "debug", "info", "warn", "error"
+  format          string   Output format: "text" or "json"
+  add_source      bool     Include file and line in log output
+
+[storage]
+  name            string   Storage backend type: "s3", "sftp", or "local"
+
+  [storage.compression]
+    algo          string   Compression algorithm (e.g., "gzip")
+
+  [storage.encryption]
+    algo          string   Encryption algorithm (e.g., "aesgcm")
+    pass          string   Password (supports env vars like ${PGRWL_ENCRYPT_PASSWD})
+
+  [storage.sftp]
+    host          string   SFTP server host
+    port          int      SFTP port (default: 22)
+    user          string   SFTP username
+    pass          string   Password (env var allowed)
+    pkey_path     string   Path to SSH private key (optional)
+    pkey_pass     string   SSH private key passphrase (optional)
+
+  [storage.s3]
+    url               string   S3 endpoint (e.g., https://s3.example.com)
+    access_key_id     string   Access key ID
+    secret_access_key string   Secret access key (supports env var)
+    bucket            string   Bucket name for WAL files
+    region            string   AWS region (e.g., "us-east-1")
+    use_path_style    bool     Enable path-style URLs (required for MinIO)
+    disable_ssl       bool     Disable HTTPS (use HTTP instead)
 ```
 
 ---
@@ -119,9 +194,7 @@ _The full process may look like this (a typical, rough, and simplified example):
 
 ### Design Notes
 
-This utility follows a **single-responsibility** principle.
-
-Is designed to use the local filesystem exclusively. This is a deliberate choice, because - as mentioned
+`pgrwl` is designed to use the local filesystem exclusively. This is a deliberate choice, because - as mentioned
 earlier - we must rely on fsync after each message is written to disk.
 This ensures that `*.partial` files always contain fully valid WAL segments, making them safe to use during the restore
 phase (after simply removing the `*.partial` suffix).
@@ -132,16 +205,6 @@ unpredictable issues.
 
 In short: PostgreSQL waits for the replica to confirm commits, so we cannot afford to depend on external systems in such
 critical paths.
-
-This utility focuses on doing one thing well: robustly streaming WAL segments.
-In my strong opinion, combining this core responsibility with other concerns—such as retention policies, remote uploads,
-or additional processing - risks introducing failure modes.
-If any of those subsystems were to crash, it could bring down the main WAL receiving loop, which is precisely the kind
-of failure we aim to avoid.
-
-Handling retention, remote uploads, and other lifecycle operations should be the responsibility of **separate tools**
-that consume the WAL files archived by this utility.
-This is the same design philosophy used by `pg_receivewal` and other official PostgreSQL tools.
 
 ### 💾 Notes on `fsync` (since the utility works in synchronous mode **only**):
 

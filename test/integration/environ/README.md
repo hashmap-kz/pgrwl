@@ -14,8 +14,8 @@ docker exec -it pg17 bash
 ### Run all tests
 
 ```
-docker exec -it pg17 chmod +x /var/lib/postgresql/scripts/runners/run-tests.sh
-docker exec -it pg17 su - postgres -c /var/lib/postgresql/scripts/runners/run-tests.sh
+docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/runners/run-tests.sh
+docker exec -it pg-primary su - postgres -c /var/lib/postgresql/scripts/runners/run-tests.sh
 ```
 
 ### Login into "VM" (an SFTP storage)

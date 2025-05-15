@@ -8,9 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/fsync"
-
-	"github.com/hashmap-kz/pgrwl/internal/conv"
+	"github.com/hashmap-kz/pgrwl/internal/core/conv"
+	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
 
 	"github.com/jackc/pglogrepl"
 )

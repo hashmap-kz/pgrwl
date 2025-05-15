@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 
-	"github.com/hashmap-kz/pgrwl/internal/conv"
+	"github.com/jackc/pgx/v5/pgproto3"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"

@@ -1,0 +1,14 @@
+{
+  "mode": {
+    "name": "serve",
+    "serve": {
+      "listen_port": 7070,
+      "directory": "wals"
+    }
+  },
+  "log": {
+    "level": "trace",
+    "format": "text",
+    "add_source": true
+  }
+}
