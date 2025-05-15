@@ -58,15 +58,15 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 	_ = os.Setenv("PGRWL_S3_DISABLE_SSL", "true")
 	_ = os.Setenv("PGRWL_S3_URL", "http://env-url")
 
-	json := `{
+	jsonData := `{
 		"PGRWL_DIRECTORY": "/var/lib/test",
 		"PGRWL_RECEIVE_NO_LOOP": true,
 		"PGRWL_LOG_LEVEL": "info"
 	}`
 
-	path := writeTempConfigFile(t, json)
+	path := writeTempConfigFile(t, jsonData)
 
-	cfg, err := loadCfg(path)
+	cfg, err := mustLoadCfg(path)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "/var/lib/test", cfg.Directory)
@@ -79,19 +79,6 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 	assert.Equal(t, true, cfg.LogAddSource)
 	assert.Equal(t, true, cfg.S3DisableSSL)
 	assert.Equal(t, "http://env-url", cfg.S3URL)
-}
-
-func TestLoadCfg_NoFile_OnlyEnv(t *testing.T) {
-	cleanenvs(t)
-
-	_ = os.Setenv("PGRWL_RECEIVE_NO_LOOP", "true")
-	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "7777")
-
-	cfg, err := loadCfg("") // no file
-	assert.NoError(t, err)
-
-	assert.True(t, cfg.ReceiveNoLoop)
-	assert.Equal(t, 7777, cfg.ReceiveListenPort)
 }
 
 func TestLoadCfg_FromFile(t *testing.T) {
@@ -108,7 +95,7 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	}`
 	path := writeTempConfigFile(t, jsonData)
 
-	cfg, err := loadCfg(path)
+	cfg, err := mustLoadCfg(path)
 	require.NoError(t, err)
 
 	assert.Equal(t, "/tmp/test", cfg.Directory)
@@ -118,32 +105,4 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	assert.Equal(t, "debug", cfg.LogLevel)
 	assert.Equal(t, "text", cfg.LogFormat)
 	assert.True(t, cfg.LogAddSource)
-}
-
-func TestLoadCfg_FromEnvFallback(t *testing.T) {
-	cleanenvs(t)
-
-	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "fallback_slot")
-	_ = os.Setenv("PGRWL_LOG_ADD_SOURCE", "true")
-
-	cfg, err := loadCfg("") // No file
-	require.NoError(t, err)
-
-	assert.Equal(t, "fallback_slot", cfg.ReceiveSlot)
-	assert.Equal(t, true, cfg.LogAddSource)
-}
-
-func TestMergeEnvIfUnset(t *testing.T) {
-	cleanenvs(t)
-
-	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "1234")
-
-	cfg := Config{
-		LogLevel: "warn", // should not be overwritten
-	}
-
-	mergeEnvIfUnset(&cfg)
-
-	assert.Equal(t, 1234, cfg.ReceiveListenPort)
-	assert.Equal(t, "warn", cfg.LogLevel)
 }

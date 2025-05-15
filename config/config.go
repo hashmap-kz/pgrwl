@@ -91,7 +91,7 @@ func Cfg() *Config {
 func Read(path string) *Config {
 	once.Do(func() {
 		var err error
-		config, err = loadCfg(path)
+		config, err = mustLoadCfg(path)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -99,17 +99,14 @@ func Read(path string) *Config {
 	return config
 }
 
-func loadCfg(path string) (*Config, error) {
+func mustLoadCfg(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
 	var c Config
-	// if path is set, must read from file
-	if path != "" {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		if err := json.Unmarshal(data, &c); err != nil {
-			return nil, err
-		}
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil, err
 	}
 	// fill from env if JSON did not provide values
 	mergeEnvIfUnset(&c)

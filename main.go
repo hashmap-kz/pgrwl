@@ -30,7 +30,11 @@ func main() {
 			configFlag,
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
-			cfg = config.Read(c.String("config"))
+			configPath := c.String("config")
+			if configPath == "" {
+				log.Fatal("config path is not defined")
+			}
+			cfg = config.Read(configPath)
 			_, _ = fmt.Fprintln(os.Stderr, cfg.String()) // debug config (NOTE: sensitive fields are hidden)
 			logger.Init(&logger.Opts{
 				Level:     cfg.LogLevel,
