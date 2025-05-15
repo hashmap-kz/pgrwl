@@ -25,6 +25,7 @@ _`pgrwl` stream write-ahead logs from a PostgreSQL server_
     - [Integration Testing](#-integration-testing)
     - [Verify build locally](#to-contribute-or-verify-the-project-locally-the-following-make-targets-should-all-pass)
     - [Source Code Structure](#-source-code-structure)
+    - [Notes On Configuration](#notes-on-configuration)
     - [Links](#-links)
     - [Planned Features](#-planned-features)
 - [📜 License](#-license)
