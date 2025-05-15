@@ -25,6 +25,7 @@ const (
 
 func init() {
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
+	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
 }
 
 func main() {
@@ -75,7 +76,7 @@ func main() {
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			configPath := c.String("config")
 			if configPath != "" {
-				cfg = config.Read(configPath)
+				cfg = config.MustRead(configPath)
 			} else {
 				cfg = config.Default()
 			}
@@ -97,14 +98,14 @@ func main() {
 					&cli.StringFlag{
 						Name:    flagSlot,
 						Aliases: []string{"S"},
-						Usage:   "Replication slot name",
+						Usage:   "Replication slot to use",
 						Value:   "pgrwl_v5",
 						Sources: cli.EnvVars("PGRWL_RECEIVE_SLOT"),
 					},
 					&cli.BoolFlag{
 						Name:    flagNoLoop,
 						Aliases: []string{"n"},
-						Usage:   "Disable loop after file stream ends",
+						Usage:   "Do not loop on connection lost",
 						Sources: cli.EnvVars("PGRWL_RECEIVE_NO_LOOP"),
 					},
 				},

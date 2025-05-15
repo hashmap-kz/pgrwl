@@ -68,7 +68,7 @@ func Cfg() *Config {
 	return config
 }
 
-func Read(path string) *Config {
+func MustRead(path string) *Config {
 	once.Do(func() {
 		var err error
 		config, err = mustLoadCfg(path)
