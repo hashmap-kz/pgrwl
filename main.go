@@ -122,6 +122,10 @@ NAME:
 USAGE:
   # RECEIVE/SERVE MODE (requires appropriate sections in config.json)
   pgrwl -c config.json
+
+  # NOTE: Environment variable placeholders with the 'PGRWL_' prefix are expanded.
+  # This allows you to store secrets in the config file like this:
+  # "secret_access_key": "${PGRWL_SECRET_ACCESS_KEY}"
   
   # basic config for 'receive' mode:
   {
