@@ -49,8 +49,6 @@ container running PostgreSQL.
 ### `Receive` mode
 
 ```bash
-# Run in 'receive' mode:
-
 cat <<EOF >config.json
 {
   "mode": {
@@ -97,93 +95,60 @@ pgrwl -c config.json
 The configuration file is in JSON format only. It supports environment variable placeholders like
 `${PGRWL_SECRET_ACCESS_KEY}`.
 
----
+```
+-----------------------------
+REQUIRED SECTIONS
+-----------------------------
 
-## `mode`
+[mode]
+  name            string   Mode of operation: "receive" or "serve"
 
-Controls which mode the application runs in.
+  [mode.receive]  Used when mode.name is "receive"
+    listen_port   int      Port for HTTP status/metrics (e.g., 7070)
+    directory     string   Directory to archive WAL files
+    slot          string   Replication slot name
+    no_loop       bool     Disable reconnect loop on failure
 
-| Field  | Type   | Description                                |
-|--------|--------|--------------------------------------------|
-| `name` | string | One of `"receive"` or `"serve"`. Required. |
+  [mode.serve]    Used when mode.name is "serve"
+    listen_port   int      Port to serve WAL files (e.g., 7070)
+    directory     string   Directory from which WAL files are served
 
-### `mode.receive`
+-----------------------------
+OPTIONAL SECTIONS
+-----------------------------
 
-Used when `mode.name` is `"receive"`.
+[log]
+  level           string   Log level: "trace", "debug", "info", "warn", "error"
+  format          string   Output format: "text" or "json"
+  add_source      bool     Include file and line in log output
 
-| Field         | Type    | Description                                           |
-|---------------|---------|-------------------------------------------------------|
-| `listen_port` | integer | HTTP port to expose metrics and status (e.g. `7070`). |
-| `directory`   | string  | Path to local WAL archive directory.                  |
-| `slot`        | string  | PostgreSQL replication slot name.                     |
-| `no_loop`     | boolean | Do not loop on connection lost.                       |
+[storage]
+  name            string   Storage backend type: "s3", "sftp", or "local"
 
-### `mode.serve`
+  [storage.compression]
+    algo          string   Compression algorithm (e.g., "gzip")
 
-Used when `mode.name` is `"serve"`.
+  [storage.encryption]
+    algo          string   Encryption algorithm (e.g., "aesgcm")
+    pass          string   Password (supports env vars like ${PGRWL_ENCRYPT_PASSWD})
 
-| Field         | Type    | Description                               |
-|---------------|---------|-------------------------------------------|
-| `listen_port` | integer | Port to serve WAL files.                  |
-| `directory`   | string  | Directory from which WALs will be served. |
+  [storage.sftp]
+    host          string   SFTP server host
+    port          int      SFTP port (default: 22)
+    user          string   SFTP username
+    pass          string   Password (env var allowed)
+    pkey_path     string   Path to SSH private key (optional)
+    pkey_pass     string   SSH private key passphrase (optional)
 
----
-
-## `log` **(optional)**
-
-Logging configuration.
-
-| Field        | Type    | Description                                                 |
-|--------------|---------|-------------------------------------------------------------|
-| `level`      | string  | One of `"trace"`, `"debug"`, `"info"`, `"warn"`, `"error"`. |
-| `format`     | string  | Log format: `"text"` or `"json"`. Default is `"text"`.      |
-| `add_source` | boolean | Include file and line number in logs.                       |
-
----
-
-## `storage` **(optional)**
-
-Configuration for where and how WAL files are stored.
-
-| Field  | Type   | Description                                   |
-|--------|--------|-----------------------------------------------|
-| `name` | string | Storage type: `"s3"`, `"sftp"`, or `"local"`. |
-
-### `storage.compression`
-
-| Field  | Type   | Description                          |
-|--------|--------|--------------------------------------|
-| `algo` | string | Compression algorithm (e.g. `gzip`). |
-
-### `storage.encryption`
-
-| Field  | Type   | Description                                         |
-|--------|--------|-----------------------------------------------------|
-| `algo` | string | Encryption algorithm (e.g. `aesgcm`).               |
-| `pass` | string | Encryption password. Supports env var placeholders. |
-
-#### `storage.sftp`
-
-| Field       | Type    | Description                                          |
-|-------------|---------|------------------------------------------------------|
-| `host`      | string  | SFTP server hostname.                                |
-| `port`      | integer | Port to connect to.                                  |
-| `user`      | string  | Username for authentication.                         |
-| `pass`      | string  | Password (use `${ENV}` to keep secrets out of file). |
-| `pkey_path` | string  | Path to SSH private key. Optional.                   |
-| `pkey_pass` | string  | Passphrase for the private key. Optional.            |
-
-### `storage.s3`
-
-| Field               | Type    | Description                                         |
-|---------------------|---------|-----------------------------------------------------|
-| `url`               | string  | Endpoint for S3-compatible API (e.g. MinIO or AWS). |
-| `access_key_id`     | string  | Access key ID.                                      |
-| `secret_access_key` | string  | Secret key (use env substitution).                  |
-| `bucket`            | string  | Bucket name where WALs are stored.                  |
-| `region`            | string  | AWS region (`us-east-1`, etc).                      |
-| `use_path_style`    | boolean | Required for non-AWS S3 (e.g. MinIO).               |
-| `disable_ssl`       | boolean | Use HTTP instead of HTTPS. Useful for local dev.    |
+  [storage.s3]
+    url               string   S3 endpoint (e.g., https://s3.example.com)
+    access_key_id     string   Access key ID
+    secret_access_key string   Secret access key (supports env var)
+    bucket            string   Bucket name for WAL files
+    region            string   AWS region (e.g., "us-east-1")
+    use_path_style    bool     Enable path-style URLs (required for MinIO)
+    disable_ssl       bool     Disable HTTPS (use HTTP instead)
+```
 
 ---
 
