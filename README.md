@@ -316,6 +316,28 @@ internal/xlog/fsync/
   → Optimized wrappers for safe and efficient `fsync` system calls.
 ```
 
+### Notes on configuration
+
+Why not YAML?
+JSON is approximately 8× faster to serialize and uses about 17× less memory.
+You can also minify the config file, and you don't have to worry about tabs, spaces, indentation levels, paddings, and
+so on.
+
+When restoring a cluster, the `restore_command` executes `pgrwl` for every single WAL file.
+In such cases, config processing must be as fast as possible.
+
+I’ve tried a lot of options: CLI-only flags, environment-only flags, a bunch of libraries, and combinations of CLI + env
+vars. And I’ve struggled quite a bit trying to balance transparent usage with predictability.
+
+Who loves dozens of CLI options? No one.
+Who wants to remember dozens of environment variables? Neither.
+
+That’s why I chose a single entry point: a JSON config file.
+That’s all you need to start the app.
+
+To handle credentials, environment variable substitution is supported—so you can use $PGRWL_-prefixed placeholders
+directly in the JSON.
+
 ### ⏮️ Links
 
 - [pg_receivewal Documentation](https://www.postgresql.org/docs/current/app-pgrwl.html)
