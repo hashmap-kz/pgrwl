@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
@@ -36,6 +35,7 @@ type Opts struct {
 	Directory string
 	Slot      string
 	NoLoop    bool
+	Verbose   bool
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
@@ -58,7 +58,7 @@ func NewPgReceiver(ctx context.Context, opts *Opts) (*PgReceiveWal, error) {
 		ConnStrRepl: connStrRepl,
 		SlotName:    opts.Slot,
 		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
-		Verbose: strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace"),
+		Verbose: opts.Verbose,
 	}, nil
 }
 

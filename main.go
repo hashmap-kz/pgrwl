@@ -24,12 +24,7 @@ const (
 )
 
 func init() {
-	// default values
 	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
-	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "pgrwl_v5")
-	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
-	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
-	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
 }
 
 func main() {
@@ -40,7 +35,6 @@ func main() {
 		Usage:    "WAL-archive directory",
 		Aliases:  []string{"D"},
 		Required: true,
-		Sources:  cli.EnvVars("PGRWL_DIRECTORY"),
 	}
 	listenPortFlag := &cli.IntFlag{
 		Name:     flagListenPort,
@@ -101,12 +95,11 @@ func main() {
 					dirFlag,
 					listenPortFlag,
 					&cli.StringFlag{
-						Name:     flagSlot,
-						Aliases:  []string{"S"},
-						Value:    "pgrwl_v5",
-						Usage:    "Replication slot name",
-						Required: true,
-						Sources:  cli.EnvVars("PGRWL_RECEIVE_SLOT"),
+						Name:    flagSlot,
+						Aliases: []string{"S"},
+						Usage:   "Replication slot name",
+						Value:   "pgrwl_v5",
+						Sources: cli.EnvVars("PGRWL_RECEIVE_SLOT"),
 					},
 					&cli.BoolFlag{
 						Name:    flagNoLoop,
@@ -122,6 +115,7 @@ func main() {
 						ListenPort: c.Int(flagListenPort),
 						Slot:       c.String(flagSlot),
 						NoLoop:     c.Bool(flagNoLoop),
+						Verbose:    strings.EqualFold(c.String(flagLogLevel), "trace"),
 					})
 					return nil
 				},

@@ -19,6 +19,7 @@ type ReceiveModeOpts struct {
 	Slot       string
 	NoLoop     bool
 	ListenPort int
+	Verbose    bool
 }
 
 func RunReceiveMode(opts *ReceiveModeOpts) {
@@ -35,6 +36,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		Directory: opts.Directory,
 		Slot:      opts.Slot,
 		NoLoop:    opts.NoLoop,
+		Verbose:   opts.Verbose,
 	})
 	if err != nil {
 		//nolint:gocritic
