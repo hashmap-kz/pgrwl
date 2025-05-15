@@ -52,5 +52,5 @@ test-integ-scripts:
 
 .PHONY: image
 image:
-	docker buildx build -t mailboxsq7/pgrwl .
-	docker push mailboxsq7/pgrwl
+	docker buildx build -t localhost:5000/pgrwl .
+	docker push localhost:5000/pgrwl

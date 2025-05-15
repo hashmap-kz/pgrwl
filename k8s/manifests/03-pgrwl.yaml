@@ -117,7 +117,7 @@ spec:
 
       containers:
         - name: *app
-          image: "mailboxsq7/pgrwl:latest"
+          image: "localhost:5000/pgrwl:latest"
           imagePullPolicy: Always
           args: ["-c", "/tmp/configs/config.json"]
           ports:
