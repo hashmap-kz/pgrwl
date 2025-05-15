@@ -90,7 +90,7 @@ pgrwl -c config.json
 
 --- 
 
-## ⚙️ pgrwl Configuration Reference
+## ⚙️ Configuration Reference
 
 The configuration file is in JSON format only. It supports environment variable placeholders like
 `${PGRWL_SECRET_ACCESS_KEY}`.
@@ -194,9 +194,7 @@ _The full process may look like this (a typical, rough, and simplified example):
 
 ### Design Notes
 
-This utility follows a **single-responsibility** principle.
-
-Is designed to use the local filesystem exclusively. This is a deliberate choice, because - as mentioned
+`pgrwl` is designed to use the local filesystem exclusively. This is a deliberate choice, because - as mentioned
 earlier - we must rely on fsync after each message is written to disk.
 This ensures that `*.partial` files always contain fully valid WAL segments, making them safe to use during the restore
 phase (after simply removing the `*.partial` suffix).
