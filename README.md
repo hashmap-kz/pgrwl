@@ -46,34 +46,144 @@ container running PostgreSQL.
 
 ## 🛠️ Usage
 
+### `Receive` mode
+
 ```bash
-export PGHOST='localhost'
-export PGPORT='5432'
-export PGUSER='postgres'
-export PGPASSWORD='postgres'
+# Run in 'receive' mode:
 
-pgrwl -D /mnt/wal-archive -S bookstore_app 
+cat <<EOF >config.json
+{
+  "mode": {
+    "name": "receive",
+    "receive": {
+      "listen_port": 7070,
+      "directory": "wals",
+      "slot": "pgrwl_v5"
+    }
+  }
+}
+EOF
+
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=postgres
+
+pgrwl -c config.json
 ```
 
-### ⚙️ Flags
+### `Serve` mode
 
+```bash
+cat <<EOF >config.json
+{
+  "mode": {
+    "name": "serve",
+    "serve": {
+      "listen_port": 7070,
+      "directory": "wals"
+    }
+  }
+}
+EOF
+
+pgrwl -c config.json
 ```
-CLI:
-  -D, --directory       receive write-ahead log files into this directory (required)
-  -S, --slot            replication slot to use (required)
-  -n, --no-loop         do not loop on connection lost
-      --log-level       set log level (trace, debug, info, warn, error) (default: info)
-      --log-format      specify log formatter (json, text) (default: json)
-      --log-add-source  include source file and line in log output (default: false)
-    
-Corresponded env-vars:
-  PGRWL_DIRECTORY
-  PGRWL_SLOT
-  PGRWL_NO_LOOP
-  PGRWL_LOG_LEVEL
-  PGRWL_LOG_FORMAT
-  PGRWL_LOG_ADD_SOURCE
-```
+
+--- 
+
+## ⚙️ pgrwl Configuration Reference
+
+The configuration file is in JSON format only. It supports environment variable placeholders like
+`${PGRWL_SECRET_ACCESS_KEY}`.
+
+---
+
+## `mode`
+
+Controls which mode the application runs in.
+
+| Field  | Type   | Description                                |
+|--------|--------|--------------------------------------------|
+| `name` | string | One of `"receive"` or `"serve"`. Required. |
+
+### `mode.receive`
+
+Used when `mode.name` is `"receive"`.
+
+| Field         | Type    | Description                                           |
+|---------------|---------|-------------------------------------------------------|
+| `listen_port` | integer | HTTP port to expose metrics and status (e.g. `7070`). |
+| `directory`   | string  | Path to local WAL archive directory.                  |
+| `slot`        | string  | PostgreSQL replication slot name.                     |
+| `no_loop`     | boolean | Do not loop on connection lost.                       |
+
+### `mode.serve`
+
+Used when `mode.name` is `"serve"`.
+
+| Field         | Type    | Description                               |
+|---------------|---------|-------------------------------------------|
+| `listen_port` | integer | Port to serve WAL files.                  |
+| `directory`   | string  | Directory from which WALs will be served. |
+
+---
+
+## `log` **(optional)**
+
+Logging configuration.
+
+| Field        | Type    | Description                                                 |
+|--------------|---------|-------------------------------------------------------------|
+| `level`      | string  | One of `"trace"`, `"debug"`, `"info"`, `"warn"`, `"error"`. |
+| `format`     | string  | Log format: `"text"` or `"json"`. Default is `"text"`.      |
+| `add_source` | boolean | Include file and line number in logs.                       |
+
+---
+
+## `storage` **(optional)**
+
+Configuration for where and how WAL files are stored.
+
+| Field  | Type   | Description                                   |
+|--------|--------|-----------------------------------------------|
+| `name` | string | Storage type: `"s3"`, `"sftp"`, or `"local"`. |
+
+### `storage.compression`
+
+| Field  | Type   | Description                          |
+|--------|--------|--------------------------------------|
+| `algo` | string | Compression algorithm (e.g. `gzip`). |
+
+### `storage.encryption`
+
+| Field  | Type   | Description                                         |
+|--------|--------|-----------------------------------------------------|
+| `algo` | string | Encryption algorithm (e.g. `aesgcm`).               |
+| `pass` | string | Encryption password. Supports env var placeholders. |
+
+#### `storage.sftp`
+
+| Field       | Type    | Description                                          |
+|-------------|---------|------------------------------------------------------|
+| `host`      | string  | SFTP server hostname.                                |
+| `port`      | integer | Port to connect to.                                  |
+| `user`      | string  | Username for authentication.                         |
+| `pass`      | string  | Password (use `${ENV}` to keep secrets out of file). |
+| `pkey_path` | string  | Path to SSH private key. Optional.                   |
+| `pkey_pass` | string  | Passphrase for the private key. Optional.            |
+
+### `storage.s3`
+
+| Field               | Type    | Description                                         |
+|---------------------|---------|-----------------------------------------------------|
+| `url`               | string  | Endpoint for S3-compatible API (e.g. MinIO or AWS). |
+| `access_key_id`     | string  | Access key ID.                                      |
+| `secret_access_key` | string  | Secret key (use env substitution).                  |
+| `bucket`            | string  | Bucket name where WALs are stored.                  |
+| `region`            | string  | AWS region (`us-east-1`, etc).                      |
+| `use_path_style`    | boolean | Required for non-AWS S3 (e.g. MinIO).               |
+| `disable_ssl`       | boolean | Use HTTP instead of HTTPS. Useful for local dev.    |
 
 ---
 
