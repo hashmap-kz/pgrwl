@@ -45,7 +45,7 @@ data:
         "name": "receive",
         "receive": {
           "listen_port": 7070,
-          "directory": "wals",
+          "directory": "/wals/wal-archive",
           "slot": "pgrwl_v5"
         }
       },
