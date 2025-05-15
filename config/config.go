@@ -1,5 +1,3 @@
-//go:generate go run ../cmd/genmerge/main.go
-
 package config
 
 import (
@@ -7,32 +5,83 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync"
 )
 
-var (
-	once   sync.Once
-	config *Config
+const (
+	ModeReceive = "receive"
+	ModeServe   = "serve"
 )
 
 type Config struct {
-	StorageType            string `json:"PGRWL_STORAGE_TYPE,omitempty"`
-	StorageCompressionAlgo string `json:"PGRWL_STORAGE_COMPRESSION_ALGO,omitempty"`
-	StorageEncryptionAlgo  string `json:"PGRWL_STORAGE_ENCRYPTION_ALGO,omitempty"`
-	StorageEncryptionPass  string `json:"PGRWL_STORAGE_ENCRYPTION_PASS,omitempty"`
-	SFTPHost               string `json:"PGRWL_SFTP_HOST,omitempty"`
-	SFTPPort               int    `json:"PGRWL_SFTP_PORT,omitempty"`
-	SFTPUser               string `json:"PGRWL_SFTP_USER,omitempty"`
-	SFTPPass               string `json:"PGRWL_SFTP_PASS,omitempty"`
-	SFTPPkeyPath           string `json:"PGRWL_SFTP_PKEY_PATH,omitempty"`
-	SFTPPkeyPass           string `json:"PGRWL_SFTP_PKEY_PASS,omitempty"`
-	S3URL                  string `json:"PGRWL_S3_URL,omitempty"`
-	S3AccessKeyID          string `json:"PGRWL_S3_ACCESS_KEY_ID,omitempty"`
-	S3SecretAccessKey      string `json:"PGRWL_S3_SECRET_ACCESS_KEY,omitempty"`
-	S3Bucket               string `json:"PGRWL_S3_BUCKET,omitempty"`
-	S3Region               string `json:"PGRWL_S3_REGION,omitempty"`
-	S3UsePathStyle         bool   `json:"PGRWL_S3_USE_PATH_STYLE,omitempty"`
-	S3DisableSSL           bool   `json:"PGRWL_S3_DISABLE_SSL,omitempty"`
+	Mode    ModeConfig    `json:"mode,omitempty"`
+	Log     LogConfig     `json:"log,omitempty"`
+	Storage StorageConfig `json:"storage,omitempty"`
+}
+
+// ---- Mode Section ----
+
+type ModeConfig struct {
+	Name    string        `json:"name,omitempty"` // "receive" or "serve"
+	Receive ReceiveConfig `json:"receive,omitempty"`
+	Serve   ServeConfig   `json:"serve,omitempty"`
+}
+
+type ReceiveConfig struct {
+	ListenPort int    `json:"listen_port,omitempty"`
+	Directory  string `json:"directory,omitempty"`
+	Slot       string `json:"slot,omitempty"`
+	NoLoop     bool   `json:"no_loop,omitempty"`
+}
+
+type ServeConfig struct {
+	ListenPort int    `json:"listen_port,omitempty"`
+	Directory  string `json:"directory,omitempty"`
+}
+
+// ---- Log Section ----
+
+type LogConfig struct {
+	Level     string `json:"level,omitempty"`      // e.g. "info"
+	Format    string `json:"format,omitempty"`     // e.g. "text" or "json"
+	AddSource bool   `json:"add_source,omitempty"` // whether to include source info
+}
+
+// ---- Storage Section ----
+
+type StorageConfig struct {
+	Name        string            `json:"name,omitempty"` // e.g. "s3", "sftp", "local"
+	Compression CompressionConfig `json:"compression,omitempty"`
+	Encryption  EncryptionConfig  `json:"encryption,omitempty"`
+	SFTP        SFTPConfig        `json:"sftp,omitempty"`
+	S3          S3Config          `json:"s3,omitempty"`
+}
+
+type CompressionConfig struct {
+	Algo string `json:"algo,omitempty"` // e.g. "gzip"
+}
+
+type EncryptionConfig struct {
+	Algo string `json:"algo,omitempty"` // e.g. "aesgcm"
+	Pass string `json:"pass,omitempty"` // can reference env var
+}
+
+type SFTPConfig struct {
+	Host     string `json:"host,omitempty"`
+	Port     int    `json:"port,omitempty"`
+	User     string `json:"user,omitempty"`
+	Pass     string `json:"pass,omitempty"`
+	PKeyPath string `json:"pkey_path,omitempty"`
+	PKeyPass string `json:"pkey_pass,omitempty"`
+}
+
+type S3Config struct {
+	URL             string `json:"url,omitempty"`
+	AccessKeyID     string `json:"access_key_id,omitempty"`
+	SecretAccessKey string `json:"secret_access_key,omitempty"`
+	Bucket          string `json:"bucket,omitempty"`
+	Region          string `json:"region,omitempty"`
+	UsePathStyle    bool   `json:"use_path_style,omitempty"`
+	DisableSSL      bool   `json:"disable_ssl,omitempty"`
 }
 
 func (c *Config) String() string {
@@ -41,17 +90,17 @@ func (c *Config) String() string {
 
 	// Step 2: Redact sensitive fields (distinct between empty and filled)
 	const redacted = "[REDACTED]"
-	if cp.StorageEncryptionPass != "" {
-		cp.StorageEncryptionPass = redacted
+	if cp.Storage.Encryption.Pass != "" {
+		cp.Storage.Encryption.Pass = redacted
 	}
-	if cp.SFTPPass != "" {
-		cp.SFTPPass = redacted
+	if cp.Storage.SFTP.Pass != "" {
+		cp.Storage.SFTP.Pass = redacted
 	}
-	if cp.SFTPPkeyPass != "" {
-		cp.SFTPPkeyPass = redacted
+	if cp.Storage.SFTP.PKeyPass != "" {
+		cp.Storage.SFTP.PKeyPass = redacted
 	}
-	if cp.S3SecretAccessKey != "" {
-		cp.S3SecretAccessKey = redacted
+	if cp.Storage.S3.SecretAccessKey != "" {
+		cp.Storage.S3.SecretAccessKey = redacted
 	}
 
 	// Step 3: Marshal the copy
@@ -62,47 +111,6 @@ func (c *Config) String() string {
 	return string(b)
 }
 
-func Cfg() *Config {
-	if config == nil {
-		log.Fatal("config was not loaded in main")
-	}
-	return config
-}
-
-func MustRead(path string) *Config {
-	once.Do(func() {
-		var err error
-		config, err = mustLoadCfg(path)
-		if err != nil {
-			log.Fatal(err)
-		}
-	})
-	return config
-}
-
-func Default() *Config {
-	once.Do(func() {
-		var c Config
-		mergeEnvIfUnset(&c)
-		config = &c
-	})
-	return config
-}
-
-func mustLoadCfg(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var c Config
-	if err := json.Unmarshal(data, &c); err != nil {
-		return nil, err
-	}
-	// fill from env if JSON did not provide values
-	mergeEnvIfUnset(&c)
-	return &c, nil
-}
-
 func expandEnvsWithPrefix(input, prefix string) string {
 	return os.Expand(input, func(key string) string {
 		if strings.HasPrefix(key, prefix) {
@@ -111,4 +119,20 @@ func expandEnvsWithPrefix(input, prefix string) string {
 		// Leave unexpanded
 		return "${" + key + "}"
 	})
+}
+
+func expand(d []byte) []byte {
+	return []byte(expandEnvsWithPrefix(string(d), "PGRWL_"))
+}
+
+func MustLoad(path string) *Config {
+	var cfg Config
+	configData, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := json.Unmarshal(expand(configData), &cfg); err != nil {
+		log.Fatal(err)
+	}
+	return &cfg
 }

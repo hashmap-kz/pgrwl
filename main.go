@@ -15,159 +15,54 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const (
-	flagDirectory    = "directory"
-	flagListenPort   = "listen-port"
-	flagSlot         = "slot"
-	flagNoLoop       = "no-loop"
-	flagLogLevel     = "log-level"
-	flagLogFormat    = "log-format"
-	flagLogAddSource = "log-add-source"
-)
-
-func init() {
-	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
-	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
-}
-
 func main() {
 	var cfg *config.Config
-
-	dirFlag := &cli.StringFlag{
-		Name:     flagDirectory,
-		Usage:    "WAL-archive directory",
-		Aliases:  []string{"D"},
-		Required: true,
-		Sources:  cli.EnvVars("PGRWL_DIRECTORY"),
-	}
-	listenPortFlag := &cli.IntFlag{
-		Name:     flagListenPort,
-		Usage:    "HTTP port",
-		Aliases:  []string{"p"},
-		Required: true,
-		Sources:  cli.EnvVars("PGRWL_LISTEN_PORT"),
-	}
 
 	app := &cli.Command{
 		Name:  "pgrwl",
 		Usage: "PostgreSQL WAL receiver and restore tool",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "config",
-				Usage:   "Path to config file (*.json)",
-				Aliases: []string{"c"},
-				Sources: cli.EnvVars("PGRWL_CONFIG_PATH"),
-			},
-			&cli.StringFlag{
-				Name:    flagLogLevel,
-				Value:   "info",
-				Usage:   "Log level (e.g. trace, debug, info, warn, error)",
-				Sources: cli.EnvVars("PGRWL_LOG_LEVEL"),
-			},
-			&cli.StringFlag{
-				Name:    flagLogFormat,
-				Value:   "json",
-				Usage:   "Log format (e.g. text, json)",
-				Sources: cli.EnvVars("PGRWL_LOG_FORMAT"),
-			},
-			&cli.BoolFlag{
-				Name:    flagLogAddSource,
-				Usage:   "Enable source field in logs",
-				Sources: cli.EnvVars("PGRWL_LOG_ADD_SOURCE"),
+				Name:     "config",
+				Usage:    "Path to config file (*.json)",
+				Aliases:  []string{"c"},
+				Required: true,
+				Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
 			},
 		},
-		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		Before: func(_ context.Context, c *cli.Command) (context.Context, error) {
 			configPath := c.String("config")
-			if configPath != "" {
-				cfg = config.MustRead(configPath)
-			} else {
-				cfg = config.Default()
-			}
+			cfg = config.MustLoad(configPath)
 			_, _ = fmt.Fprintln(os.Stderr, cfg.String()) // debug config (NOTE: sensitive fields are hidden)
 			logger.Init(&logger.Opts{
-				Level:     c.String(flagLogLevel),
-				Format:    c.String(flagLogFormat),
-				AddSource: c.Bool(flagLogAddSource),
+				Level:     cfg.Log.Level,
+				Format:    cfg.Log.Format,
+				AddSource: cfg.Log.AddSource,
 			})
 			return nil, nil
 		},
+		Action: func(_ context.Context, c *cli.Command) error {
+			//nolint:staticcheck
+			if cfg.Mode.Name == config.ModeReceive {
+				checkPgEnvsAreSet()
+				cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
+					Directory:  cfg.Mode.Receive.Directory,
+					ListenPort: cfg.Mode.Receive.ListenPort,
+					Slot:       cfg.Mode.Receive.Slot,
+					NoLoop:     cfg.Mode.Receive.NoLoop,
+					Verbose:    strings.EqualFold(c.String(cfg.Log.Level), "trace"),
+				})
+			} else if cfg.Mode.Name == config.ModeServe {
+				cmd.RunServeMode(&cmd.ServeModeOpts{
+					Directory:  cfg.Mode.Serve.Directory,
+					ListenPort: cfg.Mode.Serve.ListenPort,
+				})
+			} else {
+				log.Fatalf("unknown mode: %s", cfg.Mode.Name)
+			}
+			return nil
+		},
 		Commands: []*cli.Command{
-			// receive
-			{
-				Name:  "receive",
-				Usage: "Stream and archive WALs",
-				Description: optutils.HeredocTrim(`
-				The receive command connects to a PostgreSQL server using 
-				the streaming replication protocol and continuously receives 
-				WAL (Write-Ahead Log) files in real time. 
-				It is typically used for archiving WAL segments to support 
-				continuous backup and point-in-time recovery.
-				
-				The tool uses a replication slot to avoid missing data during restarts 
-				and can optionally compress and encrypt the received WAL files. 
-				It is designed to run continuously and ensures that all WAL data 
-				is archived safely outside the database instance.
-				
-				This command is usually run on a separate host or backup node 
-				and configured with proper replication credentials. 
-
-				Usage example:
-
-				$ export PGHOST=localhost
-				$ export PGPORT=5432
-				$ export PGUSER=postgres
-				$ export PGPASSWORD=postgres
-				$ pgrwl receive -D wals
-				`),
-				Flags: []cli.Flag{
-					dirFlag,
-					listenPortFlag,
-					&cli.StringFlag{
-						Name:    flagSlot,
-						Aliases: []string{"S"},
-						Usage:   "Replication slot to use",
-						Value:   "pgrwl_v5",
-						Sources: cli.EnvVars("PGRWL_RECEIVE_SLOT"),
-					},
-					&cli.BoolFlag{
-						Name:    flagNoLoop,
-						Aliases: []string{"n"},
-						Usage:   "Do not loop on connection lost",
-						Sources: cli.EnvVars("PGRWL_RECEIVE_NO_LOOP"),
-					},
-				},
-				Action: func(ctx context.Context, c *cli.Command) error {
-					checkPgEnvsAreSet()
-					cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
-						Directory:  c.String(flagDirectory),
-						ListenPort: c.Int(flagListenPort),
-						Slot:       c.String(flagSlot),
-						NoLoop:     c.Bool(flagNoLoop),
-						Verbose:    strings.EqualFold(c.String(flagLogLevel), "trace"),
-					})
-					return nil
-				},
-			},
-			// serve
-			{
-				Name:  "serve",
-				Usage: "Serve WAL files for restore",
-				Description: optutils.HeredocTrim(`
-				Typical usage: You're running the server in serve mode, and then you're able to fetch 
-				WAL files using the restore_command configured in the PostgreSQL instance.
-				`),
-				Flags: []cli.Flag{
-					dirFlag,
-					listenPortFlag,
-				},
-				Action: func(ctx context.Context, c *cli.Command) error {
-					cmd.RunServeMode(&cmd.ServeModeOpts{
-						Directory:  c.String(flagDirectory),
-						ListenPort: c.Int(flagListenPort),
-					})
-					return nil
-				},
-			},
 			// restore-command
 			{
 				Name:  "restore-command",
@@ -197,7 +92,7 @@ func main() {
 						Usage:    "Output path for the fetched WAL",
 					},
 				},
-				Action: func(ctx context.Context, c *cli.Command) error {
+				Action: func(_ context.Context, c *cli.Command) error {
 					return cmd.ExecRestoreCommand(
 						c.String("f"),
 						c.String("p"),

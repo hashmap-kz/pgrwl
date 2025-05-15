@@ -1,6 +1,15 @@
 {
-  "PGRWL_DIRECTORY": "wals",
-  "PGRWL_LOG_LEVEL": "debug",
-  "PGRWL_LOG_FORMAT": "text",
-  "PGRWL_LOG_ADD_SOURCE": true
+  "mode": {
+    "name": "receive",
+    "receive": {
+      "listen_port": 7070,
+      "directory": "wals",
+      "slot": "recwal_v5"
+    }
+  },
+  "log": {
+    "level": "trace",
+    "format": "text",
+    "add_source": true
+  }
 }
