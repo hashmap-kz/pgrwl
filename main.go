@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+
 	"github.com/hashmap-kz/pgrwl/cmd"
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
@@ -89,6 +91,7 @@ func main() {
 			return nil, nil
 		},
 		Commands: []*cli.Command{
+			// receive
 			{
 				Name:  "receive",
 				Usage: "Stream and archive WALs",
@@ -121,6 +124,7 @@ func main() {
 					return nil
 				},
 			},
+			// serve
 			{
 				Name:  "serve",
 				Usage: "Serve WAL files for restore",
@@ -136,9 +140,16 @@ func main() {
 					return nil
 				},
 			},
+			// restore-command
 			{
 				Name:  "restore-command",
 				Usage: "Fetch a single WAL file by name",
+
+				Description: optutils.HeredocTrim(`
+				Implements PostgreSQL restore_command, example usage in postgresql.conf:
+				restore_command = 'pgrwl restore-command --addr=k8s-worker5:30266 -f %f -p %p'
+				`),
+
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "addr",
@@ -157,7 +168,13 @@ func main() {
 					},
 				},
 				Action: func(ctx context.Context, c *cli.Command) error {
-					return nil
+					return cmd.ExecRestoreCommand(
+						c.String("f"),
+						c.String("p"),
+						&cmd.RestoreCommandOpts{
+							Addr: c.String("addr"),
+						},
+					)
 				},
 			},
 		},
