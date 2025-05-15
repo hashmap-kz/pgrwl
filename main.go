@@ -47,7 +47,7 @@ func main() {
 			})
 			return nil, nil
 		},
-		Action: func(_ context.Context, c *cli.Command) error {
+		Action: func(_ context.Context, _ *cli.Command) error {
 			//nolint:staticcheck
 			if cfg.Mode.Name == config.ModeReceive {
 				checkPgEnvsAreSet()
@@ -158,7 +158,7 @@ GLOBAL OPTIONS:
 {{end}}
 `
 
-	cli.HelpPrinter = func(w io.Writer, templ string, data any) {
+	cli.HelpPrinter = func(w io.Writer, _ string, data any) {
 		t := template.Must(template.New("help").Parse(customHelpTemplate))
 		if err := t.Execute(w, data); err != nil {
 			_, _ = fmt.Fprintln(w, "failed to render help:", err)
