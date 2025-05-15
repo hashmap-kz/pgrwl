@@ -24,8 +24,7 @@ func cleanenvs(t *testing.T) {
 	_ = os.Unsetenv("PGRWL_DIRECTORY")
 	_ = os.Unsetenv("PGRWL_RECEIVE_SLOT")
 	_ = os.Unsetenv("PGRWL_RECEIVE_NO_LOOP")
-	_ = os.Unsetenv("PGRWL_RECEIVE_LISTEN_PORT")
-	_ = os.Unsetenv("PGRWL_RESTORE_FETCH_ADDR")
+	_ = os.Unsetenv("PGRWL_LISTEN_PORT")
 	_ = os.Unsetenv("PGRWL_LOG_LEVEL")
 	_ = os.Unsetenv("PGRWL_LOG_FORMAT")
 	_ = os.Unsetenv("PGRWL_LOG_ADD_SOURCE")
@@ -53,7 +52,7 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 
 	// Set env vars that will override or fill missing values
 	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "env_slot")
-	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "6000")
+	_ = os.Setenv("PGRWL_LISTEN_PORT", "6000")
 	_ = os.Setenv("PGRWL_LOG_ADD_SOURCE", "true")
 	_ = os.Setenv("PGRWL_S3_DISABLE_SSL", "true")
 	_ = os.Setenv("PGRWL_S3_URL", "http://env-url")
@@ -75,7 +74,7 @@ func TestLoadCfg_FileAndEnvMerge(t *testing.T) {
 
 	// These come from env
 	assert.Equal(t, "env_slot", cfg.ReceiveSlot)
-	assert.Equal(t, 6000, cfg.ReceiveListenPort)
+	assert.Equal(t, 6000, cfg.ListenPort)
 	assert.Equal(t, true, cfg.LogAddSource)
 	assert.Equal(t, true, cfg.S3DisableSSL)
 	assert.Equal(t, "http://env-url", cfg.S3URL)
@@ -88,7 +87,7 @@ func TestLoadCfg_FromFile(t *testing.T) {
 		"PGRWL_DIRECTORY": "/tmp/test",
 		"PGRWL_RECEIVE_SLOT": "myslot",
 		"PGRWL_RECEIVE_NO_LOOP": true,
-		"PGRWL_RECEIVE_LISTEN_PORT": 5432,
+		"PGRWL_LISTEN_PORT": 5432,
 		"PGRWL_LOG_LEVEL": "debug",
 		"PGRWL_LOG_FORMAT": "text",
 		"PGRWL_LOG_ADD_SOURCE": true
@@ -101,7 +100,7 @@ func TestLoadCfg_FromFile(t *testing.T) {
 	assert.Equal(t, "/tmp/test", cfg.Directory)
 	assert.Equal(t, "myslot", cfg.ReceiveSlot)
 	assert.True(t, cfg.ReceiveNoLoop)
-	assert.Equal(t, 5432, cfg.ReceiveListenPort)
+	assert.Equal(t, 5432, cfg.ListenPort)
 	assert.Equal(t, "debug", cfg.LogLevel)
 	assert.Equal(t, "text", cfg.LogFormat)
 	assert.True(t, cfg.LogAddSource)

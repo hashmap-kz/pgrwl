@@ -16,18 +16,16 @@ import (
 func main() {
 	var cfg *config.Config
 
-	configFlag := &cli.StringFlag{
-		Name:     "config",
-		Usage:    "Path to config.json",
-		Aliases:  []string{"c"},
-		Required: true,
-	}
-
 	app := &cli.Command{
 		Name:  "pgrwl",
 		Usage: "PostgreSQL WAL receiver and restore tool",
 		Flags: []cli.Flag{
-			configFlag,
+			&cli.StringFlag{
+				Name:     "config",
+				Usage:    "Path to config file (*.json)",
+				Aliases:  []string{"c"},
+				Required: true,
+			},
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			configPath := c.String("config")
@@ -53,7 +51,7 @@ func main() {
 						Directory:  cfg.Directory,
 						Slot:       cfg.ReceiveSlot,
 						NoLoop:     cfg.ReceiveNoLoop,
-						ListenPort: cfg.ReceiveListenPort,
+						ListenPort: cfg.ListenPort,
 					})
 					return nil
 				},
@@ -65,7 +63,7 @@ func main() {
 					checkServeCfg(cfg)
 					cmd.RunServeMode(&cmd.ServeModeOpts{
 						Directory:  cfg.Directory,
-						ListenPort: cfg.ServeListenPort,
+						ListenPort: cfg.ListenPort,
 					})
 					return nil
 				},
@@ -74,6 +72,11 @@ func main() {
 				Name:  "restore-command",
 				Usage: "Fetch a single WAL file by name",
 				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "addr",
+						Required: true,
+						Usage:    "The address of pgrwl running in a serve mode",
+					},
 					&cli.StringFlag{
 						Name:     "f",
 						Required: true,
@@ -101,7 +104,7 @@ func checkServeCfg(cfg *config.Config) {
 	if cfg.Directory == "" {
 		log.Fatal("[FATAL] serve: directory is not defined")
 	}
-	if cfg.ServeListenPort == 0 {
+	if cfg.ListenPort == 0 {
 		log.Fatal("[FATAL] serve: listen-port is not defined")
 	}
 }
@@ -110,7 +113,7 @@ func checkReceiveCfg(cfg *config.Config) {
 	if cfg.Directory == "" {
 		log.Fatal("[FATAL] receive: directory is not defined")
 	}
-	if cfg.ReceiveListenPort == 0 {
+	if cfg.ListenPort == 0 {
 		log.Fatal("[FATAL] receive: listen-port is not defined")
 	}
 	if cfg.ReceiveSlot == "" {

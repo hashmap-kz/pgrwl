@@ -16,11 +16,9 @@ var (
 
 type Config struct {
 	Directory              string `json:"PGRWL_DIRECTORY,omitempty"`
+	ListenPort             int    `json:"PGRWL_LISTEN_PORT,omitempty"`
 	ReceiveSlot            string `json:"PGRWL_RECEIVE_SLOT,omitempty"`
 	ReceiveNoLoop          bool   `json:"PGRWL_RECEIVE_NO_LOOP,omitempty"`
-	ReceiveListenPort      int    `json:"PGRWL_RECEIVE_LISTEN_PORT,omitempty"`
-	ServeListenPort        int    `json:"PGRWL_SERVE_LISTEN_PORT,omitempty"`
-	RestoreFetchAddr       string `json:"PGRWL_RESTORE_FETCH_ADDR,omitempty"`
 	LogLevel               string `json:"PGRWL_LOG_LEVEL,omitempty"`
 	LogFormat              string `json:"PGRWL_LOG_FORMAT,omitempty"`
 	LogAddSource           bool   `json:"PGRWL_LOG_ADD_SOURCE,omitempty"`
@@ -46,12 +44,10 @@ type Config struct {
 func init() {
 	// default values
 	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "pgrwl_v5")
-	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "7070")
+	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
 	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
 	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
 	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
-	_ = os.Setenv("PGRWL_SERVE_LISTEN_PORT", "7070")
-	_ = os.Setenv("PGRWL_RESTORE_FETCH_ADDR", "http://127.0.0.1:7070")
 }
 
 func (c *Config) String() string {

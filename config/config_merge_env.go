@@ -28,23 +28,11 @@ func mergeEnvIfUnset(cfg *Config) {
 			}
 		}
 	}
-	if cfg.ReceiveListenPort == 0 {
-		if v, ok := os.LookupEnv("PGRWL_RECEIVE_LISTEN_PORT"); ok && v != "" {
+	if cfg.ListenPort == 0 {
+		if v, ok := os.LookupEnv("PGRWL_LISTEN_PORT"); ok && v != "" {
 			if i, err := strconv.Atoi(v); err == nil {
-				cfg.ReceiveListenPort = i
+				cfg.ListenPort = i
 			}
-		}
-	}
-	if cfg.ServeListenPort == 0 {
-		if v, ok := os.LookupEnv("PGRWL_SERVE_LISTEN_PORT"); ok && v != "" {
-			if i, err := strconv.Atoi(v); err == nil {
-				cfg.ServeListenPort = i
-			}
-		}
-	}
-	if cfg.RestoreFetchAddr == "" {
-		if v, ok := os.LookupEnv("PGRWL_RESTORE_FETCH_ADDR"); ok && v != "" {
-			cfg.RestoreFetchAddr = v
 		}
 	}
 	if cfg.LogLevel == "" {
