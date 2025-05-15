@@ -15,58 +15,52 @@ var (
 )
 
 type Config struct {
-	// Core options, always required
-	Mode      string `json:"PGRWL_MODE"`
-	Directory string `json:"PGRWL_DIRECTORY"`
-
-	// Logging
-	LogLevel     string `json:"PGRWL_LOG_LEVEL"`
-	LogFormat    string `json:"PGRWL_LOG_FORMAT"`
-	LogAddSource bool   `json:"PGRWL_LOG_ADD_SOURCE"`
-
-	// Receive MODE required args
-	Slot       string `json:"PGRWL_SLOT"`
-	NoLoop     bool   `json:"PGRWL_NO_LOOP"`
-	ListenPort int    `json:"PGRWL_LISTEN_PORT"`
-
-	// Restore MODE required args
-	RestoreAddr string `json:"PGRWL_RESTORE_ADDR"`
-
-	// If any remote storage is used (default local)
-	StorageType string `json:"PGRWL_STORAGE_TYPE"` // "local", "sftp", "s3"
-
-	// Compression, Encryption
-	CompressionAlgo string `json:"PGRWL_COMPRESSION_ALGO"` // gzip, zstd
-	EncryptionAlgo  string `json:"PGRWL_ENCRYPTION_ALGO"`  // aes-256-gcm
-	EncryptionPass  string `json:"PGRWL_ENCRYPTION_PASS"`
-
-	// SFTP Storage config
-	SFTPHost     string `json:"PGRWL_SFTP_HOST"`
-	SFTPPort     int    `json:"PGRWL_SFTP_PORT"`
-	SFTPUser     string `json:"PGRWL_SFTP_USER"`
-	SFTPPass     string `json:"PGRWL_SFTP_PASS"`
-	SFTPPkeyPath string `json:"PGRWL_SFTP_PKEY_PATH"`
-	SFTPPkeyPass string `json:"PGRWL_SFTP_PKEY_PASS"`
-
-	// S3 Storage config
-	S3URL             string `json:"PGRWL_S3_URL"`
-	S3AccessKeyID     string `json:"PGRWL_S3_ACCESS_KEY_ID"`
-	S3SecretAccessKey string `json:"PGRWL_S3_SECRET_ACCESS_KEY"`
-	S3Bucket          string `json:"PGRWL_S3_BUCKET"`
-	S3Region          string `json:"PGRWL_S3_REGION"`
-	S3UsePathStyle    bool   `json:"PGRWL_S3_USE_PATH_STYLE"`
-	S3DisableSSL      bool   `json:"PGRWL_S3_DISABLE_SSL"`
+	Mode                   string `json:"PGRWL_MODE"`
+	Directory              string `json:"PGRWL_DIRECTORY"`
+	ReceiveSlot            string `json:"PGRWL_RECEIVE_SLOT"`
+	ReceiveNoLoop          bool   `json:"PGRWL_RECEIVE_NO_LOOP"`
+	ReceiveListenPort      int    `json:"PGRWL_RECEIVE_LISTEN_PORT"`
+	RestoreAddr            string `json:"PGRWL_RESTORE_ADDR"`
+	LogLevel               string `json:"PGRWL_LOG_LEVEL"`
+	LogFormat              string `json:"PGRWL_LOG_FORMAT"`
+	LogAddSource           bool   `json:"PGRWL_LOG_ADD_SOURCE"`
+	StorageType            string `json:"PGRWL_STORAGE_TYPE"`
+	StorageCompressionAlgo string `json:"PGRWL_STORAGE_COMPRESSION_ALGO"`
+	StorageEncryptionAlgo  string `json:"PGRWL_STORAGE_ENCRYPTION_ALGO"`
+	StorageEncryptionPass  string `json:"PGRWL_STORAGE_ENCRYPTION_PASS"`
+	SFTPHost               string `json:"PGRWL_SFTP_HOST"`
+	SFTPPort               int    `json:"PGRWL_SFTP_PORT"`
+	SFTPUser               string `json:"PGRWL_SFTP_USER"`
+	SFTPPass               string `json:"PGRWL_SFTP_PASS"`
+	SFTPPkeyPath           string `json:"PGRWL_SFTP_PKEY_PATH"`
+	SFTPPkeyPass           string `json:"PGRWL_SFTP_PKEY_PASS"`
+	S3URL                  string `json:"PGRWL_S3_URL"`
+	S3AccessKeyID          string `json:"PGRWL_S3_ACCESS_KEY_ID"`
+	S3SecretAccessKey      string `json:"PGRWL_S3_SECRET_ACCESS_KEY"`
+	S3Bucket               string `json:"PGRWL_S3_BUCKET"`
+	S3Region               string `json:"PGRWL_S3_REGION"`
+	S3UsePathStyle         bool   `json:"PGRWL_S3_USE_PATH_STYLE"`
+	S3DisableSSL           bool   `json:"PGRWL_S3_DISABLE_SSL"`
 }
 
 func init() {
 	// default values
 	_ = os.Setenv("PGRWL_MODE", "receive")
-	_ = os.Setenv("PGRWL_SLOT", "pgrwl_v5")
-	_ = os.Setenv("PGRWL_LISTEN_PORT", "7070")
+	_ = os.Setenv("PGRWL_RECEIVE_SLOT", "pgrwl_v5")
+	_ = os.Setenv("PGRWL_RECEIVE_LISTEN_PORT", "7070")
 	_ = os.Setenv("PGRWL_LOG_LEVEL", "info")
 	_ = os.Setenv("PGRWL_LOG_FORMAT", "json")
 	_ = os.Setenv("PGRWL_STORAGE_TYPE", "local")
 	_ = os.Setenv("PGRWL_RESTORE_ADDR", "http://127.0.0.1:7070")
+}
+
+// TODO: hide sensitive
+func (c *Config) String() string {
+	b, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func Cfg() *Config {

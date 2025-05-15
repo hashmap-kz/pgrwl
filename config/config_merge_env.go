@@ -21,6 +21,30 @@ func mergeEnvIfUnset(cfg *Config) {
 			cfg.Directory = v
 		}
 	}
+	if cfg.ReceiveSlot == "" {
+		if v, ok := os.LookupEnv("PGRWL_RECEIVE_SLOT"); ok && v != "" {
+			cfg.ReceiveSlot = v
+		}
+	}
+	if !cfg.ReceiveNoLoop {
+		if v, ok := os.LookupEnv("PGRWL_RECEIVE_NO_LOOP"); ok && v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
+				cfg.ReceiveNoLoop = b
+			}
+		}
+	}
+	if cfg.ReceiveListenPort == 0 {
+		if v, ok := os.LookupEnv("PGRWL_RECEIVE_LISTEN_PORT"); ok && v != "" {
+			if i, err := strconv.Atoi(v); err == nil {
+				cfg.ReceiveListenPort = i
+			}
+		}
+	}
+	if cfg.RestoreAddr == "" {
+		if v, ok := os.LookupEnv("PGRWL_RESTORE_ADDR"); ok && v != "" {
+			cfg.RestoreAddr = v
+		}
+	}
 	if cfg.LogLevel == "" {
 		if v, ok := os.LookupEnv("PGRWL_LOG_LEVEL"); ok && v != "" {
 			cfg.LogLevel = v
@@ -38,48 +62,24 @@ func mergeEnvIfUnset(cfg *Config) {
 			}
 		}
 	}
-	if cfg.Slot == "" {
-		if v, ok := os.LookupEnv("PGRWL_SLOT"); ok && v != "" {
-			cfg.Slot = v
-		}
-	}
-	if !cfg.NoLoop {
-		if v, ok := os.LookupEnv("PGRWL_NO_LOOP"); ok && v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
-				cfg.NoLoop = b
-			}
-		}
-	}
-	if cfg.ListenPort == 0 {
-		if v, ok := os.LookupEnv("PGRWL_LISTEN_PORT"); ok && v != "" {
-			if i, err := strconv.Atoi(v); err == nil {
-				cfg.ListenPort = i
-			}
-		}
-	}
-	if cfg.RestoreAddr == "" {
-		if v, ok := os.LookupEnv("PGRWL_RESTORE_ADDR"); ok && v != "" {
-			cfg.RestoreAddr = v
-		}
-	}
 	if cfg.StorageType == "" {
 		if v, ok := os.LookupEnv("PGRWL_STORAGE_TYPE"); ok && v != "" {
 			cfg.StorageType = v
 		}
 	}
-	if cfg.CompressionAlgo == "" {
-		if v, ok := os.LookupEnv("PGRWL_COMPRESSION_ALGO"); ok && v != "" {
-			cfg.CompressionAlgo = v
+	if cfg.StorageCompressionAlgo == "" {
+		if v, ok := os.LookupEnv("PGRWL_STORAGE_COMPRESSION_ALGO"); ok && v != "" {
+			cfg.StorageCompressionAlgo = v
 		}
 	}
-	if cfg.EncryptionAlgo == "" {
-		if v, ok := os.LookupEnv("PGRWL_ENCRYPTION_ALGO"); ok && v != "" {
-			cfg.EncryptionAlgo = v
+	if cfg.StorageEncryptionAlgo == "" {
+		if v, ok := os.LookupEnv("PGRWL_STORAGE_ENCRYPTION_ALGO"); ok && v != "" {
+			cfg.StorageEncryptionAlgo = v
 		}
 	}
-	if cfg.EncryptionPass == "" {
-		if v, ok := os.LookupEnv("PGRWL_ENCRYPTION_PASS"); ok && v != "" {
-			cfg.EncryptionPass = v
+	if cfg.StorageEncryptionPass == "" {
+		if v, ok := os.LookupEnv("PGRWL_STORAGE_ENCRYPTION_PASS"); ok && v != "" {
+			cfg.StorageEncryptionPass = v
 		}
 	}
 	if cfg.SFTPHost == "" {
