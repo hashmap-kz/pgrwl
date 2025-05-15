@@ -6,4 +6,4 @@ export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
 
-go run ../main.go receive -D wals -c configs/01-basic-receive.json
+go run ../main.go receive -D wals

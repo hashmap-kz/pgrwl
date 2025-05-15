@@ -77,6 +77,9 @@ func GenerateMergeFuncCode(structVal any, structName string) string {
 		if envKey == "" {
 			continue
 		}
+		if strings.Contains(envKey, ",") {
+			envKey = strings.TrimSpace(strings.Split(envKey, ",")[0])
+		}
 
 		switch {
 		case f.Type == reflect.TypeOf(time.Duration(0)):

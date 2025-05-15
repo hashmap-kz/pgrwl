@@ -55,11 +55,10 @@ func main() {
 		Usage: "PostgreSQL WAL receiver and restore tool",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "config",
-				Usage:    "Path to config file (*.json)",
-				Aliases:  []string{"c"},
-				Required: true,
-				Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
+				Name:    "config",
+				Usage:   "Path to config file (*.json)",
+				Aliases: []string{"c"},
+				Sources: cli.EnvVars("PGRWL_CONFIG_PATH"),
 			},
 			&cli.StringFlag{
 				Name:    flagLogLevel,
@@ -81,10 +80,11 @@ func main() {
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			configPath := c.String("config")
-			if configPath == "" {
-				log.Fatal("config path is not defined")
+			if configPath != "" {
+				cfg = config.Read(configPath)
+			} else {
+				cfg = config.Default()
 			}
-			cfg = config.Read(configPath)
 			_, _ = fmt.Fprintln(os.Stderr, cfg.String()) // debug config (NOTE: sensitive fields are hidden)
 			logger.Init(&logger.Opts{
 				Level:     c.String(flagLogLevel),

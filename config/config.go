@@ -79,6 +79,15 @@ func Read(path string) *Config {
 	return config
 }
 
+func Default() *Config {
+	once.Do(func() {
+		var c Config
+		mergeEnvIfUnset(&c)
+		config = &c
+	})
+	return config
+}
+
 func mustLoadCfg(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
