@@ -3,13 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 	"log"
 	"os"
 	"strings"
-	"text/template"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/cmd"
 	"github.com/hashmap-kz/pgrwl/config"
@@ -18,57 +15,51 @@ import (
 )
 
 func main() {
-	var cfg *config.Config
-	setupUsage()
+	configFlag := &cli.StringFlag{
+		Name:     "config",
+		Usage:    "Path to config file (*.json)",
+		Aliases:  []string{"c"},
+		Required: true,
+		Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
+	}
 
 	app := &cli.Command{
 		Name:  "pgrwl",
 		Usage: "PostgreSQL WAL receiver and restore tool",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "config",
-				Usage:    "Path to config file (*.json)",
-				Aliases:  []string{"c"},
-				Required: true,
-				Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
-			},
-		},
-		Before: func(_ context.Context, c *cli.Command) (context.Context, error) {
-			configPath := c.String("config")
-			if configPath == "" {
-				log.Fatal("config path is not defined")
-			}
-			cfg = config.MustLoad(configPath)
-			_, _ = fmt.Fprintln(os.Stderr, cfg.String()) // debug config (NOTE: sensitive fields are hidden)
-			logger.Init(&logger.Opts{
-				Level:     cfg.Log.Level,
-				Format:    cfg.Log.Format,
-				AddSource: cfg.Log.AddSource,
-			})
-			return nil, nil
-		},
-		Action: func(_ context.Context, _ *cli.Command) error {
-			//nolint:staticcheck
-			if cfg.Mode.Name == config.ModeReceive {
-				checkPgEnvsAreSet()
-				cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
-					Directory:  cfg.Mode.Receive.Directory,
-					ListenPort: cfg.Mode.Receive.ListenPort,
-					Slot:       cfg.Mode.Receive.Slot,
-					NoLoop:     cfg.Mode.Receive.NoLoop,
-					Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
-				})
-			} else if cfg.Mode.Name == config.ModeServe {
-				cmd.RunServeMode(&cmd.ServeModeOpts{
-					Directory:  cfg.Mode.Serve.Directory,
-					ListenPort: cfg.Mode.Serve.ListenPort,
-				})
-			} else {
-				log.Fatalf("unknown mode: %s", cfg.Mode.Name)
-			}
-			return nil
-		},
 		Commands: []*cli.Command{
+			// server modes
+			{
+				Name:  "start",
+				Usage: "Running in a server mode: receive/serve",
+				Flags: []cli.Flag{
+					configFlag,
+				},
+				Action: func(ctx context.Context, c *cli.Command) error {
+					cfg := loadConfig(c)
+
+					//nolint:staticcheck
+					if cfg.Mode.Name == config.ModeReceive {
+						checkPgEnvsAreSet()
+						cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
+							Directory:  cfg.Mode.Receive.Directory,
+							ListenPort: cfg.Mode.Receive.ListenPort,
+							Slot:       cfg.Mode.Receive.Slot,
+							NoLoop:     cfg.Mode.Receive.NoLoop,
+							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
+						})
+					} else if cfg.Mode.Name == config.ModeServe {
+						cmd.RunServeMode(&cmd.ServeModeOpts{
+							Directory:  cfg.Mode.Serve.Directory,
+							ListenPort: cfg.Mode.Serve.ListenPort,
+						})
+					} else {
+						log.Fatalf("unknown mode: %s", cfg.Mode.Name)
+					}
+
+					return nil
+				},
+			},
+
 			// restore-command
 			{
 				Name:  "restore-command",
@@ -106,6 +97,31 @@ func main() {
 					)
 				},
 			},
+			// config-template
+			{
+				Name:  "config-template",
+				Usage: "Get a '*.json' file with all properties set",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "r",
+						Usage: "Minimal config for 'receive' mode",
+					},
+					&cli.BoolFlag{
+						Name:  "s",
+						Usage: "Minimal config for 'serve' mode",
+					},
+				},
+				Action: func(ctx context.Context, c *cli.Command) error {
+					if c.Bool("r") {
+						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateReceive())
+					} else if c.Bool("s") {
+						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateServe())
+					} else {
+						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateFull())
+					}
+					return nil
+				},
+			},
 		},
 	}
 
@@ -114,56 +130,22 @@ func main() {
 	}
 }
 
-func setupUsage() {
-	customHelpTemplate := `
-NAME:
-   {{.Name}} - {{.Usage}}
-
-USAGE:
-  # RECEIVE/SERVE MODE (requires appropriate sections in config.json)
-  pgrwl -c config.json
-
-  # NOTE: Environment variable placeholders with the 'PGRWL_' prefix are expanded.
-  # This allows you to store secrets in the config file like this:
-  # "secret_access_key": "${PGRWL_SECRET_ACCESS_KEY}"
-  
-  # basic config for 'receive' mode:
-  {
-    "mode": {
-      "name": "receive",
-      "receive": {
-        "listen_port": 7070,
-        "directory": "wals",
-        "slot": "pgrwl_v5"
-      }
-    }
-  }
-
-  # basic config fot 'serve' mode:
-  {
-    "mode": {
-      "name": "serve",
-      "serve": {
-        "listen_port": 7070,
-        "directory": "wals"
-      }
-    }
-  }
-
-  # RESTORE MODE (example usage in postgresql.conf):
-  restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
-
-GLOBAL OPTIONS:
-{{range .VisibleFlags}}{{.}}
-{{end}}
-`
-
-	cli.HelpPrinter = func(w io.Writer, _ string, data any) {
-		t := template.Must(template.New("help").Parse(customHelpTemplate))
-		if err := t.Execute(w, data); err != nil {
-			_, _ = fmt.Fprintln(w, "failed to render help:", err)
-		}
+func loadConfig(c *cli.Command) *config.Config {
+	configPath := c.String("config")
+	if configPath == "" {
+		log.Fatal("config path is not defined")
 	}
+	cfg := config.MustLoad(configPath)
+
+	// debug config (NOTE: sensitive fields are hidden)
+	_, _ = fmt.Fprintln(os.Stderr, cfg.String())
+
+	logger.Init(&logger.Opts{
+		Level:     cfg.Log.Level,
+		Format:    cfg.Log.Format,
+		AddSource: cfg.Log.AddSource,
+	})
+	return cfg
 }
 
 func checkPgEnvsAreSet() {

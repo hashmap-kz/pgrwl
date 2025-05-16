@@ -119,7 +119,7 @@ spec:
         - name: *app
           image: "localhost:5000/pgrwl:latest"
           imagePullPolicy: Always
-          args: ["-c", "/tmp/configs/config.json"]
+          args: ["start", "-c", "/tmp/configs/config.json"]
           ports:
             - containerPort: 7070
               name: http
