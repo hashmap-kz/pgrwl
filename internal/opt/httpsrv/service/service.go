@@ -34,22 +34,19 @@ type controlSvc struct {
 	info lockInfo   // metadata about the lock
 }
 
-func (s *controlSvc) GetWalFile(filename string) (*os.File, error) {
-	path := filepath.Join(s.baseDir, filename)
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
-}
-
 var _ ControlService = &controlSvc{}
 
-func NewControlService(pgrw *xlog.PgReceiveWal, baseDir string, runningMode string) ControlService {
+type ControlServiceOpts struct {
+	PGRW        *xlog.PgReceiveWal
+	BaseDir     string
+	RunningMode string
+}
+
+func NewControlService(opts *ControlServiceOpts) ControlService {
 	return &controlSvc{
-		pgrw:        pgrw,
-		baseDir:     baseDir,
-		runningMode: runningMode,
+		pgrw:        opts.PGRW,
+		baseDir:     opts.BaseDir,
+		runningMode: opts.RunningMode,
 	}
 }
 
@@ -126,4 +123,9 @@ func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
 		Bytes: size,
 		IEC:   optutils.ByteCountIEC(size),
 	}, nil
+}
+
+func (s *controlSvc) GetWalFile(filename string) (*os.File, error) {
+	path := filepath.Join(s.baseDir, filename)
+	return os.Open(path)
 }

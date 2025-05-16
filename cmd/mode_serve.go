@@ -39,7 +39,7 @@ func RunServeMode(opts *ServeModeOpts) {
 			}
 		}()
 
-		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
+		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
 			BaseDir:     opts.Directory,
 			Verbose:     opts.Verbose,
 			RunningMode: "serve",

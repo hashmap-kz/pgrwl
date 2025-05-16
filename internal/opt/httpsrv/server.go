@@ -13,21 +13,25 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type HTTPHandlersDeps struct {
+type HTTPHandlersOpts struct {
 	PGRW        *xlog.PgReceiveWal
 	BaseDir     string
 	Verbose     bool
 	RunningMode string
 }
 
-func InitHTTPHandlers(deps *HTTPHandlersDeps) http.Handler {
-	service := controlSvc.NewControlService(deps.PGRW, deps.BaseDir, deps.RunningMode)
+func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
+	service := controlSvc.NewControlService(&controlSvc.ControlServiceOpts{
+		PGRW:        opts.PGRW,
+		BaseDir:     opts.BaseDir,
+		RunningMode: opts.RunningMode,
+	})
 	controller := controlCrt.NewController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
 		Logger:  slog.With("component", "http-server"),
-		Verbose: deps.Verbose,
+		Verbose: opts.Verbose,
 	}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
 

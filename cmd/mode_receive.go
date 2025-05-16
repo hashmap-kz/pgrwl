@@ -79,7 +79,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 
-		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
+		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
 			PGRW:        pgrw,
 			BaseDir:     opts.Directory,
 			Verbose:     opts.Verbose,
