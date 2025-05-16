@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/cmd"
 	"github.com/hashmap-kz/pgrwl/config"
@@ -34,7 +35,7 @@ func main() {
 				Flags: []cli.Flag{
 					configFlag,
 				},
-				Action: func(ctx context.Context, c *cli.Command) error {
+				Action: func(_ context.Context, c *cli.Command) error {
 					cfg := loadConfig(c)
 
 					//nolint:staticcheck
@@ -111,7 +112,7 @@ func main() {
 						Usage: "Minimal config for 'serve' mode",
 					},
 				},
-				Action: func(ctx context.Context, c *cli.Command) error {
+				Action: func(_ context.Context, c *cli.Command) error {
 					if c.Bool("r") {
 						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateReceive())
 					} else if c.Bool("s") {

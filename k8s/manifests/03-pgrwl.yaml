@@ -99,21 +99,19 @@ spec:
           configMap:
             name: pgrwl-receive-config
 
-      # Wait logic is handled by the service itself.
-      #
-      # initContainers:
-      #   - name: wait-db
-      #     image: "busybox:latest"
-      #     imagePullPolicy: IfNotPresent
-      #     command:
-      #       - /bin/sh
-      #       - -euc
-      #       - |
-      #         while ! nc -z postgres 5432; do
-      #           echo "Waiting for PostgreSQL to boot";
-      #           sleep 5;
-      #         done;
-      #         echo "PostgreSQL is ready";
+      initContainers:
+        - name: wait-db
+          image: "busybox:latest"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -euc
+            - |
+              while ! nc -z postgres 5432; do
+                echo "Waiting for PostgreSQL to boot";
+                sleep 5;
+              done;
+              echo "PostgreSQL is ready";
 
       containers:
         - name: *app

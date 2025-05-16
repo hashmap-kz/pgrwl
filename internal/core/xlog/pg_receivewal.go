@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
@@ -41,39 +40,8 @@ type Opts struct {
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
 
-func waitForPostgresIsReady(ctx context.Context, dsn string, maxWaitTimeout, sleepInterval time.Duration) error {
-	var err error
-	var conn *pgconn.PgConn
-
-	deadline := time.Now().Add(maxWaitTimeout)
-	for {
-		slog.Info("waiting while pg_isready",
-			slog.Duration("maxWaitTimeout", maxWaitTimeout),
-			slog.Duration("sleepInterval", sleepInterval),
-		)
-
-		conn, err = pgconn.Connect(ctx, dsn)
-		if err == nil {
-			conn.Close(ctx) // explicitly close
-			slog.Info("pg_isready", slog.String("status", "ok"))
-			return nil
-		}
-
-		if time.Now().After(deadline) {
-			return errors.New("timeout: postgres is not ready")
-		}
-		time.Sleep(sleepInterval)
-	}
-}
-
 func NewPgReceiver(ctx context.Context, opts *Opts) (*PgReceiveWal, error) {
 	connStrRepl := fmt.Sprintf("application_name=%s replication=yes", opts.Slot)
-
-	err := waitForPostgresIsReady(ctx, connStrRepl, 5*time.Minute, 5*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
 	conn, err := pgconn.Connect(ctx, connStrRepl)
 	if err != nil {
 		slog.Error("cannot establish connection", slog.Any("err", err))
