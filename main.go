@@ -52,6 +52,7 @@ func main() {
 						cmd.RunServeMode(&cmd.ServeModeOpts{
 							Directory:  cfg.Mode.Serve.Directory,
 							ListenPort: cfg.Mode.Serve.ListenPort,
+							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
 						})
 					} else {
 						log.Fatalf("unknown mode: %s", cfg.Mode.Name)

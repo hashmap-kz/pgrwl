@@ -3,8 +3,6 @@ package httpsrv
 import (
 	"log/slog"
 	"net/http"
-	"os"
-	"strings"
 
 	controlCrt "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/controller"
 	controlSvc "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
@@ -18,18 +16,17 @@ import (
 type HTTPHandlersDeps struct {
 	PGRW    *xlog.PgReceiveWal
 	BaseDir string
+	Verbose bool
 }
 
 func InitHTTPHandlers(deps *HTTPHandlersDeps) http.Handler {
-	verbose := strings.EqualFold(os.Getenv("LOG_LEVEL"), "trace")
-
 	service := controlSvc.NewControlService(deps.PGRW, deps.BaseDir)
 	controller := controlCrt.NewController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
 		Logger:  slog.With("component", "http-server"),
-		Verbose: verbose,
+		Verbose: deps.Verbose,
 	}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
 

@@ -111,8 +111,13 @@ EOSQL
   # fix configs
   xpg_config
   cat <<EOF >>"${PG_CFG}"
-restore_command = 'cp ${WAL_PATH}/%f %p'
+#restore_command = 'cp ${WAL_PATH}/%f %p'
+restore_command = 'pgrwl restore-command --serve-addr=127.0.0.1:7070 %f %p'
 EOF
+
+  # run serve-mode
+  echo_delim "running wal fetcher"
+  bash "/var/lib/postgresql/scripts/pg/run_serve_mode.sh" "start"
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -145,6 +150,7 @@ EOF
   echo_delim "cleanup wal-archives, run wal-receivers with a new timeline"
   x_remake_dirs
   # run wal-receiver
+  bash "/var/lib/postgresql/scripts/pg/run_serve_mode.sh" "stop"
   bash "/var/lib/postgresql/scripts/pg/run_receiver.sh" "start"
   # run pg_receivewal
   bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"

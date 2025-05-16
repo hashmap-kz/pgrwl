@@ -13,6 +13,7 @@ import (
 type ServeModeOpts struct {
 	Directory  string
 	ListenPort int
+	Verbose    bool
 }
 
 func RunServeMode(opts *ServeModeOpts) {
@@ -40,6 +41,7 @@ func RunServeMode(opts *ServeModeOpts) {
 
 		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
 			BaseDir: opts.Directory,
+			Verbose: opts.Verbose,
 		})
 		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
