@@ -80,9 +80,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}()
 
 		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
-			PGRW:    pgrw,
-			BaseDir: opts.Directory,
-			Verbose: opts.Verbose,
+			PGRW:        pgrw,
+			BaseDir:     opts.Directory,
+			Verbose:     opts.Verbose,
+			RunningMode: "receive",
 		})
 		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))

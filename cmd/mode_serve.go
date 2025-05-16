@@ -40,8 +40,9 @@ func RunServeMode(opts *ServeModeOpts) {
 		}()
 
 		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersDeps{
-			BaseDir: opts.Directory,
-			Verbose: opts.Verbose,
+			BaseDir:     opts.Directory,
+			Verbose:     opts.Verbose,
+			RunningMode: "serve",
 		})
 		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))

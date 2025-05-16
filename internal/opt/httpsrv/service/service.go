@@ -14,7 +14,7 @@ import (
 )
 
 type ControlService interface {
-	Status() *xlog.StreamStatus
+	Status() *model.PgRwlStatus
 	RetainWALs() error
 	WALArchiveSize() (*model.WALArchiveSize, error)
 	GetWalFile(filename string) (*os.File, error)
@@ -25,8 +25,9 @@ type lockInfo struct {
 }
 
 type controlSvc struct {
-	pgrw    *xlog.PgReceiveWal // direct access to running state
-	baseDir string
+	pgrw        *xlog.PgReceiveWal // direct access to running state
+	baseDir     string
+	runningMode string
 
 	mu   sync.Mutex // protects access to `lock`
 	held bool       // is the lock currently held?
@@ -44,10 +45,11 @@ func (s *controlSvc) GetWalFile(filename string) (*os.File, error) {
 
 var _ ControlService = &controlSvc{}
 
-func NewControlService(pgrw *xlog.PgReceiveWal, baseDir string) ControlService {
+func NewControlService(pgrw *xlog.PgReceiveWal, baseDir string, runningMode string) ControlService {
 	return &controlSvc{
-		pgrw:    pgrw,
-		baseDir: baseDir,
+		pgrw:        pgrw,
+		baseDir:     baseDir,
+		runningMode: runningMode,
 	}
 }
 
@@ -77,14 +79,24 @@ func (s *controlSvc) unlock() {
 	s.mu.Unlock()
 }
 
-func (s *controlSvc) Status() *xlog.StreamStatus {
+func (s *controlSvc) Status() *model.PgRwlStatus {
 	// read-only; doesn’t need to block
-	if s.pgrw == nil {
-		return &xlog.StreamStatus{
-			Running: false,
+
+	var streamStatusResp *model.StreamStatus
+	if s.pgrw != nil {
+		streamStatus := s.pgrw.Status()
+		streamStatusResp = &model.StreamStatus{
+			Slot:         streamStatus.Slot,
+			Timeline:     streamStatus.Timeline,
+			LastFlushLSN: streamStatus.LastFlushLSN,
+			Uptime:       streamStatus.Uptime,
+			Running:      streamStatus.Running,
 		}
 	}
-	return s.pgrw.Status()
+	return &model.PgRwlStatus{
+		RunningMode:  s.runningMode,
+		StreamStatus: streamStatusResp,
+	}
 }
 
 func (s *controlSvc) RetainWALs() error {
