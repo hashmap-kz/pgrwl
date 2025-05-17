@@ -14,16 +14,16 @@ import (
 )
 
 type HTTPHandlersOpts struct {
-	PGRW         *xlog.PgReceiveWal
-	DirReceiving string
-	Verbose      bool
-	RunningMode  string
+	PGRW        *xlog.PgReceiveWal
+	BaseDir     string
+	Verbose     bool
+	RunningMode string
 }
 
 func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 	service := controlSvc.NewControlService(&controlSvc.ControlServiceOpts{
 		PGRW:        opts.PGRW,
-		BaseDir:     opts.DirReceiving,
+		BaseDir:     opts.BaseDir,
 		RunningMode: opts.RunningMode,
 	})
 	controller := controlCrt.NewController(service)
@@ -41,6 +41,10 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 		loggingMiddleware.Middleware,
 		rateLimitMiddleware.Middleware,
 	)
+	plainChain := middleware.MiddlewareChain(
+		middleware.SafeHandlerMiddleware,
+		loggingMiddleware.Middleware,
+	)
 
 	// Init handlers
 	mux := http.NewServeMux()
@@ -54,7 +58,7 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 
 	// Standalone mode (i.e. just serving wal-archive during restore)
 	mux.Handle("/archive/size", secureChain(http.HandlerFunc(controller.ArchiveSizeHandler)))
-	mux.Handle("/wal/{filename}", secureChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
+	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
 	return mux
 }
