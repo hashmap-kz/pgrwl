@@ -9,6 +9,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/hashmap-kz/storecrypt/pkg/clients"
+	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
 // HTTP
@@ -57,4 +61,45 @@ func runHTTPServer(ctx context.Context, port int, router http.Handler) error {
 		return err // real error
 	}
 	return nil
+}
+
+func setupStorage(baseDir string) (*st.TransformingStorage, error) {
+	cfg := config.Cfg()
+
+	// TODO: handle compression/encryption configs
+
+	if cfg.Storage.Name == "" || cfg.Storage.Name == config.StorageNameLocal {
+		local, err := st.NewLocal(&st.LocalStorageOpts{
+			BaseDir: baseDir,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &st.TransformingStorage{
+			Backend: local,
+		}, nil
+	}
+
+	if strings.EqualFold(cfg.Storage.Name, config.StorageNameS3) {
+		client, err := clients.NewS3Client(&clients.S3Config{
+			EndpointURL:     cfg.Storage.S3.URL,
+			AccessKeyID:     cfg.Storage.S3.AccessKeyID,
+			SecretAccessKey: cfg.Storage.S3.SecretAccessKey,
+			Bucket:          cfg.Storage.S3.Bucket,
+			Region:          cfg.Storage.S3.Region,
+			UsePathStyle:    cfg.Storage.S3.UsePathStyle,
+			DisableSSL:      cfg.Storage.S3.DisableSSL,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &st.TransformingStorage{
+			Backend:      st.NewS3Storage(client.Client(), cfg.Storage.S3.Bucket, baseDir),
+			Crypter:      nil,
+			Compressor:   nil,
+			Decompressor: nil,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("unknown storage name: %s", cfg.Storage.Name)
 }

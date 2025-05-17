@@ -11,6 +11,10 @@ import (
 const (
 	ModeReceive = "receive"
 	ModeServe   = "serve"
+
+	StorageNameLocal = "local"
+	StorageNameS3    = "s3"
+	StorageNameSFTP  = "sftp"
 )
 
 var (

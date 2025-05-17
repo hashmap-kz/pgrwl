@@ -6,9 +6,12 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
@@ -38,6 +41,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		NoLoop:    opts.NoLoop,
 		Verbose:   opts.Verbose,
 	})
+	if err != nil {
+		//nolint:gocritic
+		log.Fatal(err)
+	}
+
+	stor, err := setupStorage(opts.Directory)
 	if err != nil {
 		//nolint:gocritic
 		log.Fatal(err)
@@ -90,6 +99,21 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}
 	}()
 
+	// Uploader
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("upload loop panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "uploader"),
+				)
+			}
+		}()
+		runUploaderLoop(ctx, stor, opts.Directory, 30*time.Second)
+	}()
+
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
 	slog.Info("shutting down, waiting for goroutines...")
@@ -97,6 +121,73 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	slog.Info("all components shut down cleanly")
+}
+
+func runUploaderLoop(ctx context.Context, stor storage.Storage, dir string, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("(uploader-loop) context is done, exiting...")
+			return
+		case <-ticker.C:
+			files, err := os.ReadDir(dir)
+			if err != nil {
+				slog.Error("error reading dir",
+					slog.String("component", "uploader-loop"),
+					slog.Any("err", err),
+				)
+				continue
+			}
+
+			for _, entry := range files {
+				if entry.IsDir() {
+					continue
+				}
+				if !xlog.IsXLogFileName(entry.Name()) {
+					continue
+				}
+
+				path := filepath.ToSlash(filepath.Join(dir, entry.Name()))
+				slog.Info("uploader-loop, handle file", slog.String("path", path))
+
+				file, err := os.Open(path)
+				if err != nil {
+					slog.Error("error open file",
+						slog.String("component", "uploader-loop"),
+						slog.String("path", path),
+						slog.Any("err", err),
+					)
+					continue
+				}
+				err = stor.Put(ctx, entry.Name(), file)
+				if err != nil {
+					slog.Error("error upload file",
+						slog.String("component", "uploader-loop"),
+						slog.String("path", path),
+						slog.Any("err", err),
+					)
+				}
+				_ = file.Close()
+
+				if err := os.Remove(path); err != nil {
+					log.Printf("delete failed: %s: %v", path, err)
+					slog.Error("delete failed",
+						slog.String("component", "uploader-loop"),
+						slog.String("path", path),
+						slog.Any("err", err),
+					)
+				} else {
+					slog.Info("uploaded and deleted",
+						slog.String("component", "uploader-loop"),
+						slog.String("path", path),
+					)
+				}
+			}
+		}
+	}
 }
 
 func runStreamingLoop(ctx context.Context, pgrw *xlog.PgReceiveWal, opts *ReceiveModeOpts) error {
