@@ -10,6 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashmap-kz/streamcrypt/pkg/codec"
+	"github.com/hashmap-kz/streamcrypt/pkg/crypt"
+	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
+
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/storecrypt/pkg/clients"
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
@@ -66,18 +70,9 @@ func runHTTPServer(ctx context.Context, port int, router http.Handler) error {
 func setupStorage(baseDir string) (*st.TransformingStorage, error) {
 	cfg := config.Cfg()
 
-	// TODO: handle compression/encryption configs
-
-	if cfg.Storage.Name == "" || cfg.Storage.Name == config.StorageNameLocal {
-		local, err := st.NewLocal(&st.LocalStorageOpts{
-			BaseDir: baseDir,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &st.TransformingStorage{
-			Backend: local,
-		}, nil
+	compressor, decompressor, crypter, err := decideCompressorEncryptor(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	if strings.EqualFold(cfg.Storage.Name, config.StorageNameS3) {
@@ -95,11 +90,51 @@ func setupStorage(baseDir string) (*st.TransformingStorage, error) {
 		}
 		return &st.TransformingStorage{
 			Backend:      st.NewS3Storage(client.Client(), cfg.Storage.S3.Bucket, baseDir),
-			Crypter:      nil,
-			Compressor:   nil,
-			Decompressor: nil,
+			Crypter:      crypter,
+			Compressor:   compressor,
+			Decompressor: decompressor,
 		}, nil
 	}
 
 	return nil, fmt.Errorf("unknown storage name: %s", cfg.Storage.Name)
+}
+
+func decideCompressorEncryptor(cfg *config.Config) (codec.Compressor, codec.Decompressor, crypt.Crypter, error) {
+	var compressor codec.Compressor
+	var decompressor codec.Decompressor
+	var crypter crypt.Crypter
+
+	if cfg.Storage.Compression.Algo != "" {
+		slog.Info("init compressor",
+			slog.String("module", "boot"),
+			slog.String("compressor", cfg.Storage.Compression.Algo),
+		)
+
+		switch cfg.Storage.Compression.Algo {
+		case config.RepoCompressorGzip:
+			compressor = &codec.GzipCompressor{}
+			decompressor = &codec.GzipDecompressor{}
+		case config.RepoCompressorZstd:
+			compressor = &codec.ZstdCompressor{}
+			decompressor = codec.ZstdDecompressor{}
+		default:
+			return nil, nil, nil,
+				fmt.Errorf("unknown compression algo: %s", cfg.Storage.Compression.Algo)
+		}
+	}
+	if cfg.Storage.Encryption.Algo != "" {
+		slog.Info("init crypter",
+			slog.String("module", "boot"),
+			slog.String("crypter", string(cfg.Storage.Encryption.Algo)),
+		)
+
+		if cfg.Storage.Encryption.Algo == config.RepoEncryptorAes256Gcm {
+			crypter = aesgcm.NewChunkedGCMCrypter(cfg.Storage.Encryption.Pass)
+		} else {
+			return nil, nil, nil,
+				fmt.Errorf("unknown encryption algo: %s", cfg.Storage.Encryption.Algo)
+		}
+	}
+
+	return compressor, decompressor, crypter, nil
 }

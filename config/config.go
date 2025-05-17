@@ -12,9 +12,12 @@ const (
 	ModeReceive = "receive"
 	ModeServe   = "serve"
 
-	StorageNameLocal = "local"
-	StorageNameS3    = "s3"
-	StorageNameSFTP  = "sftp"
+	StorageNameS3   = "s3"
+	StorageNameSFTP = "sftp"
+
+	RepoEncryptorAes256Gcm string = "aes-256-gcm"
+	RepoCompressorGzip     string = "gzip"
+	RepoCompressorZstd     string = "zstd"
 )
 
 var (
@@ -92,6 +95,14 @@ type S3Config struct {
 	Region          string `json:"region,omitempty"`
 	UsePathStyle    bool   `json:"use_path_style,omitempty"`
 	DisableSSL      bool   `json:"disable_ssl,omitempty"`
+}
+
+func (c *Config) HasExternalStorageConfigured() bool {
+	switch c.Storage.Name {
+	case StorageNameS3, StorageNameSFTP:
+		return true
+	}
+	return false
 }
 
 func (c *Config) String() string {

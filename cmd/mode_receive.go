@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/config"
+
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
@@ -26,6 +28,8 @@ type ReceiveModeOpts struct {
 }
 
 func RunReceiveMode(opts *ReceiveModeOpts) {
+	cfg := config.Cfg()
+
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -46,10 +50,13 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		log.Fatal(err)
 	}
 
-	stor, err := setupStorage(opts.Directory)
-	if err != nil {
-		//nolint:gocritic
-		log.Fatal(err)
+	var stor *storage.TransformingStorage
+	if cfg.HasExternalStorageConfigured() {
+		stor, err = setupStorage(opts.Directory)
+		if err != nil {
+			//nolint:gocritic
+			log.Fatal(err)
+		}
 	}
 
 	// Use WaitGroup to wait for all goroutines to finish
@@ -99,20 +106,22 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}
 	}()
 
-	// Uploader
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				slog.Error("upload loop panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "uploader"),
-				)
-			}
+	if cfg.HasExternalStorageConfigured() {
+		// Uploader
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("upload loop panicked",
+						slog.Any("panic", r),
+						slog.String("goroutine", "uploader"),
+					)
+				}
+			}()
+			runUploaderLoop(ctx, stor, opts.Directory, 30*time.Second)
 		}()
-		runUploaderLoop(ctx, stor, opts.Directory, 30*time.Second)
-	}()
+	}
 
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
