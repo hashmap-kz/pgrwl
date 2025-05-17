@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
@@ -42,17 +45,18 @@ func main() {
 					if cfg.Mode.Name == config.ModeReceive {
 						checkPgEnvsAreSet()
 						cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
-							Directory:  cfg.Mode.Receive.Directory,
-							ListenPort: cfg.Mode.Receive.ListenPort,
-							Slot:       cfg.Mode.Receive.Slot,
-							NoLoop:     cfg.Mode.Receive.NoLoop,
-							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
+							DirReceiving: filepath.Join(cfg.Mode.Receive.Directory, xlog.WalReceivingDir),
+							DirStatus:    filepath.Join(cfg.Mode.Receive.Directory, xlog.WalStatusDir),
+							ListenPort:   cfg.Mode.Receive.ListenPort,
+							Slot:         cfg.Mode.Receive.Slot,
+							NoLoop:       cfg.Mode.Receive.NoLoop,
+							Verbose:      strings.EqualFold(cfg.Log.Level, "trace"),
 						})
 					} else if cfg.Mode.Name == config.ModeServe {
 						cmd.RunServeMode(&cmd.ServeModeOpts{
-							Directory:  cfg.Mode.Serve.Directory,
-							ListenPort: cfg.Mode.Serve.ListenPort,
-							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
+							DirReceiving: filepath.Join(cfg.Mode.Serve.Directory, xlog.WalReceivingDir),
+							ListenPort:   cfg.Mode.Serve.ListenPort,
+							Verbose:      strings.EqualFold(cfg.Log.Level, "trace"),
 						})
 					} else {
 						log.Fatalf("unknown mode: %s", cfg.Mode.Name)

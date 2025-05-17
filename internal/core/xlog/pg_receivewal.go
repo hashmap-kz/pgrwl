@@ -19,23 +19,30 @@ import (
 	"github.com/jackc/pglogrepl"
 )
 
+const (
+	WalReceivingDir = "wal_receiving"
+	WalStatusDir    = "wal_status"
+)
+
 type PgReceiveWal struct {
-	BaseDir     string
-	WalSegSz    uint64
-	Conn        *pgconn.PgConn
-	ConnStrRepl string
-	SlotName    string
-	Verbose     bool
+	DirReceiving string
+	DirStatus    string
+	WalSegSz     uint64
+	Conn         *pgconn.PgConn
+	ConnStrRepl  string
+	SlotName     string
+	Verbose      bool
 
 	streamMu sync.RWMutex
 	stream   *StreamCtl // current active stream (or nil)
 }
 
 type Opts struct {
-	Directory string
-	Slot      string
-	NoLoop    bool
-	Verbose   bool
+	DirReceiving string
+	DirStatus    string
+	Slot         string
+	NoLoop       bool
+	Verbose      bool
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
@@ -52,11 +59,12 @@ func NewPgReceiver(ctx context.Context, opts *Opts) (*PgReceiveWal, error) {
 		return nil, err
 	}
 	return &PgReceiveWal{
-		BaseDir:     opts.Directory,
-		WalSegSz:    startupInfo.WalSegSz,
-		Conn:        conn,
-		ConnStrRepl: connStrRepl,
-		SlotName:    opts.Slot,
+		DirReceiving: opts.DirReceiving,
+		DirStatus:    opts.DirStatus,
+		WalSegSz:     startupInfo.WalSegSz,
+		Conn:         conn,
+		ConnStrRepl:  connStrRepl,
+		SlotName:     opts.Slot,
 		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
 		Verbose: opts.Verbose,
 	}, nil
@@ -106,6 +114,9 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	}
 
 	// 4
+	if err := pgrw.makeDirs(); err != nil {
+		return err
+	}
 	streamStartLSN, streamStartTimeline, err := pgrw.findStreamingStart()
 	if err != nil {
 		if !errors.Is(err, ErrNoWalEntries) {
@@ -148,7 +159,8 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 		Timeline:        streamStartTimeline,
 		ReplicationSlot: pgrw.SlotName,
 		WalSegSz:        pgrw.WalSegSz,
-		BaseDir:         pgrw.BaseDir,
+		DirReceiving:    pgrw.DirReceiving,
+		DirStatus:       pgrw.DirStatus,
 		Conn:            pgrw.Conn,
 		Verbose:         pgrw.Verbose,
 	})
@@ -164,7 +176,7 @@ func (pgrw *PgReceiveWal) StreamLog(ctx context.Context) error {
 	}
 
 	// fsync dir
-	err = fsync.FsyncDir(pgrw.BaseDir)
+	err = fsync.FsyncDir(pgrw.DirReceiving)
 	if err != nil {
 		slog.Info("could not finish writing WAL files", slog.Any("err", err))
 		// not a fatal error, just log it
@@ -191,11 +203,6 @@ func (pgrw *PgReceiveWal) SetStream(s *StreamCtl) {
 
 // findStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
 func (pgrw *PgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
-	// ensure dir exists
-	if err := os.MkdirAll(pgrw.BaseDir, 0o750); err != nil {
-		return 0, 0, err
-	}
-
 	type walEntry struct {
 		tli       uint32
 		segNo     uint64
@@ -205,7 +212,7 @@ func (pgrw *PgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
 
 	var entries []walEntry
 
-	err := filepath.WalkDir(pgrw.BaseDir, func(path string, _ fs.DirEntry, err error) error {
+	err := filepath.WalkDir(pgrw.DirReceiving, func(path string, _ fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -246,7 +253,7 @@ func (pgrw *PgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, 0, fmt.Errorf("could not read directory %q: %w", pgrw.BaseDir, err)
+		return 0, 0, fmt.Errorf("could not read directory %q: %w", pgrw.DirReceiving, err)
 	}
 
 	if len(entries) == 0 {
@@ -279,4 +286,14 @@ func (pgrw *PgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
 		slog.String("wal", best.basename),
 	)
 	return startLSN, best.tli, nil
+}
+
+func (pgrw *PgReceiveWal) makeDirs() error {
+	if err := os.MkdirAll(pgrw.DirReceiving, 0o750); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(pgrw.DirStatus, 0o750); err != nil {
+		return err
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -127,5 +128,6 @@ func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
 
 func (s *controlSvc) GetWalFile(filename string) (*os.File, error) {
 	path := filepath.Join(s.baseDir, filename)
+	slog.Info("wal-restore", slog.String("path", path))
 	return os.Open(path)
 }

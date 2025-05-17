@@ -26,7 +26,8 @@ type StreamOpts struct {
 	Timeline        uint32
 	ReplicationSlot string
 	WalSegSz        uint64
-	BaseDir         string
+	DirReceiving    string
+	DirStatus       string
 	Conn            *pgconn.PgConn
 	Verbose         bool
 }
@@ -39,7 +40,8 @@ type StreamCtl struct {
 	partialSuffix         string
 	replicationSlot       string
 	walSegSz              uint64
-	baseDir               string
+	dirReceiving          string
+	dirStatus             string
 	reportFlushPosition   bool
 	lastStatus            time.Time
 	lastFlushPosition     pglogrepl.LSN
@@ -62,7 +64,8 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		timeline:              o.Timeline,
 		replicationSlot:       o.ReplicationSlot,
 		walSegSz:              o.WalSegSz,
-		baseDir:               o.BaseDir,
+		dirReceiving:          o.DirReceiving,
+		dirStatus:             o.DirStatus,
 		conn:                  o.Conn,
 		verbose:               o.Verbose,
 		startedAt:             time.Now(),
@@ -543,7 +546,7 @@ func (stream *StreamCtl) existsTimeLineHistoryFile() bool {
 	}
 
 	histfname := fmt.Sprintf("%08X.history", stream.timeline)
-	return fileExists(filepath.Join(stream.baseDir, histfname))
+	return fileExists(filepath.Join(stream.dirReceiving, histfname))
 }
 
 func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) error {
@@ -553,7 +556,7 @@ func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) erro
 		return fmt.Errorf("server reported unexpected history file name for timeline %d: %s", stream.timeline, filename)
 	}
 
-	histPath := filepath.Join(stream.baseDir, filename+".tmp")
+	histPath := filepath.Join(stream.dirReceiving, filename+".tmp")
 
 	// Create temporary file first
 	f, err := os.OpenFile(histPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -582,7 +585,7 @@ func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) erro
 	}
 
 	// Rename from .tmp to final
-	finalPath := filepath.Join(stream.baseDir, filename)
+	finalPath := filepath.Join(stream.dirReceiving, filename)
 	if err := os.Rename(histPath, finalPath); err != nil {
 		return fmt.Errorf("could not rename temp timeline history file to final: %w", err)
 	}

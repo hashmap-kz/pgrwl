@@ -59,7 +59,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 
 	segno := XLByteToSeg(uint64(startpoint), stream.walSegSz)
 	filename := XLogFileName(stream.timeline, segno, stream.walSegSz) + stream.partialSuffix
-	fullPath := filepath.Join(stream.baseDir, filename)
+	fullPath := filepath.Join(stream.dirReceiving, filename)
 
 	l := slog.With(
 		slog.String("job", "open_wal_file"),
@@ -285,6 +285,13 @@ func (stream *StreamCtl) closeAndRename() error {
 
 	l.Debug("fsync filename and parent-directory")
 	if err := fsync.FsyncFnameAndDir(finalName); err != nil {
+		return err
+	}
+
+	// create *.done file
+	doneFileName := filepath.Base(finalName) + ".done"
+	l.Debug("writing *.done file", slog.String("name", doneFileName))
+	if err := os.WriteFile(filepath.Join(stream.dirStatus, doneFileName), []byte{}, 0o600); err != nil {
 		return err
 	}
 

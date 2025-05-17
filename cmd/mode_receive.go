@@ -15,11 +15,12 @@ import (
 )
 
 type ReceiveModeOpts struct {
-	Directory  string
-	Slot       string
-	NoLoop     bool
-	ListenPort int
-	Verbose    bool
+	DirReceiving string
+	DirStatus    string
+	Slot         string
+	NoLoop       bool
+	ListenPort   int
+	Verbose      bool
 }
 
 func RunReceiveMode(opts *ReceiveModeOpts) {
@@ -33,10 +34,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.Opts{
-		Directory: opts.Directory,
-		Slot:      opts.Slot,
-		NoLoop:    opts.NoLoop,
-		Verbose:   opts.Verbose,
+		DirReceiving: opts.DirReceiving,
+		DirStatus:    opts.DirStatus,
+		Slot:         opts.Slot,
+		NoLoop:       opts.NoLoop,
+		Verbose:      opts.Verbose,
 	})
 	if err != nil {
 		//nolint:gocritic
@@ -80,10 +82,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}()
 
 		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
-			PGRW:        pgrw,
-			BaseDir:     opts.Directory,
-			Verbose:     opts.Verbose,
-			RunningMode: "receive",
+			PGRW:         pgrw,
+			DirReceiving: opts.DirReceiving,
+			Verbose:      opts.Verbose,
+			RunningMode:  "receive",
 		})
 		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
