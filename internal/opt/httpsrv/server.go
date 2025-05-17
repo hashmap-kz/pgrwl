@@ -14,16 +14,16 @@ import (
 )
 
 type HTTPHandlersOpts struct {
-	PGRW        *xlog.PgReceiveWal
-	BaseDir     string
-	Verbose     bool
-	RunningMode string
+	PGRW         *xlog.PgReceiveWal
+	DirReceiving string
+	Verbose      bool
+	RunningMode  string
 }
 
 func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 	service := controlSvc.NewControlService(&controlSvc.ControlServiceOpts{
 		PGRW:        opts.PGRW,
-		BaseDir:     opts.BaseDir,
+		BaseDir:     opts.DirReceiving,
 		RunningMode: opts.RunningMode,
 	})
 	controller := controlCrt.NewController(service)
