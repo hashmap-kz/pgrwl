@@ -41,6 +41,10 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 		loggingMiddleware.Middleware,
 		rateLimitMiddleware.Middleware,
 	)
+	plainChain := middleware.MiddlewareChain(
+		middleware.SafeHandlerMiddleware,
+		loggingMiddleware.Middleware,
+	)
 
 	// Init handlers
 	mux := http.NewServeMux()
@@ -54,7 +58,7 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 
 	// Standalone mode (i.e. just serving wal-archive during restore)
 	mux.Handle("/archive/size", secureChain(http.HandlerFunc(controller.ArchiveSizeHandler)))
-	mux.Handle("/wal/{filename}", secureChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
+	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
 	return mux
 }
