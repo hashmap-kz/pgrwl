@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/hashmap-kz/storecrypt/pkg/storage"
+
 	controlCrt "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/controller"
 	controlSvc "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
 
@@ -18,6 +20,7 @@ type HTTPHandlersOpts struct {
 	BaseDir     string
 	Verbose     bool
 	RunningMode string
+	Storage     *storage.TransformingStorage
 }
 
 func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
@@ -25,6 +28,7 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 		PGRW:        opts.PGRW,
 		BaseDir:     opts.BaseDir,
 		RunningMode: opts.RunningMode,
+		Storage:     opts.Storage,
 	})
 	controller := controlCrt.NewController(service)
 

@@ -1,0 +1,33 @@
+{
+  "mode": {
+    "name": "serve",
+    "serve": {
+      "listen_port": 7070,
+      "directory": "wals"
+    }
+  },
+  "log": {
+    "level": "trace",
+    "format": "text",
+    "add_source": true
+  },
+  "storage": {
+    "name": "s3",
+    "compression": {
+      "algo": "gzip"
+    },
+    "encryption": {
+      "algo": "aes-256-gcm",
+      "pass": "qwerty123"
+    },
+    "s3": {
+      "url": "https://localhost:9000",
+      "access_key_id": "minioadmin",
+      "secret_access_key": "minioadmin123",
+      "bucket": "backups",
+      "region": "main",
+      "use_path_style": true,
+      "disable_ssl": true
+    }
+  }
+}

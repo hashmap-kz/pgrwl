@@ -16,7 +16,7 @@ const (
 	WalSegMaxSize = 1 * 1024 * 1024 * 1024 // 1 GiB
 
 	XLogFileNameLen = 24
-	partialSuffix   = ".partial"
+	PartialSuffix   = ".partial"
 )
 
 // IsPowerOf2 returns true if x is a power of 2
@@ -83,11 +83,11 @@ func IsXLogFileName(fname string) bool {
 }
 
 func IsPartialXLogFileName(fname string) bool {
-	expectedLen := XLogFileNameLen + len(partialSuffix)
+	expectedLen := XLogFileNameLen + len(PartialSuffix)
 
 	return len(fname) == expectedLen &&
 		strspnMap(fname[:XLogFileNameLen], hexSet) == XLogFileNameLen &&
-		fname[XLogFileNameLen:] == partialSuffix
+		fname[XLogFileNameLen:] == PartialSuffix
 }
 
 // XLogFromFileName parses a 24-character WAL segment filename.

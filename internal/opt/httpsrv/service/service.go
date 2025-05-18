@@ -1,11 +1,16 @@
 package service
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"
 
@@ -17,7 +22,7 @@ type ControlService interface {
 	Status() *model.PgRwlStatus
 	RetainWALs() error
 	WALArchiveSize() (*model.WALArchiveSize, error)
-	GetWalFile(filename string) (*os.File, error)
+	GetWalFile(filename string) (io.ReadCloser, error)
 }
 type lockInfo struct {
 	task     string
@@ -28,6 +33,7 @@ type controlSvc struct {
 	pgrw        *xlog.PgReceiveWal // direct access to running state
 	baseDir     string
 	runningMode string
+	storage     *storage.TransformingStorage
 
 	mu   sync.Mutex // protects access to `lock`
 	held bool       // is the lock currently held?
@@ -40,6 +46,7 @@ type ControlServiceOpts struct {
 	PGRW        *xlog.PgReceiveWal
 	BaseDir     string
 	RunningMode string
+	Storage     *storage.TransformingStorage
 }
 
 func NewControlService(opts *ControlServiceOpts) ControlService {
@@ -47,6 +54,7 @@ func NewControlService(opts *ControlServiceOpts) ControlService {
 		pgrw:        opts.PGRW,
 		baseDir:     opts.BaseDir,
 		runningMode: opts.RunningMode,
+		storage:     opts.Storage,
 	}
 }
 
@@ -125,7 +133,35 @@ func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
 	}, nil
 }
 
-func (s *controlSvc) GetWalFile(filename string) (*os.File, error) {
+func (s *controlSvc) GetWalFile(filename string) (io.ReadCloser, error) {
+	// 1) Fast-path: check that file exists locally
+	// 2) Check *.partial file locally
+	// 3) Fetch from storage (if it's not nil)
+
 	path := filepath.Join(s.baseDir, filename)
-	return os.Open(path)
+	slog.Debug("wal-restore, begin to restore file", slog.String("path", path))
+
+	if fileExists(path) {
+		slog.Debug("wal-restore, found local file", slog.String("path", path))
+		return os.Open(path)
+	}
+	if fileExists(path + xlog.PartialSuffix) {
+		slog.Debug("wal-restore, found local partial file", slog.String("path", path))
+		return os.Open(path + xlog.PartialSuffix)
+	}
+	if s.storage != nil {
+		slog.Debug("wal-restore, fetching remote file", slog.String("filename", filename))
+		return s.storage.Get(context.TODO(), filename)
+	}
+
+	return nil, fmt.Errorf("cannot get file from any available paths: %s", path)
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		// File does not exist or another error
+		return false
+	}
+	return info.Mode().IsRegular()
 }

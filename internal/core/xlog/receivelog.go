@@ -56,7 +56,7 @@ func NewStream(o *StreamOpts) *StreamCtl {
 	return &StreamCtl{
 		standbyMessageTimeout: 10 * time.Second,
 		synchronous:           true,
-		partialSuffix:         partialSuffix,
+		partialSuffix:         PartialSuffix,
 		reportFlushPosition:   true,
 		startPos:              o.StartPos,
 		timeline:              o.Timeline,

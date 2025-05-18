@@ -116,6 +116,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			BaseDir:     opts.Directory,
 			Verbose:     opts.Verbose,
 			RunningMode: "receive",
+			Storage:     stor,
 		})
 		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
@@ -161,7 +162,7 @@ func checkStorageManifest(cfg *config.Config) (*StorageManifest, error) {
 			if err != nil {
 				return nil, err
 			}
-			err = os.WriteFile(manifestPath, data, 0640)
+			err = os.WriteFile(manifestPath, data, 0o640)
 			if err != nil {
 				return nil, err
 			}
