@@ -35,7 +35,7 @@ func RunServeMode(opts *ServeModeOpts) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		manifest, err := checkStorageManifest(cfg)
+		manifest, err := checkStorageManifest(cfg, cfg.Mode.Serve.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}

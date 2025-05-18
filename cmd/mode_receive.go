@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"log"
 	"log/slog"
 	"os"
@@ -63,7 +61,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		manifest, err := checkStorageManifest(cfg)
+		manifest, err := checkStorageManifest(cfg, cfg.Mode.Receive.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -147,34 +145,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	slog.Info("all components shut down cleanly")
-}
-
-func checkStorageManifest(cfg *config.Config) (*StorageManifest, error) {
-	var m StorageManifest
-	manifestPath := filepath.Join(cfg.Mode.Receive.Directory, "manifest.json")
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		// create if not exists
-		if errors.Is(err, os.ErrNotExist) {
-			m.CompressionAlgo = cfg.Storage.Compression.Algo
-			m.EncryptionAlgo = cfg.Storage.Encryption.Algo
-			data, err := json.Marshal(&m)
-			if err != nil {
-				return nil, err
-			}
-			err = os.WriteFile(manifestPath, data, 0o640)
-			if err != nil {
-				return nil, err
-			}
-			return &m, nil
-		}
-		return nil, err
-	}
-	err = json.Unmarshal(data, &m)
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
 }
 
 func runUploaderLoop(ctx context.Context, stor storage.Storage, dir string, interval time.Duration) {

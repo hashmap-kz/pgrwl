@@ -2,11 +2,14 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -137,4 +140,32 @@ func decideCompressorEncryptor(cfg *config.Config) (codec.Compressor, codec.Deco
 	}
 
 	return compressor, decompressor, crypter, nil
+}
+
+func checkStorageManifest(cfg *config.Config, dir string) (*StorageManifest, error) {
+	var m StorageManifest
+	manifestPath := filepath.Join(dir, "manifest.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		// create if not exists
+		if errors.Is(err, os.ErrNotExist) {
+			m.CompressionAlgo = cfg.Storage.Compression.Algo
+			m.EncryptionAlgo = cfg.Storage.Encryption.Algo
+			data, err := json.Marshal(&m)
+			if err != nil {
+				return nil, err
+			}
+			err = os.WriteFile(manifestPath, data, 0o640)
+			if err != nil {
+				return nil, err
+			}
+			return &m, nil
+		}
+		return nil, err
+	}
+	err = json.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
 }
