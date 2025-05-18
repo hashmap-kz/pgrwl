@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"log"
 	"log/slog"
 	"os"
@@ -25,6 +27,11 @@ type ReceiveModeOpts struct {
 	NoLoop     bool
 	ListenPort int
 	Verbose    bool
+}
+
+type StorageManifest struct {
+	CompressionAlgo string `json:"compression_algo,omitempty"`
+	EncryptionAlgo  string `json:"encryption_algo,omitempty"`
 }
 
 func RunReceiveMode(opts *ReceiveModeOpts) {
@@ -54,8 +61,17 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	if cfg.HasExternalStorageConfigured() {
 		stor, err = setupStorage(opts.Directory)
 		if err != nil {
-			//nolint:gocritic
 			log.Fatal(err)
+		}
+		manifest, err := checkStorageManifest(cfg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if manifest.CompressionAlgo != cfg.Storage.Compression.Algo {
+			log.Fatal("storage compression mismatch from previous setup")
+		}
+		if manifest.EncryptionAlgo != cfg.Storage.Encryption.Algo {
+			log.Fatal("storage encryption mismatch from previous setup")
 		}
 	}
 
@@ -130,6 +146,34 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	slog.Info("all components shut down cleanly")
+}
+
+func checkStorageManifest(cfg *config.Config) (*StorageManifest, error) {
+	var m StorageManifest
+	manifestPath := filepath.Join(cfg.Mode.Receive.Directory, "manifest.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		// create if not exists
+		if errors.Is(err, os.ErrNotExist) {
+			m.CompressionAlgo = cfg.Storage.Compression.Algo
+			m.EncryptionAlgo = cfg.Storage.Encryption.Algo
+			data, err := json.Marshal(&m)
+			if err != nil {
+				return nil, err
+			}
+			err = os.WriteFile(manifestPath, data, 0640)
+			if err != nil {
+				return nil, err
+			}
+			return &m, nil
+		}
+		return nil, err
+	}
+	err = json.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
 }
 
 func runUploaderLoop(ctx context.Context, stor storage.Storage, dir string, interval time.Duration) {
