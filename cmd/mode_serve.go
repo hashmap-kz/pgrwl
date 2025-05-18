@@ -35,15 +35,9 @@ func RunServeMode(opts *ServeModeOpts) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		manifest, err := checkStorageManifest(cfg, cfg.Mode.Serve.Directory)
+		err = checkManifest(cfg, cfg.Mode.Serve.Directory)
 		if err != nil {
 			log.Fatal(err)
-		}
-		if manifest.CompressionAlgo != cfg.Storage.Compression.Algo {
-			log.Fatal("storage compression mismatch from previous setup")
-		}
-		if manifest.EncryptionAlgo != cfg.Storage.Encryption.Algo {
-			log.Fatal("storage encryption mismatch from previous setup")
 		}
 	}
 

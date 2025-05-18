@@ -61,15 +61,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		manifest, err := checkStorageManifest(cfg, cfg.Mode.Receive.Directory)
+		err := checkManifest(cfg, cfg.Mode.Receive.Directory)
 		if err != nil {
 			log.Fatal(err)
-		}
-		if manifest.CompressionAlgo != cfg.Storage.Compression.Algo {
-			log.Fatal("storage compression mismatch from previous setup")
-		}
-		if manifest.EncryptionAlgo != cfg.Storage.Encryption.Algo {
-			log.Fatal("storage encryption mismatch from previous setup")
 		}
 	}
 

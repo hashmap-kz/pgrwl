@@ -142,7 +142,21 @@ func decideCompressorEncryptor(cfg *config.Config) (codec.Compressor, codec.Deco
 	return compressor, decompressor, crypter, nil
 }
 
-func checkStorageManifest(cfg *config.Config, dir string) (*StorageManifest, error) {
+func checkManifest(cfg *config.Config, dir string) error {
+	manifest, err := readOrWriteManifest(cfg, dir)
+	if err != nil {
+		return err
+	}
+	if manifest.CompressionAlgo != cfg.Storage.Compression.Algo {
+		return fmt.Errorf("storage compression mismatch from previous setup")
+	}
+	if manifest.EncryptionAlgo != cfg.Storage.Encryption.Algo {
+		return fmt.Errorf("storage encryption mismatch from previous setup")
+	}
+	return nil
+}
+
+func readOrWriteManifest(cfg *config.Config, dir string) (*StorageManifest, error) {
 	var m StorageManifest
 	manifestPath := filepath.Join(dir, "manifest.json")
 	data, err := os.ReadFile(manifestPath)
