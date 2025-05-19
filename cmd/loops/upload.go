@@ -88,9 +88,16 @@ func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, 
 		go func() {
 			defer wg.Done()
 			for filePath := range filesChan {
-				dumpErr := uploadOneFile(ctx, stor, filePath)
-				if dumpErr != nil {
-					errorChan <- dumpErr
+				// Check for cancellation
+				if ctx.Err() != nil {
+					return
+				}
+				err := uploadOneFile(ctx, stor, filePath)
+				if err != nil {
+					select {
+					case errorChan <- err:
+					default:
+					}
 				}
 			}
 		}()
