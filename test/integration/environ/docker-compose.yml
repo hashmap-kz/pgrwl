@@ -2,7 +2,7 @@ services:
   pg-primary:
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: ./Dockerfile_pg
     container_name: pg-primary
     restart: unless-stopped
     environment:
@@ -38,12 +38,55 @@ services:
         sleep 2;
         done &&
         exec docker-entrypoint.sh postgres \
-          -c hba_file=/etc/postgresql/pg_hba.conf \
-          -c config_file=/etc/postgresql/postgresql.conf \
-          -c hot_standby=on
+        -c hba_file=/etc/postgresql/pg_hba.conf \
+        -c config_file=/etc/postgresql/postgresql.conf \
+        -c hot_standby=on
         ",
       ]
+
+  vm:
+    build:
+      context: .
+      dockerfile: ./Dockerfile_sshd
+    container_name: vm
+    restart: unless-stopped
+    ports:
+      - "2525:22"
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+      - ./files/minio/certs:/root/.minio/certs:ro
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-k", "https://localhost:9000/minio/health/ready"]
+      interval: 2s
+      timeout: 20s
+      retries: 30
+    restart: unless-stopped
+
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      mc alias set local https://minio:9000 minioadmin minioadmin123 --insecure && \
+      mc mb local/backups --insecure || true && \
+      mc version enable local/backups --insecure && \
+      exit 0;
+      "
 
 volumes:
   pg-primary-data:
   pg-standby-data:
+  minio_data:
