@@ -49,7 +49,7 @@ func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	file, err := c.Service.GetWalFile(filename)
+	file, err := c.Service.GetWalFile(r.Context(), filename)
 	if err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
@@ -61,7 +61,4 @@ func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *htt
 		http.Error(w, "cannot read file", http.StatusInternalServerError)
 		return
 	}
-
-	// w.Header().Set("Content-Type", "application/octet-stream")
-	// w.WriteHeader(http.StatusOK)
 }

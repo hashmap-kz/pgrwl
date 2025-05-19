@@ -22,7 +22,7 @@ type ControlService interface {
 	Status() *model.PgRwlStatus
 	RetainWALs() error
 	WALArchiveSize() (*model.WALArchiveSize, error)
-	GetWalFile(filename string) (io.ReadCloser, error)
+	GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error)
 }
 type lockInfo struct {
 	task     string
@@ -133,35 +133,27 @@ func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
 	}, nil
 }
 
-func (s *controlSvc) GetWalFile(filename string) (io.ReadCloser, error) {
+func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error) {
 	// 1) Fast-path: check that file exists locally
 	// 2) Check *.partial file locally
 	// 3) Fetch from storage (if it's not nil)
 
-	path := filepath.Join(s.baseDir, filename)
-	slog.Debug("wal-restore, begin to restore file", slog.String("path", path))
+	if s.storage == nil {
+		filePath := filepath.Join(s.baseDir, filename)
+		partialFilePath := filePath + xlog.PartialSuffix
 
-	if fileExists(path) {
-		slog.Debug("wal-restore, found local file", slog.String("path", path))
-		return os.Open(path)
-	}
-	if fileExists(path + xlog.PartialSuffix) {
-		slog.Debug("wal-restore, found local partial file", slog.String("path", path))
-		return os.Open(path + xlog.PartialSuffix)
-	}
-	if s.storage != nil {
-		slog.Debug("wal-restore, fetching remote file", slog.String("filename", filename))
-		return s.storage.Get(context.TODO(), filename)
+		slog.Debug("wal-restore, fetching local file", slog.String("path", filePath))
+		if optutils.FileExists(filePath) {
+			slog.Debug("wal-restore, found local file", slog.String("path", filePath))
+			return os.Open(filePath)
+		}
+		if optutils.FileExists(partialFilePath) {
+			slog.Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
+			return os.Open(partialFilePath)
+		}
+		return nil, fmt.Errorf("cannot find local file: %s", filePath)
 	}
 
-	return nil, fmt.Errorf("cannot get file from any available paths: %s", path)
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		// File does not exist or another error
-		return false
-	}
-	return info.Mode().IsRegular()
+	slog.Debug("wal-restore, fetching remote file", slog.String("filename", filename))
+	return s.storage.Get(ctx, filename)
 }
