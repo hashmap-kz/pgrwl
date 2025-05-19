@@ -8,6 +8,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hashmap-kz/pgrwl/cmd/repo"
+
+	"github.com/hashmap-kz/pgrwl/cmd/loops"
+
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
@@ -31,11 +35,11 @@ func RunServeMode(opts *ServeModeOpts) {
 
 	var stor *storage.TransformingStorage
 	if cfg.HasExternalStorageConfigured() {
-		stor, err = setupStorage(opts.Directory)
+		stor, err = repo.SetupStorage(opts.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = checkManifest(cfg, cfg.Mode.Serve.Directory)
+		err = repo.CheckManifest(cfg, cfg.Mode.Serve.Directory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -64,7 +68,7 @@ func RunServeMode(opts *ServeModeOpts) {
 			RunningMode: "serve",
 			Storage:     stor,
 		})
-		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
+		if err := loops.RunHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 			cancel()
 		}
