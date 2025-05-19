@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/hashmap-kz/pgrwl/cmd/cmdutils"
 	"log"
 	"log/slog"
 	"os/signal"
@@ -117,7 +118,8 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 					)
 				}
 			}()
-			loops.RunUploaderLoop(ctx, stor, opts.Directory, 30*time.Second)
+			syncInterval := cmdutils.ParseDurationOrDefault(cfg.Storage.Upload.SyncInterval, 30*time.Second)
+			loops.RunUploaderLoop(ctx, stor, opts.Directory, syncInterval)
 		}()
 	}
 

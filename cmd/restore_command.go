@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/hashmap-kz/pgrwl/cmd/cmdutils"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,7 +19,7 @@ func ExecRestoreCommand(walFileName, walFilePath string, opts *RestoreCommandOpt
 		slog.String("p", walFilePath),
 	)
 
-	addr, err := addr(opts.Addr)
+	addr, err := cmdutils.Addr(opts.Addr)
 	if err != nil {
 		return err
 	}

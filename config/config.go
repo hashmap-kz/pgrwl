@@ -62,11 +62,18 @@ type LogConfig struct {
 // ---- Storage Section ----
 
 type StorageConfig struct {
-	Name        string            `json:"name,omitempty"` // e.g. "s3", "sftp", "local"
+	Name        string            `json:"name,omitempty"` // e.g. "s3", "sftp"
+	Upload      UploadConfig      `json:"upload"`
 	Compression CompressionConfig `json:"compression,omitempty"`
 	Encryption  EncryptionConfig  `json:"encryption,omitempty"`
 	SFTP        SFTPConfig        `json:"sftp,omitempty"`
 	S3          S3Config          `json:"s3,omitempty"`
+}
+
+type UploadConfig struct {
+	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	SyncInterval   string `json:"sync_interval"`
+	MaxConcurrency int    `json:"max_concurrency"`
 }
 
 type CompressionConfig struct {
