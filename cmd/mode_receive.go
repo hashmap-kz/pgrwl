@@ -187,8 +187,28 @@ func runUploaderLoop(ctx context.Context, stor storage.Storage, dir string, inte
 						slog.String("path", path),
 						slog.Any("err", err),
 					)
+
+					// upload error: closing file, continue the loop, DO NOT REMOVE SOURCE WHEN UPLOAD IS FAILED
+					err = file.Close()
+					if err != nil {
+						slog.Error("error close file",
+							slog.String("component", "uploader-loop"),
+							slog.String("path", path),
+							slog.Any("err", err),
+						)
+					}
+					continue
 				}
-				_ = file.Close()
+
+				// upload success: closing file
+				err = file.Close()
+				if err != nil {
+					slog.Error("error close file",
+						slog.String("component", "uploader-loop"),
+						slog.String("path", path),
+						slog.Any("err", err),
+					)
+				}
 
 				if err := os.Remove(path); err != nil {
 					log.Printf("delete failed: %s: %v", path, err)

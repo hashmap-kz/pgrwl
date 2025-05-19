@@ -22,7 +22,7 @@
       "pass": "qwerty123"
     },
     "s3": {
-      "url": "https://localhost:9000",
+      "url": "${PGRWL_MINIO_URL}",
       "access_key_id": "minioadmin",
       "secret_access_key": "minioadmin123",
       "bucket": "backups",
