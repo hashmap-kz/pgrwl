@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // TODO: stat: skipped by permission issues, or vanished
@@ -70,4 +71,13 @@ func FileExists(path string) bool {
 		return false
 	}
 	return info.Mode().IsRegular()
+}
+
+func IsFileStable(path string, minAge time.Duration) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	isStab := time.Since(info.ModTime()) > minAge
+	return isStab, nil
 }
