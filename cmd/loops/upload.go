@@ -2,7 +2,6 @@ package loops
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -40,50 +39,9 @@ func RunUploaderLoop(ctx context.Context, stor storage.Storage, dir string, inte
 				}
 
 				path := filepath.ToSlash(filepath.Join(dir, entry.Name()))
-				slog.Info("uploader-loop, handle file", slog.String("path", path))
-
-				file, err := os.Open(path)
-				if err != nil {
-					slog.Error("error open file",
-						slog.String("component", "uploader-loop"),
-						slog.String("path", path),
-						slog.Any("err", err),
-					)
-					continue
-				}
-				err = stor.Put(ctx, entry.Name(), file)
+				err = uploadOneFile(ctx, stor, path)
 				if err != nil {
 					slog.Error("error upload file",
-						slog.String("component", "uploader-loop"),
-						slog.String("path", path),
-						slog.Any("err", err),
-					)
-
-					// upload error: closing file, continue the loop, DO NOT REMOVE SOURCE WHEN UPLOAD IS FAILED
-					err = file.Close()
-					if err != nil {
-						slog.Error("error close file",
-							slog.String("component", "uploader-loop"),
-							slog.String("path", path),
-							slog.Any("err", err),
-						)
-					}
-					continue
-				}
-
-				// upload success: closing file
-				err = file.Close()
-				if err != nil {
-					slog.Error("error close file",
-						slog.String("component", "uploader-loop"),
-						slog.String("path", path),
-						slog.Any("err", err),
-					)
-				}
-
-				if err := os.Remove(path); err != nil {
-					log.Printf("delete failed: %s: %v", path, err)
-					slog.Error("delete failed",
 						slog.String("component", "uploader-loop"),
 						slog.String("path", path),
 						slog.Any("err", err),
@@ -97,4 +55,32 @@ func RunUploaderLoop(ctx context.Context, stor storage.Storage, dir string, inte
 			}
 		}
 	}
+}
+
+func uploadOneFile(ctx context.Context, stor storage.Storage, path string) error {
+	slog.Info("uploader-loop, handle file", slog.String("path", path))
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+
+	err = stor.Put(ctx, filepath.Base(path), file)
+	if err != nil {
+		// upload error: close the file, return err, DO NOT REMOVE SOURCE WHEN UPLOAD IS FAILED
+		_ = file.Close()
+		return err
+	}
+
+	// upload success: closing file
+	if err := file.Close(); err != nil {
+		return err
+	}
+
+	// remove file
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+
+	return nil
 }
