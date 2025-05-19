@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/hashmap-kz/pgrwl/cmd/cmdutils"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/hashmap-kz/pgrwl/cmd/cmdutils"
 )
 
 type RestoreCommandOpts struct {
