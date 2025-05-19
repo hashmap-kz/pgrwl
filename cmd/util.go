@@ -78,6 +78,27 @@ func setupStorage(baseDir string) (*st.TransformingStorage, error) {
 		return nil, err
 	}
 
+	// sftp
+	if strings.EqualFold(cfg.Storage.Name, config.StorageNameSFTP) {
+		client, err := clients.NewSFTPClient(&clients.SFTPConfig{
+			Host:       cfg.Storage.SFTP.Host,
+			Port:       fmt.Sprintf("%d", cfg.Storage.SFTP.Port),
+			User:       cfg.Storage.SFTP.User,
+			PkeyPath:   cfg.Storage.SFTP.Pass,
+			Passphrase: cfg.Storage.SFTP.PKeyPass,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &st.TransformingStorage{
+			Backend:      st.NewSFTPStorage(client.SFTPClient(), baseDir),
+			Crypter:      crypter,
+			Compressor:   compressor,
+			Decompressor: decompressor,
+		}, nil
+	}
+
+	// s3
 	if strings.EqualFold(cfg.Storage.Name, config.StorageNameS3) {
 		client, err := clients.NewS3Client(&clients.S3Config{
 			EndpointURL:     cfg.Storage.S3.URL,
@@ -128,7 +149,7 @@ func decideCompressorEncryptor(cfg *config.Config) (codec.Compressor, codec.Deco
 	if cfg.Storage.Encryption.Algo != "" {
 		slog.Info("init crypter",
 			slog.String("module", "boot"),
-			slog.String("crypter", string(cfg.Storage.Encryption.Algo)),
+			slog.String("crypter", cfg.Storage.Encryption.Algo),
 		)
 
 		if cfg.Storage.Encryption.Algo == config.RepoEncryptorAes256Gcm {
@@ -158,7 +179,7 @@ func checkManifest(cfg *config.Config, dir string) error {
 
 func readOrWriteManifest(cfg *config.Config, dir string) (*StorageManifest, error) {
 	var m StorageManifest
-	manifestPath := filepath.Join(dir, "manifest.json")
+	manifestPath := filepath.Join(dir, ".manifest.json")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
 		// create if not exists
