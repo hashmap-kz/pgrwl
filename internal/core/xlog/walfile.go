@@ -59,7 +59,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 
 	segno := XLByteToSeg(uint64(startpoint), stream.walSegSz)
 	filename := XLogFileName(stream.timeline, segno, stream.walSegSz) + stream.partialSuffix
-	fullPath := filepath.Join(stream.baseDir, filename)
+	fullPath := filepath.Join(stream.receiveDir, filename)
 
 	l := slog.With(
 		slog.String("job", "open_wal_file"),
@@ -263,31 +263,67 @@ func (stream *StreamCtl) closeAndRename() error {
 	finalName := strings.TrimSuffix(pathname, stream.partialSuffix)
 	l := slog.With(
 		slog.String("job", "close_wal_file_with_rename"),
-		slog.String("src", filepath.ToSlash(pathname)),
-		slog.String("dst", filepath.ToSlash(finalName)),
 	)
 
-	l.Debug("closing fd (*.partial file)")
+	l.Debug("closing fd (*.partial file)", slog.String("path", filepath.ToSlash(pathname)))
 	if err := stream.walfile.fd.Close(); err != nil {
 		return err
 	}
 
-	l.Debug("fsync path (*.partial file)")
+	l.Debug("fsync path (*.partial file)", slog.String("path", filepath.ToSlash(pathname)))
 	if err := fsync.FsyncFname(pathname); err != nil {
 		return err
 	}
 
-	l.Debug("renaming to complete segment")
+	l.Debug("renaming to complete segment",
+		slog.String("src", filepath.ToSlash(pathname)),
+		slog.String("dst", filepath.ToSlash(finalName)),
+	)
 	if err := os.Rename(pathname, finalName); err != nil {
 		return err
 	}
 	stream.walfile = nil
 
-	l.Debug("fsync filename and parent-directory")
+	l.Debug("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(finalName)))
 	if err := fsync.FsyncFnameAndDir(finalName); err != nil {
 		return err
 	}
 
+	// *.done marker file +
+	go func() {
+		// WAL file size can be up to 1 GiB, so we use a separate goroutine
+		// for checksum computation and *.done marker creation.
+		// This avoids blocking the main streaming loop.
+		if err := stream.createDoneMarker(finalName); err != nil {
+			slog.Error("failed to write .done marker",
+				slog.String("wal", filepath.ToSlash(finalName)),
+				slog.String("err", err.Error()),
+			)
+		}
+	}()
+	// *.done marker file -
+
 	l.Info("segment is complete")
+	return nil
+}
+
+func (stream *StreamCtl) createDoneMarker(finalName string) error {
+	l := slog.With(
+		slog.String("job", "done_marker_goroutine"),
+	)
+
+	l.Debug("calc checksum", slog.String("path", filepath.ToSlash(finalName)))
+	checksum, err := sha256Path(finalName)
+	if err != nil {
+		return err
+	}
+	doneMarkerFileName := filepath.Base(finalName) + ".done"
+	doneMarkerFilePath := filepath.Join(stream.statusDir, doneMarkerFileName)
+	l.Debug("creating .done marker", slog.String("path", filepath.ToSlash(doneMarkerFilePath)))
+	if err := os.WriteFile(doneMarkerFilePath, []byte(checksum), 0o640); err != nil {
+		return err
+	}
+
+	l.Debug(".done marker file is created", slog.String("path", filepath.ToSlash(doneMarkerFilePath)))
 	return nil
 }

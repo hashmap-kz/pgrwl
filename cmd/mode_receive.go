@@ -33,10 +33,11 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.Opts{
-		Directory: opts.Directory,
-		Slot:      opts.Slot,
-		NoLoop:    opts.NoLoop,
-		Verbose:   opts.Verbose,
+		ReceiveDirectory: opts.ReceiveDirectory,
+		StatusDirectory:  opts.StatusDirectory,
+		Slot:             opts.Slot,
+		NoLoop:           opts.NoLoop,
+		Verbose:          opts.Verbose,
 	})
 	if err != nil {
 		//nolint:gocritic
@@ -45,7 +46,7 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 
 	var stor *storage.TransformingStorage
 	if cfg.HasExternalStorageConfigured() {
-		stor, err = repo.SetupStorage(opts.Directory)
+		stor, err = repo.SetupStorage(opts.ReceiveDirectory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -93,7 +94,7 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 
 		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
 			PGRW:        pgrw,
-			BaseDir:     opts.Directory,
+			BaseDir:     opts.ReceiveDirectory,
 			Verbose:     opts.Verbose,
 			RunningMode: "receive",
 			Storage:     stor,
@@ -116,7 +117,7 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 					)
 				}
 			}()
-			loops.RunUploaderLoop(ctx, cfg, stor, opts.Directory)
+			loops.RunUploaderLoop(ctx, cfg, stor, opts.ReceiveDirectory)
 		}()
 	}
 

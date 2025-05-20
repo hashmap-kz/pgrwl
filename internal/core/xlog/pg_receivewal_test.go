@@ -23,8 +23,8 @@ func TestFindStreamingStart_PartialAndComplete(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, partial), make([]byte, 1*1024*1024), 0o600)) // shorter
 
 	pgrw := &PgReceiveWal{
-		BaseDir:  dir,
-		WalSegSz: segSize,
+		ReceiveDirectory: dir,
+		WalSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()
@@ -45,8 +45,8 @@ func TestFindStreamingStart_OnlyComplete(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, name), make([]byte, segSize), 0o600))
 
 	pgrw := &PgReceiveWal{
-		BaseDir:  dir,
-		WalSegSz: segSize,
+		ReceiveDirectory: dir,
+		WalSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()
@@ -61,8 +61,8 @@ func TestFindStreamingStart_OnlyComplete(t *testing.T) {
 func TestFindStreamingStart_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 	pgrw := &PgReceiveWal{
-		BaseDir:  dir,
-		WalSegSz: 16 * 1024 * 1024,
+		ReceiveDirectory: dir,
+		WalSegSz:         16 * 1024 * 1024,
 	}
 
 	_, _, err := pgrw.findStreamingStart()
@@ -82,8 +82,8 @@ func TestFindStreamingStart_DifferentTimelines(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, fileTLI2), make([]byte, 1*1024*1024), 0o600)) // smaller partial
 
 	pgrw := &PgReceiveWal{
-		BaseDir:  dir,
-		WalSegSz: segSize,
+		ReceiveDirectory: dir,
+		WalSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()
@@ -144,8 +144,8 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 	}
 
 	pgrw := &PgReceiveWal{
-		BaseDir:  dir,
-		WalSegSz: segSize,
+		ReceiveDirectory: dir,
+		WalSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()

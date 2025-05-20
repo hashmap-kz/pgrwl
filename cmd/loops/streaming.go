@@ -10,11 +10,12 @@ import (
 )
 
 type ReceiveModeOpts struct {
-	Directory  string
-	Slot       string
-	NoLoop     bool
-	ListenPort int
-	Verbose    bool
+	ReceiveDirectory string
+	StatusDirectory  string
+	Slot             string
+	NoLoop           bool
+	ListenPort       int
+	Verbose          bool
 }
 
 func RunStreamingLoop(ctx context.Context, pgrw *xlog.PgReceiveWal, opts *ReceiveModeOpts) error {

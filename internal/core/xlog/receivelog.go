@@ -22,13 +22,14 @@ import (
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
 type StreamOpts struct {
-	StartPos        pglogrepl.LSN
-	Timeline        uint32
-	ReplicationSlot string
-	WalSegSz        uint64
-	BaseDir         string
-	Conn            *pgconn.PgConn
-	Verbose         bool
+	StartPos         pglogrepl.LSN
+	Timeline         uint32
+	ReplicationSlot  string
+	WalSegSz         uint64
+	ReceiveDirectory string
+	StatusDirectory  string
+	Conn             *pgconn.PgConn
+	Verbose          bool
 }
 
 type StreamCtl struct {
@@ -39,7 +40,8 @@ type StreamCtl struct {
 	partialSuffix         string
 	replicationSlot       string
 	walSegSz              uint64
-	baseDir               string
+	receiveDir            string
+	statusDir             string
 	reportFlushPosition   bool
 	lastStatus            time.Time
 	lastFlushPosition     pglogrepl.LSN
@@ -62,7 +64,8 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		timeline:              o.Timeline,
 		replicationSlot:       o.ReplicationSlot,
 		walSegSz:              o.WalSegSz,
-		baseDir:               o.BaseDir,
+		receiveDir:            o.ReceiveDirectory,
+		statusDir:             o.StatusDirectory,
 		conn:                  o.Conn,
 		verbose:               o.Verbose,
 		startedAt:             time.Now(),
@@ -543,7 +546,7 @@ func (stream *StreamCtl) existsTimeLineHistoryFile() bool {
 	}
 
 	histfname := fmt.Sprintf("%08X.history", stream.timeline)
-	return fileExists(filepath.Join(stream.baseDir, histfname))
+	return fileExists(filepath.Join(stream.receiveDir, histfname))
 }
 
 func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) error {
@@ -553,7 +556,7 @@ func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) erro
 		return fmt.Errorf("server reported unexpected history file name for timeline %d: %s", stream.timeline, filename)
 	}
 
-	histPath := filepath.Join(stream.baseDir, filename+".tmp")
+	histPath := filepath.Join(stream.receiveDir, filename+".tmp")
 
 	// Create temporary file first
 	f, err := os.OpenFile(histPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -582,7 +585,7 @@ func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) erro
 	}
 
 	// Rename from .tmp to final
-	finalPath := filepath.Join(stream.baseDir, filename)
+	finalPath := filepath.Join(stream.receiveDir, filename)
 	if err := os.Rename(histPath, finalPath); err != nil {
 		return fmt.Errorf("could not rename temp timeline history file to final: %w", err)
 	}

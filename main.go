@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 
 	"github.com/hashmap-kz/pgrwl/cmd/loops"
 
@@ -44,15 +47,16 @@ func main() {
 					if cfg.Mode.Name == config.ModeReceive {
 						checkPgEnvsAreSet()
 						cmd.RunReceiveMode(&loops.ReceiveModeOpts{
-							Directory:  cfg.Mode.Receive.Directory,
-							ListenPort: cfg.Mode.Receive.ListenPort,
-							Slot:       cfg.Mode.Receive.Slot,
-							NoLoop:     cfg.Mode.Receive.NoLoop,
-							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
+							ReceiveDirectory: filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalReceiveDirName)),
+							StatusDirectory:  filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalStatusDirName)),
+							ListenPort:       cfg.Mode.Receive.ListenPort,
+							Slot:             cfg.Mode.Receive.Slot,
+							NoLoop:           cfg.Mode.Receive.NoLoop,
+							Verbose:          strings.EqualFold(cfg.Log.Level, "trace"),
 						})
 					} else if cfg.Mode.Name == config.ModeServe {
 						cmd.RunServeMode(&cmd.ServeModeOpts{
-							Directory:  cfg.Mode.Serve.Directory,
+							Directory:  filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalReceiveDirName)),
 							ListenPort: cfg.Mode.Serve.ListenPort,
 							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
 						})

@@ -16,7 +16,7 @@ func setupTestStreamCtl(t *testing.T) *StreamCtl {
 
 	tmpDir := t.TempDir()
 	return &StreamCtl{
-		baseDir:       tmpDir,
+		receiveDir:    tmpDir,
 		timeline:      1,
 		walSegSz:      16 * 1024 * 1024, // 16 MiB
 		partialSuffix: ".partial",
@@ -174,7 +174,7 @@ func TestCloseWalfile_WithCompleteSegment(t *testing.T) {
 	assert.NoError(t, err)
 
 	// File should be renamed to final path
-	expectedFinal := filepath.Join(stream.baseDir, strings.TrimSuffix(filepath.Base(pathname), stream.partialSuffix))
+	expectedFinal := filepath.Join(stream.receiveDir, strings.TrimSuffix(filepath.Base(pathname), stream.partialSuffix))
 	_, err = os.Stat(expectedFinal)
 	assert.NoError(t, err)
 }
