@@ -1,12 +1,17 @@
 package loops
 
 import (
+	"archive/tar"
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/cmd/cmdutils"
 	"github.com/hashmap-kz/pgrwl/config"
@@ -15,7 +20,17 @@ import (
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
-func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Storage, dir string) {
+type UploaderLoopOpts struct {
+	ReceiveDirectory string
+	StatusDirectory  string
+}
+
+type uploadBundle struct {
+	doneFilePath string
+	walFilePath  string
+}
+
+func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Storage, opts *UploaderLoopOpts) {
 	syncInterval := cmdutils.ParseDurationOrDefault(cfg.Storage.Upload.SyncInterval, 30*time.Second)
 
 	ticker := time.NewTicker(syncInterval)
@@ -27,7 +42,7 @@ func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Stora
 			slog.Info("(uploader-loop) context is done, exiting...")
 			return
 		case <-ticker.C:
-			files, err := os.ReadDir(dir)
+			files, err := os.ReadDir(opts.StatusDirectory)
 			if err != nil {
 				slog.Error("error reading dir",
 					slog.String("component", "uploader-loop"),
@@ -36,7 +51,7 @@ func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Stora
 				continue
 			}
 
-			filesToUpload := filterFilesToUpload(dir, files)
+			filesToUpload := filterFilesToUpload(opts, files)
 			if len(filesToUpload) == 0 {
 				continue
 			}
@@ -51,22 +66,45 @@ func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Stora
 	}
 }
 
-func filterFilesToUpload(dir string, files []os.DirEntry) []string {
-	var r []string
+func filterFilesToUpload(opts *UploaderLoopOpts, files []os.DirEntry) []uploadBundle {
+	var r []uploadBundle
 	for _, entry := range files {
 		if entry.IsDir() {
 			continue
 		}
-		if !xlog.IsXLogFileName(entry.Name()) {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".done") {
 			continue
 		}
-		path := filepath.ToSlash(filepath.Join(dir, entry.Name()))
-		r = append(r, path)
+		name = strings.TrimSuffix(name, ".done")
+		if !xlog.IsXLogFileName(name) {
+			continue
+		}
+		walFilePath := filepath.ToSlash(filepath.Join(opts.ReceiveDirectory, name))
+		doneFilePath := filepath.ToSlash(filepath.Join(opts.StatusDirectory, name+".done"))
+		if !optutils.FileExists(walFilePath) {
+			// misconfigured, etc, we may safely delete *.done file here
+			err := os.Remove(doneFilePath)
+			if err == nil {
+				slog.Warn("a *.done marker file that does not has corresponding WAL segment is removed",
+					slog.String("path", doneFilePath),
+				)
+			} else {
+				slog.Error("cannot remove a *.done marker file that does not has corresponding WAL segment",
+					slog.String("path", doneFilePath),
+				)
+			}
+			continue
+		}
+		r = append(r, uploadBundle{
+			doneFilePath: doneFilePath,
+			walFilePath:  walFilePath,
+		})
 	}
 	return r
 }
 
-func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, files []string) error {
+func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, files []uploadBundle) error {
 	workerCount := cfg.Storage.Upload.MaxConcurrency
 	if workerCount <= 0 {
 		workerCount = 1
@@ -78,7 +116,7 @@ func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, 
 		slog.Int("files", len(files)),
 	)
 
-	filesChan := make(chan string, len(files))
+	filesChan := make(chan uploadBundle, len(files))
 	errorChan := make(chan error, len(files))
 	var wg sync.WaitGroup
 
@@ -126,37 +164,86 @@ func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, 
 	return lastErr
 }
 
-func uploadOneFile(ctx context.Context, stor storage.Storage, path string) error {
+func uploadOneFile(ctx context.Context, stor storage.Storage, bundle uploadBundle) error {
 	slog.Info("starting upload file",
-		slog.String("path", path),
+		slog.String("path", bundle.walFilePath),
 		slog.String("component", "uploader-loop"),
 	)
 
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
+	tarReader := createTarReader([]string{
+		bundle.doneFilePath,
+		bundle.walFilePath,
+	})
 
-	err = stor.Put(ctx, filepath.Base(path), file)
+	resultFileName := filepath.Base(bundle.walFilePath) + ".tar"
+
+	err := stor.Put(ctx, resultFileName, tarReader)
 	if err != nil {
 		// upload error: close the file, return err, DO NOT REMOVE SOURCE WHEN UPLOAD IS FAILED
-		_ = file.Close()
+		_ = tarReader.Close()
 		return err
 	}
 
 	// upload success: closing file
-	if err := file.Close(); err != nil {
+	if err := tarReader.Close(); err != nil {
 		return err
 	}
 
-	// remove file
-	if err := os.Remove(path); err != nil {
+	// remove files when upload is success
+	if err := os.Remove(bundle.doneFilePath); err != nil {
+		return err
+	}
+	if err := os.Remove(bundle.walFilePath); err != nil {
 		return err
 	}
 
 	slog.Info("uploaded and deleted",
 		slog.String("component", "uploader-loop"),
-		slog.String("path", path),
+		slog.String("done-marker-path", bundle.doneFilePath),
+		slog.String("wal-path", bundle.walFilePath),
+		slog.String("result-path", resultFileName),
 	)
 	return nil
+}
+
+func createTarReader(files []string) io.ReadCloser {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+		tw := tar.NewWriter(pw)
+		defer tw.Close()
+
+		for _, file := range files {
+			err := func() error {
+				f, err := os.Open(file)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+
+				stat, err := f.Stat()
+				if err != nil {
+					return err
+				}
+
+				header, err := tar.FileInfoHeader(stat, "")
+				if err != nil {
+					return err
+				}
+				header.Name = filepath.Base(file)
+				if err := tw.WriteHeader(header); err != nil {
+					return err
+				}
+				_, err = io.Copy(tw, f)
+				return err
+			}()
+			if err != nil {
+				_ = pw.CloseWithError(err)
+				return
+			}
+		}
+	}()
+
+	return pr
 }

@@ -117,7 +117,10 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 					)
 				}
 			}()
-			loops.RunUploaderLoop(ctx, cfg, stor, opts.ReceiveDirectory)
+			loops.RunUploaderLoop(ctx, cfg, stor, &loops.UploaderLoopOpts{
+				ReceiveDirectory: opts.ReceiveDirectory,
+				StatusDirectory:  opts.StatusDirectory,
+			})
 		}()
 	}
 

@@ -58,6 +58,15 @@ func NewPgReceiver(ctx context.Context, opts *Opts) (*PgReceiveWal, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// ensure dirs
+	if err := os.MkdirAll(opts.ReceiveDirectory, 0o750); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(opts.StatusDirectory, 0o750); err != nil {
+		return nil, err
+	}
+
 	return &PgReceiveWal{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		StatusDirectory:  opts.StatusDirectory,
@@ -200,14 +209,6 @@ func (pgrw *PgReceiveWal) SetStream(s *StreamCtl) {
 
 // findStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
 func (pgrw *PgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
-	// ensure dir exists
-	if err := os.MkdirAll(pgrw.ReceiveDirectory, 0o750); err != nil {
-		return 0, 0, err
-	}
-	if err := os.MkdirAll(pgrw.StatusDirectory, 0o750); err != nil {
-		return 0, 0, err
-	}
-
 	type walEntry struct {
 		tli       uint32
 		segNo     uint64
