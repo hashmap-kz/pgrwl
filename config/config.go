@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -173,8 +176,18 @@ func mustLoadCfg(path string) *Config {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := json.Unmarshal(expand(configData), &cfg); err != nil {
-		log.Fatal(err)
+	ext := filepath.Ext(path)
+	switch ext {
+	case ".json":
+		if err := json.Unmarshal(expand(configData), &cfg); err != nil {
+			log.Fatal(err)
+		}
+	case ".yml", ".yaml":
+		if err := yaml.Unmarshal(expand(configData), &cfg); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatalf("unexpected config-file extension: %s", ext)
 	}
 	return &cfg
 }

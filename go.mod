@@ -10,6 +10,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v3 v3.3.3
 	golang.org/x/time v0.11.0
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
