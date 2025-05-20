@@ -1,0 +1,40 @@
+---                                           #
+mode:                                         # required
+  name: receive                               # one of: receive/serve
+  receive:                                    # section is required for 'receive' mode
+    listen_port: 7070                         # HTTP server will use this port (management)
+    directory: "/var/lib/pgwal"               # base directory to where store WAL files
+    slot: replication_slot                    # replication slot to use
+    no_loop: false                            # do not loop on connection lost
+  serve:                                      # section is required for 'serve' mode
+    listen_port: 7070                         # HTTP server will use this port (serving WAL-files)
+    directory: "/var/lib/pgwal"               # base directory to fetch WAL-files from (non-uploaded, *.partial)
+log:                                          # optional
+  level: info                                 # one of: trace/debug/info/warn/error
+  format: text                                # one of: text/json
+  add_source: true                            # add file:line in log messages (for debug and localdev)
+storage:                                      # optional
+  name: s3                                    # one of: s3/sftp
+  upload:                                     # optional (used in receive mode)
+    sync_interval: 10s                        # watch interval for uploading goroutine
+    max_concurrency: 4                        # how many files may be uploaded concurrently
+  compression:                                # optional
+    algo: gzip                                # one of: gzip/zstd
+  encryption:                                 # optional
+    algo: aesgcm                              # one of: aeg-256-gcm
+    pass: "${PGRWL_ENCRYPT_PASSWD}"           #
+  sftp:                                       # section is required for 'sftp' storage
+    host: sftp.example.com                    #
+    port: 22                                  #
+    user: backupuser                          #
+    pass: "${PGRWL_VM_PASSWORD}"              #
+    pkey_path: "/home/user/.ssh/id_rsa"       #
+    pkey_pass: "${PGRWL_SSH_PKEY_PASSPHRASE}" # required, when pkey is password-protected
+  s3:                                         # section is required for 's3' storage
+    url: https://s3.example.com               #
+    access_key_id: AKIAEXAMPLE                #
+    secret_access_key: "${PGRWL_SECRET_KEY}"  #
+    bucket: postgres-backups                  #
+    region: us-east-1                         #
+    use_path_style: true                      #
+    disable_ssl: false                        #
