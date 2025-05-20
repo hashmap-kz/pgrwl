@@ -339,6 +339,12 @@ That’s all you need to start the app.
 To handle credentials, environment variable substitution is supported—so you can use $PGRWL_-prefixed placeholders
 directly in the JSON.
 
+### TODO
+
+- Download all WAL files 
+- Concurrent batch-uploads 
+- Metrics
+
 ### ⏮️ Links
 
 - [pg_receivewal Documentation](https://www.postgresql.org/docs/current/app-pgrwl.html)

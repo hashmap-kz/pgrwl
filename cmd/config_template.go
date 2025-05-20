@@ -24,6 +24,10 @@ var confTempl = `
   },
   "storage": {
     "name": "s3",
+    "upload": {
+      "sync_interval": "10s",
+      "max_concurrency": 4
+    },
     "compression": {
       "algo": "gzip"
     },

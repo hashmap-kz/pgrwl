@@ -1,33 +1,15 @@
-package cmd
+package loops
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
-// HTTP
-
-func addr(from string) (string, error) {
-	if strings.HasPrefix(from, "http://") || strings.HasPrefix(from, "https://") {
-		return from, nil
-	}
-	host, port, err := net.SplitHostPort(from)
-	if err != nil {
-		return "", err
-	}
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	return fmt.Sprintf("http://%s:%s", host, port), nil
-}
-
-func runHTTPServer(ctx context.Context, port int, router http.Handler) error {
+func RunHTTPServer(ctx context.Context, port int, router http.Handler) error {
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
 		Handler:           router,

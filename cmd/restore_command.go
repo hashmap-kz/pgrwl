@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/hashmap-kz/pgrwl/cmd/cmdutils"
 )
 
 type RestoreCommandOpts struct {
@@ -18,7 +20,7 @@ func ExecRestoreCommand(walFileName, walFilePath string, opts *RestoreCommandOpt
 		slog.String("p", walFilePath),
 	)
 
-	addr, err := addr(opts.Addr)
+	addr, err := cmdutils.Addr(opts.Addr)
 	if err != nil {
 		return err
 	}

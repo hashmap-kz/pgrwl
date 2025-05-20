@@ -4,25 +4,25 @@ import (
 	"context"
 	"log"
 	"log/slog"
-	"os"
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
+
+	"github.com/hashmap-kz/pgrwl/cmd/repo"
+
+	"github.com/hashmap-kz/pgrwl/cmd/loops"
+
+	"github.com/hashmap-kz/pgrwl/config"
+
+	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
-type ReceiveModeOpts struct {
-	Directory  string
-	Slot       string
-	NoLoop     bool
-	ListenPort int
-	Verbose    bool
-}
+func RunReceiveMode(opts *loops.ReceiveModeOpts) {
+	cfg := config.Cfg()
 
-func RunReceiveMode(opts *ReceiveModeOpts) {
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -43,6 +43,18 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		log.Fatal(err)
 	}
 
+	var stor *storage.TransformingStorage
+	if cfg.HasExternalStorageConfigured() {
+		stor, err = repo.SetupStorage(opts.Directory)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err := repo.CheckManifest(cfg, cfg.Mode.Receive.Directory)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
@@ -59,7 +71,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 
-		if err := runStreamingLoop(ctx, pgrw, opts); err != nil {
+		if err := loops.RunStreamingLoop(ctx, pgrw, opts); err != nil {
 			slog.Error("streaming failed", slog.Any("err", err))
 			cancel() // cancel everything on error
 		}
@@ -84,11 +96,29 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			BaseDir:     opts.Directory,
 			Verbose:     opts.Verbose,
 			RunningMode: "receive",
+			Storage:     stor,
 		})
-		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
+		if err := loops.RunHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 		}
 	}()
+
+	if cfg.HasExternalStorageConfigured() {
+		// Uploader
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("upload loop panicked",
+						slog.Any("panic", r),
+						slog.String("goroutine", "uploader"),
+					)
+				}
+			}()
+			loops.RunUploaderLoop(ctx, cfg, stor, opts.Directory)
+		}()
+	}
 
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
@@ -97,32 +127,4 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	slog.Info("all components shut down cleanly")
-}
-
-func runStreamingLoop(ctx context.Context, pgrw *xlog.PgReceiveWal, opts *ReceiveModeOpts) error {
-	// enter main streaming loop
-	for {
-		err := pgrw.StreamLog(ctx)
-		if err != nil {
-			slog.Error("an error occurred in StreamLog(), exiting",
-				slog.Any("err", err),
-			)
-			os.Exit(1)
-		}
-
-		select {
-		case <-ctx.Done():
-			slog.Info("(main) received termination signal, exiting...")
-			os.Exit(0)
-		default:
-		}
-
-		if opts.NoLoop {
-			slog.Error("disconnected")
-			os.Exit(1)
-		}
-
-		slog.Info("disconnected; waiting 5 seconds to try again")
-		time.Sleep(5 * time.Second)
-	}
 }

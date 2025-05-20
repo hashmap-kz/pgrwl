@@ -2,10 +2,18 @@ package cmd
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/hashmap-kz/pgrwl/cmd/repo"
+
+	"github.com/hashmap-kz/pgrwl/cmd/loops"
+
+	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
@@ -17,10 +25,25 @@ type ServeModeOpts struct {
 }
 
 func RunServeMode(opts *ServeModeOpts) {
+	cfg := config.Cfg()
+	var err error
+
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
+
+	var stor *storage.TransformingStorage
+	if cfg.HasExternalStorageConfigured() {
+		stor, err = repo.SetupStorage(opts.Directory)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = repo.CheckManifest(cfg, cfg.Mode.Serve.Directory)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
@@ -43,8 +66,9 @@ func RunServeMode(opts *ServeModeOpts) {
 			BaseDir:     opts.Directory,
 			Verbose:     opts.Verbose,
 			RunningMode: "serve",
+			Storage:     stor,
 		})
-		if err := runHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
+		if err := loops.RunHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
 			slog.Error("http server failed", slog.Any("err", err))
 			cancel()
 		}

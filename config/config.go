@@ -11,6 +11,13 @@ import (
 const (
 	ModeReceive = "receive"
 	ModeServe   = "serve"
+
+	StorageNameS3   = "s3"
+	StorageNameSFTP = "sftp"
+
+	RepoEncryptorAes256Gcm string = "aes-256-gcm"
+	RepoCompressorGzip     string = "gzip"
+	RepoCompressorZstd     string = "zstd"
 )
 
 var (
@@ -55,11 +62,18 @@ type LogConfig struct {
 // ---- Storage Section ----
 
 type StorageConfig struct {
-	Name        string            `json:"name,omitempty"` // e.g. "s3", "sftp", "local"
+	Name        string            `json:"name,omitempty"` // e.g. "s3", "sftp"
+	Upload      UploadConfig      `json:"upload"`
 	Compression CompressionConfig `json:"compression,omitempty"`
 	Encryption  EncryptionConfig  `json:"encryption,omitempty"`
 	SFTP        SFTPConfig        `json:"sftp,omitempty"`
 	S3          S3Config          `json:"s3,omitempty"`
+}
+
+type UploadConfig struct {
+	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	SyncInterval   string `json:"sync_interval"`
+	MaxConcurrency int    `json:"max_concurrency"`
 }
 
 type CompressionConfig struct {
@@ -88,6 +102,14 @@ type S3Config struct {
 	Region          string `json:"region,omitempty"`
 	UsePathStyle    bool   `json:"use_path_style,omitempty"`
 	DisableSSL      bool   `json:"disable_ssl,omitempty"`
+}
+
+func (c *Config) HasExternalStorageConfigured() bool {
+	switch c.Storage.Name {
+	case StorageNameS3, StorageNameSFTP:
+		return true
+	}
+	return false
 }
 
 func (c *Config) String() string {

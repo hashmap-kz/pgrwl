@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/cmd/loops"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/cmd"
@@ -41,7 +43,7 @@ func main() {
 					//nolint:staticcheck
 					if cfg.Mode.Name == config.ModeReceive {
 						checkPgEnvsAreSet()
-						cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
+						cmd.RunReceiveMode(&loops.ReceiveModeOpts{
 							Directory:  cfg.Mode.Receive.Directory,
 							ListenPort: cfg.Mode.Receive.ListenPort,
 							Slot:       cfg.Mode.Receive.Slot,
