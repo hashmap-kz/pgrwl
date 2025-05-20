@@ -1,9 +1,7 @@
 package service
 
 import (
-	"archive/tar"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -164,35 +162,5 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 	if err != nil {
 		return nil, err
 	}
-	return getFileFromTar(tarFile, filename)
-}
-
-// getFileFromTar returns a ReadCloser for a specific file inside a tar stream.
-// The caller must close the returned ReadCloser.
-func getFileFromTar(r io.Reader, target string) (io.ReadCloser, error) {
-	tr := tar.NewReader(r)
-
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			return nil, errors.New("file not found in tar")
-		}
-		if err != nil {
-			return nil, err
-		}
-		if hdr.Name == target {
-			// Wrap tar.Reader in ReadCloser so caller can close
-			pr, pw := io.Pipe()
-
-			go func() {
-				defer pw.Close()
-				_, err := io.Copy(pw, tr)
-				if err != nil {
-					_ = pw.CloseWithError(err)
-				}
-			}()
-
-			return pr, nil
-		}
-	}
+	return optutils.GetFileFromTar(tarFile, filename)
 }
