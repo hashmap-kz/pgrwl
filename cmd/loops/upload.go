@@ -73,27 +73,20 @@ func filterFilesToUpload(opts *UploaderLoopOpts, files []os.DirEntry) []uploadBu
 			continue
 		}
 		name := entry.Name()
+		doneFilePath := filepath.ToSlash(filepath.Join(opts.StatusDirectory, name))
 		if !strings.HasSuffix(name, ".done") {
+			removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
 		name = strings.TrimSuffix(name, ".done")
 		if !xlog.IsXLogFileName(name) {
+			removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
 		walFilePath := filepath.ToSlash(filepath.Join(opts.ReceiveDirectory, name))
-		doneFilePath := filepath.ToSlash(filepath.Join(opts.StatusDirectory, name+".done"))
 		if !optutils.FileExists(walFilePath) {
 			// misconfigured, etc, we may safely delete *.done file here
-			err := os.Remove(doneFilePath)
-			if err == nil {
-				slog.Warn("a *.done marker file that does not has corresponding WAL segment is removed",
-					slog.String("path", doneFilePath),
-				)
-			} else {
-				slog.Error("cannot remove a *.done marker file that does not has corresponding WAL segment",
-					slog.String("path", doneFilePath),
-				)
-			}
+			removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
 		r = append(r, uploadBundle{
@@ -102,6 +95,19 @@ func filterFilesToUpload(opts *UploaderLoopOpts, files []os.DirEntry) []uploadBu
 		})
 	}
 	return r
+}
+
+func removeStrayDoneMarkerFile(doneFilePath string) {
+	err := os.Remove(doneFilePath)
+	if err == nil {
+		slog.Warn("stray *.done marker file is removed",
+			slog.String("path", doneFilePath),
+		)
+	} else {
+		slog.Error("cannot remove stray *.done marker file",
+			slog.String("path", doneFilePath),
+		)
+	}
 }
 
 func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, files []uploadBundle) error {
