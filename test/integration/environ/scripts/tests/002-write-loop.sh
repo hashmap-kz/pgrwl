@@ -64,8 +64,13 @@ x_backup_restore() {
   # fix configs
   xpg_config
   cat <<EOF >>"${PG_CFG}"
-restore_command = 'cp ${WAL_PATH}/%f %p'
+#restore_command = 'cp ${WAL_PATH}/%f %p'
+restore_command = 'pgrwl restore-command --serve-addr=127.0.0.1:7070 %f %p'
 EOF
+
+  # run serve-mode
+  echo_delim "running wal fetcher"
+  bash "/var/lib/postgresql/scripts/pg/run_serve_mode.sh" "start"
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -85,7 +90,7 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}/wal_receive" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 
 x_backup_restore "${@}"

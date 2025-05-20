@@ -144,7 +144,7 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}/wal_receive" "${WAL_PATH_PG_RECEIVEWAL}"
 
   # run receivers with a new timeline
   echo_delim "cleanup wal-archives, run wal-receivers with a new timeline"
@@ -158,7 +158,7 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal with a new timeline stream"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}/wal_receive" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 
 x_backup_restore "${@}"

@@ -56,7 +56,7 @@ func main() {
 						})
 					} else if cfg.Mode.Name == config.ModeServe {
 						cmd.RunServeMode(&cmd.ServeModeOpts{
-							Directory:  filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalReceiveDirName)),
+							Directory:  filepath.ToSlash(filepath.Join(cfg.Mode.Serve.Directory, xlog.WalReceiveDirName)),
 							ListenPort: cfg.Mode.Serve.ListenPort,
 							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
 						})
