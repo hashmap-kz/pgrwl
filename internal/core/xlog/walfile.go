@@ -317,10 +317,10 @@ func (stream *StreamCtl) createDoneMarker(finalName string) error {
 	if err != nil {
 		return err
 	}
-	doneMarkerFileName := filepath.Base(finalName) + ".done"
+	doneMarkerFileName := filepath.Base(finalName) + DoneMarkerFileExt
 	doneMarkerFilePath := filepath.Join(stream.statusDir, doneMarkerFileName)
 	l.Debug("creating .done marker", slog.String("path", filepath.ToSlash(doneMarkerFilePath)))
-	if err := os.WriteFile(doneMarkerFilePath, []byte(checksum), 0o640); err != nil {
+	if err := os.WriteFile(doneMarkerFilePath, []byte(checksum), 0o600); err != nil {
 		return err
 	}
 

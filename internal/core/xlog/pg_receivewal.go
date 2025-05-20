@@ -22,6 +22,7 @@ import (
 const (
 	WalReceiveDirName = "wal_receive"
 	WalStatusDirName  = "wal_status"
+	DoneMarkerFileExt = ".done"
 )
 
 type PgReceiveWal struct {

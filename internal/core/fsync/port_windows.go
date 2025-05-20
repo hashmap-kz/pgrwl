@@ -8,7 +8,6 @@ import (
 	"syscall"
 )
 
-//nolint:revive
 func Fsync(f *os.File) error {
 	return syscall.FlushFileBuffers(syscall.Handle(f.Fd()))
 }
@@ -29,6 +28,8 @@ func FsyncFname(path string) error {
 }
 
 // FsyncDir fsyncs dir contents.
+//
+//nolint:revive
 func FsyncDir(dirPath string) error {
 	return nil
 }

@@ -37,6 +37,7 @@ func RunServeMode(opts *ServeModeOpts) {
 	if cfg.HasExternalStorageConfigured() {
 		stor, err = repo.SetupStorage(opts.Directory)
 		if err != nil {
+			//nolint:gocritic
 			log.Fatal(err)
 		}
 		err = repo.CheckManifest(cfg, cfg.Mode.Serve.Directory)

@@ -144,7 +144,7 @@ func readOrWriteManifest(cfg *config.Config, dir string) (*StorageManifest, erro
 			if err != nil {
 				return nil, err
 			}
-			err = os.WriteFile(manifestPath, data, 0o640)
+			err = os.WriteFile(manifestPath, data, 0o600)
 			if err != nil {
 				return nil, err
 			}

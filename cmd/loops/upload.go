@@ -67,18 +67,18 @@ func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Stora
 }
 
 func filterFilesToUpload(opts *UploaderLoopOpts, files []os.DirEntry) []uploadBundle {
-	var r []uploadBundle
+	r := make([]uploadBundle, 0, len(files))
 	for _, entry := range files {
 		if entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
 		doneFilePath := filepath.ToSlash(filepath.Join(opts.StatusDirectory, name))
-		if !strings.HasSuffix(name, ".done") {
+		if !strings.HasSuffix(name, xlog.DoneMarkerFileExt) {
 			removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
-		name = strings.TrimSuffix(name, ".done")
+		name = strings.TrimSuffix(name, xlog.DoneMarkerFileExt)
 		if !xlog.IsXLogFileName(name) {
 			removeStrayDoneMarkerFile(doneFilePath)
 			continue
