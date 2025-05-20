@@ -17,14 +17,7 @@ x_remake_dirs() {
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
 
-  # TODO:
-  # "compression": {
-  #   "algo": "gzip"
-  # },
-  # "encryption": {
-  #   "algo": "aes-256-gcm",
-  #   "pass": "qwerty123"
-  # },
+
 
   cat <<EOF >/tmp/receive-config.json
 {
@@ -44,6 +37,13 @@ x_remake_dirs() {
   },
   "storage": {
     "name": "s3",
+    "compression": {
+      "algo": "gzip"
+    },
+    "encryption": {
+      "algo": "aes-256-gcm",
+      "pass": "qwerty123"
+    },
     "upload": {
       "sync_interval": "5s",
       "max_concurrency": 4
@@ -77,6 +77,13 @@ EOF
   },
   "storage": {
     "name": "s3",
+    "compression": {
+      "algo": "gzip"
+    },
+    "encryption": {
+      "algo": "aes-256-gcm",
+      "pass": "qwerty123"
+    },
     "s3": {
       "url": "https://minio:9000",
       "access_key_id": "minioadmin",
