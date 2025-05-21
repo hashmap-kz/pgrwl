@@ -1,9 +1,7 @@
 package loops
 
 import (
-	"archive/tar"
 	"context"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -176,7 +174,7 @@ func uploadOneFile(ctx context.Context, stor storage.Storage, bundle uploadBundl
 		slog.String("component", "uploader-loop"),
 	)
 
-	tarReader := createTarReader([]string{
+	tarReader := optutils.CreateTarReader([]string{
 		bundle.doneFilePath,
 		bundle.walFilePath,
 	})
@@ -210,46 +208,4 @@ func uploadOneFile(ctx context.Context, stor storage.Storage, bundle uploadBundl
 		slog.String("result-path", resultFileName),
 	)
 	return nil
-}
-
-func createTarReader(files []string) io.ReadCloser {
-	pr, pw := io.Pipe()
-
-	go func() {
-		defer pw.Close()
-		tw := tar.NewWriter(pw)
-		defer tw.Close()
-
-		for _, file := range files {
-			err := func() error {
-				f, err := os.Open(file)
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-
-				stat, err := f.Stat()
-				if err != nil {
-					return err
-				}
-
-				header, err := tar.FileInfoHeader(stat, "")
-				if err != nil {
-					return err
-				}
-				header.Name = filepath.Base(file)
-				if err := tw.WriteHeader(header); err != nil {
-					return err
-				}
-				_, err = io.Copy(tw, f)
-				return err
-			}()
-			if err != nil {
-				_ = pw.CloseWithError(err)
-				return
-			}
-		}
-	}()
-
-	return pr
 }

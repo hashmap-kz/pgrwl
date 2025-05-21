@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 )
 
 // GetFileFromTar returns a ReadCloser for a specific file inside a tar stream.
@@ -34,4 +36,46 @@ func GetFileFromTar(r io.Reader, target string) (io.ReadCloser, error) {
 			return pr, nil
 		}
 	}
+}
+
+func CreateTarReader(files []string) io.ReadCloser {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+		tw := tar.NewWriter(pw)
+		defer tw.Close()
+
+		for _, file := range files {
+			err := func() error {
+				f, err := os.Open(file)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+
+				stat, err := f.Stat()
+				if err != nil {
+					return err
+				}
+
+				header, err := tar.FileInfoHeader(stat, "")
+				if err != nil {
+					return err
+				}
+				header.Name = filepath.Base(file)
+				if err := tw.WriteHeader(header); err != nil {
+					return err
+				}
+				_, err = io.Copy(tw, f)
+				return err
+			}()
+			if err != nil {
+				_ = pw.CloseWithError(err)
+				return
+			}
+		}
+	}()
+
+	return pr
 }

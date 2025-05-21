@@ -4,7 +4,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -56,4 +60,49 @@ func TestGetFileFromTar_NotFound(t *testing.T) {
 	assert.Nil(t, rc)
 	assert.Error(t, err)
 	assert.Equal(t, "file not found in tar", err.Error())
+}
+
+func TestCreateTarReader(t *testing.T) {
+	// Setup: create temp files
+	dir := t.TempDir()
+	files := []string{}
+	contentMap := map[string]string{
+		"file1.txt": "hello",
+		"file2.txt": "world",
+	}
+
+	for name, content := range contentMap {
+		path := filepath.Join(dir, name)
+		err := os.WriteFile(path, []byte(content), 0o644)
+		require.NoError(t, err)
+		files = append(files, path)
+	}
+
+	// Call the function
+	rc := CreateTarReader(files)
+	defer rc.Close()
+
+	// Read the tar stream
+	tr := tar.NewReader(rc)
+	found := map[string]string{}
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, tr)
+		require.NoError(t, err)
+
+		found[hdr.Name] = buf.String()
+	}
+
+	// Assert all files were found and contents match
+	require.Equal(t, len(contentMap), len(found))
+	for name, expected := range contentMap {
+		require.Equal(t, expected, found[name])
+	}
 }
