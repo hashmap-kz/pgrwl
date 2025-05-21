@@ -15,6 +15,7 @@ log:                                     # Optional
   level: info                            # One of: trace / debug / info / warn / error
   format: text                           # One of: text / json
   add_source: true                       # Include file:line in log messages (for local development)
+
 storage:                                 # Optional
   name: s3                               # One of: s3 / sftp
   compression:                           # Optional
