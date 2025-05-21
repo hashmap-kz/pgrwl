@@ -44,6 +44,13 @@ func NewUploader(cfg *config.Config, stor storage.Storage, opts *UploaderLoopOpt
 	}
 }
 
+func (u *Uploader) log() *slog.Logger {
+	if u.l != nil {
+		return u.l
+	}
+	return slog.Default().With(slog.String("component", "uploader"))
+}
+
 func (u *Uploader) Run(ctx context.Context) {
 	cfg := u.cfg
 	opts := u.opts
@@ -60,7 +67,7 @@ func (u *Uploader) Run(ctx context.Context) {
 		case <-ticker.C:
 			files, err := os.ReadDir(opts.StatusDirectory)
 			if err != nil {
-				u.l.Error("error reading dir",
+				u.log().Error("error reading dir",
 					slog.String("component", "uploader-loop"),
 					slog.Any("err", err),
 				)
@@ -73,7 +80,7 @@ func (u *Uploader) Run(ctx context.Context) {
 			}
 			err = u.uploadFiles(ctx, filesToUpload)
 			if err != nil {
-				u.l.Error("error upload files",
+				u.log().Error("error upload files",
 					slog.String("component", "uploader-loop"),
 					slog.Any("err", err),
 				)
@@ -117,11 +124,11 @@ func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
 func (u *Uploader) removeStrayDoneMarkerFile(doneFilePath string) {
 	err := os.Remove(doneFilePath)
 	if err == nil {
-		u.l.Warn("stray *.done marker file is removed",
+		u.log().Warn("stray *.done marker file is removed",
 			slog.String("path", doneFilePath),
 		)
 	} else {
-		u.l.Error("cannot remove stray *.done marker file",
+		u.log().Error("cannot remove stray *.done marker file",
 			slog.String("path", doneFilePath),
 		)
 	}
@@ -135,7 +142,7 @@ func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error 
 		workerCount = 1
 	}
 
-	u.l.Debug("starting concurrent file uploads",
+	u.log().Debug("starting concurrent file uploads",
 		slog.Int("workers", workerCount),
 		slog.Int("files", len(files)),
 	)
@@ -179,7 +186,7 @@ func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error 
 
 	var lastErr error
 	for e := range errorChan {
-		u.l.Error("file upload error",
+		u.log().Error("file upload error",
 
 			slog.Any("err", e),
 		)
@@ -189,7 +196,7 @@ func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error 
 }
 
 func (u *Uploader) uploadOneFile(ctx context.Context, bundle uploadBundle) error {
-	u.l.Info("starting upload file",
+	u.log().Info("starting upload file",
 		slog.String("path", bundle.walFilePath),
 	)
 
@@ -220,7 +227,7 @@ func (u *Uploader) uploadOneFile(ctx context.Context, bundle uploadBundle) error
 		return err
 	}
 
-	u.l.Info("uploaded and deleted",
+	u.log().Info("uploaded and deleted",
 		slog.String("done-marker-path", bundle.doneFilePath),
 		slog.String("wal-path", bundle.walFilePath),
 		slog.String("result-path", resultFileName),
