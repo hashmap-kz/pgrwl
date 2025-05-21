@@ -1,9 +1,7 @@
 ---
-mode:
-  name: serve
-  serve:
-    listen_port: 7070
-    directory: wals
+main:
+  listen_port: 7070
+  directory: wals
 
 log:
   level: trace

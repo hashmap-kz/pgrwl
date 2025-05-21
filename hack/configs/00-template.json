@@ -1,16 +1,9 @@
 {
-  "mode": {
-    "name": "receive",
-    "receive": {
-      "listen_port": 7070,
-      "directory": "/var/lib/pgwal",
-      "slot": "replication_slot",
-      "no_loop": false
-    },
-    "serve": {
-      "listen_port": 7070,
-      "directory": "/var/lib/pgwal"
-    }
+  "main": {
+    "listen_port": 7070,
+    "directory": "/var/lib/pgwal",
+    "slot": "replication_slot",
+    "no_loop": false
   },
   "log": {
     "level": "info",

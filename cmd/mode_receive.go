@@ -60,7 +60,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err := repo.CheckManifest(cfg, cfg.Mode.Receive.Directory)
+		err := repo.CheckManifest(cfg)
 		if err != nil {
 			log.Fatal(err)
 		}

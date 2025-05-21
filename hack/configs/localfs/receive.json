@@ -1,11 +1,8 @@
 {
-  "mode": {
-    "name": "receive",
-    "receive": {
-      "listen_port": 7070,
-      "directory": "wals",
-      "slot": "pgrwl_v5"
-    }
+  "main": {
+    "listen_port": 7070,
+    "directory": "wals",
+    "slot": "pgrwl_v5"
   },
   "log": {
     "level": "trace",

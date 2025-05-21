@@ -41,13 +41,10 @@ metadata:
 data:
   config.json: |
     {
-      "mode": {
-        "name": "receive",
-        "receive": {
-          "listen_port": 7070,
-          "directory": "/wals/wal-archive",
-          "slot": "pgrwl_v5"
-        }
+      "main": {
+        "listen_port": 7070,
+        "directory": "/wals/wal-archive",
+        "slot": "pgrwl_v5"
       },
       "log": {
         "level": "trace",
@@ -118,6 +115,9 @@ spec:
           image: "localhost:5000/pgrwl:latest"
           imagePullPolicy: Always
           args: ["start", "-c", "/tmp/configs/config.json"]
+          env:
+            - name: PGRWL_MODE
+              value: "receive"
           ports:
             - containerPort: 7070
               name: http

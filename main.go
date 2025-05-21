@@ -26,6 +26,13 @@ func main() {
 		Required: true,
 		Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
 	}
+	modeFlag := &cli.StringFlag{
+		Name:     "mode",
+		Usage:    "Run mode: receive/serve",
+		Aliases:  []string{"m"},
+		Required: true,
+		Sources:  cli.EnvVars("PGRWL_MODE"),
+	}
 
 	app := &cli.Command{
 		Name:  "pgrwl",
@@ -37,29 +44,34 @@ func main() {
 				Usage: "Running in a server mode: receive/serve",
 				Flags: []cli.Flag{
 					configFlag,
+					modeFlag,
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					cfg := loadConfig(c)
+					mode := c.String("mode")
+					if mode == "" {
+						log.Fatal("required flag 'mode' is empty")
+					}
 
 					//nolint:staticcheck
-					if cfg.Mode.Name == config.ModeReceive {
+					if mode == config.ModeReceive {
 						checkPgEnvsAreSet()
 						cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
-							ReceiveDirectory: filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalReceiveDirName)),
-							StatusDirectory:  filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalStatusDirName)),
-							ListenPort:       cfg.Mode.Receive.ListenPort,
-							Slot:             cfg.Mode.Receive.Slot,
-							NoLoop:           cfg.Mode.Receive.NoLoop,
+							ReceiveDirectory: filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalReceiveDirName)),
+							StatusDirectory:  filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalStatusDirName)),
+							ListenPort:       cfg.Main.ListenPort,
+							Slot:             cfg.Main.Slot,
+							NoLoop:           cfg.Main.NoLoop,
 							Verbose:          strings.EqualFold(cfg.Log.Level, "trace"),
 						})
-					} else if cfg.Mode.Name == config.ModeServe {
+					} else if mode == config.ModeServe {
 						cmd.RunServeMode(&cmd.ServeModeOpts{
-							Directory:  filepath.ToSlash(filepath.Join(cfg.Mode.Serve.Directory, xlog.WalReceiveDirName)),
-							ListenPort: cfg.Mode.Serve.ListenPort,
+							Directory:  filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalReceiveDirName)),
+							ListenPort: cfg.Main.ListenPort,
 							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
 						})
 					} else {
-						log.Fatalf("unknown mode: %s", cfg.Mode.Name)
+						log.Fatalf("unknown mode: %s", mode)
 					}
 
 					return nil
