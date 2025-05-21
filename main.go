@@ -10,8 +10,6 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 
-	"github.com/hashmap-kz/pgrwl/cmd/loops"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/cmd"
@@ -46,7 +44,7 @@ func main() {
 					//nolint:staticcheck
 					if cfg.Mode.Name == config.ModeReceive {
 						checkPgEnvsAreSet()
-						cmd.RunReceiveMode(&loops.ReceiveModeOpts{
+						cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
 							ReceiveDirectory: filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalReceiveDirName)),
 							StatusDirectory:  filepath.ToSlash(filepath.Join(cfg.Mode.Receive.Directory, xlog.WalStatusDirName)),
 							ListenPort:       cfg.Mode.Receive.ListenPort,

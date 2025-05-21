@@ -30,7 +30,7 @@ type lockInfo struct {
 }
 
 type controlSvc struct {
-	pgrw        *xlog.PgReceiveWal // direct access to running state
+	pgrw        xlog.PgReceiveWal // direct access to running state
 	baseDir     string
 	runningMode string
 	storage     *storage.TransformingStorage
@@ -43,7 +43,7 @@ type controlSvc struct {
 var _ ControlService = &controlSvc{}
 
 type ControlServiceOpts struct {
-	PGRW        *xlog.PgReceiveWal
+	PGRW        xlog.PgReceiveWal
 	BaseDir     string
 	RunningMode string
 	Storage     *storage.TransformingStorage

@@ -22,9 +22,9 @@ func TestFindStreamingStart_PartialAndComplete(t *testing.T) {
 	partial := "000000010000000000000002.partial"
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, partial), make([]byte, 1*1024*1024), 0o600)) // shorter
 
-	pgrw := &PgReceiveWal{
-		ReceiveDirectory: dir,
-		WalSegSz:         segSize,
+	pgrw := &pgReceiveWal{
+		receiveDirectory: dir,
+		walSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()
@@ -44,9 +44,9 @@ func TestFindStreamingStart_OnlyComplete(t *testing.T) {
 	name := "00000002000000000000000A"
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, name), make([]byte, segSize), 0o600))
 
-	pgrw := &PgReceiveWal{
-		ReceiveDirectory: dir,
-		WalSegSz:         segSize,
+	pgrw := &pgReceiveWal{
+		receiveDirectory: dir,
+		walSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()
@@ -60,9 +60,9 @@ func TestFindStreamingStart_OnlyComplete(t *testing.T) {
 
 func TestFindStreamingStart_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
-	pgrw := &PgReceiveWal{
-		ReceiveDirectory: dir,
-		WalSegSz:         16 * 1024 * 1024,
+	pgrw := &pgReceiveWal{
+		receiveDirectory: dir,
+		walSegSz:         16 * 1024 * 1024,
 	}
 
 	_, _, err := pgrw.findStreamingStart()
@@ -81,9 +81,9 @@ func TestFindStreamingStart_DifferentTimelines(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, fileTLI1), make([]byte, segSize), 0o600))
 	assert.NoError(t, os.WriteFile(filepath.Join(dir, fileTLI2), make([]byte, 1*1024*1024), 0o600)) // smaller partial
 
-	pgrw := &PgReceiveWal{
-		ReceiveDirectory: dir,
-		WalSegSz:         segSize,
+	pgrw := &pgReceiveWal{
+		receiveDirectory: dir,
+		walSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()
@@ -143,9 +143,9 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 		}
 	}
 
-	pgrw := &PgReceiveWal{
-		ReceiveDirectory: dir,
-		WalSegSz:         segSize,
+	pgrw := &pgReceiveWal{
+		receiveDirectory: dir,
+		walSegSz:         segSize,
 	}
 
 	lsn, tli, err := pgrw.findStreamingStart()

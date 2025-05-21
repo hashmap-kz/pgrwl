@@ -16,7 +16,7 @@ import (
 )
 
 type HTTPHandlersOpts struct {
-	PGRW        *xlog.PgReceiveWal
+	PGRW        xlog.PgReceiveWal
 	BaseDir     string
 	Verbose     bool
 	RunningMode string

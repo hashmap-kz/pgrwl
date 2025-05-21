@@ -48,7 +48,7 @@ func (u *Uploader) log() *slog.Logger {
 	if u.l != nil {
 		return u.l
 	}
-	return slog.Default().With(slog.String("component", "uploader"))
+	return slog.With(slog.String("component", "uploader"))
 }
 
 func (u *Uploader) Run(ctx context.Context) {

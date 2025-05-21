@@ -20,7 +20,16 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
-func RunReceiveMode(opts *loops.ReceiveModeOpts) {
+type ReceiveModeOpts struct {
+	ReceiveDirectory string
+	StatusDirectory  string
+	Slot             string
+	NoLoop           bool
+	ListenPort       int
+	Verbose          bool
+}
+
+func RunReceiveMode(opts *ReceiveModeOpts) {
 	cfg := config.Cfg()
 
 	// setup context
@@ -32,7 +41,7 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 	slog.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
 	// setup wal-receiver
-	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.Opts{
+	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		StatusDirectory:  opts.StatusDirectory,
 		Slot:             opts.Slot,
@@ -72,7 +81,7 @@ func RunReceiveMode(opts *loops.ReceiveModeOpts) {
 			}
 		}()
 
-		if err := loops.RunStreamingLoop(ctx, pgrw, opts); err != nil {
+		if err := pgrw.Run(ctx); err != nil {
 			slog.Error("streaming failed", slog.Any("err", err))
 			cancel() // cancel everything on error
 		}
