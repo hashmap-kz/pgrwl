@@ -34,7 +34,7 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
-		Logger:  slog.With("component", "http-server"),
+		Logger:  slog.With("component", "rest-api"),
 		Verbose: opts.Verbose,
 	}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
