@@ -31,6 +31,7 @@ type ReceiveModeOpts struct {
 
 func RunReceiveMode(opts *ReceiveModeOpts) {
 	cfg := config.Cfg()
+	loggr := slog.With("component", "receive-mode-runner")
 
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,7 +39,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	defer signalCancel()
 
 	// print options
-	slog.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
+	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
@@ -74,7 +75,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		defer wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("wal-receiver panicked",
+				loggr.Error("wal-receiver panicked",
 					slog.Any("panic", r),
 					slog.String("goroutine", "wal-receiver"),
 				)
@@ -82,7 +83,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}()
 
 		if err := pgrw.Run(ctx); err != nil {
-			slog.Error("streaming failed", slog.Any("err", err))
+			loggr.Error("streaming failed", slog.Any("err", err))
 			cancel() // cancel everything on error
 		}
 	}()
@@ -94,7 +95,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		defer wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("http server panicked",
+				loggr.Error("http server panicked",
 					slog.Any("panic", r),
 					slog.String("goroutine", "http-server"),
 				)
@@ -105,11 +106,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			PGRW:        pgrw,
 			BaseDir:     opts.ReceiveDirectory,
 			Verbose:     opts.Verbose,
-			RunningMode: "receive",
+			RunningMode: config.ModeReceive,
 			Storage:     stor,
 		})
-		if err := loops.RunHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
-			slog.Error("http server failed", slog.Any("err", err))
+		srv := loops.NewHTTPSrv(opts.ListenPort, handlers)
+		if err := srv.Run(ctx); err != nil {
+			loggr.Error("http server failed", slog.Any("err", err))
 		}
 	}()
 
@@ -120,7 +122,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			defer wg.Done()
 			defer func() {
 				if r := recover(); r != nil {
-					slog.Error("upload loop panicked",
+					loggr.Error("upload loop panicked",
 						slog.Any("panic", r),
 						slog.String("goroutine", "uploader"),
 					)
@@ -136,9 +138,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
-	slog.Info("shutting down, waiting for goroutines...")
+	loggr.Info("shutting down, waiting for goroutines...")
 
 	// Wait for all goroutines to finish
 	wg.Wait()
-	slog.Info("all components shut down cleanly")
+	loggr.Info("all components shut down cleanly")
 }
