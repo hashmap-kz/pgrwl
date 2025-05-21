@@ -26,8 +26,9 @@ _`pgrwl` stream write-ahead logs from a PostgreSQL server_
     - [Verify build locally](#to-contribute-or-verify-the-project-locally-the-following-make-targets-should-all-pass)
     - [Source Code Structure](#-source-code-structure)
     - [Notes On Configuration](#notes-on-configuration)
-    - [Links](#-links)
+    - [Main Loop Diagram](#-main-loop)
     - [Planned Features](#-planned-features)
+    - [Links](#-links)
 - [📜 License](#-license)
 
 ---
@@ -304,11 +305,16 @@ internal/xlog/fsync/
   → Optimized wrappers for safe and efficient `fsync` system calls.
 ```
 
-### TODO
+### 🚀 Main Loop
+
+![main loop](assets/diagrams/loop.png)
+
+### 🛠 Planned Features
 
 - Download all WAL files
 - [X] Concurrent batch-uploads
-- Metrics
+- Metrics, alerting
+- Retention loop (configured: i.e.: retention_period = 3d, and triggered: i.e.: /api/v1/retention)
 
 ### ⏮️ Links
 
@@ -317,11 +323,6 @@ internal/xlog/fsync/
 - [Streaming Replication Protocol](https://www.postgresql.org/docs/current/protocol-replication.html)
 - [Continuous Archiving and Point-in-Time Recovery](https://www.postgresql.org/docs/current/continuous-archiving.html)
 - [Setting Up WAL Archiving](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-ARCHIVING-WAL)
-
-### 🛠 Planned Features
-
-- Optional compression/encryption for completed WAL segments
-- Optional metrics and alerting
 
 ---
 
