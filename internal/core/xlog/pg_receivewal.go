@@ -100,25 +100,23 @@ func (pgrw *pgReceiveWal) Run(ctx context.Context) error {
 	for {
 		err := pgrw.streamLog(ctx)
 		if err != nil {
-			slog.Error("an error occurred in StreamLog(), exiting",
-				slog.Any("err", err),
-			)
+			pgrw.log().Error("an error occurred in StreamLog(), exiting", slog.Any("err", err))
 			os.Exit(1)
 		}
 
 		select {
 		case <-ctx.Done():
-			slog.Info("(main) received termination signal, exiting...")
+			pgrw.log().Info("context is done, exiting...")
 			os.Exit(0)
 		default:
 		}
 
 		if pgrw.noLoop {
-			slog.Error("disconnected")
+			pgrw.log().Error("disconnected")
 			os.Exit(1)
 		}
 
-		slog.Info("disconnected; waiting 5 seconds to try again")
+		pgrw.log().Info("disconnected; waiting 5 seconds to try again")
 		time.Sleep(5 * time.Second)
 	}
 }

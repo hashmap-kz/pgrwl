@@ -62,15 +62,12 @@ func (u *Uploader) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("(uploader-loop) context is done, exiting...")
+			u.log().Info("context is done, exiting...")
 			return
 		case <-ticker.C:
 			files, err := os.ReadDir(opts.StatusDirectory)
 			if err != nil {
-				u.log().Error("error reading dir",
-					slog.String("component", "uploader-loop"),
-					slog.Any("err", err),
-				)
+				u.log().Error("error reading dir", slog.Any("err", err))
 				continue
 			}
 
@@ -80,10 +77,7 @@ func (u *Uploader) Run(ctx context.Context) {
 			}
 			err = u.uploadFiles(ctx, filesToUpload)
 			if err != nil {
-				u.log().Error("error upload files",
-					slog.String("component", "uploader-loop"),
-					slog.Any("err", err),
-				)
+				u.log().Error("error upload files", slog.Any("err", err))
 			}
 		}
 	}
