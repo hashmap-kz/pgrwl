@@ -21,7 +21,7 @@ import (
 func main() {
 	configFlag := &cli.StringFlag{
 		Name:     "config",
-		Usage:    "Path to config file (*.json)",
+		Usage:    "Path to config file",
 		Aliases:  []string{"c"},
 		Required: true,
 		Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
@@ -113,31 +113,6 @@ func main() {
 							Addr: c.String("serve-addr"),
 						},
 					)
-				},
-			},
-			// config-template
-			{
-				Name:  "config-template",
-				Usage: "Get a '*.json' file with all properties set",
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  "r",
-						Usage: "Minimal config for 'receive' mode",
-					},
-					&cli.BoolFlag{
-						Name:  "s",
-						Usage: "Minimal config for 'serve' mode",
-					},
-				},
-				Action: func(_ context.Context, c *cli.Command) error {
-					if c.Bool("r") {
-						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateReceive())
-					} else if c.Bool("s") {
-						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateServe())
-					} else {
-						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateFull())
-					}
-					return nil
 				},
 			},
 		},
