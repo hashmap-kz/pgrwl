@@ -27,6 +27,7 @@ func GetFileFromTar(r io.Reader, target string) (io.ReadCloser, error) {
 
 			go func() {
 				defer pw.Close()
+				//nolint:gosec
 				_, err := io.Copy(pw, tr)
 				if err != nil {
 					_ = pw.CloseWithError(err)

@@ -26,7 +26,7 @@ If applicable, add screenshots to help explain your problem.
 **Environment (please complete the following information):**
 
 - OS: [e.g. Linux]
-- k8s version [`kubectl version -ojson` output]
+- PostgreSQL major version [e.g. 17]
 
 **Additional context**
 Add any other context about the problem here.

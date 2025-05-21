@@ -73,7 +73,7 @@ func TestCreateTarReader(t *testing.T) {
 
 	for name, content := range contentMap {
 		path := filepath.Join(dir, name)
-		err := os.WriteFile(path, []byte(content), 0o644)
+		err := os.WriteFile(path, []byte(content), 0o600)
 		require.NoError(t, err)
 		files = append(files, path)
 	}
@@ -94,6 +94,7 @@ func TestCreateTarReader(t *testing.T) {
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
+		//nolint:gosec
 		_, err = io.Copy(&buf, tr)
 		require.NoError(t, err)
 
