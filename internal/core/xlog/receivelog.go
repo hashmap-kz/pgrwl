@@ -49,6 +49,7 @@ type StreamCtl struct {
 	stopPos               pglogrepl.LSN
 	conn                  *pgconn.PgConn
 	walfile               *walfileT
+	l                     *slog.Logger
 	verbose               bool
 	startedAt             time.Time
 	mu                    sync.RWMutex
@@ -70,6 +71,13 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		verbose:               o.Verbose,
 		startedAt:             time.Now(),
 	}
+}
+
+func (stream *StreamCtl) log() *slog.Logger {
+	if stream.l != nil {
+		return stream.l
+	}
+	return slog.With("component", "receivelog")
 }
 
 func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
@@ -165,7 +173,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			stream.timeline = newTimeline
 			stream.startPos = newStartPos - (newStartPos % pglogrepl.LSN(stream.walSegSz))
 
-			slog.Info("end of timeline, continue",
+			stream.log().Info("end of timeline, continue",
 				slog.Uint64("new-tli", uint64(stream.timeline)),
 				slog.String("new-pos", stream.startPos.String()),
 			)
@@ -178,7 +186,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		 */
 
 		if stream.verbose {
-			slog.LogAttrs(ctx, logger.LevelTrace, "stream termination",
+			stream.log().LogAttrs(ctx, logger.LevelTrace, "stream termination",
 				slog.String("job", "receive_xlog_stream"),
 				slog.String("reason", "controlled shutdown"),
 				slog.Uint64("tli", uint64(stream.timeline)),
@@ -186,7 +194,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 			)
 		}
 
-		slog.Warn("replication stream was terminated")
+		stream.log().Warn("replication stream was terminated")
 		stream.CloseWalFileIfPresentNoRename("controlled shutdown")
 		return nil
 	}
@@ -202,7 +210,7 @@ func (stream *StreamCtl) handleCopyStream(ctx context.Context) (*pglogrepl.CopyD
 		// If synchronous, flush WAL file and update server immediately
 		if stream.synchronous && stream.lastFlushPosition < stream.blockPos && stream.walfile != nil {
 			if stream.verbose {
-				slog.LogAttrs(ctx, logger.LevelTrace, "SYNC-1",
+				stream.log().LogAttrs(ctx, logger.LevelTrace, "SYNC-1",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
@@ -299,7 +307,7 @@ func (stream *StreamCtl) processOneMsg(ctx context.Context, msg pgproto3.Backend
 			}
 
 			if stream.verbose {
-				slog.LogAttrs(ctx, logger.LevelTrace, "begin to process xlog data msg",
+				stream.log().LogAttrs(ctx, logger.LevelTrace, "begin to process xlog data msg",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
@@ -313,7 +321,7 @@ func (stream *StreamCtl) processOneMsg(ctx context.Context, msg pgproto3.Backend
 			}
 
 			if stream.verbose {
-				slog.LogAttrs(ctx, logger.LevelTrace, "log data msg processed",
+				stream.log().LogAttrs(ctx, logger.LevelTrace, "log data msg processed",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
@@ -329,15 +337,15 @@ func (stream *StreamCtl) processOneMsg(ctx context.Context, msg pgproto3.Backend
 
 		// Handle other commands
 	case *pgproto3.CommandComplete:
-		slog.Warn("received CommandComplete, treating as disconnection")
+		stream.log().Warn("received CommandComplete, treating as disconnection")
 		return nil, nil // safe exit
 	case *pgproto3.ErrorResponse:
 		return nil, fmt.Errorf("error response from server: %s", m.Message)
 	case *pgproto3.ReadyForQuery:
-		slog.Warn("received ReadyForQuery, treating as disconnection")
+		stream.log().Warn("received ReadyForQuery, treating as disconnection")
 		return nil, nil // safe exit
 	default:
-		slog.Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
+		stream.log().Warn("received unexpected message", slog.String("type", fmt.Sprintf("%T", msg)))
 		return nil, fmt.Errorf("received unexpected message: %T", msg)
 	}
 	return nil, nil
@@ -358,7 +366,7 @@ func (stream *StreamCtl) processKeepaliveMsg(ctx context.Context, keepalive pglo
 			 */
 
 			if stream.verbose {
-				slog.LogAttrs(ctx, logger.LevelTrace, "SYNC-K",
+				stream.log().LogAttrs(ctx, logger.LevelTrace, "SYNC-K",
 					slog.String("job", "process_keepalive_msg"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
 					slog.String("block_pos", stream.blockPos.String()),
@@ -410,7 +418,7 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 	bytesWritten := uint64(0)
 
 	if stream.verbose {
-		slog.LogAttrs(ctx, logger.LevelTrace, "begin to write xlog data msg",
+		stream.log().LogAttrs(ctx, logger.LevelTrace, "begin to write xlog data msg",
 			slog.String("job", "process_xlog_data_msg"),
 			slog.String("flush_pos", stream.lastFlushPosition.String()),
 			slog.String("block_pos", stream.blockPos.String()),
@@ -474,7 +482,7 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 
 func (stream *StreamCtl) sendFeedback(ctx context.Context, now time.Time, replyRequested bool) error {
 	if stream.verbose {
-		slog.LogAttrs(ctx, logger.LevelTrace, "sending feedback",
+		stream.log().LogAttrs(ctx, logger.LevelTrace, "sending feedback",
 			slog.String("flush_pos", stream.lastFlushPosition.String()),
 			slog.String("block_pos", stream.blockPos.String()),
 			slog.Uint64("diff", uint64(stream.blockPos)-uint64(stream.lastFlushPosition)),
@@ -498,7 +506,7 @@ func (stream *StreamCtl) sendFeedback(ctx context.Context, now time.Time, replyR
 
 	err := pglogrepl.SendStandbyStatusUpdate(ctx, stream.conn, standbyStatus)
 	if err != nil {
-		slog.Error("could not send feedback packet", slog.Any("err", err))
+		stream.log().Error("could not send feedback packet", slog.Any("err", err))
 		return err
 	}
 
@@ -506,7 +514,7 @@ func (stream *StreamCtl) sendFeedback(ctx context.Context, now time.Time, replyR
 }
 
 func (stream *StreamCtl) handleEndOfCopyStream(ctx context.Context) (*pglogrepl.CopyDoneResult, error) {
-	slog.Debug("received CopyDone")
+	stream.log().Debug("received CopyDone")
 	var err error
 	var cdr *pglogrepl.CopyDoneResult
 
@@ -518,7 +526,7 @@ func (stream *StreamCtl) handleEndOfCopyStream(ctx context.Context) (*pglogrepl.
 	if err != nil {
 		return nil, fmt.Errorf("failed to send client CopyDone: %w", err)
 	}
-	slog.Debug("CopyDoneResult", slog.Any("cdr", cdr))
+	stream.log().Debug("CopyDoneResult", slog.Any("cdr", cdr))
 
 	stream.stopPos = stream.blockPos
 	return cdr, nil
@@ -526,7 +534,7 @@ func (stream *StreamCtl) handleEndOfCopyStream(ctx context.Context) (*pglogrepl.
 
 func (stream *StreamCtl) updateLastFlushPosition(ctx context.Context, p pglogrepl.LSN, reason string) {
 	if stream.verbose {
-		slog.LogAttrs(ctx, logger.LevelTrace, "updating last-flush position",
+		stream.log().LogAttrs(ctx, logger.LevelTrace, "updating last-flush position",
 			slog.String("prev", stream.lastFlushPosition.String()),
 			slog.String("next", p.String()),
 			slog.Uint64("diff", uint64(p-stream.lastFlushPosition)),
