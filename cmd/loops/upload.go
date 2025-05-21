@@ -52,9 +52,7 @@ func (u *Uploader) log() *slog.Logger {
 }
 
 func (u *Uploader) Run(ctx context.Context) {
-	cfg := u.cfg
-	opts := u.opts
-	syncInterval := cmdutils.ParseDurationOrDefault(cfg.Uploader.SyncInterval, 30*time.Second)
+	syncInterval := cmdutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
 
 	ticker := time.NewTicker(syncInterval)
 	defer ticker.Stop()
@@ -65,7 +63,7 @@ func (u *Uploader) Run(ctx context.Context) {
 			u.log().Info("context is done, exiting...")
 			return
 		case <-ticker.C:
-			files, err := os.ReadDir(opts.StatusDirectory)
+			files, err := os.ReadDir(u.opts.StatusDirectory)
 			if err != nil {
 				u.log().Error("error reading dir", slog.Any("err", err))
 				continue
@@ -84,14 +82,13 @@ func (u *Uploader) Run(ctx context.Context) {
 }
 
 func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
-	opts := u.opts
 	r := make([]uploadBundle, 0, len(files))
 	for _, entry := range files {
 		if entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		doneFilePath := filepath.ToSlash(filepath.Join(opts.StatusDirectory, name))
+		doneFilePath := filepath.ToSlash(filepath.Join(u.opts.StatusDirectory, name))
 		if !strings.HasSuffix(name, xlog.DoneMarkerFileExt) {
 			u.removeStrayDoneMarkerFile(doneFilePath)
 			continue
@@ -101,7 +98,7 @@ func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
 			u.removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
-		walFilePath := filepath.ToSlash(filepath.Join(opts.ReceiveDirectory, name))
+		walFilePath := filepath.ToSlash(filepath.Join(u.opts.ReceiveDirectory, name))
 		if !optutils.FileExists(walFilePath) {
 			// misconfigured, etc, we may safely delete *.done file here
 			u.removeStrayDoneMarkerFile(doneFilePath)
@@ -129,9 +126,7 @@ func (u *Uploader) removeStrayDoneMarkerFile(doneFilePath string) {
 }
 
 func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error {
-	cfg := u.cfg
-
-	workerCount := cfg.Uploader.MaxConcurrency
+	workerCount := u.cfg.Uploader.MaxConcurrency
 	if workerCount <= 0 {
 		workerCount = 1
 	}
