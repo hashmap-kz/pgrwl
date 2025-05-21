@@ -2,7 +2,13 @@
 main:
   listen_port: 7070
   directory: wals
+
+receiver:
   slot: pgrwl_v5
+
+uploader:
+  sync_interval: 10s
+  max_concurrency: 4
 
 log:
   level: trace
@@ -11,9 +17,6 @@ log:
 
 storage:
   name: s3
-  upload:
-    sync_interval: 10s
-    max_concurrency: 4
   compression:
     algo: gzip
   encryption:

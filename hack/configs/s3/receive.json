@@ -1,7 +1,9 @@
 {
   "main": {
     "listen_port": 7070,
-    "directory": "wals",
+    "directory": "wals"
+  },
+  "receiver": {
     "slot": "pgrwl_v5"
   },
   "log": {
@@ -9,12 +11,12 @@
     "format": "text",
     "add_source": true
   },
+  "uploader": {
+    "sync_interval": "10s",
+    "max_concurrency": 4
+  },
   "storage": {
     "name": "s3",
-    "upload": {
-      "sync_interval": "10s",
-      "max_concurrency": 4
-    },
     "compression": {
       "algo": "gzip"
     },

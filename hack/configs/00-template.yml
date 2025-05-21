@@ -1,9 +1,15 @@
 ---
-main:                                    # Required
+main:                                    # Required for both modes: receive/serve
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
+
+receiver:                                # Required for 'receive' mode
   slot: replication_slot                 # Replication slot to use
   no_loop: false                         # If true, do not loop on connection loss
+
+uploader:                                # Optional (used in receive mode)
+  sync_interval: 10s                     # Interval for the upload worker to check for new files
+  max_concurrency: 4                     # Maximum number of files to upload concurrently
 
 log:                                     # Optional
   level: info                            # One of: trace / debug / info / warn / error
@@ -11,9 +17,6 @@ log:                                     # Optional
   add_source: true                       # Include file:line in log messages (for local development)
 storage:                                 # Optional
   name: s3                               # One of: s3 / sftp
-  upload:                                # Optional (used in receive mode)
-    sync_interval: 10s                   # Interval for the upload worker to check for new files
-    max_concurrency: 4                   # Maximum number of files to upload concurrently
   compression:                           # Optional
     algo: gzip                           # One of: gzip / zstd
   encryption:                            # Optional

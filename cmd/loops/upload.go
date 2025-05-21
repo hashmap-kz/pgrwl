@@ -54,7 +54,7 @@ func (u *Uploader) log() *slog.Logger {
 func (u *Uploader) Run(ctx context.Context) {
 	cfg := u.cfg
 	opts := u.opts
-	syncInterval := cmdutils.ParseDurationOrDefault(cfg.Storage.Upload.SyncInterval, 30*time.Second)
+	syncInterval := cmdutils.ParseDurationOrDefault(cfg.Uploader.SyncInterval, 30*time.Second)
 
 	ticker := time.NewTicker(syncInterval)
 	defer ticker.Stop()
@@ -131,7 +131,7 @@ func (u *Uploader) removeStrayDoneMarkerFile(doneFilePath string) {
 func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error {
 	cfg := u.cfg
 
-	workerCount := cfg.Storage.Upload.MaxConcurrency
+	workerCount := cfg.Uploader.MaxConcurrency
 	if workerCount <= 0 {
 		workerCount = 1
 	}

@@ -1,7 +1,9 @@
 {
   "main": {
     "listen_port": 7070,
-    "directory": "/tmp/wal-archive",
+    "directory": "/tmp/wal-archive"
+  },
+  "receiver": {
     "slot": "pgrwl_v5",
     "no_loop": true
   },

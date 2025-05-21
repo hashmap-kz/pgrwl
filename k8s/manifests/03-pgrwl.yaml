@@ -43,7 +43,9 @@ data:
     {
       "main": {
         "listen_port": 7070,
-        "directory": "/wals/wal-archive",
+        "directory": "/wals/wal-archive"
+      },
+      "receiver": {
         "slot": "pgrwl_v5"
       },
       "log": {

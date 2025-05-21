@@ -1,7 +1,9 @@
 {
   "main": {
     "listen_port": 7070,
-    "directory": "/var/lib/pgwal",
+    "directory": "/var/lib/pgwal"
+  },
+  "receiver": {
     "slot": "replication_slot",
     "no_loop": false
   },
@@ -10,12 +12,12 @@
     "format": "text",
     "add_source": true
   },
+  "uploader": {
+    "sync_interval": "10s",
+    "max_concurrency": 4
+  },
   "storage": {
     "name": "s3",
-    "upload": {
-      "sync_interval": "10s",
-      "max_concurrency": 4
-    },
     "compression": {
       "algo": "gzip"
     },

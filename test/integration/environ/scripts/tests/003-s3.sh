@@ -17,13 +17,13 @@ x_remake_dirs() {
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
 
-
-
   cat <<EOF >/tmp/config.json
 {
   "main": {
      "listen_port": 7070,
-     "directory": "${WAL_PATH}",
+     "directory": "${WAL_PATH}"
+  },
+  "receiver": {
      "slot": "pgrwl_v5",
      "no_loop": true
   },

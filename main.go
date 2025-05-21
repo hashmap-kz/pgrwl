@@ -60,8 +60,8 @@ func main() {
 							ReceiveDirectory: filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalReceiveDirName)),
 							StatusDirectory:  filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalStatusDirName)),
 							ListenPort:       cfg.Main.ListenPort,
-							Slot:             cfg.Main.Slot,
-							NoLoop:           cfg.Main.NoLoop,
+							Slot:             cfg.Receiver.Slot,
+							NoLoop:           cfg.Receiver.NoLoop,
 							Verbose:          strings.EqualFold(cfg.Log.Level, "trace"),
 						})
 					} else if mode == config.ModeServe {
