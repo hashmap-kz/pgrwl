@@ -28,7 +28,25 @@ type uploadBundle struct {
 	walFilePath  string
 }
 
-func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Storage, opts *UploaderLoopOpts) {
+type Uploader struct {
+	cfg  *config.Config
+	stor storage.Storage
+	opts *UploaderLoopOpts
+	l    *slog.Logger
+}
+
+func NewUploader(cfg *config.Config, stor storage.Storage, opts *UploaderLoopOpts) *Uploader {
+	return &Uploader{
+		cfg:  cfg,
+		stor: stor,
+		opts: opts,
+		l:    slog.Default().With(slog.String("component", "uploader")),
+	}
+}
+
+func (u *Uploader) Run(ctx context.Context) {
+	cfg := u.cfg
+	opts := u.opts
 	syncInterval := cmdutils.ParseDurationOrDefault(cfg.Storage.Upload.SyncInterval, 30*time.Second)
 
 	ticker := time.NewTicker(syncInterval)
@@ -42,20 +60,20 @@ func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Stora
 		case <-ticker.C:
 			files, err := os.ReadDir(opts.StatusDirectory)
 			if err != nil {
-				slog.Error("error reading dir",
+				u.l.Error("error reading dir",
 					slog.String("component", "uploader-loop"),
 					slog.Any("err", err),
 				)
 				continue
 			}
 
-			filesToUpload := filterFilesToUpload(opts, files)
+			filesToUpload := u.filterFilesToUpload(files)
 			if len(filesToUpload) == 0 {
 				continue
 			}
-			err = uploadFiles(ctx, cfg, stor, filesToUpload)
+			err = u.uploadFiles(ctx, filesToUpload)
 			if err != nil {
-				slog.Error("error upload files",
+				u.l.Error("error upload files",
 					slog.String("component", "uploader-loop"),
 					slog.Any("err", err),
 				)
@@ -64,7 +82,8 @@ func RunUploaderLoop(ctx context.Context, cfg *config.Config, stor storage.Stora
 	}
 }
 
-func filterFilesToUpload(opts *UploaderLoopOpts, files []os.DirEntry) []uploadBundle {
+func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
+	opts := u.opts
 	r := make([]uploadBundle, 0, len(files))
 	for _, entry := range files {
 		if entry.IsDir() {
@@ -73,18 +92,18 @@ func filterFilesToUpload(opts *UploaderLoopOpts, files []os.DirEntry) []uploadBu
 		name := entry.Name()
 		doneFilePath := filepath.ToSlash(filepath.Join(opts.StatusDirectory, name))
 		if !strings.HasSuffix(name, xlog.DoneMarkerFileExt) {
-			removeStrayDoneMarkerFile(doneFilePath)
+			u.removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
 		name = strings.TrimSuffix(name, xlog.DoneMarkerFileExt)
 		if !xlog.IsXLogFileName(name) {
-			removeStrayDoneMarkerFile(doneFilePath)
+			u.removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
 		walFilePath := filepath.ToSlash(filepath.Join(opts.ReceiveDirectory, name))
 		if !optutils.FileExists(walFilePath) {
 			// misconfigured, etc, we may safely delete *.done file here
-			removeStrayDoneMarkerFile(doneFilePath)
+			u.removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
 		r = append(r, uploadBundle{
@@ -95,27 +114,28 @@ func filterFilesToUpload(opts *UploaderLoopOpts, files []os.DirEntry) []uploadBu
 	return r
 }
 
-func removeStrayDoneMarkerFile(doneFilePath string) {
+func (u *Uploader) removeStrayDoneMarkerFile(doneFilePath string) {
 	err := os.Remove(doneFilePath)
 	if err == nil {
-		slog.Warn("stray *.done marker file is removed",
+		u.l.Warn("stray *.done marker file is removed",
 			slog.String("path", doneFilePath),
 		)
 	} else {
-		slog.Error("cannot remove stray *.done marker file",
+		u.l.Error("cannot remove stray *.done marker file",
 			slog.String("path", doneFilePath),
 		)
 	}
 }
 
-func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, files []uploadBundle) error {
+func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error {
+	cfg := u.cfg
+
 	workerCount := cfg.Storage.Upload.MaxConcurrency
 	if workerCount <= 0 {
 		workerCount = 1
 	}
 
-	slog.Debug("starting concurrent file uploads",
-		slog.String("component", "uploader-loop"),
+	u.l.Debug("starting concurrent file uploads",
 		slog.Int("workers", workerCount),
 		slog.Int("files", len(files)),
 	)
@@ -134,7 +154,7 @@ func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, 
 				if ctx.Err() != nil {
 					return
 				}
-				err := uploadOneFile(ctx, stor, filePath)
+				err := u.uploadOneFile(ctx, filePath)
 				if err != nil {
 					select {
 					case errorChan <- err:
@@ -159,8 +179,8 @@ func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, 
 
 	var lastErr error
 	for e := range errorChan {
-		slog.Error("file upload error",
-			slog.String("component", "uploader-loop"),
+		u.l.Error("file upload error",
+
 			slog.Any("err", e),
 		)
 		lastErr = e
@@ -168,10 +188,9 @@ func uploadFiles(ctx context.Context, cfg *config.Config, stor storage.Storage, 
 	return lastErr
 }
 
-func uploadOneFile(ctx context.Context, stor storage.Storage, bundle uploadBundle) error {
-	slog.Info("starting upload file",
+func (u *Uploader) uploadOneFile(ctx context.Context, bundle uploadBundle) error {
+	u.l.Info("starting upload file",
 		slog.String("path", bundle.walFilePath),
-		slog.String("component", "uploader-loop"),
 	)
 
 	tarReader := optutils.CreateTarReader([]string{
@@ -181,7 +200,7 @@ func uploadOneFile(ctx context.Context, stor storage.Storage, bundle uploadBundl
 
 	resultFileName := filepath.Base(bundle.walFilePath) + ".tar"
 
-	err := stor.Put(ctx, resultFileName, tarReader)
+	err := u.stor.Put(ctx, resultFileName, tarReader)
 	if err != nil {
 		// upload error: close the file, return err, DO NOT REMOVE SOURCE WHEN UPLOAD IS FAILED
 		_ = tarReader.Close()
@@ -201,8 +220,7 @@ func uploadOneFile(ctx context.Context, stor storage.Storage, bundle uploadBundl
 		return err
 	}
 
-	slog.Info("uploaded and deleted",
-		slog.String("component", "uploader-loop"),
+	u.l.Info("uploaded and deleted",
 		slog.String("done-marker-path", bundle.doneFilePath),
 		slog.String("wal-path", bundle.walFilePath),
 		slog.String("result-path", resultFileName),
