@@ -154,26 +154,30 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 
 	s.log().Debug("fetching WAL file", slog.String("filename", filename))
 
-	if s.storage == nil {
-		filePath := filepath.Join(s.baseDir, filename)
-		partialFilePath := filePath + xlog.PartialSuffix
+	// 1) trying to find local completed segment
+	// 2) trying to find partial segment
+	filePath := filepath.Join(s.baseDir, filename)
+	partialFilePath := filePath + xlog.PartialSuffix
 
-		s.log().Debug("wal-restore, fetching local file", slog.String("path", filePath))
-		if optutils.FileExists(filePath) {
-			s.log().Debug("wal-restore, found local file", slog.String("path", filePath))
-			return os.Open(filePath)
-		}
-		if optutils.FileExists(partialFilePath) {
-			s.log().Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
-			return os.Open(partialFilePath)
-		}
-		return nil, fmt.Errorf("cannot find local file: %s", filePath)
+	s.log().Debug("wal-restore, fetching local file", slog.String("path", filePath))
+	if optutils.FileExists(filePath) {
+		s.log().Debug("wal-restore, found local file", slog.String("path", filePath))
+		return os.Open(filePath)
+	}
+	if optutils.FileExists(partialFilePath) {
+		s.log().Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
+		return os.Open(partialFilePath)
 	}
 
-	s.log().Debug("wal-restore, fetching remote file", slog.String("filename", filename))
-	tarFile, err := s.storage.Get(ctx, filename+".tar")
-	if err != nil {
-		return nil, err
+	// 3) trying remote
+	if s.storage != nil {
+		s.log().Debug("wal-restore, fetching remote file", slog.String("filename", filename))
+		tarFile, err := s.storage.Get(ctx, filename+".tar")
+		if err != nil {
+			return nil, err
+		}
+		return optutils.GetFileFromTar(tarFile, filename)
 	}
-	return optutils.GetFileFromTar(tarFile, filename)
+
+	return nil, fmt.Errorf("cannot fetch file: %s", filename)
 }
