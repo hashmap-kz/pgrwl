@@ -1,14 +1,9 @@
 ---
-mode:                                    # Required
-  name: receive                          # One of: receive / serve
-  receive:                               # Required section for 'receive' mode
-    listen_port: 7070                    # HTTP server port (used for management)
-    directory: "/var/lib/pgwal"          # Base directory for storing WAL files
-    slot: replication_slot               # Replication slot to use
-    no_loop: false                       # If true, do not loop on connection loss
-  serve:                                 # Required section for 'serve' mode
-    listen_port: 7070                    # HTTP server port (used for serving WAL files)
-    directory: "/var/lib/pgwal"          # Base directory to serve WAL files from (non-uploaded, *.partial)
+main:                                    # Required
+  listen_port: 7070                      # HTTP server port (used for management)
+  directory: "/var/lib/pgwal"            # Base directory for storing WAL files
+  slot: replication_slot                 # Replication slot to use
+  no_loop: false                         # If true, do not loop on connection loss
 
 log:                                     # Optional
   level: info                            # One of: trace / debug / info / warn / error

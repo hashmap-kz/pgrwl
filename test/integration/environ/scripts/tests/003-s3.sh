@@ -19,16 +19,13 @@ x_remake_dirs() {
 
 
 
-  cat <<EOF >/tmp/receive-config.json
+  cat <<EOF >/tmp/config.json
 {
-  "mode": {
-    "name": "receive",
-    "receive": {
-      "listen_port": 7070,
-      "directory": "${WAL_PATH}",
-      "slot": "pgrwl_v5",
-      "no_loop": true
-    }
+  "main": {
+     "listen_port": 7070,
+     "directory": "${WAL_PATH}",
+     "slot": "pgrwl_v5",
+     "no_loop": true
   },
   "log": {
     "level": "trace",
@@ -61,41 +58,6 @@ x_remake_dirs() {
 }
 EOF
 
-  cat <<EOF >/tmp/serve-config.json
-{
-  "mode": {
-    "name": "serve",
-    "serve": {
-      "listen_port": 7070,
-      "directory": "${WAL_PATH}"
-    }
-  },
-  "log": {
-    "level": "trace",
-    "format": "text",
-    "add_source": true
-  },
-  "storage": {
-    "name": "s3",
-    "compression": {
-      "algo": "gzip"
-    },
-    "encryption": {
-      "algo": "aes-256-gcm",
-      "pass": "qwerty123"
-    },
-    "s3": {
-      "url": "https://minio:9000",
-      "access_key_id": "minioadmin",
-      "secret_access_key": "minioadmin123",
-      "bucket": "backups",
-      "region": "main",
-      "use_path_style": true,
-      "disable_ssl": true
-    }
-  }
-}
-EOF
 }
 
 x_backup_restore() {
@@ -108,7 +70,7 @@ x_backup_restore() {
 
   # run wal-receivers
   echo_delim "running wal-receivers"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/receive-config.json" >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -151,7 +113,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/serve-config.json" >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log

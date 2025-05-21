@@ -6,7 +6,8 @@ WAL_PATH="/tmp/wal-archive"
 
 ARGS=(
   "start"
-  "-c" "/var/lib/postgresql/configs/02-basic-serve.json"
+  "-c" "/var/lib/postgresql/configs/01-basic-receive.json"
+  "-m" "serve"
 )
 
 mkdir -p "${WAL_PATH}"

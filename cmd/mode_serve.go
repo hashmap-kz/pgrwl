@@ -41,7 +41,7 @@ func RunServeMode(opts *ServeModeOpts) {
 			//nolint:gocritic
 			log.Fatal(err)
 		}
-		err = repo.CheckManifest(cfg, cfg.Mode.Serve.Directory)
+		err = repo.CheckManifest(cfg)
 		if err != nil {
 			log.Fatal(err)
 		}

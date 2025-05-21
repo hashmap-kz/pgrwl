@@ -29,29 +29,18 @@ var (
 )
 
 type Config struct {
-	Mode    ModeConfig    `json:"mode,omitempty"`
+	Main    MainConfig    `json:"main,omitempty"`
 	Log     LogConfig     `json:"log,omitempty"`
 	Storage StorageConfig `json:"storage,omitempty"`
 }
 
-// ---- Mode Section ----
+// ---- Main Section ----
 
-type ModeConfig struct {
-	Name    string        `json:"name,omitempty"` // "receive" or "serve"
-	Receive ReceiveConfig `json:"receive,omitempty"`
-	Serve   ServeConfig   `json:"serve,omitempty"`
-}
-
-type ReceiveConfig struct {
+type MainConfig struct {
 	ListenPort int    `json:"listen_port,omitempty"`
 	Directory  string `json:"directory,omitempty"`
 	Slot       string `json:"slot,omitempty"`
 	NoLoop     bool   `json:"no_loop,omitempty"`
-}
-
-type ServeConfig struct {
-	ListenPort int    `json:"listen_port,omitempty"`
-	Directory  string `json:"directory,omitempty"`
 }
 
 // ---- Log Section ----
