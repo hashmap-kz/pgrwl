@@ -32,6 +32,10 @@ x_remake_dirs() {
     "format": "text",
     "add_source": true
   },
+  "uploader": {
+    "sync_interval": "5s",
+    "max_concurrency": 4
+  },
   "storage": {
     "name": "s3",
     "compression": {
@@ -40,10 +44,6 @@ x_remake_dirs() {
     "encryption": {
       "algo": "aes-256-gcm",
       "pass": "qwerty123"
-    },
-    "upload": {
-      "sync_interval": "5s",
-      "max_concurrency": 4
     },
     "s3": {
       "url": "https://minio:9000",
