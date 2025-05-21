@@ -32,6 +32,7 @@ type PgReceiveWal interface {
 }
 
 type pgReceiveWal struct {
+	l                *slog.Logger
 	receiveDirectory string
 	statusDirectory  string
 	walSegSz         uint64
@@ -40,7 +41,6 @@ type pgReceiveWal struct {
 	slotName         string
 	noLoop           bool
 	verbose          bool
-	l                *slog.Logger
 
 	streamMu sync.RWMutex
 	stream   *StreamCtl // current active stream (or nil)
@@ -82,6 +82,7 @@ func NewPgReceiver(ctx context.Context, opts *PgReceiveWalOpts) (PgReceiveWal, e
 	}
 
 	return &pgReceiveWal{
+		l:                slog.With(slog.String("component", "pgreceivewal")),
 		receiveDirectory: opts.ReceiveDirectory,
 		statusDirectory:  opts.StatusDirectory,
 		walSegSz:         startupInfo.WalSegSz,

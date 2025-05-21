@@ -30,6 +30,7 @@ type lockInfo struct {
 }
 
 type controlSvc struct {
+	l           *slog.Logger
 	pgrw        xlog.PgReceiveWal // direct access to running state
 	baseDir     string
 	runningMode string
@@ -51,6 +52,7 @@ type ControlServiceOpts struct {
 
 func NewControlService(opts *ControlServiceOpts) ControlService {
 	return &controlSvc{
+		l:           slog.With("component", "control-service"),
 		pgrw:        opts.PGRW,
 		baseDir:     opts.BaseDir,
 		runningMode: opts.RunningMode,
@@ -84,8 +86,17 @@ func (s *controlSvc) unlock() {
 	s.mu.Unlock()
 }
 
+func (s *controlSvc) log() *slog.Logger {
+	if s.l != nil {
+		return s.l
+	}
+	return slog.With("component", "control-service")
+}
+
 func (s *controlSvc) Status() *model.PgRwlStatus {
 	// read-only; doesn’t need to block
+
+	s.log().Debug("querying status")
 
 	var streamStatusResp *model.StreamStatus
 	if s.pgrw != nil {
@@ -141,23 +152,25 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 	// TODO: local storage
 	// TODO: send checksum in headers
 
+	s.log().Debug("fetching WAL file", slog.String("filename", filename))
+
 	if s.storage == nil {
 		filePath := filepath.Join(s.baseDir, filename)
 		partialFilePath := filePath + xlog.PartialSuffix
 
-		slog.Debug("wal-restore, fetching local file", slog.String("path", filePath))
+		s.log().Debug("wal-restore, fetching local file", slog.String("path", filePath))
 		if optutils.FileExists(filePath) {
-			slog.Debug("wal-restore, found local file", slog.String("path", filePath))
+			s.log().Debug("wal-restore, found local file", slog.String("path", filePath))
 			return os.Open(filePath)
 		}
 		if optutils.FileExists(partialFilePath) {
-			slog.Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
+			s.log().Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
 			return os.Open(partialFilePath)
 		}
 		return nil, fmt.Errorf("cannot find local file: %s", filePath)
 	}
 
-	slog.Debug("wal-restore, fetching remote file", slog.String("filename", filename))
+	s.log().Debug("wal-restore, fetching remote file", slog.String("filename", filename))
 	tarFile, err := s.storage.Get(ctx, filename+".tar")
 	if err != nil {
 		return nil, err

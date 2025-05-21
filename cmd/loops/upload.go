@@ -29,18 +29,18 @@ type uploadBundle struct {
 }
 
 type Uploader struct {
+	l    *slog.Logger
 	cfg  *config.Config
 	stor storage.Storage
 	opts *UploaderLoopOpts
-	l    *slog.Logger
 }
 
 func NewUploader(cfg *config.Config, stor storage.Storage, opts *UploaderLoopOpts) *Uploader {
 	return &Uploader{
+		l:    slog.With(slog.String("component", "uploader")),
 		cfg:  cfg,
 		stor: stor,
 		opts: opts,
-		l:    slog.Default().With(slog.String("component", "uploader")),
 	}
 }
 

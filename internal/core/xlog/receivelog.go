@@ -33,6 +33,7 @@ type StreamOpts struct {
 }
 
 type StreamCtl struct {
+	l                     *slog.Logger
 	startPos              pglogrepl.LSN
 	timeline              uint32
 	standbyMessageTimeout time.Duration
@@ -49,7 +50,6 @@ type StreamCtl struct {
 	stopPos               pglogrepl.LSN
 	conn                  *pgconn.PgConn
 	walfile               *walfileT
-	l                     *slog.Logger
 	verbose               bool
 	startedAt             time.Time
 	mu                    sync.RWMutex
@@ -57,6 +57,7 @@ type StreamCtl struct {
 
 func NewStream(o *StreamOpts) *StreamCtl {
 	return &StreamCtl{
+		l:                     slog.With("component", "receivelog"),
 		standbyMessageTimeout: 10 * time.Second,
 		synchronous:           true,
 		partialSuffix:         PartialSuffix,
