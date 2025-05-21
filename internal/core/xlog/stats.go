@@ -23,7 +23,7 @@ func (stream *StreamCtl) Status() *StreamStatus {
 	return status
 }
 
-func (pgrw *PgReceiveWal) Status() *StreamStatus {
+func (pgrw *pgReceiveWal) Status() *StreamStatus {
 	pgrw.streamMu.RLock()
 	defer pgrw.streamMu.RUnlock()
 	if pgrw.stream == nil {

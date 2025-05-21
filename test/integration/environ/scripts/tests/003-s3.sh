@@ -4,7 +4,6 @@ set -euo pipefail
 
 export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
-export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
 export LOG_FILE="/tmp/pgrwl.log"
 
 # Default environment
@@ -17,25 +16,48 @@ x_remake_dirs() {
   # cleanup possible state
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
-  rm -rf "${WAL_PATH_PG_RECEIVEWAL}" && mkdir -p "${WAL_PATH_PG_RECEIVEWAL}"
 
   cat <<EOF >/tmp/config.json
 {
   "main": {
-    "listen_port": 7070,
-    "directory": "/tmp/wal-archive"
+     "listen_port": 7070,
+     "directory": "${WAL_PATH}"
   },
   "receiver": {
-    "slot": "pgrwl_v5",
-    "no_loop": true
+     "slot": "pgrwl_v5",
+     "no_loop": true
   },
   "log": {
     "level": "trace",
     "format": "text",
     "add_source": true
+  },
+  "uploader": {
+    "sync_interval": "5s",
+    "max_concurrency": 4
+  },
+  "storage": {
+    "name": "s3",
+    "compression": {
+      "algo": "gzip"
+    },
+    "encryption": {
+      "algo": "aes-256-gcm",
+      "pass": "qwerty123"
+    },
+    "s3": {
+      "url": "https://minio:9000",
+      "access_key_id": "minioadmin",
+      "secret_access_key": "minioadmin123",
+      "bucket": "backups",
+      "region": "main",
+      "use_path_style": true,
+      "disable_ssl": true
+    }
   }
 }
 EOF
+
 }
 
 x_backup_restore() {
@@ -48,10 +70,7 @@ x_backup_restore() {
 
   # run wal-receivers
   echo_delim "running wal-receivers"
-  # run wal-receiver
   nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
-  # run pg_receivewal
-  bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -64,15 +83,19 @@ x_backup_restore() {
     --verbose
 
   # trying to write ~100 of WAL files as quick as possible
-  for ((i=0; i<100; i++)); do
+  for ((i = 0; i < 100; i++)); do
     psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);'
   done
 
   # remember the state
   pg_dumpall -f /tmp/pg_dumpall-before
 
+  echo_delim "waiting upload"
+  sleep 10
+
   # stop cluster, cleanup data
   echo_delim "teardown"
+  pkill -9 pgrwl || true
   xpg_teardown
 
   # restore from backup
@@ -82,14 +105,9 @@ x_backup_restore() {
   chown -R postgres:postgres "${PGDATA}"
   touch "${PGDATA}/recovery.signal"
 
-  # prepare archive (all partial files contain valid wal-segments)
-  find "${WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
-  find "${WAL_PATH_PG_RECEIVEWAL}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
-
   # fix configs
   xpg_config
   cat <<EOF >>"${PG_CFG}"
-#restore_command = 'cp ${WAL_PATH}/%f %p'
 restore_command = 'pgrwl restore-command --serve-addr=127.0.0.1:7070 %f %p'
 EOF
 
@@ -112,10 +130,6 @@ EOF
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
   pg_dumpall -f /tmp/pg_dumpall-arter
   diff /tmp/pg_dumpall-before /tmp/pg_dumpall-arter
-
-  # compare with pg_receivewal
-  echo_delim "compare wal-archive with pg_receivewal"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}/wal_receive" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 
 x_backup_restore "${@}"

@@ -25,8 +25,9 @@ type ServeModeOpts struct {
 }
 
 func RunServeMode(opts *ServeModeOpts) {
-	cfg := config.Cfg()
 	var err error
+	cfg := config.Cfg()
+	loggr := slog.With("component", "serve-mode-runner")
 
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -37,9 +38,10 @@ func RunServeMode(opts *ServeModeOpts) {
 	if cfg.HasExternalStorageConfigured() {
 		stor, err = repo.SetupStorage(opts.Directory)
 		if err != nil {
+			//nolint:gocritic
 			log.Fatal(err)
 		}
-		err = repo.CheckManifest(cfg, cfg.Mode.Serve.Directory)
+		err = repo.CheckManifest(cfg)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -55,7 +57,7 @@ func RunServeMode(opts *ServeModeOpts) {
 
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("http server panicked",
+				loggr.Info("http server panicked",
 					slog.Any("panic", r),
 					slog.String("goroutine", "http-server"),
 				)
@@ -65,20 +67,21 @@ func RunServeMode(opts *ServeModeOpts) {
 		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
 			BaseDir:     opts.Directory,
 			Verbose:     opts.Verbose,
-			RunningMode: "serve",
+			RunningMode: config.ModeServe,
 			Storage:     stor,
 		})
-		if err := loops.RunHTTPServer(ctx, opts.ListenPort, handlers); err != nil {
-			slog.Error("http server failed", slog.Any("err", err))
+		srv := loops.NewHTTPSrv(opts.ListenPort, handlers)
+		if err := srv.Run(ctx); err != nil {
+			loggr.Info("http server failed", slog.Any("err", err))
 			cancel()
 		}
 	}()
 
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
-	slog.Info("shutting down, waiting for goroutines...")
+	loggr.Info("shutting down, waiting for goroutines...")
 
 	// Wait for all goroutines to finish
 	wg.Wait()
-	slog.Info("all components shut down cleanly")
+	loggr.Info("all components shut down cleanly")
 }

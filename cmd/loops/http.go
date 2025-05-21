@@ -9,10 +9,31 @@ import (
 	"time"
 )
 
-func RunHTTPServer(ctx context.Context, port int, router http.Handler) error {
+type HTTPSrv struct {
+	l      *slog.Logger
+	port   int
+	router http.Handler
+}
+
+func NewHTTPSrv(port int, router http.Handler) *HTTPSrv {
+	return &HTTPSrv{
+		l:      slog.With("component", "httpsrv"),
+		port:   port,
+		router: router,
+	}
+}
+
+func (s *HTTPSrv) log() *slog.Logger {
+	if s.l != nil {
+		return s.l
+	}
+	return slog.With("component", "httpsrv")
+}
+
+func (s *HTTPSrv) Run(ctx context.Context) error {
 	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
-		Handler:           router,
+		Addr:              fmt.Sprintf(":%d", s.port),
+		Handler:           s.router,
 		ReadTimeout:       5 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      10 * time.Second,
@@ -25,13 +46,13 @@ func RunHTTPServer(ctx context.Context, port int, router http.Handler) error {
 		defer cancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			slog.Error("HTTP server shutdown error", slog.Any("err", err))
+			s.log().Error("HTTP server shutdown error", slog.Any("err", err))
 		} else {
-			slog.Debug("HTTP server shut down")
+			s.log().Debug("HTTP server shut down")
 		}
 	}()
 
-	slog.Info("starting HTTP server", slog.String("addr", srv.Addr))
+	s.log().Info("starting HTTP server", slog.String("addr", srv.Addr))
 
 	// Start the server (blocking)
 	err := srv.ListenAndServe()

@@ -50,105 +50,92 @@ container running PostgreSQL.
 ### `Receive` mode
 
 ```bash
-cat <<EOF >config.json
-{
-  "mode": {
-    "name": "receive",
-    "receive": {
-      "listen_port": 7070,
-      "directory": "wals",
-      "slot": "pgrwl_v5"
-    }
-  }
-}
+cat <<EOF >config.yml
+main:
+  listen_port: 7070
+  directory: wals
+receiver:
+  slot: pgrwl_v5
+log:
+  level: trace
+  format: text
+  add_source: true
 EOF
 
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
+export PGRWL_MODE=receive
 
-pgrwl -c config.json
+pgrwl -c config.yml
 ```
 
 ### `Serve` mode
 
 ```bash
-cat <<EOF >config.json
-{
-  "mode": {
-    "name": "serve",
-    "serve": {
-      "listen_port": 7070,
-      "directory": "wals"
-    }
-  }
-}
+cat <<EOF >config.yml
+main:
+  listen_port: 7070
+  directory: wals
+log:
+  level: trace
+  format: text
+  add_source: true
 EOF
 
-pgrwl -c config.json
+export PGRWL_MODE=serve
+
+pgrwl -c config.yml
 ```
 
 --- 
 
 ## ⚙️ Configuration Reference
 
-The configuration file is in JSON format only. It supports environment variable placeholders like
-`${PGRWL_SECRET_ACCESS_KEY}`.
+The configuration file is in JSON or YML format (*.json is preferred).
+It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
 ```
------------------------------
-REQUIRED SECTIONS
------------------------------
+main:                                    # Required for both modes: 'receive' / 'serve'
+  listen_port: 7070                      # HTTP server port (used for management)
+  directory: "/var/lib/pgwal"            # Base directory for storing WAL files
 
-[mode]
-  name            string   Mode of operation: "receive" or "serve"
+receiver:                                # Required for 'receive' mode
+  slot: replication_slot                 # Replication slot to use
+  no_loop: false                         # If true, do not loop on connection loss
 
-  [mode.receive]  Used when mode.name is "receive"
-    listen_port   int      Port for HTTP status/metrics (e.g., 7070)
-    directory     string   Directory to archive WAL files
-    slot          string   Replication slot name
-    no_loop       bool     Disable reconnect loop on failure
+uploader:                                # Optional (used in receive mode)
+  sync_interval: 10s                     # Interval for the upload worker to check for new files
+  max_concurrency: 4                     # Maximum number of files to upload concurrently
 
-  [mode.serve]    Used when mode.name is "serve"
-    listen_port   int      Port to serve WAL files (e.g., 7070)
-    directory     string   Directory from which WAL files are served
+log:                                     # Optional
+  level: info                            # One of: trace / debug / info / warn / error
+  format: text                           # One of: text / json
+  add_source: true                       # Include file:line in log messages (for local development)
 
------------------------------
-OPTIONAL SECTIONS
------------------------------
-
-[log]
-  level           string   Log level: "trace", "debug", "info", "warn", "error"
-  format          string   Output format: "text" or "json"
-  add_source      bool     Include file and line in log output
-
-[storage]
-  name            string   Storage backend type: "s3", "sftp", or "local"
-
-  [storage.compression]
-    algo          string   Compression algorithm (e.g., "gzip")
-
-  [storage.encryption]
-    algo          string   Encryption algorithm (e.g., "aesgcm")
-    pass          string   Password (supports env vars like ${PGRWL_ENCRYPT_PASSWD})
-
-  [storage.sftp]
-    host          string   SFTP server host
-    port          int      SFTP port (default: 22)
-    user          string   SFTP username
-    pass          string   Password (env var allowed)
-    pkey_path     string   Path to SSH private key (optional)
-    pkey_pass     string   SSH private key passphrase (optional)
-
-  [storage.s3]
-    url               string   S3 endpoint (e.g., https://s3.example.com)
-    access_key_id     string   Access key ID
-    secret_access_key string   Secret access key (supports env var)
-    bucket            string   Bucket name for WAL files
-    region            string   AWS region (e.g., "us-east-1")
-    use_path_style    bool     Enable path-style URLs (required for MinIO)
-    disable_ssl       bool     Disable HTTPS (use HTTP instead)
+storage:                                 # Optional
+  name: s3                               # One of: s3 / sftp
+  compression:                           # Optional
+    algo: gzip                           # One of: gzip / zstd
+  encryption:                            # Optional
+    algo: aesgcm                         # One of: aes-256-gcm
+    pass: "${PGRWL_ENCRYPT_PASSWD}"      # Encryption password (from env)
+  sftp:                                  # Required section for 'sftp' storage
+    host: sftp.example.com               # SFTP server hostname
+    port: 22                             # SFTP server port
+    user: backupuser                     # SFTP username
+    pass: "${PGRWL_VM_PASSWORD}"         # SFTP password (from env)
+    pkey_path: "/home/user/.ssh/id_rsa"  # Path to SSH private key (optional)
+    pkey_pass: "${PGRWL_SSH_PKEY_PASS}"  # Required if the private key is password-protected
+  s3:                                    # Required section for 's3' storage
+    url: https://s3.example.com          # S3-compatible endpoint URL
+    access_key_id: AKIAEXAMPLE           # AWS access key ID
+    secret_access_key: "${PGRWL_AWS_SK}" # AWS secret access key (from env)
+    bucket: postgres-backups             # Target S3 bucket name
+    region: us-east-1                    # S3 region
+    use_path_style: true                 # Use path-style URLs for S3
+    disable_ssl: false                   # Disable SSL
 ```
 
 ---
@@ -317,32 +304,10 @@ internal/xlog/fsync/
   → Optimized wrappers for safe and efficient `fsync` system calls.
 ```
 
-### Notes on configuration
-
-Why not YAML?
-JSON is approximately 8× faster to serialize and uses about 17× less memory.
-You can also minify the config file, and you don't have to worry about tabs, spaces, indentation levels, paddings, and
-so on.
-
-When restoring a cluster, the `restore_command` executes `pgrwl` for every single WAL file.
-In such cases, config processing must be as fast as possible.
-
-I’ve tried a lot of options: CLI-only flags, environment-only flags, a bunch of libraries, and combinations of CLI + env
-vars. And I’ve struggled quite a bit trying to balance transparent usage with predictability.
-
-Who loves dozens of CLI options? No one.
-Who wants to remember dozens of environment variables? Neither.
-
-That’s why I chose a single entry point: a JSON config file.
-That’s all you need to start the app.
-
-To handle credentials, environment variable substitution is supported—so you can use $PGRWL_-prefixed placeholders
-directly in the JSON.
-
 ### TODO
 
-- Download all WAL files 
-- Concurrent batch-uploads 
+- Download all WAL files
+- [X] Concurrent batch-uploads
 - Metrics
 
 ### ⏮️ Links

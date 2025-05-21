@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -26,29 +29,33 @@ var (
 )
 
 type Config struct {
-	Mode    ModeConfig    `json:"mode,omitempty"`
-	Log     LogConfig     `json:"log,omitempty"`
-	Storage StorageConfig `json:"storage,omitempty"`
+	Main     MainConfig    `json:"main,omitempty"`
+	Receiver ReceiveConfig `json:"receiver,omitempty"`
+	Uploader UploadConfig  `json:"uploader,omitempty"`
+	Log      LogConfig     `json:"log,omitempty"`
+	Storage  StorageConfig `json:"storage,omitempty"`
 }
 
-// ---- Mode Section ----
+// ---- Main Section ----
 
-type ModeConfig struct {
-	Name    string        `json:"name,omitempty"` // "receive" or "serve"
-	Receive ReceiveConfig `json:"receive,omitempty"`
-	Serve   ServeConfig   `json:"serve,omitempty"`
+type MainConfig struct {
+	ListenPort int    `json:"listen_port,omitempty"`
+	Directory  string `json:"directory,omitempty"`
 }
+
+// ---- Receiver ----
 
 type ReceiveConfig struct {
-	ListenPort int    `json:"listen_port,omitempty"`
-	Directory  string `json:"directory,omitempty"`
-	Slot       string `json:"slot,omitempty"`
-	NoLoop     bool   `json:"no_loop,omitempty"`
+	Slot   string `json:"slot,omitempty"`
+	NoLoop bool   `json:"no_loop,omitempty"`
 }
 
-type ServeConfig struct {
-	ListenPort int    `json:"listen_port,omitempty"`
-	Directory  string `json:"directory,omitempty"`
+// ---- Uploader ----
+
+type UploadConfig struct {
+	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	SyncInterval   string `json:"sync_interval"`
+	MaxConcurrency int    `json:"max_concurrency"`
 }
 
 // ---- Log Section ----
@@ -63,17 +70,10 @@ type LogConfig struct {
 
 type StorageConfig struct {
 	Name        string            `json:"name,omitempty"` // e.g. "s3", "sftp"
-	Upload      UploadConfig      `json:"upload"`
 	Compression CompressionConfig `json:"compression,omitempty"`
 	Encryption  EncryptionConfig  `json:"encryption,omitempty"`
 	SFTP        SFTPConfig        `json:"sftp,omitempty"`
 	S3          S3Config          `json:"s3,omitempty"`
-}
-
-type UploadConfig struct {
-	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval   string `json:"sync_interval"`
-	MaxConcurrency int    `json:"max_concurrency"`
 }
 
 type CompressionConfig struct {
@@ -173,8 +173,18 @@ func mustLoadCfg(path string) *Config {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := json.Unmarshal(expand(configData), &cfg); err != nil {
-		log.Fatal(err)
+	ext := filepath.Ext(path)
+	switch ext {
+	case ".json":
+		if err := json.Unmarshal(expand(configData), &cfg); err != nil {
+			log.Fatal(err)
+		}
+	case ".yml", ".yaml":
+		if err := yaml.Unmarshal(expand(configData), &cfg); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatalf("unexpected config-file extension: %s", ext)
 	}
 	return &cfg
 }

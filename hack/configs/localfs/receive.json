@@ -1,11 +1,10 @@
 {
   "main": {
     "listen_port": 7070,
-    "directory": "/mnt/wal-archive"
+    "directory": "wals"
   },
   "receiver": {
-    "slot": "pgrwl_v5",
-    "no_loop": true
+    "slot": "pgrwl_v5"
   },
   "log": {
     "level": "trace",

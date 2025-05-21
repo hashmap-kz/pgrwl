@@ -1,0 +1,40 @@
+---
+main:                                    # Required for both modes: receive/serve
+  listen_port: 7070                      # HTTP server port (used for management)
+  directory: "/var/lib/pgwal"            # Base directory for storing WAL files
+
+receiver:                                # Required for 'receive' mode
+  slot: replication_slot                 # Replication slot to use
+  no_loop: false                         # If true, do not loop on connection loss
+
+uploader:                                # Optional (used in receive mode)
+  sync_interval: 10s                     # Interval for the upload worker to check for new files
+  max_concurrency: 4                     # Maximum number of files to upload concurrently
+
+log:                                     # Optional
+  level: info                            # One of: trace / debug / info / warn / error
+  format: text                           # One of: text / json
+  add_source: true                       # Include file:line in log messages (for local development)
+
+storage:                                 # Optional
+  name: s3                               # One of: s3 / sftp
+  compression:                           # Optional
+    algo: gzip                           # One of: gzip / zstd
+  encryption:                            # Optional
+    algo: aesgcm                         # One of: aes-256-gcm
+    pass: "${PGRWL_ENCRYPT_PASSWD}"      # Encryption password (from env)
+  sftp:                                  # Required section for 'sftp' storage
+    host: sftp.example.com               # SFTP server hostname
+    port: 22                             # SFTP server port
+    user: backupuser                     # SFTP username
+    pass: "${PGRWL_VM_PASSWORD}"         # SFTP password (from env)
+    pkey_path: "/home/user/.ssh/id_rsa"  # Path to SSH private key (optional)
+    pkey_pass: "${PGRWL_SSH_PKEY_PASS}"  # Required if the private key is password-protected
+  s3:                                    # Required section for 's3' storage
+    url: https://s3.example.com          # S3-compatible endpoint URL
+    access_key_id: AKIAEXAMPLE           # AWS access key ID
+    secret_access_key: "${PGRWL_AWS_SK}" # AWS secret access key (from env)
+    bucket: postgres-backups             # Target S3 bucket name
+    region: us-east-1                    # S3 region
+    use_path_style: true                 # Use path-style URLs for S3
+    disable_ssl: false                   # Disable SSL

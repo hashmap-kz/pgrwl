@@ -30,7 +30,7 @@ services:
       PGPORT: 5432
       PGUSER: postgres
       PGPASSWORD: postgres
-    command: start -c /tmp/configs/01-basic-receive.json
+    command: start -c /tmp/configs/01-basic-receive.json -m receive
     volumes:
       - shared-data:/mnt
     depends_on:

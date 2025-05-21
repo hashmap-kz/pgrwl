@@ -117,8 +117,8 @@ func decideCompressorEncryptor(cfg *config.Config) (codec.Compressor, codec.Deco
 
 // manifest
 
-func CheckManifest(cfg *config.Config, dir string) error {
-	manifest, err := readOrWriteManifest(cfg, dir)
+func CheckManifest(cfg *config.Config) error {
+	manifest, err := readOrWriteManifest(cfg)
 	if err != nil {
 		return err
 	}
@@ -131,9 +131,9 @@ func CheckManifest(cfg *config.Config, dir string) error {
 	return nil
 }
 
-func readOrWriteManifest(cfg *config.Config, dir string) (*StorageManifest, error) {
+func readOrWriteManifest(cfg *config.Config) (*StorageManifest, error) {
 	var m StorageManifest
-	manifestPath := filepath.Join(dir, ".manifest.json")
+	manifestPath := filepath.Join(cfg.Main.Directory, ".manifest.json")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
 		// create if not exists
@@ -144,7 +144,7 @@ func readOrWriteManifest(cfg *config.Config, dir string) (*StorageManifest, erro
 			if err != nil {
 				return nil, err
 			}
-			err = os.WriteFile(manifestPath, data, 0o640)
+			err = os.WriteFile(manifestPath, data, 0o600)
 			if err != nil {
 				return nil, err
 			}

@@ -32,12 +32,37 @@ set -euo pipefail
 export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
 export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
+export LOG_FILE="/tmp/pgrwl.log"
+
+# Default environment
+export PGHOST="localhost"
+export PGPORT="5432"
+export PGUSER="postgres"
+export PGPASSWORD="postgres"
 
 x_remake_dirs() {
   # cleanup possible state
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
   rm -rf "${WAL_PATH_PG_RECEIVEWAL}" && mkdir -p "${WAL_PATH_PG_RECEIVEWAL}"
+
+  cat <<EOF >/tmp/config.json
+{
+  "main": {
+    "listen_port": 7070,
+    "directory": "/tmp/wal-archive"
+  },
+  "receiver": {
+    "slot": "pgrwl_v5",
+    "no_loop": true
+  },
+  "log": {
+    "level": "trace",
+    "format": "text",
+    "add_source": true
+  }
+}
+EOF
 }
 
 x_backup_restore() {
@@ -51,7 +76,7 @@ x_backup_restore() {
   # run wal-receivers
   echo_delim "running wal-receivers"
   # run wal-receiver
-  bash "/var/lib/postgresql/scripts/pg/run_receiver.sh" "start"
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
 
@@ -117,7 +142,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  bash "/var/lib/postgresql/scripts/pg/run_serve_mode.sh" "start"
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -144,21 +169,21 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}/wal_receive" "${WAL_PATH_PG_RECEIVEWAL}"
 
   # run receivers with a new timeline
   echo_delim "cleanup wal-archives, run wal-receivers with a new timeline"
   x_remake_dirs
   # run wal-receiver
-  bash "/var/lib/postgresql/scripts/pg/run_serve_mode.sh" "stop"
-  bash "/var/lib/postgresql/scripts/pg/run_receiver.sh" "start"
+  pkill -f pgrwl || true
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
   sleep 5 # wait a little (feedback timeout, etc...)
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal with a new timeline stream"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}/wal_receive" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 
 x_backup_restore "${@}"

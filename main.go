@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/cmd/loops"
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
@@ -20,10 +21,17 @@ import (
 func main() {
 	configFlag := &cli.StringFlag{
 		Name:     "config",
-		Usage:    "Path to config file (*.json)",
+		Usage:    "Path to config file",
 		Aliases:  []string{"c"},
 		Required: true,
 		Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
+	}
+	modeFlag := &cli.StringFlag{
+		Name:     "mode",
+		Usage:    "Run mode: receive/serve",
+		Aliases:  []string{"m"},
+		Required: true,
+		Sources:  cli.EnvVars("PGRWL_MODE"),
 	}
 
 	app := &cli.Command{
@@ -36,28 +44,34 @@ func main() {
 				Usage: "Running in a server mode: receive/serve",
 				Flags: []cli.Flag{
 					configFlag,
+					modeFlag,
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					cfg := loadConfig(c)
+					mode := c.String("mode")
+					if mode == "" {
+						log.Fatal("required flag 'mode' is empty")
+					}
 
 					//nolint:staticcheck
-					if cfg.Mode.Name == config.ModeReceive {
+					if mode == config.ModeReceive {
 						checkPgEnvsAreSet()
-						cmd.RunReceiveMode(&loops.ReceiveModeOpts{
-							Directory:  cfg.Mode.Receive.Directory,
-							ListenPort: cfg.Mode.Receive.ListenPort,
-							Slot:       cfg.Mode.Receive.Slot,
-							NoLoop:     cfg.Mode.Receive.NoLoop,
-							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
+						cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
+							ReceiveDirectory: filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalReceiveDirName)),
+							StatusDirectory:  filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalStatusDirName)),
+							ListenPort:       cfg.Main.ListenPort,
+							Slot:             cfg.Receiver.Slot,
+							NoLoop:           cfg.Receiver.NoLoop,
+							Verbose:          strings.EqualFold(cfg.Log.Level, "trace"),
 						})
-					} else if cfg.Mode.Name == config.ModeServe {
+					} else if mode == config.ModeServe {
 						cmd.RunServeMode(&cmd.ServeModeOpts{
-							Directory:  cfg.Mode.Serve.Directory,
-							ListenPort: cfg.Mode.Serve.ListenPort,
+							Directory:  filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalReceiveDirName)),
+							ListenPort: cfg.Main.ListenPort,
 							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
 						})
 					} else {
-						log.Fatalf("unknown mode: %s", cfg.Mode.Name)
+						log.Fatalf("unknown mode: %s", mode)
 					}
 
 					return nil
@@ -99,31 +113,6 @@ func main() {
 							Addr: c.String("serve-addr"),
 						},
 					)
-				},
-			},
-			// config-template
-			{
-				Name:  "config-template",
-				Usage: "Get a '*.json' file with all properties set",
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:  "r",
-						Usage: "Minimal config for 'receive' mode",
-					},
-					&cli.BoolFlag{
-						Name:  "s",
-						Usage: "Minimal config for 'serve' mode",
-					},
-				},
-				Action: func(_ context.Context, c *cli.Command) error {
-					if c.Bool("r") {
-						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateReceive())
-					} else if c.Bool("s") {
-						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateServe())
-					} else {
-						_, _ = fmt.Fprintln(os.Stderr, cmd.GetConfigTemplateFull())
-					}
-					return nil
 				},
 			},
 		},

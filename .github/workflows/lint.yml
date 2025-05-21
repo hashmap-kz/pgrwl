@@ -32,7 +32,7 @@ jobs:
 
       - name: Run golangci-lint
         if: runner.os == 'Linux'
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           skip-cache: true

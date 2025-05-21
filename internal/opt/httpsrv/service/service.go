@@ -30,7 +30,8 @@ type lockInfo struct {
 }
 
 type controlSvc struct {
-	pgrw        *xlog.PgReceiveWal // direct access to running state
+	l           *slog.Logger
+	pgrw        xlog.PgReceiveWal // direct access to running state
 	baseDir     string
 	runningMode string
 	storage     *storage.TransformingStorage
@@ -43,7 +44,7 @@ type controlSvc struct {
 var _ ControlService = &controlSvc{}
 
 type ControlServiceOpts struct {
-	PGRW        *xlog.PgReceiveWal
+	PGRW        xlog.PgReceiveWal
 	BaseDir     string
 	RunningMode string
 	Storage     *storage.TransformingStorage
@@ -51,6 +52,7 @@ type ControlServiceOpts struct {
 
 func NewControlService(opts *ControlServiceOpts) ControlService {
 	return &controlSvc{
+		l:           slog.With("component", "control-service"),
 		pgrw:        opts.PGRW,
 		baseDir:     opts.BaseDir,
 		runningMode: opts.RunningMode,
@@ -84,8 +86,17 @@ func (s *controlSvc) unlock() {
 	s.mu.Unlock()
 }
 
+func (s *controlSvc) log() *slog.Logger {
+	if s.l != nil {
+		return s.l
+	}
+	return slog.With("component", "control-service")
+}
+
 func (s *controlSvc) Status() *model.PgRwlStatus {
 	// read-only; doesn’t need to block
+
+	s.log().Debug("querying status")
 
 	var streamStatusResp *model.StreamStatus
 	if s.pgrw != nil {
@@ -138,22 +149,35 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 	// 2) Check *.partial file locally
 	// 3) Fetch from storage (if it's not nil)
 
-	if s.storage == nil {
-		filePath := filepath.Join(s.baseDir, filename)
-		partialFilePath := filePath + xlog.PartialSuffix
+	// TODO: local storage
+	// TODO: send checksum in headers
 
-		slog.Debug("wal-restore, fetching local file", slog.String("path", filePath))
-		if optutils.FileExists(filePath) {
-			slog.Debug("wal-restore, found local file", slog.String("path", filePath))
-			return os.Open(filePath)
-		}
-		if optutils.FileExists(partialFilePath) {
-			slog.Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
-			return os.Open(partialFilePath)
-		}
-		return nil, fmt.Errorf("cannot find local file: %s", filePath)
+	s.log().Debug("fetching WAL file", slog.String("filename", filename))
+
+	// 1) trying to find local completed segment
+	// 2) trying to find partial segment
+	filePath := filepath.Join(s.baseDir, filename)
+	partialFilePath := filePath + xlog.PartialSuffix
+
+	s.log().Debug("wal-restore, fetching local file", slog.String("path", filePath))
+	if optutils.FileExists(filePath) {
+		s.log().Debug("wal-restore, found local file", slog.String("path", filePath))
+		return os.Open(filePath)
+	}
+	if optutils.FileExists(partialFilePath) {
+		s.log().Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
+		return os.Open(partialFilePath)
 	}
 
-	slog.Debug("wal-restore, fetching remote file", slog.String("filename", filename))
-	return s.storage.Get(ctx, filename)
+	// 3) trying remote
+	if s.storage != nil {
+		s.log().Debug("wal-restore, fetching remote file", slog.String("filename", filename))
+		tarFile, err := s.storage.Get(ctx, filename+".tar")
+		if err != nil {
+			return nil, err
+		}
+		return optutils.GetFileFromTar(tarFile, filename)
+	}
+
+	return nil, fmt.Errorf("cannot fetch file: %s", filename)
 }

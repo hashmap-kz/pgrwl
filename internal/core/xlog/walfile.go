@@ -59,9 +59,9 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 
 	segno := XLByteToSeg(uint64(startpoint), stream.walSegSz)
 	filename := XLogFileName(stream.timeline, segno, stream.walSegSz) + stream.partialSuffix
-	fullPath := filepath.Join(stream.baseDir, filename)
+	fullPath := filepath.Join(stream.receiveDir, filename)
 
-	l := slog.With(
+	l := stream.log().With(
 		slog.String("job", "open_wal_file"),
 		slog.String("startpoint", startpoint.String()),
 		slog.String("segno", fmt.Sprintf("%08X", segno)),
@@ -87,9 +87,9 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 			l.Debug("file exists and correctly sized, open and fsync")
 
 			// File already correctly sized, open it
-			fd, err := openFileAndFsync(fullPath)
+			fd, err := stream.openFileAndFsync(fullPath)
 			if err != nil {
-				slog.Error("cannot open and fsync existing file, exiting", slog.Any("err", err))
+				stream.log().Error("cannot open and fsync existing file, exiting", slog.Any("err", err))
 				// MARK:exit
 				os.Exit(1)
 			}
@@ -117,7 +117,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	)
 
 	// Otherwise create new file and preallocate
-	fd, err := createFileAndTruncate(fullPath, stream.walSegSz)
+	fd, err := stream.createFileAndTruncate(fullPath, stream.walSegSz)
 	if err != nil {
 		return fmt.Errorf("could not create WAL file %s: %w", fullPath, err)
 	}
@@ -132,7 +132,7 @@ func (stream *StreamCtl) OpenWalFile(startpoint pglogrepl.LSN) error {
 	return nil
 }
 
-func createFileAndTruncate(fullPath string, initSize uint64) (*os.File, error) {
+func (stream *StreamCtl) createFileAndTruncate(fullPath string, initSize uint64) (*os.File, error) {
 	// Create new file
 	fd, err := os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o660)
 	if err != nil {
@@ -152,10 +152,10 @@ func createFileAndTruncate(fullPath string, initSize uint64) (*os.File, error) {
 	return fd, nil
 }
 
-func openFileAndFsync(fullPath string) (*os.File, error) {
+func (stream *StreamCtl) openFileAndFsync(fullPath string) (*os.File, error) {
 	fd, err := os.OpenFile(fullPath, os.O_RDWR, 0o660)
 	if err != nil {
-		slog.Warn("could not open file",
+		stream.log().Warn("could not open file",
 			slog.String("path", filepath.ToSlash(fullPath)),
 			slog.Any("err", err),
 		)
@@ -165,13 +165,13 @@ func openFileAndFsync(fullPath string) (*os.File, error) {
 	// fsync file in case of a previous crash
 	if errFsync := fsync.Fsync(fd); errFsync != nil {
 		if errClose := fd.Close(); errClose != nil {
-			slog.Warn("cannot close file",
+			stream.log().Warn("cannot close file",
 				slog.String("path", filepath.ToSlash(fullPath)),
 				slog.Any("err", errClose),
 			)
 		}
 		if errUnlink := os.Remove(fullPath); errUnlink != nil {
-			slog.Warn("cannot unlink file",
+			stream.log().Warn("cannot unlink file",
 				slog.String("path", filepath.ToSlash(fullPath)),
 				slog.Any("err", errUnlink),
 			)
@@ -191,7 +191,7 @@ func (stream *StreamCtl) CloseWalFile() error {
 		return nil
 	}
 
-	l := slog.With(
+	l := stream.log().With(
 		slog.String("job", "close_wal_file"),
 		slog.String("pos", pos.String()),
 		slog.String("path", filepath.ToSlash(stream.walfile.pathname)),
@@ -209,7 +209,7 @@ func (stream *StreamCtl) CloseWalFile() error {
 	}
 
 	if err != nil {
-		slog.Error("could not close file, (CloseWalfile)", slog.Any("err", err))
+		stream.log().Error("could not close file, (CloseWalfile)", slog.Any("err", err))
 		return fmt.Errorf("could not close file: %w", err)
 	}
 
@@ -219,11 +219,11 @@ func (stream *StreamCtl) CloseWalFile() error {
 
 // CloseWalFileIfPresentNoRename if any error occurs during streaming, safely close and fsync partial segment
 func (stream *StreamCtl) CloseWalFileIfPresentNoRename(notice string) {
-	slog.Warn("closing WAL file without renaming", slog.String("cause", notice))
+	stream.log().Warn("closing WAL file without renaming", slog.String("cause", notice))
 	if stream.walfile != nil {
 		err := stream.closeNoRename()
 		if err != nil {
-			slog.Error("could not close WAL file", slog.Any("err", err))
+			stream.log().Error("could not close WAL file", slog.Any("err", err))
 		}
 	}
 }
@@ -234,7 +234,7 @@ func (stream *StreamCtl) closeNoRename() error {
 	}
 
 	pathname := stream.walfile.pathname
-	l := slog.With(
+	l := stream.log().With(
 		slog.String("job", "close_wal_file_no_rename"),
 		slog.String("path", filepath.ToSlash(pathname)),
 	)
@@ -261,33 +261,69 @@ func (stream *StreamCtl) closeAndRename() error {
 
 	pathname := stream.walfile.pathname
 	finalName := strings.TrimSuffix(pathname, stream.partialSuffix)
-	l := slog.With(
+	l := stream.log().With(
 		slog.String("job", "close_wal_file_with_rename"),
-		slog.String("src", filepath.ToSlash(pathname)),
-		slog.String("dst", filepath.ToSlash(finalName)),
 	)
 
-	l.Debug("closing fd (*.partial file)")
+	l.Debug("closing fd (*.partial file)", slog.String("path", filepath.ToSlash(pathname)))
 	if err := stream.walfile.fd.Close(); err != nil {
 		return err
 	}
 
-	l.Debug("fsync path (*.partial file)")
+	l.Debug("fsync path (*.partial file)", slog.String("path", filepath.ToSlash(pathname)))
 	if err := fsync.FsyncFname(pathname); err != nil {
 		return err
 	}
 
-	l.Debug("renaming to complete segment")
+	l.Debug("renaming to complete segment",
+		slog.String("src", filepath.ToSlash(pathname)),
+		slog.String("dst", filepath.ToSlash(finalName)),
+	)
 	if err := os.Rename(pathname, finalName); err != nil {
 		return err
 	}
 	stream.walfile = nil
 
-	l.Debug("fsync filename and parent-directory")
+	l.Debug("fsync filename and parent-directory", slog.String("path", filepath.ToSlash(finalName)))
 	if err := fsync.FsyncFnameAndDir(finalName); err != nil {
 		return err
 	}
 
+	// *.done marker file +
+	go func() {
+		// WAL file size can be up to 1 GiB, so we use a separate goroutine
+		// for checksum computation and *.done marker creation.
+		// This avoids blocking the main streaming loop.
+		if err := stream.createDoneMarker(finalName); err != nil {
+			stream.log().Error("failed to write .done marker",
+				slog.String("wal", filepath.ToSlash(finalName)),
+				slog.String("err", err.Error()),
+			)
+		}
+	}()
+	// *.done marker file -
+
 	l.Info("segment is complete")
+	return nil
+}
+
+func (stream *StreamCtl) createDoneMarker(finalName string) error {
+	l := stream.log().With(
+		slog.String("job", "done_marker_goroutine"),
+	)
+
+	l.Debug("calc checksum", slog.String("path", filepath.ToSlash(finalName)))
+	checksum, err := sha256Path(finalName)
+	if err != nil {
+		return err
+	}
+	doneMarkerFileName := filepath.Base(finalName) + DoneMarkerFileExt
+	doneMarkerFilePath := filepath.Join(stream.statusDir, doneMarkerFileName)
+	l.Debug("creating .done marker", slog.String("path", filepath.ToSlash(doneMarkerFilePath)))
+	if err := os.WriteFile(doneMarkerFilePath, []byte(checksum), 0o600); err != nil {
+		return err
+	}
+
+	l.Debug(".done marker file is created", slog.String("path", filepath.ToSlash(doneMarkerFilePath)))
 	return nil
 }

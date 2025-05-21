@@ -1,12 +1,11 @@
 {
-  "mode": {
-    "name": "receive",
-    "receive": {
-      "listen_port": 7070,
-      "directory": "/tmp/wal-archive",
-      "slot": "pgrwl_v5",
-      "no_loop": true
-    }
+  "main": {
+    "listen_port": 7070,
+    "directory": "/tmp/wal-archive"
+  },
+  "receiver": {
+    "slot": "pgrwl_v5",
+    "no_loop": true
   },
   "log": {
     "level": "trace",

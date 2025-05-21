@@ -4,11 +4,13 @@ go 1.24.1
 
 require (
 	github.com/hashmap-kz/storecrypt v1.0.0
+	github.com/hashmap-kz/streamcrypt v1.1.0
 	github.com/jackc/pglogrepl v0.0.0-20250509230407-a9884f6bd75a
-	github.com/jackc/pgx/v5 v5.7.4
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v3 v3.3.3
 	golang.org/x/time v0.11.0
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -32,7 +34,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.19 // indirect
 	github.com/aws/smithy-go v1.22.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/hashmap-kz/streamcrypt v1.1.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
