@@ -169,6 +169,24 @@ chmod +x /usr/local/bin/pgrwl
 )
 ```
 
+### Package-Based installation (suitable in CI/CD)
+
+#### Debian 
+
+```
+sudo apt update -y && sudo apt install -y curl
+curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linux_amd64.deb
+sudo dpkg -i pgrwl_linux_amd64.deb
+```
+
+#### Apline Linux
+
+```
+apk update && apk add --no-cache bash curl
+curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linux_amd64.apk
+apk add pgrwl_linux_amd64.apk --allow-untrusted
+```
+
 --- 
 
 ## 🗃️ Usage In Backup Process
