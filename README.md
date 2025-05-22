@@ -50,7 +50,7 @@ _`pgrwl` stream write-ahead logs from a PostgreSQL server_
 
 ## 🛠️ Usage
 
-### `Receive` mode
+### `Receive` mode (_the main loop of the WAL receiver_)
 
 ```bash
 cat <<EOF >config.yml
@@ -74,7 +74,7 @@ export PGRWL_MODE=receive
 pgrwl -c config.yml
 ```
 
-### `Serve` mode
+### `Serve` mode (_used during restore to serve archived WAL files from storage_)
 
 ```bash
 cat <<EOF >config.yml
@@ -90,6 +90,13 @@ EOF
 export PGRWL_MODE=serve
 
 pgrwl -c config.yml
+```
+
+### `restore_command` example for postgresql.conf
+
+```
+# where 'k8s-worker5:30266' represents the host and port of a 'pgrwl' instance running in 'serve' mode. 
+restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 ```
 
 ⭐ **See also: [examples](examples) (step-by-step archive and recovery), and [k8s](k8s) (basic setup)**
