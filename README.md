@@ -13,8 +13,6 @@ _`pgrwl` stream write-ahead logs from a PostgreSQL server_
 
 - [🚀 About](#-about)
 - [🛠️ Usage](#-usage)
-    - [Required Flags](#-required-flags)
-    - [Optional Flags](#-optional-flags)
 - [🚀 Installation](#-installation)
 - [🗃️ Usage In Backup Process](#-usage-in-backup-process)
 - [🧱 Architecture](#-architecture)
