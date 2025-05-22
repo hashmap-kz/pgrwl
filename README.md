@@ -38,6 +38,8 @@ _`pgrwl` stream write-ahead logs from a PostgreSQL server_
 The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
 recovery.
 
+_It's primarily designed for use in containerized environments._
+
 The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
 streaming into partial files, extensive error checking and more.
 

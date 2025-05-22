@@ -27,11 +27,21 @@ nodes:
     extraPortMappings:
       - containerPort: 30000
         hostPort: 30000
+      # postgres
       - containerPort: 30265
         hostPort: 30265
         protocol: TCP
+      # pgrwl
       - containerPort: 30266
         hostPort: 30266
+        protocol: TCP
+      # minio-ui
+      - containerPort: 30267
+        hostPort: 30267
+        protocol: TCP
+      # minio-server
+      - containerPort: 30268
+        hostPort: 30268
         protocol: TCP
 EOF
 
