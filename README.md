@@ -95,7 +95,8 @@ pgrwl -c config.yml
 ### `restore_command` example for postgresql.conf
 
 ```
-# where 'k8s-worker5:30266' represents the host and port of a 'pgrwl' instance running in 'serve' mode. 
+# where 'k8s-worker5:30266' represents the host and port 
+# of a 'pgrwl' instance running in 'serve' mode. 
 restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 ```
 
