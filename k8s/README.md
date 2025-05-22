@@ -29,3 +29,24 @@ curl -X GET http://localhost:5000/v2/pgrwl/tags/list
 ```
 curl --location 'http://localhost:30266/status'
 ```
+
+```
+# Example response:
+#
+# {
+#     "running_mode": "receive",
+#     "stream_status": {
+#         "slot": "pgrwl_v5",
+#         "timeline": 1,
+#         "last_flush_lsn": "0/246539F0",
+#         "uptime": "58m36.71s",
+#         "running": true
+#     }
+# }
+```
+
+### Generate 512Mi of data:
+
+```
+kubectl -n pgrwl-test exec -it postgres-0 -- psql -U postgres -c "CREATE TABLE bigdata AS SELECT i, repeat('x', 1024) AS filler FROM generate_series(1, (1 * 1024 * 1024)/2) AS t(i);"
+```
