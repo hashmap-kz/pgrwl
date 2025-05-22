@@ -42,6 +42,8 @@ kind: ConfigMap
 metadata:
   name: &app minio
   namespace: pgrwl-test
+  labels:
+    app: *app
 data:
   TZ: "Asia/Aqtau"
   MINIO_ROOT_USER: "minioadmin"
@@ -76,6 +78,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: &app minio
+  namespace: pgrwl-test
   labels:
     app: *app
 spec:
