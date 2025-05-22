@@ -92,7 +92,7 @@ export PGRWL_MODE=serve
 pgrwl -c config.yml
 ```
 
-**Also checks: `examples` (step-by-step archive and recovery), and `k8s` (basic setup)**
+**See also: [examples](examples) (step-by-step archive and recovery), and [k8s](k8s) (basic setup)**
 
 --- 
 
