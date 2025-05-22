@@ -94,7 +94,6 @@ spec:
     - name: server
       port: 5432
       protocol: TCP
-      # dev/tst/preprod/master
       nodePort: 30265
   selector:
     app: *app

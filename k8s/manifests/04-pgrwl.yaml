@@ -11,7 +11,6 @@ spec:
   ports:
     - port: 7070
       targetPort: 7070
-      # dev/tst/preprod/master
       nodePort: 30266
       name: http
   selector:
