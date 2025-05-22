@@ -58,3 +58,35 @@ nfpms:
         dst: /usr/share/doc/pgrwl/copyright
         file_info:
           mode: 0644
+
+dockers:
+  - image_templates:
+      - "quay.io/hashmap_kz/pgrwl:{{ .Version }}-amd64"
+    dockerfile: Dockerfile
+    extra_files:
+      - go.mod
+      - go.sum
+      - main.go
+      - cmd/
+      - config/
+      - internal/
+      - test/
+    build_flag_templates:
+      - "--label=io.artifacthub.package.readme-url=https://raw.githubusercontent.com/hashmap-kz/pgrwl/master/README.md"
+      - '--label=io.artifacthub.package.maintainers=[{"name":"alexey.zh","email":"mailbox.stdio@gmail.com"}]'
+      - "--label=io.artifacthub.package.license=MIT"
+      - "--label=org.opencontainers.image.description=Durable PostgreSQL WAL streaming"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/amd64"
+
+docker_manifests:
+  - name_template: "quay.io/hashmap_kz/pgrwl:{{ .Version }}"
+    image_templates:
+      - "quay.io/hashmap_kz/pgrwl:{{ .Version }}-amd64"
+  - name_template: "quay.io/hashmap_kz/pgrwl:latest"
+    image_templates:
+      - "quay.io/hashmap_kz/pgrwl:{{ .Version }}-amd64"

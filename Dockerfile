@@ -19,10 +19,8 @@ RUN apk update && apk add --no-cache \
     vim \
     mc
 
-ARG APP_ENVIRONMENT
-ENV APP_ENVIRONMENT=${APP_ENVIRONMENT}
-
 COPY --from=build-stage /app/pgrwl /usr/local/bin/pgrwl
+
 RUN chmod +x /usr/local/bin/pgrwl
 
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
