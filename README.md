@@ -35,16 +35,16 @@ _`pgrwl` stream write-ahead logs from a PostgreSQL server_
 
 ## 🚀 About
 
-The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
-recovery.
+* The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
+  recovery.
 
-_It's primarily designed for use in containerized environments._
+* _It's primarily designed for use in containerized environments._
 
-The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
-streaming into partial files, extensive error checking and more.
+* The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
+  streaming into partial files, extensive error checking and more.
 
-The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
-container running PostgreSQL.
+* The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
+  container running PostgreSQL.
 
 ---
 
@@ -92,7 +92,7 @@ export PGRWL_MODE=serve
 pgrwl -c config.yml
 ```
 
-**See also: [examples](examples) (step-by-step archive and recovery), and [k8s](k8s) (basic setup)**
+⭐ **See also: [examples](examples) (step-by-step archive and recovery), and [k8s](k8s) (basic setup)**
 
 --- 
 
@@ -309,7 +309,7 @@ internal/xlog/fsync/
   → Optimized wrappers for safe and efficient `fsync` system calls.
 ```
 
-### 🚀 Main Loop
+### 📐 Main Loop
 
 ![main loop](assets/diagrams/loop.png)
 
