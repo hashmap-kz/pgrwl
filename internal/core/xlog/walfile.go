@@ -289,41 +289,6 @@ func (stream *StreamCtl) closeAndRename() error {
 		return err
 	}
 
-	// *.done marker file +
-	go func() {
-		// WAL file size can be up to 1 GiB, so we use a separate goroutine
-		// for checksum computation and *.done marker creation.
-		// This avoids blocking the main streaming loop.
-		if err := stream.createDoneMarker(finalName); err != nil {
-			stream.log().Error("failed to write .done marker",
-				slog.String("wal", filepath.ToSlash(finalName)),
-				slog.String("err", err.Error()),
-			)
-		}
-	}()
-	// *.done marker file -
-
 	l.Info("segment is complete")
-	return nil
-}
-
-func (stream *StreamCtl) createDoneMarker(finalName string) error {
-	l := stream.log().With(
-		slog.String("job", "done_marker_goroutine"),
-	)
-
-	l.Debug("calc checksum", slog.String("path", filepath.ToSlash(finalName)))
-	checksum, err := sha256Path(finalName)
-	if err != nil {
-		return err
-	}
-	doneMarkerFileName := filepath.Base(finalName) + DoneMarkerFileExt
-	doneMarkerFilePath := filepath.Join(stream.statusDir, doneMarkerFileName)
-	l.Debug("creating .done marker", slog.String("path", filepath.ToSlash(doneMarkerFilePath)))
-	if err := os.WriteFile(doneMarkerFilePath, []byte(checksum), 0o600); err != nil {
-		return err
-	}
-
-	l.Debug(".done marker file is created", slog.String("path", filepath.ToSlash(doneMarkerFilePath)))
 	return nil
 }

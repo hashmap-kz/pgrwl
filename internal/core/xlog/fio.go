@@ -16,6 +16,7 @@ func fileExists(path string) bool {
 	return info.Mode().IsRegular()
 }
 
+//nolint:unused
 func sha256Path(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {

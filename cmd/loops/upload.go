@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,12 +19,11 @@ import (
 
 type UploaderLoopOpts struct {
 	ReceiveDirectory string
-	StatusDirectory  string
+	PGRW             xlog.PgReceiveWal
 }
 
 type uploadBundle struct {
-	doneFilePath string
-	walFilePath  string
+	walFilePath string
 }
 
 type Uploader struct {
@@ -63,7 +61,7 @@ func (u *Uploader) Run(ctx context.Context) {
 			u.log().Info("context is done, exiting...")
 			return
 		case <-ticker.C:
-			files, err := os.ReadDir(u.opts.StatusDirectory)
+			files, err := os.ReadDir(u.opts.ReceiveDirectory)
 			if err != nil {
 				u.log().Error("error reading dir", slog.Any("err", err))
 				continue
@@ -88,41 +86,20 @@ func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
 			continue
 		}
 		name := entry.Name()
-		doneFilePath := filepath.ToSlash(filepath.Join(u.opts.StatusDirectory, name))
-		if !strings.HasSuffix(name, xlog.DoneMarkerFileExt) {
-			u.removeStrayDoneMarkerFile(doneFilePath)
-			continue
-		}
-		name = strings.TrimSuffix(name, xlog.DoneMarkerFileExt)
-		if !xlog.IsXLogFileName(name) {
-			u.removeStrayDoneMarkerFile(doneFilePath)
+		currentOpenWALFileName := u.opts.PGRW.CurrentOpenWALFileName()
+		if filepath.Base(name) == filepath.Base(currentOpenWALFileName) {
+			u.log().Debug("skipped currently opened file", slog.String("path", filepath.ToSlash(name)))
 			continue
 		}
 		walFilePath := filepath.ToSlash(filepath.Join(u.opts.ReceiveDirectory, name))
 		if !optutils.FileExists(walFilePath) {
-			// misconfigured, etc, we may safely delete *.done file here
-			u.removeStrayDoneMarkerFile(doneFilePath)
 			continue
 		}
 		r = append(r, uploadBundle{
-			doneFilePath: doneFilePath,
-			walFilePath:  walFilePath,
+			walFilePath: walFilePath,
 		})
 	}
 	return r
-}
-
-func (u *Uploader) removeStrayDoneMarkerFile(doneFilePath string) {
-	err := os.Remove(doneFilePath)
-	if err == nil {
-		u.log().Warn("stray *.done marker file is removed",
-			slog.String("path", doneFilePath),
-		)
-	} else {
-		u.log().Error("cannot remove stray *.done marker file",
-			slog.String("path", doneFilePath),
-		)
-	}
 }
 
 func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error {
@@ -189,35 +166,32 @@ func (u *Uploader) uploadOneFile(ctx context.Context, bundle uploadBundle) error
 		slog.String("path", bundle.walFilePath),
 	)
 
-	tarReader := optutils.CreateTarReader([]string{
-		bundle.doneFilePath,
-		bundle.walFilePath,
-	})
+	file, err := os.Open(bundle.walFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-	resultFileName := filepath.Base(bundle.walFilePath) + ".tar"
+	resultFileName := filepath.Base(bundle.walFilePath)
 
-	err := u.stor.Put(ctx, resultFileName, tarReader)
+	err = u.stor.Put(ctx, resultFileName, file)
 	if err != nil {
 		// upload error: close the file, return err, DO NOT REMOVE SOURCE WHEN UPLOAD IS FAILED
-		_ = tarReader.Close()
+		_ = file.Close()
 		return err
 	}
 
 	// upload success: closing file
-	if err := tarReader.Close(); err != nil {
+	if err := file.Close(); err != nil {
 		return err
 	}
 
 	// remove files when upload is success
-	if err := os.Remove(bundle.doneFilePath); err != nil {
-		return err
-	}
 	if err := os.Remove(bundle.walFilePath); err != nil {
 		return err
 	}
 
 	u.log().Info("uploaded and deleted",
-		slog.String("done-marker-path", bundle.doneFilePath),
 		slog.String("wal-path", bundle.walFilePath),
 		slog.String("result-path", resultFileName),
 	)

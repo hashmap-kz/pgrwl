@@ -20,7 +20,7 @@ x_backup_restore() {
   # fix configs
   xpg_config
   cat <<EOF >>"${PG_CFG}"
-restore_command = 'cp ${WAL_PATH}/wal_receive/%f %p'
+restore_command = 'cp ${WAL_PATH}/%f %p'
 EOF
 
   # cleanup logs

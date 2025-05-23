@@ -27,7 +27,6 @@ type StreamOpts struct {
 	ReplicationSlot  string
 	WalSegSz         uint64
 	ReceiveDirectory string
-	StatusDirectory  string
 	Conn             *pgconn.PgConn
 	Verbose          bool
 }
@@ -42,7 +41,6 @@ type StreamCtl struct {
 	replicationSlot       string
 	walSegSz              uint64
 	receiveDir            string
-	statusDir             string
 	reportFlushPosition   bool
 	lastStatus            time.Time
 	lastFlushPosition     pglogrepl.LSN
@@ -67,7 +65,6 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		replicationSlot:       o.ReplicationSlot,
 		walSegSz:              o.WalSegSz,
 		receiveDir:            o.ReceiveDirectory,
-		statusDir:             o.StatusDirectory,
 		conn:                  o.Conn,
 		verbose:               o.Verbose,
 		startedAt:             time.Now(),

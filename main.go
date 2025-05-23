@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/cmd"
@@ -57,8 +55,7 @@ func main() {
 					if mode == config.ModeReceive {
 						checkPgEnvsAreSet()
 						cmd.RunReceiveMode(&cmd.ReceiveModeOpts{
-							ReceiveDirectory: filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalReceiveDirName)),
-							StatusDirectory:  filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalStatusDirName)),
+							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
 							ListenPort:       cfg.Main.ListenPort,
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
@@ -66,7 +63,7 @@ func main() {
 						})
 					} else if mode == config.ModeServe {
 						cmd.RunServeMode(&cmd.ServeModeOpts{
-							Directory:  filepath.ToSlash(filepath.Join(cfg.Main.Directory, xlog.WalReceiveDirName)),
+							Directory:  filepath.ToSlash(cfg.Main.Directory),
 							ListenPort: cfg.Main.ListenPort,
 							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
 						})
