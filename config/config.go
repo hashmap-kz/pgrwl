@@ -29,11 +29,12 @@ var (
 )
 
 type Config struct {
-	Main     MainConfig    `json:"main,omitempty"`
-	Receiver ReceiveConfig `json:"receiver,omitempty"`
-	Uploader UploadConfig  `json:"uploader,omitempty"`
-	Log      LogConfig     `json:"log,omitempty"`
-	Storage  StorageConfig `json:"storage,omitempty"`
+	Main      MainConfig      `json:"main,omitempty"`
+	Receiver  ReceiveConfig   `json:"receiver,omitempty"`
+	Uploader  UploadConfig    `json:"uploader,omitempty"`
+	Retention RetentionConfig `json:"retention,omitempty"`
+	Log       LogConfig       `json:"log,omitempty"`
+	Storage   StorageConfig   `json:"storage,omitempty"`
 }
 
 // ---- Main Section ----
@@ -56,6 +57,15 @@ type UploadConfig struct {
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	SyncInterval   string `json:"sync_interval"`
 	MaxConcurrency int    `json:"max_concurrency"`
+}
+
+// ---- Retention ----
+
+type RetentionConfig struct {
+	Enable bool `json:"enable,omitempty"`
+	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	SyncInterval string `json:"sync_interval"`
+	KeepPeriod   string `json:"keep_period,omitempty"`
 }
 
 // ---- Log Section ----

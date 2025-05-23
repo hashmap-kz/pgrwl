@@ -130,7 +130,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
-			u.Run(ctx)
+			if cfg.Retention.Enable {
+				u.RunWithRetention(ctx)
+			} else {
+				u.RunUploader(ctx)
+			}
 		}()
 	}
 
