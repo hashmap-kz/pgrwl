@@ -102,19 +102,6 @@ func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
 	return r
 }
 
-func (u *Uploader) removeStrayDoneMarkerFile(doneFilePath string) {
-	err := os.Remove(doneFilePath)
-	if err == nil {
-		u.log().Warn("stray *.done marker file is removed",
-			slog.String("path", doneFilePath),
-		)
-	} else {
-		u.log().Error("cannot remove stray *.done marker file",
-			slog.String("path", doneFilePath),
-		)
-	}
-}
-
 func (u *Uploader) uploadFiles(ctx context.Context, files []uploadBundle) error {
 	workerCount := u.cfg.Uploader.MaxConcurrency
 	if workerCount <= 0 {
