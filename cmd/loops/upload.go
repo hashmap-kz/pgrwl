@@ -94,10 +94,6 @@ func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
 			continue
 		}
 		name = strings.TrimSuffix(name, xlog.DoneMarkerFileExt)
-		if !xlog.IsXLogFileName(name) {
-			u.removeStrayDoneMarkerFile(doneFilePath)
-			continue
-		}
 		walFilePath := filepath.ToSlash(filepath.Join(u.opts.ReceiveDirectory, name))
 		if !optutils.FileExists(walFilePath) {
 			// misconfigured, etc, we may safely delete *.done file here

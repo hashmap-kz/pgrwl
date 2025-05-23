@@ -599,6 +599,16 @@ func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) erro
 		return fmt.Errorf("could not rename temp timeline history file to final: %w", err)
 	}
 
+	// *.done marker file +
+	if err := stream.createDoneMarker(finalPath); err != nil {
+		stream.log().Error("failed to write .done marker",
+			slog.String("wal", filepath.ToSlash(finalPath)),
+			slog.String("err", err.Error()),
+		)
+		return err
+	}
+	// *.done marker file -
+
 	return nil
 }
 
