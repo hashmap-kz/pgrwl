@@ -22,7 +22,6 @@ import (
 
 type ReceiveModeOpts struct {
 	ReceiveDirectory string
-	StatusDirectory  string
 	Slot             string
 	NoLoop           bool
 	ListenPort       int
@@ -44,7 +43,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
-		StatusDirectory:  opts.StatusDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
 		Verbose:          opts.Verbose,
@@ -130,7 +128,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}()
 			u := loops.NewUploader(cfg, stor, &loops.UploaderLoopOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
-				StatusDirectory:  opts.StatusDirectory,
+				PGRW:             pgrw,
 			})
 			u.Run(ctx)
 		}()

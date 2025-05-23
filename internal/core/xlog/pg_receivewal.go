@@ -20,21 +20,15 @@ import (
 	"github.com/jackc/pglogrepl"
 )
 
-const (
-	WalReceiveDirName = "wal_receive"
-	WalStatusDirName  = "wal_status"
-	DoneMarkerFileExt = ".done"
-)
-
 type PgReceiveWal interface {
 	Run(ctx context.Context) error
 	Status() *StreamStatus
+	CurrentOpenWALFileName() string
 }
 
 type pgReceiveWal struct {
 	l                *slog.Logger
 	receiveDirectory string
-	statusDirectory  string
 	walSegSz         uint64
 	conn             *pgconn.PgConn
 	connStrRepl      string
@@ -50,7 +44,6 @@ var _ PgReceiveWal = &pgReceiveWal{}
 
 type PgReceiveWalOpts struct {
 	ReceiveDirectory string
-	StatusDirectory  string
 	Slot             string
 	NoLoop           bool
 	Verbose          bool
@@ -77,14 +70,10 @@ func NewPgReceiver(ctx context.Context, opts *PgReceiveWalOpts) (PgReceiveWal, e
 	if err := os.MkdirAll(opts.ReceiveDirectory, 0o750); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(opts.StatusDirectory, 0o750); err != nil {
-		return nil, err
-	}
 
 	return &pgReceiveWal{
 		l:                slog.With(slog.String("component", "pgreceivewal")),
 		receiveDirectory: opts.ReceiveDirectory,
-		statusDirectory:  opts.StatusDirectory,
 		walSegSz:         startupInfo.WalSegSz,
 		conn:             conn,
 		connStrRepl:      connStrRepl,
@@ -119,6 +108,15 @@ func (pgrw *pgReceiveWal) Run(ctx context.Context) error {
 		pgrw.log().Info("disconnected; waiting 5 seconds to try again")
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func (pgrw *pgReceiveWal) CurrentOpenWALFileName() string {
+	pgrw.streamMu.Lock()
+	defer pgrw.streamMu.Unlock()
+	if pgrw.stream == nil || pgrw.stream.walfile == nil || pgrw.stream.walfile.fd == nil {
+		return ""
+	}
+	return pgrw.stream.walfile.pathname
 }
 
 func (pgrw *pgReceiveWal) log() *slog.Logger {
@@ -215,7 +213,6 @@ func (pgrw *pgReceiveWal) streamLog(ctx context.Context) error {
 		ReplicationSlot:  pgrw.slotName,
 		WalSegSz:         pgrw.walSegSz,
 		ReceiveDirectory: pgrw.receiveDirectory,
-		StatusDirectory:  pgrw.statusDirectory,
 		Conn:             pgrw.conn,
 		Verbose:          pgrw.verbose,
 	})

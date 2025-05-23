@@ -3,23 +3,15 @@ start
 
 partition "Streaming Process" {
   :Receive WAL segment;
-  :Write <segment>.partial to wal_receive;
   :Finish writing;
   :Rename to <segment> (remove .partial);
-  :Calculate SHA256;
-  :Write <segment>.done to wal_status with checksum;
 }
 
 partition "Archiver Goroutine" {
-  :Watch wal_status for *.done;
-  if (found *.done?) then (yes)
+  if (Is file opened by receiver?) then (yes)
     :Read WAL from wal_receive;
-    :Read checksum from *.done;
-    :Create tar with WAL + checksum;
-    :Compress and encrypt tar;
-    :Upload to remote storage;
+    :Compress, encrypt and upload to remote storage;
     if (upload success?) then (yes)
-      :Delete *.done marker;
       :Delete original WAL file;
     endif
   endif
@@ -27,20 +19,3 @@ partition "Archiver Goroutine" {
 
 stop
 @enduml
-
-'Diagram for WAL receiver:
-'
-'The system has two directories: wal_receive, wal_status.
-'
-'The streaming process creates a *.partial file in the wal_receive directory.
-'When the file is complete, it is renamed (i.e., the .partial suffix is removed and the file is closed).
-'At the same time, a *.done file is created in the wal_status directory.
-'The name of this file matches the WAL file name with a .done suffix, and its content is the SHA256 checksum of the completed WAL file.
-'
-'A separate goroutine watches the wal_status directory.
-'For each *.done file it finds, it creates a tar than contains an original WAL file, a checksum file.
-'Then it compress, encrypt and upload a tar file to remote storage.
-'If all steps are success - it removes *.done marker and the WAL file.
-
-
-

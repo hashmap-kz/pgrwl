@@ -115,7 +115,7 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}/wal_receive" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 
 x_backup_restore "${@}"

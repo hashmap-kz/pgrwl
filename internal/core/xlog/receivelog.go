@@ -27,7 +27,6 @@ type StreamOpts struct {
 	ReplicationSlot  string
 	WalSegSz         uint64
 	ReceiveDirectory string
-	StatusDirectory  string
 	Conn             *pgconn.PgConn
 	Verbose          bool
 }
@@ -67,7 +66,6 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		replicationSlot:       o.ReplicationSlot,
 		walSegSz:              o.WalSegSz,
 		receiveDir:            o.ReceiveDirectory,
-		statusDir:             o.StatusDirectory,
 		conn:                  o.Conn,
 		verbose:               o.Verbose,
 		startedAt:             time.Now(),
@@ -598,16 +596,6 @@ func (stream *StreamCtl) writeTimeLineHistoryFile(filename, content string) erro
 	if err := os.Rename(histPath, finalPath); err != nil {
 		return fmt.Errorf("could not rename temp timeline history file to final: %w", err)
 	}
-
-	// *.done marker file +
-	if err := stream.createDoneMarker(finalPath); err != nil {
-		stream.log().Error("failed to write .done marker",
-			slog.String("wal", filepath.ToSlash(finalPath)),
-			slog.String("err", err.Error()),
-		)
-		return err
-	}
-	// *.done marker file -
 
 	return nil
 }
