@@ -172,11 +172,7 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 	// 3) trying remote
 	if s.storage != nil {
 		s.log().Debug("wal-restore, fetching remote file", slog.String("filename", filename))
-		tarFile, err := s.storage.Get(ctx, filename)
-		if err != nil {
-			return nil, err
-		}
-		return optutils.GetFileFromTar(tarFile, filename)
+		return s.storage.Get(ctx, filename)
 	}
 
 	return nil, fmt.Errorf("cannot fetch file: %s", filename)
