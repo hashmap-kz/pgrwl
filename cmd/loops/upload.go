@@ -170,7 +170,6 @@ func (u *Uploader) uploadOneFile(ctx context.Context, bundle uploadBundle) error
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
 	resultFileName := filepath.Base(bundle.walFilePath)
 
