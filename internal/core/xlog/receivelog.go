@@ -41,7 +41,6 @@ type StreamCtl struct {
 	replicationSlot       string
 	walSegSz              uint64
 	receiveDir            string
-	statusDir             string
 	reportFlushPosition   bool
 	lastStatus            time.Time
 	lastFlushPosition     pglogrepl.LSN
