@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/hashmap-kz/pgrwl/cmd/repo"
 
@@ -52,7 +53,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		log.Fatal(err)
 	}
 
+	// TODO: config.Check() method at the boot stage
 	var stor *storage.TransformingStorage
+	var daysKeepRetention time.Duration
 	if cfg.HasExternalStorageConfigured() {
 		stor, err = repo.SetupStorage(opts.ReceiveDirectory)
 		if err != nil {
@@ -61,6 +64,13 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		err := repo.CheckManifest(cfg)
 		if err != nil {
 			log.Fatal(err)
+		}
+
+		if cfg.Retention.Enable {
+			daysKeepRetention, err = time.ParseDuration(cfg.Retention.KeepPeriod)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
@@ -130,7 +140,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
-			u.Run(ctx)
+			if cfg.Retention.Enable {
+				u.RunWithRetention(ctx, daysKeepRetention)
+			} else {
+				u.RunUploader(ctx)
+			}
 		}()
 	}
 

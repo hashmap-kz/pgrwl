@@ -28,6 +28,7 @@ type uploadBundle struct {
 
 type Uploader struct {
 	l    *slog.Logger
+	mu   sync.Mutex
 	cfg  *config.Config
 	stor storage.Storage
 	opts *UploaderLoopOpts
@@ -49,7 +50,7 @@ func (u *Uploader) log() *slog.Logger {
 	return slog.With(slog.String("component", "uploader"))
 }
 
-func (u *Uploader) Run(ctx context.Context) {
+func (u *Uploader) RunUploader(ctx context.Context) {
 	syncInterval := cmdutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
 
 	ticker := time.NewTicker(syncInterval)
@@ -61,22 +62,100 @@ func (u *Uploader) Run(ctx context.Context) {
 			u.log().Info("context is done, exiting...")
 			return
 		case <-ticker.C:
-			files, err := os.ReadDir(u.opts.ReceiveDirectory)
-			if err != nil {
-				u.log().Error("error reading dir", slog.Any("err", err))
-				continue
-			}
-
-			filesToUpload := u.filterFilesToUpload(files)
-			if len(filesToUpload) == 0 {
-				continue
-			}
-			err = u.uploadFiles(ctx, filesToUpload)
+			u.log().Debug("upload worker is running")
+			err := u.performUploads(ctx)
+			u.log().Debug("upload worker is done")
 			if err != nil {
 				u.log().Error("error upload files", slog.Any("err", err))
 			}
 		}
 	}
+}
+
+func (u *Uploader) RunWithRetention(ctx context.Context, daysKeepRetention time.Duration) {
+	syncInterval := cmdutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
+	retentionInterval := cmdutils.ParseDurationOrDefault(u.cfg.Retention.SyncInterval, 24*time.Hour)
+
+	uploadTicker := time.NewTicker(syncInterval)
+	retentionTicker := time.NewTicker(retentionInterval)
+	defer uploadTicker.Stop()
+	defer retentionTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			u.log().Info("context is done, exiting...")
+			return
+		case <-uploadTicker.C:
+			u.log().Debug("upload worker is running")
+			u.mu.Lock()
+			err := u.performUploads(ctx)
+			u.mu.Unlock()
+			u.log().Debug("upload worker is done")
+			if err != nil {
+				u.log().Error("error upload files", slog.Any("err", err))
+			}
+		case <-retentionTicker.C:
+			u.log().Debug("retention worker is running")
+			u.mu.Lock()
+			err := u.performRetention(ctx, daysKeepRetention)
+			u.mu.Unlock()
+			u.log().Debug("retention worker is done")
+			if err != nil {
+				u.log().Error("error retain files", slog.Any("err", err))
+			}
+		}
+	}
+}
+
+func (u *Uploader) performUploads(ctx context.Context) error {
+	files, err := os.ReadDir(u.opts.ReceiveDirectory)
+	if err != nil {
+		u.log().Error("error reading dir", slog.Any("err", err))
+		return err
+	}
+	filesToUpload := u.filterFilesToUpload(files)
+	if len(filesToUpload) == 0 {
+		return nil
+	}
+	return u.uploadFiles(ctx, filesToUpload)
+}
+
+func (u *Uploader) filterOlderThan(files []storage.FileInfo, maxAge time.Duration) []storage.FileInfo {
+	var result []storage.FileInfo
+	cutoff := time.Now().Add(-maxAge)
+	for _, f := range files {
+		if f.ModTime.Before(cutoff) {
+			result = append(result, f)
+		}
+	}
+	return result
+}
+
+func (u *Uploader) performRetention(ctx context.Context, daysKeepRetention time.Duration) error {
+	fileInfos, err := u.stor.ListInfo(ctx, "")
+	if err != nil {
+		return err
+	}
+	if len(fileInfos) == 0 {
+		return nil
+	}
+
+	olderThan := u.filterOlderThan(fileInfos, daysKeepRetention)
+	if len(olderThan) == 0 {
+		return nil
+	}
+
+	// TODO: bulk delete, no iterations
+	u.log().Debug("begin to retain files", slog.Int("cnt", len(olderThan)))
+	for _, elem := range olderThan {
+		u.log().Debug("delete file", slog.String("path", filepath.ToSlash(elem.Path)))
+		err := u.stor.Delete(ctx, elem.Path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
@@ -86,6 +165,9 @@ func (u *Uploader) filterFilesToUpload(files []os.DirEntry) []uploadBundle {
 			continue
 		}
 		name := entry.Name()
+		if filepath.Base(name) == ".manifest.json" {
+			continue
+		}
 		currentOpenWALFileName := u.opts.PGRW.CurrentOpenWALFileName()
 		if filepath.Base(name) == filepath.Base(currentOpenWALFileName) {
 			u.log().Debug("skipped currently opened file", slog.String("path", filepath.ToSlash(name)))
