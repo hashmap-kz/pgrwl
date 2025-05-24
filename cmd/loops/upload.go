@@ -147,9 +147,9 @@ func (u *Uploader) performRetention(ctx context.Context, daysKeepRetention time.
 	}
 
 	// TODO: bulk delete, no iterations
-	slog.Debug("begin to retain files", slog.Int("cnt", len(olderThan)))
+	u.log().Debug("begin to retain files", slog.Int("cnt", len(olderThan)))
 	for _, elem := range olderThan {
-		slog.Debug("delete file", slog.String("path", filepath.ToSlash(elem.Path)))
+		u.log().Debug("delete file", slog.String("path", filepath.ToSlash(elem.Path)))
 		err := u.stor.Delete(ctx, elem.Path)
 		if err != nil {
 			return err
