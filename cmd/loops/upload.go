@@ -72,7 +72,7 @@ func (u *Uploader) RunUploader(ctx context.Context) {
 	}
 }
 
-func (u *Uploader) RunWithRetention(ctx context.Context) {
+func (u *Uploader) RunWithRetention(ctx context.Context, daysKeepRetention time.Duration) {
 	syncInterval := cmdutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
 	retentionInterval := cmdutils.ParseDurationOrDefault(u.cfg.Retention.SyncInterval, 24*time.Hour)
 
@@ -98,7 +98,7 @@ func (u *Uploader) RunWithRetention(ctx context.Context) {
 		case <-retentionTicker.C:
 			u.log().Debug("retention worker is running")
 			u.mu.Lock()
-			err := u.performRetention(ctx)
+			err := u.performRetention(ctx, daysKeepRetention)
 			u.mu.Unlock()
 			u.log().Debug("retention worker is done")
 			if err != nil {
@@ -121,7 +121,40 @@ func (u *Uploader) performUploads(ctx context.Context) error {
 	return u.uploadFiles(ctx, filesToUpload)
 }
 
-func (u *Uploader) performRetention(_ context.Context) error {
+func (u *Uploader) filterOlderThan(files []storage.FileInfo, maxAge time.Duration) []storage.FileInfo {
+	var result []storage.FileInfo
+	cutoff := time.Now().Add(-maxAge)
+	for _, f := range files {
+		if f.ModTime.Before(cutoff) {
+			result = append(result, f)
+		}
+	}
+	return result
+}
+
+func (u *Uploader) performRetention(ctx context.Context, daysKeepRetention time.Duration) error {
+	fileInfos, err := u.stor.ListInfo(ctx, "")
+	if err != nil {
+		return err
+	}
+	if len(fileInfos) == 0 {
+		return nil
+	}
+
+	olderThan := u.filterOlderThan(fileInfos, daysKeepRetention)
+	if len(olderThan) == 0 {
+		return nil
+	}
+
+	// TODO: bulk delete, no iterations
+	slog.Debug("begin to retain files", slog.Int("cnt", len(olderThan)))
+	for _, elem := range olderThan {
+		slog.Debug("delete file", slog.String("path", filepath.ToSlash(elem.Path)))
+		err := u.stor.Delete(ctx, elem.Path)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
