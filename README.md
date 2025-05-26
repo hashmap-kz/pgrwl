@@ -351,9 +351,10 @@ internal/xlog/fsync/
 ### 🛠 Planned Features
 
 - Download all WAL files
-- [X] Concurrent batch-uploads
 - Metrics, alerting
-- Retention loop (configured: i.e.: retention_period = 3d, and triggered: i.e.: /api/v1/retention)
+- [X] Concurrent batch-uploads
+- [X] Retention loop (configured: i.e.: retention_period = 3d)
+- Retention loop (triggered: i.e.: /api/v1/retention?before=0000000100000006000000DE)
 
 ### ⏮️ Links
 
