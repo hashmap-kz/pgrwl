@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-go run ../main.go start -c configs/localfs/serve.json
+export PGRWL_MODE=serve
+
+go run ../main.go start -c configs/localfs/receive.json
