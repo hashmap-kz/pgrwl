@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/config"
@@ -17,6 +19,7 @@ import (
 type ArchiveSupervisorOpts struct {
 	ReceiveDirectory string
 	PGRW             xlog.PgReceiveWal
+	Metrics          metrics.PgrwlMetrics
 }
 
 type uploadBundle struct {
@@ -24,25 +27,25 @@ type uploadBundle struct {
 }
 
 type ArchiveSupervisor struct {
-	l    *slog.Logger
-	mu   sync.Mutex
-	cfg  *config.Config
-	stor storage.Storage
-	opts *ArchiveSupervisorOpts
-
-	// opts (for fast-access without traverse the config)
-	metricsEnable bool
-	storageName   string
+	l                *slog.Logger
+	mu               sync.Mutex
+	cfg              *config.Config
+	stor             storage.Storage
+	receiveDirectory string
+	pgrw             xlog.PgReceiveWal
+	metrics          metrics.PgrwlMetrics
+	storageName      string
 }
 
 func NewArchiveSupervisor(cfg *config.Config, stor storage.Storage, opts *ArchiveSupervisorOpts) *ArchiveSupervisor {
 	return &ArchiveSupervisor{
-		l:             slog.With(slog.String("component", "archive-supervisor")),
-		cfg:           cfg,
-		stor:          stor,
-		opts:          opts,
-		metricsEnable: cfg.Metrics.Enable,
-		storageName:   cfg.Storage.Name,
+		l:                slog.With(slog.String("component", "archive-supervisor")),
+		cfg:              cfg,
+		stor:             stor,
+		receiveDirectory: opts.ReceiveDirectory,
+		pgrw:             opts.PGRW,
+		metrics:          opts.Metrics,
+		storageName:      cfg.Storage.Name,
 	}
 }
 
