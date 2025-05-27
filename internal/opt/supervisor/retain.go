@@ -46,8 +46,6 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, daysKeepRetent
 		}
 	}
 
-	if u.metricsEnable {
-		metrics.WALSegmentsDeleted.Inc()
-	}
+	metrics.PgrwlMetricsCollector.IncWALFilesDeleted(u.storageName)
 	return nil
 }

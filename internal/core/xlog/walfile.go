@@ -291,9 +291,7 @@ func (stream *StreamCtl) closeAndRename() error {
 	}
 
 	// NOTE:metrics
-	if stream.metricsEnable {
-		metrics.WALSegmentsReceived.Inc()
-	}
+	metrics.PgrwlMetricsCollector.IncWALFilesReceived()
 
 	l.Info("segment is complete")
 	return nil

@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 
 	"github.com/hashmap-kz/pgrwl/config"
@@ -39,13 +41,17 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
+	// metrics
+	if cfg.Metrics.Enable {
+		metrics.InitPromMetrics()
+	}
+
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
 		Verbose:          opts.Verbose,
-		MetricsEnable:    cfg.Metrics.Enable,
 	})
 	if err != nil {
 		//nolint:gocritic

@@ -143,9 +143,6 @@ func (u *ArchiveSupervisor) uploadOneFile(ctx context.Context, bundle uploadBund
 		slog.String("result-path", resultFileName),
 	)
 
-	if u.metricsEnable {
-		metrics.WALFilesUploaded.WithLabelValues(u.storageName).Inc()
-	}
-
+	metrics.PgrwlMetricsCollector.IncWALFilesUploaded(u.storageName)
 	return nil
 }

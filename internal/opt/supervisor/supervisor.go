@@ -31,18 +31,16 @@ type ArchiveSupervisor struct {
 	opts *ArchiveSupervisorOpts
 
 	// opts (for fast-access without traverse the config)
-	metricsEnable bool
-	storageName   string
+	storageName string
 }
 
 func NewArchiveSupervisor(cfg *config.Config, stor storage.Storage, opts *ArchiveSupervisorOpts) *ArchiveSupervisor {
 	return &ArchiveSupervisor{
-		l:             slog.With(slog.String("component", "archive-supervisor")),
-		cfg:           cfg,
-		stor:          stor,
-		opts:          opts,
-		metricsEnable: cfg.Metrics.Enable,
-		storageName:   cfg.Storage.Name,
+		l:           slog.With(slog.String("component", "archive-supervisor")),
+		cfg:         cfg,
+		stor:        stor,
+		opts:        opts,
+		storageName: cfg.Storage.Name,
 	}
 }
 

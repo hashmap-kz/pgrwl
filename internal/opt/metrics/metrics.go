@@ -6,68 +6,84 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// TODO: when metrics disabled by config, we should totally ellimitate any inits
+var PgrwlMetricsCollector pgrwlMetrics = &pgrwlMetricsNoop{}
 
-var (
-	// Replication metrics
+type pgrwlMetrics interface {
+	MetricsEnabled() bool
+	AddWALBytesReceived(float64)
+	IncWALFilesReceived()
+	IncWALFilesUploaded(storageName string)
+	IncWALFilesDeleted(storageName string)
+}
 
-	WALBytesReceived = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pgrwl_wal_bytes_received_total",
-		Help: "Total number of WAL bytes received from PostgreSQL.",
-	})
+// noop
 
-	WALSegmentsReceived = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pgrwl_wal_segments_received_total",
-		Help: "Total number of WAL segments received.",
-	})
+type pgrwlMetricsNoop struct{}
 
-	// Supervisor (upload, retain)
+var _ pgrwlMetrics = &pgrwlMetricsNoop{}
 
-	WALFilesUploaded = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pgrwl_wal_files_uploaded_total",
-		Help: "Number of WAL files uploaded, partitioned by storage backend.",
-	}, []string{"backend"})
+func (p pgrwlMetricsNoop) MetricsEnabled() bool { return false }
 
-	// Storage metrics
+func (p pgrwlMetricsNoop) AddWALBytesReceived(_ float64) {}
 
-	WALDiskUsage = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "pgrwl_wal_disk_usage_bytes",
-		Help: "Disk space used by all stored WAL segments.",
-	})
+func (p pgrwlMetricsNoop) IncWALFilesReceived() {}
 
-	// Retention and cleanup
+func (p pgrwlMetricsNoop) IncWALFilesUploaded(_ string) {}
 
-	WALSegmentsDeleted = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pgrwl_wal_segments_deleted_total",
-		Help: "Number of WAL segments deleted by retention logic.",
-	})
+func (p pgrwlMetricsNoop) IncWALFilesDeleted(_ string) {}
 
-	WALRetentionDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "pgrwl_wal_retention_run_duration_seconds",
-		Help:    "Duration of the WAL retention cleanup run.",
-		Buckets: prometheus.ExponentialBuckets(0.5, 2, 10),
-	})
+// prom
 
-	// Connection/errors
+type pgrwlMetricsProm struct {
+	WALBytesReceived prometheus.Counter
+	WALFilesReceived prometheus.Counter
+	WALFilesUploaded *prometheus.CounterVec
+	WALFilesDeleted  *prometheus.CounterVec
+}
 
-	WALStreamErrors = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pgrwl_wal_stream_errors_total",
-		Help: "Errors during WAL stream reading.",
-	})
+var _ pgrwlMetrics = &pgrwlMetricsProm{}
 
-	WALDisconnects = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pgrwl_wal_pg_server_disconnects_total",
-		Help: "Unexpected disconnects from PostgreSQL server.",
-	})
-
-	WALReconnects = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pgrwl_wal_pg_connection_retries_total",
-		Help: "Number of reconnection attempts to PostgreSQL.",
-	})
-)
-
-func init() {
+func InitPromMetrics() {
 	// Unregister default prometheus collectors so we don't collect a bunch of pointless metrics
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	prometheus.Unregister(collectors.NewGoCollector())
+
+	PgrwlMetricsCollector = &pgrwlMetricsProm{
+		WALBytesReceived: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "pgrwl_wal_bytes_received_total",
+			Help: "Total number of WAL bytes received from PostgreSQL.",
+		}),
+		WALFilesReceived: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "pgrwl_wal_files_received_total",
+			Help: "Total number of WAL segments received.",
+		}),
+		WALFilesUploaded: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "pgrwl_wal_files_uploaded_total",
+			Help: "Number of WAL files uploaded, partitioned by storage backend.",
+		}, []string{"backend"}),
+		WALFilesDeleted: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "pgrwl_wal_files_deleted_total",
+			Help: "Number of WAL segments deleted by retention logic.",
+		}, []string{"backend"}),
+	}
+}
+
+func (p *pgrwlMetricsProm) MetricsEnabled() bool {
+	return true
+}
+
+func (p *pgrwlMetricsProm) AddWALBytesReceived(f float64) {
+	p.WALBytesReceived.Add(f)
+}
+
+func (p *pgrwlMetricsProm) IncWALFilesReceived() {
+	p.WALFilesReceived.Inc()
+}
+
+func (p *pgrwlMetricsProm) IncWALFilesUploaded(storageName string) {
+	p.WALFilesUploaded.WithLabelValues(storageName).Inc()
+}
+
+func (p *pgrwlMetricsProm) IncWALFilesDeleted(storageName string) {
+	p.WALFilesDeleted.WithLabelValues(storageName).Inc()
 }
