@@ -14,6 +14,7 @@ type pgrwlMetrics interface {
 	IncWALFilesReceived()
 	IncWALFilesUploaded(storageName string)
 	IncWALFilesDeleted(storageName string)
+	AddWALFilesDeleted(storageName string, f float64)
 }
 
 // noop
@@ -22,15 +23,12 @@ type pgrwlMetricsNoop struct{}
 
 var _ pgrwlMetrics = &pgrwlMetricsNoop{}
 
-func (p pgrwlMetricsNoop) MetricsEnabled() bool { return false }
-
-func (p pgrwlMetricsNoop) AddWALBytesReceived(_ float64) {}
-
-func (p pgrwlMetricsNoop) IncWALFilesReceived() {}
-
-func (p pgrwlMetricsNoop) IncWALFilesUploaded(_ string) {}
-
-func (p pgrwlMetricsNoop) IncWALFilesDeleted(_ string) {}
+func (p pgrwlMetricsNoop) MetricsEnabled() bool                   { return false }
+func (p pgrwlMetricsNoop) AddWALBytesReceived(_ float64)          {}
+func (p pgrwlMetricsNoop) IncWALFilesReceived()                   {}
+func (p pgrwlMetricsNoop) IncWALFilesUploaded(_ string)           {}
+func (p pgrwlMetricsNoop) IncWALFilesDeleted(_ string)            {}
+func (p pgrwlMetricsNoop) AddWALFilesDeleted(_ string, _ float64) {}
 
 // prom
 
@@ -86,4 +84,8 @@ func (p *pgrwlMetricsProm) IncWALFilesUploaded(storageName string) {
 
 func (p *pgrwlMetricsProm) IncWALFilesDeleted(storageName string) {
 	p.walFilesDeleted.WithLabelValues(storageName).Inc()
+}
+
+func (p *pgrwlMetricsProm) AddWALFilesDeleted(storageName string, f float64) {
+	p.walFilesDeleted.WithLabelValues(storageName).Add(f)
 }

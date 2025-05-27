@@ -46,6 +46,6 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, daysKeepRetent
 		}
 	}
 
-	metrics.PgrwlMetricsCollector.IncWALFilesDeleted(u.storageName)
+	metrics.PgrwlMetricsCollector.AddWALFilesDeleted(u.storageName, float64(len(olderThan)))
 	return nil
 }
