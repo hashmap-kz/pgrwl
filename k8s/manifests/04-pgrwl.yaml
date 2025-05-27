@@ -52,6 +52,8 @@ data:
     uploader:
       sync_interval: 10s
       max_concurrency: 4
+    metrics:
+      enable: true
     storage:
       name: s3
       compression:

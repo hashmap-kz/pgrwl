@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
@@ -29,6 +30,7 @@ type StreamOpts struct {
 	ReceiveDirectory string
 	Conn             *pgconn.PgConn
 	Verbose          bool
+	MetricsEnable    bool
 }
 
 type StreamCtl struct {
@@ -49,6 +51,7 @@ type StreamCtl struct {
 	conn                  *pgconn.PgConn
 	walfile               *walfileT
 	verbose               bool
+	metricsEnable         bool
 	startedAt             time.Time
 	mu                    sync.RWMutex
 }
@@ -67,6 +70,7 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		receiveDir:            o.ReceiveDirectory,
 		conn:                  o.Conn,
 		verbose:               o.Verbose,
+		metricsEnable:         o.MetricsEnable,
 		startedAt:             time.Now(),
 	}
 }
@@ -480,6 +484,11 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 		bytesLeft -= bytesToWrite
 		stream.blockPos += pglogrepl.LSN(bytesToWrite)
 		xlogoff += bytesToWrite
+
+		// NOTE:metrics
+		if stream.metricsEnable {
+			metrics.WALBytesReceived.Add(float64(bytesToWrite))
+		}
 
 		/* Did we reach the end of a WAL segment? */
 		xlSegOff := XLogSegmentOffset(stream.blockPos, stream.walSegSz)

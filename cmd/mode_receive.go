@@ -47,6 +47,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
 		Verbose:          opts.Verbose,
+		MetricsEnable:    cfg.Metrics.Enable,
 	})
 	if err != nil {
 		//nolint:gocritic
