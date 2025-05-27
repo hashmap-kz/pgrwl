@@ -78,6 +78,24 @@ func (stream *StreamCtl) log() *slog.Logger {
 	return slog.With("component", "receivelog")
 }
 
+// ReceiveXlogStream
+//
+// Receive a log stream starting at the specified position.
+//
+// Individual parameters are passed through the StreamCtl structure.
+//
+// All received segments will be written to the directory
+// specified by basedir.
+// This will also fetch any missing timeline history files.
+//
+// Files are initially created with the *.partial suffix,
+// and the suffix is removed once the file is finished.
+// That allows you to tell the difference between partial and completed files,
+// so that you can continue later where you left.
+//
+// The received WAL is flushes as soon as written.
+//
+// Note: The WAL location *must* be at a log segment start!
 func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 	/*
 	 * initialize flush position to starting point, it's the caller's
