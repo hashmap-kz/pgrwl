@@ -1,5 +1,11 @@
 _`pgrwl` stream write-ahead logs from a PostgreSQL server_
 
+**pgrwl** is a PostgreSQL write-ahead log (WAL) receiver written in Go. It’s a drop-in, container-friendly alternative
+to `pg_receivewal`, supporting streaming replication, encryption, compression, and remote storage (S3, SFTP).
+
+Designed for disaster recovery and PITR (Point-in-Time Recovery), `pgrwl` ensures zero data loss (RPO=0) and seamless
+integration with Kubernetes environments.
+
 [![License](https://img.shields.io/github/license/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgrwl)](https://goreportcard.com/report/github.com/hashmap-kz/pgrwl)
 [![Workflow Status](https://img.shields.io/github/actions/workflow/status/hashmap-kz/pgrwl/ci.yml?branch=master)](https://github.com/hashmap-kz/pgrwl/actions/workflows/ci.yml?query=branch:master)
@@ -14,7 +20,10 @@ _`pgrwl` stream write-ahead logs from a PostgreSQL server_
 - [🚀 About](#-about)
 - [🛠️ Usage](#-usage)
 - [🚀 Installation](#-installation)
-- [🗃️ Usage In Backup Process](#-usage-in-backup-process)
+    - [Docker Images](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
+    - [Binaries](#manual-installation)
+    - [Packages](#package-based-installation-suitable-in-cicd)
+- [🗃️ Disaster Recovery Use Cases](#-disaster-recovery-use-cases)
 - [🧱 Architecture](#-architecture)
     - [Design Notes](#design-notes)
     - [Notes on `fsync`](#-notes-on-fsync-since-the-utility-works-in-synchronous-mode-only)
@@ -188,7 +197,7 @@ chmod +x /usr/local/bin/pgrwl
 
 ### Package-Based installation (suitable in CI/CD)
 
-#### Debian 
+#### Debian
 
 ```
 sudo apt update -y && sudo apt install -y curl
@@ -206,13 +215,13 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 --- 
 
-## 🗃️ Usage In Backup Process
+## 🗃️ Disaster Recovery Use Cases
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
 - You have a cron job that performs a _base backup_ of your cluster every three days.
 - You run `pgrwl` as a systemd unit or a Kubernetes pod (depending on your infrastructure).
-- You have a cron job that prunes WAL files older than three days.
+- You have a configured retention worker that prunes WAL files older than three days.
 - With this setup, you're able to restore your cluster - in the event of a crash - to any second within the past three
   days.
 
