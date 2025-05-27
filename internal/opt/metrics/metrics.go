@@ -35,10 +35,10 @@ func (p pgrwlMetricsNoop) IncWALFilesDeleted(_ string) {}
 // prom
 
 type pgrwlMetricsProm struct {
-	WALBytesReceived prometheus.Counter
-	WALFilesReceived prometheus.Counter
-	WALFilesUploaded *prometheus.CounterVec
-	WALFilesDeleted  *prometheus.CounterVec
+	walBytesReceived prometheus.Counter
+	walFilesReceived prometheus.Counter
+	walFilesUploaded *prometheus.CounterVec
+	walFilesDeleted  *prometheus.CounterVec
 }
 
 var _ pgrwlMetrics = &pgrwlMetricsProm{}
@@ -49,19 +49,19 @@ func InitPromMetrics() {
 	prometheus.Unregister(collectors.NewGoCollector())
 
 	PgrwlMetricsCollector = &pgrwlMetricsProm{
-		WALBytesReceived: promauto.NewCounter(prometheus.CounterOpts{
+		walBytesReceived: promauto.NewCounter(prometheus.CounterOpts{
 			Name: "pgrwl_wal_bytes_received_total",
 			Help: "Total number of WAL bytes received from PostgreSQL.",
 		}),
-		WALFilesReceived: promauto.NewCounter(prometheus.CounterOpts{
+		walFilesReceived: promauto.NewCounter(prometheus.CounterOpts{
 			Name: "pgrwl_wal_files_received_total",
 			Help: "Total number of WAL segments received.",
 		}),
-		WALFilesUploaded: promauto.NewCounterVec(prometheus.CounterOpts{
+		walFilesUploaded: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: "pgrwl_wal_files_uploaded_total",
 			Help: "Number of WAL files uploaded, partitioned by storage backend.",
 		}, []string{"backend"}),
-		WALFilesDeleted: promauto.NewCounterVec(prometheus.CounterOpts{
+		walFilesDeleted: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: "pgrwl_wal_files_deleted_total",
 			Help: "Number of WAL segments deleted by retention logic.",
 		}, []string{"backend"}),
@@ -73,17 +73,17 @@ func (p *pgrwlMetricsProm) MetricsEnabled() bool {
 }
 
 func (p *pgrwlMetricsProm) AddWALBytesReceived(f float64) {
-	p.WALBytesReceived.Add(f)
+	p.walBytesReceived.Add(f)
 }
 
 func (p *pgrwlMetricsProm) IncWALFilesReceived() {
-	p.WALFilesReceived.Inc()
+	p.walFilesReceived.Inc()
 }
 
 func (p *pgrwlMetricsProm) IncWALFilesUploaded(storageName string) {
-	p.WALFilesUploaded.WithLabelValues(storageName).Inc()
+	p.walFilesUploaded.WithLabelValues(storageName).Inc()
 }
 
 func (p *pgrwlMetricsProm) IncWALFilesDeleted(storageName string) {
-	p.WALFilesDeleted.WithLabelValues(storageName).Inc()
+	p.walFilesDeleted.WithLabelValues(storageName).Inc()
 }
