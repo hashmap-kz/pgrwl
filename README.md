@@ -134,6 +134,9 @@ retention:                               # Optional (used in receive mode)
   sync_interval: 24h                     # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
   keep_period: 72h                       # Remove WAL files older than given period
 
+metrics:
+  enable: true                           # Optional (used in receive mode: http://host:port/metrics)
+
 log:                                     # Optional
   level: info                            # One of: trace / debug / info / warn / error
   format: text                           # One of: text / json
