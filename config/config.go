@@ -33,6 +33,7 @@ type Config struct {
 	Receiver  ReceiveConfig   `json:"receiver,omitempty"`
 	Uploader  UploadConfig    `json:"uploader,omitempty"`
 	Retention RetentionConfig `json:"retention,omitempty"`
+	Metrics   MetricsConfig   `json:"metrics,omitempty"`
 	Log       LogConfig       `json:"log,omitempty"`
 	Storage   StorageConfig   `json:"storage,omitempty"`
 }
@@ -66,6 +67,12 @@ type RetentionConfig struct {
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	SyncInterval string `json:"sync_interval"`
 	KeepPeriod   string `json:"keep_period,omitempty"`
+}
+
+// ---- Metrics ----
+
+type MetricsConfig struct {
+	Enable bool `json:"enable,omitempty"`
 }
 
 // ---- Log Section ----

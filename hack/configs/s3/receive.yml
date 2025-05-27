@@ -15,6 +15,9 @@ retention:
   sync_interval: 10s
   keep_period: "1m"
 
+metrics:
+  enable: true
+
 log:
   level: trace
   format: text

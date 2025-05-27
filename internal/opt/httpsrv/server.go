@@ -4,6 +4,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	controlCrt "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/controller"
@@ -24,6 +27,8 @@ type HTTPHandlersOpts struct {
 }
 
 func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
+	cfg := config.Cfg()
+
 	service := controlSvc.NewControlService(&controlSvc.ControlServiceOpts{
 		PGRW:        opts.PGRW,
 		BaseDir:     opts.BaseDir,
@@ -63,6 +68,10 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 	// Standalone mode (i.e. just serving wal-archive during restore)
 	mux.Handle("/archive/size", secureChain(http.HandlerFunc(controller.ArchiveSizeHandler)))
 	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
+
+	if cfg.Metrics.Enable {
+		mux.Handle("/metrics", promhttp.Handler())
+	}
 
 	return mux
 }

@@ -123,6 +123,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}
 	}()
 
+	// Uploader
 	if cfg.HasExternalStorageConfigured() {
 		// Uploader
 		wg.Add(1)
