@@ -2,8 +2,11 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+// TODO: when metrics disabled by config, we should totally ellimitate any inits
 
 var (
 	// Replication metrics
@@ -113,3 +116,9 @@ var (
 		Help: "Number of current goroutines.",
 	})
 )
+
+func init() {
+	// Unregister default prometheus collectors so we don't collect a bunch of pointless metrics
+	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	prometheus.Unregister(collectors.NewGoCollector())
+}
