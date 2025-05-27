@@ -182,8 +182,6 @@ spec:
               value: "admin"
             - name: GF_SECURITY_ADMIN_PASSWORD
               value: "admin"
-            - name: GF_AUTH_DISABLE_INITIAL_ADMIN_CHANGE_PASSWORD
-              value: "true"
           volumeMounts:
             - name: grafana-storage
               mountPath: /var/lib/grafana
