@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 )
 
@@ -100,7 +102,6 @@ func (u *ArchiveSupervisor) uploadFiles(ctx context.Context, files []uploadBundl
 	var lastErr error
 	for e := range errorChan {
 		u.log().Error("file upload error",
-
 			slog.Any("err", e),
 		)
 		lastErr = e
@@ -141,5 +142,10 @@ func (u *ArchiveSupervisor) uploadOneFile(ctx context.Context, bundle uploadBund
 		slog.String("wal-path", bundle.walFilePath),
 		slog.String("result-path", resultFileName),
 	)
+
+	if u.metricsEnable {
+		metrics.WALFilesUploaded.WithLabelValues(u.storageName).Inc()
+	}
+
 	return nil
 }

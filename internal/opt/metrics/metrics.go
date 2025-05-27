@@ -32,6 +32,12 @@ var (
 		Help: "Current timeline ID being streamed.",
 	})
 
+	// Supervisor (upload, retain)
+	WALFilesUploaded = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "pgrwl_wal_files_uploaded_total",
+		Help: "Number of WAL files uploaded, partitioned by storage backend.",
+	}, []string{"backend"})
+
 	// Performance histograms
 	WALSegmentDownloadDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "pgrwl_wal_segment_download_duration_seconds",
