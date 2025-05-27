@@ -9,9 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/cmd/repo"
-
-	"github.com/hashmap-kz/pgrwl/cmd/loops"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 
 	"github.com/hashmap-kz/pgrwl/config"
 
@@ -58,11 +56,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	var stor *storage.TransformingStorage
 	var daysKeepRetention time.Duration
 	if cfg.HasExternalStorageConfigured() {
-		stor, err = repo.SetupStorage(opts.ReceiveDirectory)
+		stor, err = supervisor.SetupStorage(opts.ReceiveDirectory)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err := repo.CheckManifest(cfg)
+		err := supervisor.CheckManifest(cfg)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -118,15 +116,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			RunningMode: config.ModeReceive,
 			Storage:     stor,
 		})
-		srv := loops.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := httpsrv.NewHTTPSrv(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}
 	}()
 
-	// Uploader
+	// ArchiveSupervisor
 	if cfg.HasExternalStorageConfigured() {
-		// Uploader
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -138,7 +135,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 					)
 				}
 			}()
-			u := loops.NewUploader(cfg, stor, &loops.UploaderLoopOpts{
+			u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})

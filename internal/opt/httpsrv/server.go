@@ -1,77 +1,63 @@
 package httpsrv
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
-
-	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
-
-	controlCrt "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/controller"
-	controlSvc "github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
-
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/middleware"
-
-	"golang.org/x/time/rate"
+	"time"
 )
 
-type HTTPHandlersOpts struct {
-	PGRW        xlog.PgReceiveWal
-	BaseDir     string
-	Verbose     bool
-	RunningMode string
-	Storage     *storage.TransformingStorage
+type HTTPSrv struct {
+	l      *slog.Logger
+	port   int
+	router http.Handler
 }
 
-func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
-	cfg := config.Cfg()
-
-	service := controlSvc.NewControlService(&controlSvc.ControlServiceOpts{
-		PGRW:        opts.PGRW,
-		BaseDir:     opts.BaseDir,
-		RunningMode: opts.RunningMode,
-		Storage:     opts.Storage,
-	})
-	controller := controlCrt.NewController(service)
-
-	// init middlewares
-	loggingMiddleware := middleware.LoggingMiddleware{
-		Logger:  slog.With("component", "rest-api"),
-		Verbose: opts.Verbose,
+func NewHTTPSrv(port int, router http.Handler) *HTTPSrv {
+	return &HTTPSrv{
+		l:      slog.With("component", "httpsrv"),
+		port:   port,
+		router: router,
 	}
-	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
+}
 
-	// Build middleware chain
-	secureChain := middleware.MiddlewareChain(
-		middleware.SafeHandlerMiddleware,
-		loggingMiddleware.Middleware,
-		rateLimitMiddleware.Middleware,
-	)
-	plainChain := middleware.MiddlewareChain(
-		middleware.SafeHandlerMiddleware,
-		loggingMiddleware.Middleware,
-	)
+func (s *HTTPSrv) log() *slog.Logger {
+	if s.l != nil {
+		return s.l
+	}
+	return slog.With("component", "httpsrv")
+}
 
-	// Init handlers
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	// Streaming mode (requires that wal-streaming process is running)
-	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
-	mux.Handle("POST /retention", secureChain(http.HandlerFunc(controller.RetentionHandler)))
-
-	// Standalone mode (i.e. just serving wal-archive during restore)
-	mux.Handle("/archive/size", secureChain(http.HandlerFunc(controller.ArchiveSizeHandler)))
-	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
-
-	if cfg.Metrics.Enable {
-		mux.Handle("/metrics", promhttp.Handler())
+func (s *HTTPSrv) Run(ctx context.Context) error {
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", s.port),
+		Handler:           s.router,
+		ReadTimeout:       5 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      10 * time.Second,
 	}
 
-	return mux
+	go func() {
+		<-ctx.Done()
+		// Context was cancelled, shut down the HTTP server gracefully
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			s.log().Error("HTTP server shutdown error", slog.Any("err", err))
+		} else {
+			s.log().Debug("HTTP server shut down")
+		}
+	}()
+
+	s.log().Info("starting HTTP server", slog.String("addr", srv.Addr))
+
+	// Start the server (blocking)
+	err := srv.ListenAndServe()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err // real error
+	}
+	return nil
 }

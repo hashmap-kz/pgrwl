@@ -290,6 +290,7 @@ func (stream *StreamCtl) closeAndRename() error {
 		return err
 	}
 
+	// NOTE:metrics
 	if stream.metricsEnable {
 		metrics.WALSegmentsReceived.Inc()
 	}
