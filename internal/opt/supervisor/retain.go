@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
@@ -44,6 +46,8 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, daysKeepRetent
 		}
 	}
 
-	u.metrics.WalFilesRetainedInc(u.storageName)
+	if u.metricsEnable {
+		metrics.WALSegmentsDeleted.Inc()
+	}
 	return nil
 }

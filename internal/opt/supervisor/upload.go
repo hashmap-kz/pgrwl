@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 )
 
 func (u *ArchiveSupervisor) performUploads(ctx context.Context) error {
-	files, err := os.ReadDir(u.receiveDirectory)
+	files, err := os.ReadDir(u.opts.ReceiveDirectory)
 	if err != nil {
 		u.log().Error("error reading dir", slog.Any("err", err))
 		return err
@@ -33,12 +35,12 @@ func (u *ArchiveSupervisor) filterFilesToUpload(files []os.DirEntry) []uploadBun
 		if filepath.Base(name) == ".manifest.json" {
 			continue
 		}
-		currentOpenWALFileName := u.pgrw.CurrentOpenWALFileName()
+		currentOpenWALFileName := u.opts.PGRW.CurrentOpenWALFileName()
 		if filepath.Base(name) == filepath.Base(currentOpenWALFileName) {
 			u.log().Debug("skipped currently opened file", slog.String("path", filepath.ToSlash(name)))
 			continue
 		}
-		walFilePath := filepath.ToSlash(filepath.Join(u.receiveDirectory, name))
+		walFilePath := filepath.ToSlash(filepath.Join(u.opts.ReceiveDirectory, name))
 		if !optutils.FileExists(walFilePath) {
 			continue
 		}
@@ -141,6 +143,9 @@ func (u *ArchiveSupervisor) uploadOneFile(ctx context.Context, bundle uploadBund
 		slog.String("result-path", resultFileName),
 	)
 
-	u.metrics.WalFilesUploadedInc(u.storageName)
+	if u.metricsEnable {
+		metrics.WALFilesUploaded.WithLabelValues(u.storageName).Inc()
+	}
+
 	return nil
 }

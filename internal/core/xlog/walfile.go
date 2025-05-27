@@ -10,6 +10,8 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/jackc/pglogrepl"
 )
 
@@ -289,7 +291,9 @@ func (stream *StreamCtl) closeAndRename() error {
 	}
 
 	// NOTE:metrics
-	stream.metrics.WalSegmentsReceivedInc()
+	if stream.metricsEnable {
+		metrics.WALSegmentsReceived.Inc()
+	}
 
 	l.Info("segment is complete")
 	return nil

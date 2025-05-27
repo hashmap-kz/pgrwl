@@ -9,8 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 
 	"github.com/hashmap-kz/pgrwl/config"
@@ -41,18 +39,13 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	// setup metrics
-	metricsCollector := metrics.NewPgrwlMetrics(&metrics.PgrwlMetricsOpts{
-		Enable: cfg.Metrics.Enable,
-	})
-
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
 		Verbose:          opts.Verbose,
-		Metrics:          metricsCollector,
+		MetricsEnable:    cfg.Metrics.Enable,
 	})
 	if err != nil {
 		//nolint:gocritic
@@ -145,7 +138,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
-				Metrics:          metricsCollector,
 			})
 			if cfg.Retention.Enable {
 				u.RunWithRetention(ctx, daysKeepRetention)

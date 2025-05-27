@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
-
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
 
@@ -37,9 +35,10 @@ type pgReceiveWal struct {
 	slotName         string
 	noLoop           bool
 	verbose          bool
-	metrics          metrics.PgrwlMetrics
-	streamMu         sync.RWMutex
-	stream           *StreamCtl // current active stream (or nil)
+	metricsEnable    bool
+
+	streamMu sync.RWMutex
+	stream   *StreamCtl // current active stream (or nil)
 }
 
 var _ PgReceiveWal = &pgReceiveWal{}
@@ -49,7 +48,7 @@ type PgReceiveWalOpts struct {
 	Slot             string
 	NoLoop           bool
 	Verbose          bool
-	Metrics          metrics.PgrwlMetrics
+	MetricsEnable    bool
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
@@ -83,8 +82,8 @@ func NewPgReceiver(ctx context.Context, opts *PgReceiveWalOpts) (PgReceiveWal, e
 		slotName:         opts.Slot,
 		noLoop:           opts.NoLoop,
 		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
-		verbose: opts.Verbose,
-		metrics: opts.Metrics,
+		verbose:       opts.Verbose,
+		metricsEnable: opts.MetricsEnable,
 	}, nil
 }
 
@@ -219,7 +218,7 @@ func (pgrw *pgReceiveWal) streamLog(ctx context.Context) error {
 		ReceiveDirectory: pgrw.receiveDirectory,
 		Conn:             pgrw.conn,
 		Verbose:          pgrw.verbose,
-		Metrics:          pgrw.metrics,
+		MetricsEnable:    pgrw.metricsEnable,
 	})
 	pgrw.SetStream(stream)
 

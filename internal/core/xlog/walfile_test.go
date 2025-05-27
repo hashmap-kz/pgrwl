@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 	"github.com/jackc/pglogrepl"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +20,6 @@ func setupTestStreamCtl(t *testing.T) *StreamCtl {
 		timeline:      1,
 		walSegSz:      16 * 1024 * 1024, // 16 MiB
 		partialSuffix: ".partial",
-		metrics:       metrics.NewPgrwlMetrics(&metrics.PgrwlMetricsOpts{Enable: false}),
 	}
 }
 
