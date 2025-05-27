@@ -138,6 +138,25 @@ data:
         isDefault: true
 
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-config
+  namespace: pgrwl-test
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        options:
+          path: /var/lib/grafana/dashboards
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -159,13 +178,23 @@ spec:
           ports:
             - containerPort: 3000
           env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
             - name: GF_SECURITY_ADMIN_PASSWORD
               value: "admin"
+            - name: GF_AUTH_DISABLE_INITIAL_ADMIN_CHANGE_PASSWORD
+              value: "true"
           volumeMounts:
             - name: grafana-storage
               mountPath: /var/lib/grafana
             - name: grafana-datasources
               mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+            - name: grafana-dashboard-config
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
               readOnly: true
           resources: {}
       volumes:
@@ -176,3 +205,9 @@ spec:
         - name: grafana-datasources
           configMap:
             name: grafana-datasources
+        - name: grafana-dashboard-config
+          configMap:
+            name: grafana-dashboard-config
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards
