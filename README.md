@@ -36,6 +36,7 @@ integration with Kubernetes environments.
     - [Design Notes](#design-notes)
     - [Notes on `fsync`](#-notes-on-fsync-since-the-utility-works-in-synchronous-mode-only)
     - [Notes on `archive_command` and `archive_timeout`](#-notes-on-archive_command-and-archive_timeout)
+- [Contributing](#contributing)
 - [Developer Notes](#developer-notes)
     - [Developer Postulates](#developer-postulates)
     - [Developer Experience](#developer-experience)
@@ -303,6 +304,11 @@ _It is therefore unwise to set a very short `archive_timeout` - it will bloat yo
 In contrast, streaming WAL archiving-when used with replication slots and the `synchronous_standby_names`
 parameter-ensures that the system can be restored to the latest committed transaction.
 This approach provides true zero data loss (**RPO=0**), making it ideal for high-durability requirements.
+
+## Contributing
+
+Contributions are welcomed and greatly appreciated. See [CONTRIBUTING.md](./CONTRIBUTING.md)
+for details on submitting patches and the contribution workflow.
 
 ---
 
