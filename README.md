@@ -19,10 +19,10 @@ integration with Kubernetes environments.
 
 - [About](#about)
 - [Usage](#usage)
-    - [Receive Mode](#receive-mode-_the-main-loop-of-the-wal-receiver_)
-    - [Serve Mode](#serve-mode-_used-during-restore-to-serve-archived-wal-files-from-storage_)
-    - [Restore Command](#restore_command-example-for-postgresqlconf)
-- [Quick Start](#-quick-start)
+    - [Receive Mode](#receive-mode)
+    - [Serve Mode](#serve-mode)
+    - [Restore Command](#restore-command)
+- [Quick Start](examples)
     - [Docker Compose (Basic Setup)](examples/docker-compose-quick-start/)
     - [Docker Compose (Archive And Recovery)](examples/docker-compose-recovery-example/)
     - [Kubernetes (all features: s3-storage, compression, encryption, retention, monitoring, etc...)](examples/k8s-quick-start/)
@@ -63,7 +63,9 @@ integration with Kubernetes environments.
 
 ## Usage
 
-### `Receive` mode (_the main loop of the WAL receiver_)
+### Receive Mode
+
+`Receive` mode is _the main loop of the WAL receiver_.
 
 ```bash
 cat <<EOF >config.yml
@@ -87,7 +89,9 @@ export PGRWL_MODE=receive
 pgrwl -c config.yml
 ```
 
-### `Serve` mode (_used during restore to serve archived WAL files from storage_)
+### Serve Mode
+
+`Serve` mode is _used during restore to serve archived WAL files from storage_.
 
 ```bash
 cat <<EOF >config.yml
@@ -105,7 +109,9 @@ export PGRWL_MODE=serve
 pgrwl -c config.yml
 ```
 
-### `restore_command` example for postgresql.conf
+### Restore Command
+
+`restore_command` example for postgresql.conf:
 
 ```
 # where 'k8s-worker5:30266' represents the host and port
