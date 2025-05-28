@@ -37,6 +37,10 @@ integration with Kubernetes environments.
     - [Notes on `fsync`](#-notes-on-fsync-since-the-utility-works-in-synchronous-mode-only)
     - [Notes on `archive_command` and `archive_timeout`](#-notes-on-archive_command-and-archive_timeout)
 - [Developer Notes](#developer-notes)
+    - [Developer Postulates](#developer-postulates)
+    - [Developer Experience](#developer-experience)
+    - [Clarity of Purpose](#clarity-of-purpose)
+    - [Observability](#observability)
     - [Integration Testing](#integration-testing)
     - [Verify build locally](#to-contribute-or-verify-the-project-locally-the-following-make-targets-should-all-pass)
     - [Source Code Structure](#source-code-structure)
@@ -287,17 +291,17 @@ risk.
 There’s a significant difference between using `archive_command` and archiving WAL files via the streaming replication
 protocol.
 
-The `archive_command` is triggered only after a WAL file is fully completed—typically when it reaches 16 MiB (the
+The `archive_command` is triggered only after a WAL file is fully completed-typically when it reaches 16 MiB (the
 default segment size). This means that in a crash scenario, you could lose up to 16 MiB of data.
 
 You can mitigate this by setting a lower `archive_timeout` (e.g., 1 minute), but even then, in a worst-case scenario,
 you risk losing up to 1 minute of data.
 Also, it’s important to note that PostgreSQL preallocates WAL files to the configured `wal_segment_size`, so they are
 created with full size regardless of how much data has been written. (Quote from documentation:
-_It is therefore unwise to set a very short `archive_timeout` — it will bloat your archive storage._).
+_It is therefore unwise to set a very short `archive_timeout` - it will bloat your archive storage._).
 
-In contrast, streaming WAL archiving—when used with replication slots and the `synchronous_standby_names`
-parameter—ensures that the system can be restored to the latest committed transaction.
+In contrast, streaming WAL archiving-when used with replication slots and the `synchronous_standby_names`
+parameter-ensures that the system can be restored to the latest committed transaction.
 This approach provides true zero data loss (**RPO=0**), making it ideal for high-durability requirements.
 
 ---
@@ -305,6 +309,38 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 ## Developer Notes
 
 **[`^        back to top        ^`](#table-of-contents)**
+
+### Developer Postulates
+
+These principles guide the development of `pgrwl` to ensure long-term maintainability, ease of use, and operational
+clarity:
+
+- **Simplicity**: Prioritize simplicity in both development and usage. The system should be easy to run, understand, and
+  extend.
+- **Durability**: WAL files must be reliably persisted to prevent data loss - no compromises.
+- **Predictability**: The application should behave consistently and transparently across different environments and
+  scenarios.
+
+### Developer Experience
+
+- **Simple Configuration**: Users should be able to configure and launch the application with minimal effort - ideally
+  with a single YAML file and a few environment variables.
+- **Easy Debugging**: Troubleshooting should not require navigating complex dependencies. The system must produce
+  helpful, traceable logs.
+
+### Clarity of Purpose
+
+- Anyone should be able to:
+    - Understand what the application does.
+    - Use it confidently without prior deep knowledge of PostgreSQL internals.
+    - Contribute to it without needing to reverse-engineer its design.
+
+### Observability
+
+- **Structured Logging**: All logs use structured formats (e.g., JSON or text with context) and support verbose tracing
+  when needed.
+- **Metrics**: Prometheus-compatible metrics are exposed for observability, health checks, and integration with
+  monitoring dashboards.
 
 ### Integration Testing:
 
