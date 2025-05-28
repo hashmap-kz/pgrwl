@@ -250,6 +250,8 @@ _The full process may look like this (a typical, rough, and simplified example):
 
 ## Architecture
 
+**[`^        back to top        ^`](#table-of-contents)**
+
 ### Design Notes
 
 `pgrwl` is designed to use the local filesystem exclusively. This is a deliberate choice, because - as mentioned
