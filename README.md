@@ -19,6 +19,7 @@ integration with Kubernetes environments.
 
 - [🚀 About](#-about)
 - [🛠️ Usage](#-usage)
+- [⚙️ Configuration Reference](#-configuration-reference)
 - [🚀 Installation](#-installation)
     - [Docker Images](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
     - [Binaries](#manual-installation)
