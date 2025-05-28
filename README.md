@@ -8,8 +8,6 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/go.mod#L3)
 [![Latest Release](https://img.shields.io/github/v/release/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/releases/latest)
 
----
-
 **pgrwl** is a PostgreSQL write-ahead log (WAL) receiver written in Go. It’s a drop-in, container-friendly alternative
 to `pg_receivewal`, supporting streaming replication, encryption, compression, and remote storage (S3, SFTP).
 
