@@ -15,7 +15,7 @@ integration with Kubernetes environments.
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
 - [About](#about)
 - [Usage](#usage)
@@ -62,6 +62,8 @@ integration with Kubernetes environments.
 ---
 
 ## Usage
+
+**[`^        back to top        ^`](#table-of-contents)**
 
 ### Receive Mode
 
@@ -123,6 +125,8 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 
 ## Configuration Reference
 
+**[`^        back to top        ^`](#table-of-contents)**
+
 The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
@@ -180,6 +184,8 @@ storage:                                 # Optional
 
 ## Installation
 
+**[`^        back to top        ^`](#table-of-contents)**
+
 ### Docker images are available at [quay.io/hashmap_kz/pgrwl](https://quay.io/repository/hashmap_kz/pgrwl)
 
 ```
@@ -229,6 +235,8 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 ---
 
 ## Disaster Recovery Use Cases
+
+**[`^        back to top        ^`](#table-of-contents)**
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
@@ -284,6 +292,8 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 ---
 
 ## Developer Notes
+
+**[`^        back to top        ^`](#table-of-contents)**
 
 ### Integration Testing:
 
