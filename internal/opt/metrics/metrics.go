@@ -15,7 +15,9 @@ type pgrwlMetrics interface {
 	IncWALFilesUploaded()
 	IncWALFilesDeleted()
 	AddWALFilesDeleted(f float64)
-} // noop
+}
+
+// noop
 
 type pgrwlMetricsNoop struct{}
 
