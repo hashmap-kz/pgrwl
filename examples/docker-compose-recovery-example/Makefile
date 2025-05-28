@@ -7,8 +7,6 @@ COMPOSE_FILE = docker-compose.yml
 
 # Build images, up containers
 build:
-	@rm -rf bin
-	@sh -c 'cd ../ && make build && mv bin examples'
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build
 	@echo "✅ Cluster is starting..."
 

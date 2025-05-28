@@ -2,7 +2,7 @@
 set -euo pipefail
 
 (
-  cd .. && make image
+  cd ../../../ && make image
 )
 
 kubectl create ns pgrwl-test --dry-run=client -oyaml | kubectl apply -f -

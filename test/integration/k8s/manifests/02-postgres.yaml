@@ -1,0 +1,179 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-init-script
+  namespace: pgrwl-test
+data:
+  initdb.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # https://hub.docker.com/_/postgres
+    # Initialization scripts
+
+    echo ">>> Initializing PostgreSQL server"
+
+    ####### extensions (optional) #######
+
+    echo ">>> Enabling [pg_stat_statements] module on database"
+    psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" <<-EOSQL
+        CREATE EXTENSION pg_stat_statements;
+    EOSQL
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-envs
+  namespace: pgrwl-test
+data:
+  TZ: "Asia/Aqtau"
+  POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+  PGDATA: "/var/lib/postgresql/data/pgdata"
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "postgres"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-conf
+  namespace: pgrwl-test
+data:
+  pg_hba.conf: |
+    local all         all     trust
+    local replication all     trust
+    host  all         all all trust
+    host  replication all all trust
+
+  postgresql.conf: |
+    listen_addresses                = '*'
+    port                            = 5432
+    max_connections                 = 250
+    superuser_reserved_connections  = 3
+    log_lock_waits                  = on
+    log_temp_files                  = 0
+    log_checkpoints                 = on
+    log_connections                 = on
+    log_destination                 = 'stderr'
+    log_error_verbosity             = 'DEFAULT'
+    log_hostname                    = off
+    log_min_messages                = 'INFO'
+    log_timezone                    = 'Asia/Aqtau'
+    log_line_prefix                 = '%t [%p-%l] %r %q%u@%d '
+    log_replication_commands        = on
+    password_encryption             = 'scram-sha-256'
+    datestyle                       = 'iso, mdy'
+    timezone                        = 'Asia/Aqtau'
+    compute_query_id                = on
+    track_activity_query_size       = '2048'
+    track_functions                 = 'pl'
+    track_io_timing                 = 'on'
+    track_wal_io_timing             = 'on'
+    shared_preload_libraries        = 'pg_stat_statements'
+    pg_stat_statements.max          = 10000
+    pg_stat_statements.track        = top
+    wal_level                       = replica
+    max_wal_size                    = 1GB
+    min_wal_size                    = 80MB
+    max_wal_senders                 = 10
+    max_replication_slots           = 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: &app postgres
+  namespace: pgrwl-test
+  labels:
+    app: *app
+spec:
+  type: NodePort
+  ports:
+    - name: server
+      port: 5432
+      protocol: TCP
+      nodePort: 30265
+  selector:
+    app: *app
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: pgrwl-test
+spec:
+  # NOTE: replace with pvc you're using in your infra.
+  storageClassName: standard
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: &app postgres
+  namespace: pgrwl-test
+  labels:
+    app: *app
+spec:
+  replicas: 1
+  serviceName: *app
+  selector:
+    matchLabels:
+      app: *app
+  template:
+    metadata:
+      labels:
+        app: *app
+    spec:
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: postgres-data
+            readOnly: false
+        - name: postgres-dev-shm # https://stackoverflow.com/a/67144103/1326803
+          emptyDir:
+            medium: Memory
+        - name: postgresql-init-script
+          configMap:
+            name: postgresql-init-script
+        - name: postgresql-conf
+          configMap:
+            name: postgresql-conf
+      containers:
+        - name: server
+          image: postgres:17-bookworm
+          imagePullPolicy: IfNotPresent
+          args:
+            - -c
+            - config_file=/etc/postgresql/postgresql.conf
+            - -c
+            - hba_file=/etc/postgresql/pg_hba.conf
+          envFrom:
+            - configMapRef:
+                name: postgresql-envs
+          ports:
+            - containerPort: 5432
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "32m"
+            limits:
+              memory: "2500Mi"
+              cpu: "2"
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: storage
+            - name: postgres-dev-shm
+              mountPath: /dev/shm
+            - mountPath: /etc/postgresql
+              name: postgresql-conf
+            - mountPath: /docker-entrypoint-initdb.d
+              name: postgresql-init-script

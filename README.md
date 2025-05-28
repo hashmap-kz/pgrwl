@@ -19,6 +19,12 @@ integration with Kubernetes environments.
 
 - [🚀 About](#-about)
 - [🛠️ Usage](#-usage)
+    - [Receive Mode](#receive-mode-_the-main-loop-of-the-wal-receiver_)
+    - [Serve Mode](#serve-mode-_used-during-restore-to-serve-archived-wal-files-from-storage_)
+- [⭐ Quick Start](#quick-start)
+    - [Docker Compose Basic Setup](examples/docker-compose-quick-start/)
+    - [Docker Compose Archive And Recovery](examples/docker-compose-recovery-example/)
+    - [Kubernetes (all features: s3-storage, compression, encryption, retention, monitoring, etc...)](examples/k8s-quick-start/)
 - [⚙️ Configuration Reference](#-configuration-reference)
 - [🚀 Installation](#-installation)
     - [Docker Images](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
@@ -43,15 +49,15 @@ integration with Kubernetes environments.
 
 ## 🚀 About
 
-* The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
+- The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
   recovery.
 
-* _It's primarily designed for use in containerized environments._
+- _It's primarily designed for use in containerized environments._
 
-* The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
+- The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
   streaming into partial files, extensive error checking and more.
 
-* The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
+- The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
   container running PostgreSQL.
 
 ---
@@ -103,18 +109,16 @@ pgrwl -c config.yml
 ### `restore_command` example for postgresql.conf
 
 ```
-# where 'k8s-worker5:30266' represents the host and port 
-# of a 'pgrwl' instance running in 'serve' mode. 
+# where 'k8s-worker5:30266' represents the host and port
+# of a 'pgrwl' instance running in 'serve' mode.
 restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 ```
 
-⭐ **See also: [examples](examples) (step-by-step archive and recovery), and [k8s](k8s) (basic setup)**
-
---- 
+---
 
 ## ⚙️ Configuration Reference
 
-The configuration file is in JSON or YML format (*.json is preferred).
+The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
 ```
@@ -217,7 +221,7 @@ curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linu
 apk add pgrwl_linux_amd64.apk --allow-untrusted
 ```
 
---- 
+---
 
 ## 🗃️ Disaster Recovery Use Cases
 
@@ -249,10 +253,10 @@ critical paths.
 
 ### 💾 Notes on `fsync` (since the utility works in synchronous mode **only**):
 
-* After each WAL segment is written, an `fsync` is performed on the currently open WAL file to ensure durability.
-* An `fsync` is triggered when a WAL segment is completed and the `*.partial` file is renamed to its final form.
-* An `fsync` is triggered when a keepalive message is received from the server with the `reply_requested` option set.
-* Additionally, `fsync` is called whenever an error occurs during the receive-copy loop.
+- After each WAL segment is written, an `fsync` is performed on the currently open WAL file to ensure durability.
+- An `fsync` is triggered when a WAL segment is completed and the `*.partial` file is renamed to its final form.
+- An `fsync` is triggered when a keepalive message is received from the server with the `reply_requested` option set.
+- Additionally, `fsync` is called whenever an error occurs during the receive-copy loop.
 
 ### 🔁 Notes on `archive_command` and `archive_timeout`
 
@@ -260,8 +264,7 @@ There’s a significant difference between using `archive_command` and archiving
 protocol.
 
 The `archive_command` is triggered only after a WAL file is fully completed—typically when it reaches 16 MiB (the
-default segment size).
-This means that in a crash scenario, you could lose up to 16 MiB of data.
+default segment size). This means that in a crash scenario, you could lose up to 16 MiB of data.
 
 You can mitigate this by setting a lower `archive_timeout` (e.g., 1 minute), but even then, in a worst-case scenario,
 you risk losing up to 1 minute of data.
@@ -285,26 +288,26 @@ It also checks that the WAL files generated are byte-for-byte identical to those
 
 #### Test Steps:
 
-* Initialize and start a PostgreSQL cluster
-* Run WAL receivers (`pgrwl` and `pg_receivewal`)
-* Create a base backup
-* Create a table, and insert the current timestamp every second (in the background)
-* Run pgbench to populate the database with 1 million rows
-* Generate additional data (~512 MiB)
-* Concurrently create 100 tables with 10000 rows each.
-* Terminate the insert-script job
-* Run pg_dumpall and save the output as plain SQL
-* Terminate all PostgreSQL processes and delete the `PGDATA` directory (termination is force and abnormal)
-* Restore `PGDATA` from the base backup, add recovery.signal, and configure restore_command
-* Rename all `*.partial` WAL files in the WAL archive directories
-* Start the PostgreSQL cluster (cluster should recover to the latest committed transaction)
-* Run pg_dumpall after the cluster is ready
-* Diff the pg_dumpall results (before and after)
-* Check the insert-script logs and verify that the table contains the last inserted row
-* Compare WAL directories (filenames and contents must match 100%)
-* Clean up WAL directories and rerun the WAL archivers on a new timeline (cleanup is necessary since we run receivers
+- Initialize and start a PostgreSQL cluster
+- Run WAL receivers (`pgrwl` and `pg_receivewal`)
+- Create a base backup
+- Create a table, and insert the current timestamp every second (in the background)
+- Run pgbench to populate the database with 1 million rows
+- Generate additional data (~512 MiB)
+- Concurrently create 100 tables with 10000 rows each.
+- Terminate the insert-script job
+- Run pg_dumpall and save the output as plain SQL
+- Terminate all PostgreSQL processes and delete the `PGDATA` directory (termination is force and abnormal)
+- Restore `PGDATA` from the base backup, add recovery.signal, and configure restore_command
+- Rename all `*.partial` WAL files in the WAL archive directories
+- Start the PostgreSQL cluster (cluster should recover to the latest committed transaction)
+- Run pg_dumpall after the cluster is ready
+- Diff the pg_dumpall results (before and after)
+- Check the insert-script logs and verify that the table contains the last inserted row
+- Compare WAL directories (filenames and contents must match 100%)
+- Clean up WAL directories and rerun the WAL archivers on a new timeline (cleanup is necessary since we run receivers
   with --no-loop option)
-* Compare the WAL directories again
+- Compare the WAL directories again
 
 ### To contribute or verify the project locally, the following `make` targets should all pass:
 
@@ -338,7 +341,7 @@ internal/xlog/pg_receivewal.go
 
 internal/xlog/receivelog.go
   → Core streaming loop and replication logic.
-    Based on the logic found in PostgreSQL: 
+    Based on the logic found in PostgreSQL:
     https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c
 
 internal/xlog/xlog_internal.go
@@ -365,8 +368,8 @@ internal/xlog/fsync/
 
 - Download all WAL files
 - Metrics, alerting
-- [X] Concurrent batch-uploads
-- [X] Retention loop (configured: i.e.: retention_period = 3d)
+- [x] Concurrent batch-uploads
+- [x] Retention loop (configured: i.e.: retention_period = 3d)
 - Retention loop (triggered: i.e.: /api/v1/retention?before=0000000100000006000000DE)
 
 ### ⏮️ Links
