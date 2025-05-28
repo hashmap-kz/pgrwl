@@ -17,37 +17,36 @@ integration with Kubernetes environments.
 
 ## 📚 Table of Contents
 
-- [🚀 About](#-about)
-- [🛠️ Usage](#-usage)
+- [About](#about)
+- [Usage](#usage)
     - [Receive Mode](#receive-mode-_the-main-loop-of-the-wal-receiver_)
     - [Serve Mode](#serve-mode-_used-during-restore-to-serve-archived-wal-files-from-storage_)
-- [⭐ Quick Start](#quick-start)
-    - [Docker Compose Basic Setup](examples/docker-compose-quick-start/)
-    - [Docker Compose Archive And Recovery](examples/docker-compose-recovery-example/)
+    - [Restore Command](#restore_command-example-for-postgresqlconf)
+- [Quick Start](#-quick-start)
+    - [Docker Compose (Basic Setup)](examples/docker-compose-quick-start/)
+    - [Docker Compose (Archive And Recovery)](examples/docker-compose-recovery-example/)
     - [Kubernetes (all features: s3-storage, compression, encryption, retention, monitoring, etc...)](examples/k8s-quick-start/)
-- [⚙️ Configuration Reference](#-configuration-reference)
-- [🚀 Installation](#-installation)
+- [Configuration Reference](#configuration-reference)
+- [Installation](#installation)
     - [Docker Images](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
     - [Binaries](#manual-installation)
     - [Packages](#package-based-installation-suitable-in-cicd)
-- [🗃️ Disaster Recovery Use Cases](#-disaster-recovery-use-cases)
-- [🧱 Architecture](#-architecture)
+- [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
+- [Architecture](#architecture)
     - [Design Notes](#design-notes)
     - [Notes on `fsync`](#-notes-on-fsync-since-the-utility-works-in-synchronous-mode-only)
     - [Notes on `archive_command` and `archive_timeout`](#-notes-on-archive_command-and-archive_timeout)
-- [👷 Developer Notes](#-developer-notes)
-    - [Integration Testing](#-integration-testing)
+- [Developer Notes](#developer-notes)
+    - [Integration Testing](#integration-testing)
     - [Verify build locally](#to-contribute-or-verify-the-project-locally-the-following-make-targets-should-all-pass)
-    - [Source Code Structure](#-source-code-structure)
-    - [Notes On Configuration](#notes-on-configuration)
-    - [Main Loop Diagram](#-main-loop)
-    - [Planned Features](#-planned-features)
-    - [Links](#-links)
-- [📜 License](#-license)
+    - [Source Code Structure](#source-code-structure)
+    - [Main Loop Diagram](#main-loop)
+    - [Links](#links)
+- [License](#license)
 
 ---
 
-## 🚀 About
+## About
 
 - The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
   recovery.
@@ -62,7 +61,7 @@ integration with Kubernetes environments.
 
 ---
 
-## 🛠️ Usage
+## Usage
 
 ### `Receive` mode (_the main loop of the WAL receiver_)
 
@@ -116,7 +115,7 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 
 ---
 
-## ⚙️ Configuration Reference
+## Configuration Reference
 
 The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
@@ -173,7 +172,7 @@ storage:                                 # Optional
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Docker images are available at [quay.io/hashmap_kz/pgrwl](https://quay.io/repository/hashmap_kz/pgrwl)
 
@@ -223,7 +222,7 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 ---
 
-## 🗃️ Disaster Recovery Use Cases
+## Disaster Recovery Use Cases
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
@@ -235,7 +234,7 @@ _The full process may look like this (a typical, rough, and simplified example):
 
 ---
 
-## 🧱 Architecture
+## Architecture
 
 ### Design Notes
 
@@ -278,9 +277,9 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 
 ---
 
-## 👷 Developer Notes
+## Developer Notes
 
-### 🧪 Integration Testing:
+### Integration Testing:
 
 Here an example of a 'golden' fundamental test.
 It verifies that we can restore to the latest committed transaction after an abrupt system crash.
@@ -331,7 +330,7 @@ make snapshot
 
 ✅ All targets should complete successfully before submitting changes or opening a PR.
 
-### 🗂️ Source Code Structure
+### Source Code Structure
 
 ```
 internal/xlog/pg_receivewal.go
@@ -360,11 +359,11 @@ internal/xlog/fsync/
   → Optimized wrappers for safe and efficient `fsync` system calls.
 ```
 
-### 📐 Main Loop
+### Main Loop
 
 ![main loop](assets/diagrams/loop.png)
 
-### ⏮️ Links
+### Links
 
 - [pg_receivewal Documentation](https://www.postgresql.org/docs/current/app-pgrwl.html)
 - [pg_receivewal Source Code](https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/pg_receivewal.c)
@@ -374,6 +373,6 @@ internal/xlog/fsync/
 
 ---
 
-## 📜 License
+## License
 
 MIT License. See [LICENSE](./LICENSE) for details.
