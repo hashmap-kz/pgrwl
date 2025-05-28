@@ -264,8 +264,7 @@ There’s a significant difference between using `archive_command` and archiving
 protocol.
 
 The `archive_command` is triggered only after a WAL file is fully completed—typically when it reaches 16 MiB (the
-default segment size).
-This means that in a crash scenario, you could lose up to 16 MiB of data.
+default segment size). This means that in a crash scenario, you could lose up to 16 MiB of data.
 
 You can mitigate this by setting a lower `archive_timeout` (e.g., 1 minute), but even then, in a worst-case scenario,
 you risk losing up to 1 minute of data.
