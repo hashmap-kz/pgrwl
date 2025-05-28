@@ -3,7 +3,7 @@ module github.com/hashmap-kz/pgrwl
 go 1.24.1
 
 require (
-	github.com/hashmap-kz/storecrypt v1.0.1
+	github.com/hashmap-kz/storecrypt v1.0.4
 	github.com/hashmap-kz/streamcrypt v1.1.0
 	github.com/jackc/pglogrepl v0.0.0-20250509230407-a9884f6bd75a
 	github.com/jackc/pgx/v5 v5.7.5

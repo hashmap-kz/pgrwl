@@ -9,23 +9,17 @@
       "program": "${workspaceFolder}/main.go",
       "buildFlags": "-tags=debug",
       "args": [
-        "receive",
-        "-D",
-        "wals",
-        "-S",
-        "pg_recwal_5",
-        "--log-level",
-        "info",
-        "--http-server-addr",
-        ":8080",
-        "--http-server-token",
-        "1024"
+        "start",
+        "-c",
+        "${workspaceFolder}/hack/configs/s3/receive.yml"
       ],
       "env": {
         "PGHOST": "localhost",
-        "PGPORT": "5432",
+        "PGPORT": "30265",
         "PGUSER": "postgres",
         "PGPASSWORD": "postgres",
+        "PGRWL_MODE": "receive",
+        "PGRWL_MINIO_URL": "https://localhost:30268"
       },
       "console": "integratedTerminal"
     }

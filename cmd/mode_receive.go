@@ -144,6 +144,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
+				Verbose:          opts.Verbose,
 			})
 			if cfg.Retention.Enable {
 				u.RunWithRetention(ctx, daysKeepRetention)

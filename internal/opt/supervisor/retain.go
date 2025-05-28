@@ -4,25 +4,33 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
-func (u *ArchiveSupervisor) filterOlderThan(files []storage.FileInfo, maxAge time.Duration) []storage.FileInfo {
-	var result []storage.FileInfo
-	cutoff := time.Now().Add(-maxAge)
+func (u *ArchiveSupervisor) filterOlderThan(
+	files []storage.FileInfo,
+	cutoff time.Time,
+) []string {
+	var result []string
 	for _, f := range files {
-		if f.ModTime.Before(cutoff) {
-			result = append(result, f)
+		if f.ModTime.UTC().Before(cutoff) {
+			result = append(result, filepath.ToSlash(f.Path))
 		}
 	}
+	slices.Sort(result)
 	return result
 }
 
 func (u *ArchiveSupervisor) performRetention(ctx context.Context, daysKeepRetention time.Duration) error {
+	cutoff := time.Now().UTC().Add(-daysKeepRetention)
+	u.log().Debug("retention cutoff", slog.String("cutoff", cutoff.Format(time.DateTime)))
+
 	fileInfos, err := u.stor.ListInfo(ctx, "")
 	if err != nil {
 		return err
@@ -31,19 +39,32 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, daysKeepRetent
 		return nil
 	}
 
-	olderThan := u.filterOlderThan(fileInfos, daysKeepRetention)
+	if u.verbose {
+		for i := range fileInfos {
+			u.log().LogAttrs(ctx, logger.LevelTrace, "files in storage",
+				slog.String("modtime", fileInfos[i].ModTime.Format(time.DateTime)),
+				slog.String("cutoff", cutoff.Format(time.DateTime)),
+				slog.String("path", fileInfos[i].Path),
+			)
+		}
+	}
+
+	olderThan := u.filterOlderThan(fileInfos, cutoff)
 	if len(olderThan) == 0 {
 		return nil
 	}
 
-	// TODO: bulk delete, no iterations
-	u.log().Debug("begin to retain files", slog.Int("cnt", len(olderThan)))
-	for _, elem := range olderThan {
-		u.log().Debug("delete file", slog.String("path", filepath.ToSlash(elem.Path)))
-		err := u.stor.Delete(ctx, elem.Path)
-		if err != nil {
-			return err
+	if u.verbose {
+		for i := range olderThan {
+			u.log().LogAttrs(ctx, logger.LevelTrace, "files to retain",
+				slog.String("path", olderThan[i]),
+			)
 		}
+	}
+
+	u.log().Debug("begin to retain files", slog.Int("cnt", len(olderThan)))
+	if err := u.stor.DeleteAllBulk(ctx, olderThan); err != nil {
+		return err
 	}
 
 	metrics.PgrwlMetricsCollector.AddWALFilesDeleted(float64(len(olderThan)))

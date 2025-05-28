@@ -13,7 +13,7 @@ uploader:
 retention:
   enable: true
   sync_interval: 10s
-  keep_period: "1m"
+  keep_period: "30s"
 
 metrics:
   enable: true
