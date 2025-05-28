@@ -15,10 +15,11 @@
       ],
       "env": {
         "PGHOST": "localhost",
-        "PGPORT": "15433",
+        "PGPORT": "30265",
         "PGUSER": "postgres",
         "PGPASSWORD": "postgres",
-        "PGRWL_MODE": "receive"
+        "PGRWL_MODE": "receive",
+        "PGRWL_MINIO_URL": "https://localhost:30268"
       },
       "console": "integratedTerminal"
     }
