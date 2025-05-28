@@ -35,9 +35,8 @@ type pgReceiveWal struct {
 	slotName         string
 	noLoop           bool
 	verbose          bool
-
-	streamMu sync.RWMutex
-	stream   *StreamCtl // current active stream (or nil)
+	streamMu         sync.RWMutex
+	stream           *StreamCtl // current active stream (or nil)
 }
 
 var _ PgReceiveWal = &pgReceiveWal{}

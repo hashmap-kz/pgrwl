@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
@@ -480,6 +481,9 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 		bytesLeft -= bytesToWrite
 		stream.blockPos += pglogrepl.LSN(bytesToWrite)
 		xlogoff += bytesToWrite
+
+		// NOTE:metrics
+		metrics.PgrwlMetricsCollector.AddWALBytesReceived(float64(bytesToWrite))
 
 		/* Did we reach the end of a WAL segment? */
 		xlSegOff := XLogSegmentOffset(stream.blockPos, stream.walSegSz)

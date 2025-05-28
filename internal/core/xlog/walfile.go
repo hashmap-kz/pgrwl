@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 
 	"github.com/jackc/pglogrepl"
 )
@@ -288,6 +289,9 @@ func (stream *StreamCtl) closeAndRename() error {
 	if err := fsync.FsyncFnameAndDir(finalName); err != nil {
 		return err
 	}
+
+	// NOTE:metrics
+	metrics.PgrwlMetricsCollector.IncWALFilesReceived()
 
 	l.Info("segment is complete")
 	return nil
