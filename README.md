@@ -364,14 +364,6 @@ internal/xlog/fsync/
 
 ![main loop](assets/diagrams/loop.png)
 
-### 🛠 Planned Features
-
-- Download all WAL files
-- Metrics, alerting
-- [x] Concurrent batch-uploads
-- [x] Retention loop (configured: i.e.: retention_period = 3d)
-- Retention loop (triggered: i.e.: /api/v1/retention?before=0000000100000006000000DE)
-
 ### ⏮️ Links
 
 - [pg_receivewal Documentation](https://www.postgresql.org/docs/current/app-pgrwl.html)
