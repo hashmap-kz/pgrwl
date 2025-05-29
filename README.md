@@ -157,6 +157,9 @@ retention:                               # Optional (used in receive mode)
 metrics:
   enable: true                           # Optional (used in receive mode: http://host:port/metrics)
 
+debug_config:                            # Optional (various dev options)  
+  enable_pprof: true
+
 log:                                     # Optional
   level: info                            # One of: trace / debug / info / warn / error
   format: text                           # One of: text / json
