@@ -1,0 +1,15 @@
+---
+main:
+  listen_port: 7070
+  directory: wals
+
+receiver:
+  slot: pgrwl_v5
+
+debug_config:
+  enable_pprof: true
+
+log:
+  level: trace
+  format: text
+  add_source: true
