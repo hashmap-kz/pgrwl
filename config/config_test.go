@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -74,4 +75,164 @@ func TestExpandEnvsWithPrefix(t *testing.T) {
 			assert.Equal(t, tt.expected, out)
 		})
 	}
+}
+
+func TestValidate_Config(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         *Config
+		mode        string
+		expectError bool
+		wantMsgs    []string // optional substring checks
+	}{
+		{
+			name: "valid receive config with s3",
+			mode: ModeReceive,
+			cfg: &Config{
+				Main: MainConfig{
+					ListenPort: 8080,
+					Directory:  "/var/lib/pgwal",
+				},
+				Receiver: ReceiveConfig{
+					Slot: "slot1",
+				},
+				Storage: StorageConfig{
+					Name: StorageNameS3,
+					S3: S3Config{
+						URL:             "https://s3.amazonaws.com",
+						AccessKeyID:     "AKIA...",
+						SecretAccessKey: "secret",
+						Bucket:          "bucket",
+						Region:          "us-east-1",
+					},
+					Uploader: UploadConfig{
+						SyncInterval:   "10s",
+						MaxConcurrency: 2,
+					},
+					Retention: RetentionConfig{
+						Enable:       true,
+						SyncInterval: "12h",
+						KeepPeriod:   "24h",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid mode and missing main",
+			mode: "invalid",
+			cfg: &Config{
+				Main: MainConfig{},
+			},
+			expectError: true,
+			wantMsgs: []string{
+				"invalid mode",
+				"main.listen_port is required",
+				"main.directory is required",
+			},
+		},
+		{
+			name: "invalid uploader and retention durations",
+			mode: ModeReceive,
+			cfg: &Config{
+				Main: MainConfig{
+					ListenPort: 1,
+					Directory:  "/pgwal",
+				},
+				Receiver: ReceiveConfig{Slot: "slot"},
+				Storage: StorageConfig{
+					Name: StorageNameS3,
+					S3: S3Config{
+						URL:             "x",
+						AccessKeyID:     "x",
+						SecretAccessKey: "x",
+						Bucket:          "x",
+						Region:          "x",
+					},
+					Uploader: UploadConfig{
+						SyncInterval:   "bad",
+						MaxConcurrency: 0,
+					},
+					Retention: RetentionConfig{
+						Enable:       true,
+						SyncInterval: "nope",
+						KeepPeriod:   "never",
+					},
+				},
+			},
+			expectError: true,
+			wantMsgs: []string{
+				"uploader.sync_interval cannot parse",
+				"uploader.max_concurrency must be > 0",
+				"retention.sync_interval cannot parse",
+				"retention.keep_period cannot parse",
+			},
+		},
+		{
+			name: "invalid sftp config missing pass or key",
+			mode: ModeReceive,
+			cfg: &Config{
+				Main: MainConfig{
+					ListenPort: 1234,
+					Directory:  "/data",
+				},
+				Receiver: ReceiveConfig{Slot: "slot"},
+				Storage: StorageConfig{
+					Name: StorageNameSFTP,
+					SFTP: SFTPConfig{
+						Host: "host",
+						Port: 22,
+						User: "user",
+						// Missing Pass and PKeyPath
+					},
+					Uploader: UploadConfig{
+						SyncInterval:   "10s",
+						MaxConcurrency: 1,
+					},
+				},
+			},
+			expectError: true,
+			wantMsgs: []string{
+				"either storage.sftp.pass or storage.sftp.pkey_path must be provided",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validate(tt.cfg, tt.mode)
+			if tt.expectError {
+				assert.Error(t, err)
+				for _, want := range tt.wantMsgs {
+					assert.Contains(t, err.Error(), want)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, 10*time.Second, tt.cfg.Storage.Uploader.SyncIntervalParsed)
+			}
+		})
+	}
+}
+
+func TestValidate_SuccessMinimalReceiveConfig(t *testing.T) {
+	cfg := &Config{
+		Main: MainConfig{
+			ListenPort: 8080,
+			Directory:  "/var/lib/pgwal",
+		},
+		Receiver: ReceiveConfig{
+			Slot: "replication_slot",
+		},
+		Storage: StorageConfig{
+			Name: "s3",
+			Uploader: UploadConfig{
+				SyncInterval:   "10s",
+				MaxConcurrency: 1,
+			},
+		},
+	}
+
+	err := validate(cfg, ModeReceive)
+	assert.Error(t, err)
+	assert.Equal(t, 10*time.Second, cfg.Storage.Uploader.SyncIntervalParsed)
 }

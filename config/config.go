@@ -49,14 +49,12 @@ var (
 // Config is the root configuration for the WAL receiver application.
 // Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
-	Main      MainConfig      `json:"main,omitempty"`       // Main application settings.
-	Receiver  ReceiveConfig   `json:"receiver,omitempty"`   // WAL receiver configuration.
-	Uploader  UploadConfig    `json:"uploader,omitempty"`   // Uploader worker configuration.
-	Retention RetentionConfig `json:"retention,omitempty"`  // Retention policy configuration.
-	Metrics   MetricsConfig   `json:"metrics,omitempty"`    // Prometheus metrics configuration.
-	Log       LogConfig       `json:"log,omitempty"`        // Logging configuration.
-	Storage   StorageConfig   `json:"storage,omitempty"`    // Storage backend configuration.
-	DevConfig DevConfig       `json:"dev_config,omitempty"` // Various dev options.
+	Main      MainConfig    `json:"main,omitempty"`       // Main application settings.
+	Receiver  ReceiveConfig `json:"receiver,omitempty"`   // WAL receiver configuration.
+	Metrics   MetricsConfig `json:"metrics,omitempty"`    // Prometheus metrics configuration.
+	Log       LogConfig     `json:"log,omitempty"`        // Logging configuration.
+	Storage   StorageConfig `json:"storage,omitempty"`    // Storage backend configuration.
+	DevConfig DevConfig     `json:"dev_config,omitempty"` // Various dev options.
 }
 
 // MainConfig holds top-level application settings.
@@ -147,6 +145,12 @@ type StorageConfig struct {
 
 	// S3 holds configuration specific to the S3 backend.
 	S3 S3Config `json:"s3,omitempty"`
+
+	// Uploader worker configuration.
+	Uploader UploadConfig `json:"uploader,omitempty"`
+
+	// Retention policy configuration.
+	Retention RetentionConfig `json:"retention,omitempty"`
 }
 
 // CompressionConfig defines the compression algorithm to use.
@@ -324,37 +328,6 @@ func validate(c *Config, mode string) error {
 		}
 	}
 
-	// Validate uploader (optional, but if provided, must be valid)
-	if mode == ModeReceive {
-		syncInterval := c.Uploader.SyncInterval
-		if duration, err := time.ParseDuration(syncInterval); err != nil {
-			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncInterval, err))
-		} else {
-			c.Uploader.SyncIntervalParsed = duration
-		}
-
-		if c.Uploader.MaxConcurrency <= 0 {
-			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
-		}
-	}
-
-	// Validate retention
-	if mode == ModeReceive && c.Retention.Enable {
-		syncInterval := c.Retention.SyncInterval
-		if duration, err := time.ParseDuration(syncInterval); err != nil {
-			errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncInterval, err))
-		} else {
-			c.Retention.SyncIntervalParsed = duration
-		}
-
-		keepPeriod := c.Retention.KeepPeriod
-		if duration, err := time.ParseDuration(keepPeriod); err != nil {
-			errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriod, err))
-		} else {
-			c.Retention.KeepPeriodParsed = duration
-		}
-	}
-
 	// Validate log (optional)
 	if c.Log.Level != "" {
 		validLevels := map[string]bool{"trace": true, "debug": true, "info": true, "warn": true, "error": true}
@@ -365,6 +338,36 @@ func validate(c *Config, mode string) error {
 	if c.Log.Format != "" {
 		if c.Log.Format != "text" && c.Log.Format != "json" {
 			errs = append(errs, fmt.Sprintf("log.format must be 'text' or 'json' (got: %s)", c.Log.Format))
+		}
+	}
+
+	if c.Storage.Name != "" {
+		// uploader
+		syncIntervalUploader := c.Storage.Uploader.SyncInterval
+		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
+			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
+		} else {
+			c.Storage.Uploader.SyncIntervalParsed = duration
+		}
+		if c.Storage.Uploader.MaxConcurrency <= 0 {
+			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
+		}
+
+		// retention
+		if c.Storage.Retention.Enable {
+			syncIntervalRetention := c.Storage.Retention.SyncInterval
+			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
+				errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
+			} else {
+				c.Storage.Retention.SyncIntervalParsed = duration
+			}
+
+			keepPeriodRetention := c.Storage.Retention.KeepPeriod
+			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
+				errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
+			} else {
+				c.Storage.Retention.KeepPeriodParsed = duration
+			}
 		}
 	}
 

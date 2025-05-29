@@ -49,17 +49,17 @@ data:
       level: trace
       format: text
       add_source: true
-    uploader:
-      sync_interval: 10s
-      max_concurrency: 4
-    retention:
-      enable: true
-      sync_interval: 10s
-      keep_period: "1m"
     metrics:
       enable: true
     storage:
       name: s3
+      uploader:
+        sync_interval: 10s
+        max_concurrency: 4
+      retention:
+        enable: true
+        sync_interval: 10s
+        keep_period: "1m"      
       compression:
         algo: gzip
       encryption:

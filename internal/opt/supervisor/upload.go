@@ -52,7 +52,7 @@ func (u *ArchiveSupervisor) filterFilesToUpload(files []os.DirEntry) []uploadBun
 }
 
 func (u *ArchiveSupervisor) uploadFiles(ctx context.Context, files []uploadBundle) error {
-	workerCount := u.cfg.Uploader.MaxConcurrency
+	workerCount := u.cfg.Storage.Uploader.MaxConcurrency
 	if workerCount <= 0 {
 		workerCount = 1
 	}
