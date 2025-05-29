@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"sigs.k8s.io/yaml"
 )
@@ -90,7 +91,8 @@ type ReceiveConfig struct {
 type UploadConfig struct {
 	// SyncInterval is the interval between upload checks (e.g., "10s", "5m").
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval string `json:"sync_interval"`
+	SyncInterval       string        `json:"sync_interval"`
+	SyncIntervalParsed time.Duration `json:"-"`
 
 	// MaxConcurrency is the maximum number of concurrent upload tasks.
 	MaxConcurrency int `json:"max_concurrency"`
@@ -103,10 +105,12 @@ type RetentionConfig struct {
 
 	// SyncInterval is the interval between retention scans (e.g., "12h").
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval string `json:"sync_interval"`
+	SyncInterval       string        `json:"sync_interval"`
+	SyncIntervalParsed time.Duration `json:"-"`
 
 	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
-	KeepPeriod string `json:"keep_period,omitempty"`
+	KeepPeriod       string        `json:"keep_period,omitempty"`
+	KeepPeriodParsed time.Duration `json:"-"`
 }
 
 // MetricsConfig enables or disables Prometheus metrics exposure.
@@ -262,9 +266,12 @@ func Cfg() *Config {
 	return config
 }
 
-func MustLoad(path string) *Config {
+func MustLoad(path, mode string) *Config {
 	once.Do(func() {
 		config = mustLoadCfg(path)
+		if err := validate(config, mode); err != nil {
+			log.Fatalf("Invalid config: %v", err)
+		}
 	})
 	return config
 }
@@ -291,10 +298,10 @@ func mustLoadCfg(path string) *Config {
 	return &cfg
 }
 
-// Validate checks that all required fields in the config are set appropriately.
+// validate checks that all required fields in the config are set appropriately.
 //
 //nolint:gocyclo
-func (c *Config) Validate(mode string) error {
+func validate(c *Config, mode string) error {
 	var errs []string
 
 	// Validate mode
@@ -318,22 +325,33 @@ func (c *Config) Validate(mode string) error {
 	}
 
 	// Validate uploader (optional, but if provided, must be valid)
-	if mode == ModeReceive && (c.Uploader.SyncInterval != "" || c.Uploader.MaxConcurrency != 0) {
-		if c.Uploader.SyncInterval == "" {
-			errs = append(errs, "uploader.sync_interval is required if uploader is configured")
+	if mode == ModeReceive {
+		syncInterval := c.Uploader.SyncInterval
+		if duration, err := time.ParseDuration(syncInterval); err != nil {
+			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncInterval, err))
+		} else {
+			c.Uploader.SyncIntervalParsed = duration
 		}
+
 		if c.Uploader.MaxConcurrency <= 0 {
 			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
 		}
 	}
 
-	// Validate retention (optional)
+	// Validate retention
 	if mode == ModeReceive && c.Retention.Enable {
-		if c.Retention.SyncInterval == "" {
-			errs = append(errs, "retention.sync_interval is required if retention is enabled")
+		syncInterval := c.Retention.SyncInterval
+		if duration, err := time.ParseDuration(syncInterval); err != nil {
+			errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncInterval, err))
+		} else {
+			c.Retention.SyncIntervalParsed = duration
 		}
-		if c.Retention.KeepPeriod == "" {
-			errs = append(errs, "retention.keep_period is required if retention is enabled")
+
+		keepPeriod := c.Retention.KeepPeriod
+		if duration, err := time.ParseDuration(keepPeriod); err != nil {
+			errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriod, err))
+		} else {
+			c.Retention.KeepPeriodParsed = duration
 		}
 	}
 

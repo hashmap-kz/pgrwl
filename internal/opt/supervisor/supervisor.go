@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
-
 	"github.com/hashmap-kz/pgrwl/config"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
@@ -55,9 +53,7 @@ func (u *ArchiveSupervisor) log() *slog.Logger {
 }
 
 func (u *ArchiveSupervisor) RunUploader(ctx context.Context) {
-	syncInterval := optutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
-
-	ticker := time.NewTicker(syncInterval)
+	ticker := time.NewTicker(u.cfg.Uploader.SyncIntervalParsed)
 	defer ticker.Stop()
 
 	for {
@@ -77,11 +73,8 @@ func (u *ArchiveSupervisor) RunUploader(ctx context.Context) {
 }
 
 func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, daysKeepRetention time.Duration) {
-	syncInterval := optutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
-	retentionInterval := optutils.ParseDurationOrDefault(u.cfg.Retention.SyncInterval, 24*time.Hour)
-
-	uploadTicker := time.NewTicker(syncInterval)
-	retentionTicker := time.NewTicker(retentionInterval)
+	uploadTicker := time.NewTicker(u.cfg.Uploader.SyncIntervalParsed)
+	retentionTicker := time.NewTicker(u.cfg.Retention.SyncIntervalParsed)
 	defer uploadTicker.Stop()
 	defer retentionTicker.Stop()
 
