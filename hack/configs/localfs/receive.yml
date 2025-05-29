@@ -6,8 +6,9 @@ main:
 receiver:
   slot: pgrwl_v5
 
-debug_config:
-  enable_pprof: true
+dev_config:
+  pprof:
+    enable: true
 
 log:
   level: trace

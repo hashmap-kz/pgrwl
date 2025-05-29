@@ -77,7 +77,7 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 		mux.Handle("/metrics", promhttp.Handler())
 	}
 
-	if cfg.DebugConfig.EnablePprof {
+	if cfg.DevConfig.Pprof.Enable {
 		l.Debug("enable pprof endpoints")
 
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
