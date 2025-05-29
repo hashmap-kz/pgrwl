@@ -46,7 +46,6 @@ integration with Kubernetes environments.
     - [Integration Testing](#integration-testing)
     - [Verify build locally](#to-contribute-or-verify-the-project-locally-the-following-make-targets-should-all-pass)
     - [Source Code Structure](#source-code-structure)
-    - [Main Loop Diagram](#main-loop)
     - [Links](#links)
 - [License](#license)
 
@@ -64,6 +63,8 @@ integration with Kubernetes environments.
 
 - The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
   container running PostgreSQL.
+
+![Architecture Diagram](assets/diagrams/loop-v1.png)
 
 ---
 
@@ -432,10 +433,6 @@ internal/xlog/streamutil.go
 internal/xlog/fsync/
   → Optimized wrappers for safe and efficient `fsync` system calls.
 ```
-
-### Main Loop
-
-![main loop](assets/diagrams/loop.png)
 
 ### Links
 

@@ -1,0 +1,52 @@
+@startuml flow
+
+title "PGRWL (PostgreSQL WAL Receiver) — Streaming & Archiving Flow"
+footer Cloud-Native PostgreSQL WAL Receiver - pgrwl
+header "v1"
+scale max 860 height
+
+skinparam TitleFontSize 28
+
+box "PostgreSQL Server" #LightBlue
+  database "PostgreSQL" as PG #DeepSkyBlue
+end box
+
+box "Components" #HoneyDew
+  participant "WAL Receiver" as Receiver #LightYellow
+  participant "Archive Supervisor" as Supervisor #Thistle
+  participant "WAL Uploader" as Uploader #Lavender
+  participant "WAL Retainer" as Retainer #MistyRose
+end box
+
+box "Remote Storage" #AliceBlue
+  database "S3 / SFTP / etc." as Storage #LightCyan
+end box
+
+group #LightYellow WAL Reception
+  Receiver -> PG: Receive WAL segment
+  Receiver -> Receiver: Write to *.partial file
+  Receiver -> Receiver: If segment complete\n→ rename to final WAL file
+end
+
+group #Thistle Supervisor Control Loop
+  Supervisor -> Supervisor: RunWithRetention()
+
+  note right of Supervisor: Runs two periodic workers:\nUploader and Retainer
+
+  Supervisor --> Uploader: Every SyncInterval → trigger performUploads()
+  Supervisor --> Retainer: Every RetentionInterval → trigger performRetention()
+end
+
+group #Lavender WAL Upload (if remote storage is configured)
+  note right of Uploader: Skips *.partial files
+  Uploader -> Receiver: Scan for completed WAL files
+  Uploader -> Storage: Compress → Encrypt → Upload WAL file
+  Uploader -> Receiver: On success → delete local file
+end
+
+group #MistyRose WAL Retention (if enabled)
+  Retainer -> Storage: List WAL files
+  Retainer -> Storage: Delete files older than KeepPeriod
+end
+
+@enduml
