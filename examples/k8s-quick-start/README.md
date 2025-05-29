@@ -59,3 +59,7 @@ curl --location 'http://localhost:30266/status'
 ```
 kubectl -n pgrwl-test exec -it postgres-0 -- psql -U postgres -c "drop table if exists bigdata; CREATE TABLE bigdata AS SELECT i, repeat('x', 1024) AS filler FROM generate_series(1, (1 * 1024 * 1024)/2) AS t(i);"
 ```
+
+### Dashboard Basic Example (available in current grafana setup):
+
+![Basic Example](assets/dashboard.png)
