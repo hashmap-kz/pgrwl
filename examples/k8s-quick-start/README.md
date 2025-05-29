@@ -26,7 +26,7 @@ bash 01-deploy.sh
   Pass: admin
   ```
 
-- minio: http://localhost:30267
+- minio: https://localhost:30267
 
   ```
   User: minioadmin
