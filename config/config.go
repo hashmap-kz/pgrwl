@@ -46,6 +46,7 @@ var (
 )
 
 // Config is the root configuration for the WAL receiver application.
+// Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
 	Main      MainConfig      `json:"main,omitempty"`      // Main application settings.
 	Receiver  ReceiveConfig   `json:"receiver,omitempty"`  // WAL receiver configuration.
@@ -201,6 +202,7 @@ func (c *Config) HasExternalStorageConfigured() bool {
 	return false
 }
 
+// String returns a pretty-printed structure where sensitive fields are hidden.
 func (c *Config) String() string {
 	// Step 1: Make a shallow copy
 	cp := *c
