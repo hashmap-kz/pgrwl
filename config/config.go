@@ -48,13 +48,14 @@ var (
 // Config is the root configuration for the WAL receiver application.
 // Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
-	Main      MainConfig      `json:"main,omitempty"`      // Main application settings.
-	Receiver  ReceiveConfig   `json:"receiver,omitempty"`  // WAL receiver configuration.
-	Uploader  UploadConfig    `json:"uploader,omitempty"`  // Uploader worker configuration.
-	Retention RetentionConfig `json:"retention,omitempty"` // Retention policy configuration.
-	Metrics   MetricsConfig   `json:"metrics,omitempty"`   // Prometheus metrics configuration.
-	Log       LogConfig       `json:"log,omitempty"`       // Logging configuration.
-	Storage   StorageConfig   `json:"storage,omitempty"`   // Storage backend configuration.
+	Main      MainConfig      `json:"main,omitempty"`       // Main application settings.
+	Receiver  ReceiveConfig   `json:"receiver,omitempty"`   // WAL receiver configuration.
+	Uploader  UploadConfig    `json:"uploader,omitempty"`   // Uploader worker configuration.
+	Retention RetentionConfig `json:"retention,omitempty"`  // Retention policy configuration.
+	Metrics   MetricsConfig   `json:"metrics,omitempty"`    // Prometheus metrics configuration.
+	Log       LogConfig       `json:"log,omitempty"`        // Logging configuration.
+	Storage   StorageConfig   `json:"storage,omitempty"`    // Storage backend configuration.
+	DevConfig DevConfig       `json:"dev_config,omitempty"` // Various dev options.
 }
 
 // MainConfig holds top-level application settings.
@@ -64,6 +65,16 @@ type MainConfig struct {
 
 	// Directory is the base directory where WAL files and metadata are stored.
 	Directory string `json:"directory,omitempty"`
+}
+
+// DevConfig configures development-only features like profiling and debug endpoints.
+type DevConfig struct {
+	Pprof DevConfigPprof `json:"pprof,omitempty"`
+}
+
+// DevConfigPprof configures pprof.
+type DevConfigPprof struct {
+	Enable bool `json:"enable,omitempty"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.

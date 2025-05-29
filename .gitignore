@@ -18,3 +18,5 @@ bin/
 coverage.txt
 __debug_bin*
 restore_tmp/
+pprof/
+nohup.out

@@ -17,7 +17,11 @@ retention:                               # Optional (used in receive mode)
   keep_period: "1m"                      # Remove WAL files older than given period
 
 metrics:
-  enable: true                           # Optional (used in receive mode)
+  enable: true                           # Optional (used in receive mode: http://host:port/metrics)
+
+dev_config:                              # Optional (various dev options)
+  pprof:
+    enable: true
 
 log:                                     # Optional
   level: info                            # One of: trace / debug / info / warn / error

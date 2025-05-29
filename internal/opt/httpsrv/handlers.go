@@ -3,6 +3,7 @@ package httpsrv
 import (
 	"log/slog"
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -28,6 +29,7 @@ type HTTPHandlersOpts struct {
 
 func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 	cfg := config.Cfg()
+	l := slog.With("component", "rest-api")
 
 	service := controlSvc.NewControlService(&controlSvc.ControlServiceOpts{
 		PGRW:        opts.PGRW,
@@ -39,7 +41,7 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
-		Logger:  slog.With("component", "rest-api"),
+		Logger:  l,
 		Verbose: opts.Verbose,
 	}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
@@ -70,7 +72,19 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
 	if cfg.Metrics.Enable {
+		l.Debug("enable metric endpoints")
+
 		mux.Handle("/metrics", promhttp.Handler())
+	}
+
+	if cfg.DevConfig.Pprof.Enable {
+		l.Debug("enable pprof endpoints")
+
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
 
 	return mux

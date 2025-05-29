@@ -18,6 +18,9 @@ retention:
 metrics:
   enable: true
 
+debug_config:
+  enable_pprof: true
+
 log:
   level: trace
   format: text
