@@ -166,7 +166,7 @@ storage:                                 # Optional
   retention:                             # Optional
     enable: true                         # Perform retention rules
     sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-    keep_period: "1m"                    # Remove WAL files older than given period  
+    keep_period: "1m"                    # Remove WAL files older than given period
   compression:                           # Optional
     algo: gzip                           # One of: gzip / zstd
   encryption:                            # Optional
@@ -179,6 +179,7 @@ storage:                                 # Optional
     pass: "${PGRWL_VM_PASSWORD}"         # SFTP password (from env)
     pkey_path: "/home/user/.ssh/id_rsa"  # Path to SSH private key (optional)
     pkey_pass: "${PGRWL_SSH_PKEY_PASS}"  # Required if the private key is password-protected
+    base_dir: "/mnt/wal-archive"         # Base directory with sufficient user permissions
   s3:                                    # Required section for 's3' storage
     url: https://s3.example.com          # S3-compatible endpoint URL
     access_key_id: AKIAEXAMPLE           # AWS access key ID

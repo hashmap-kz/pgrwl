@@ -53,14 +53,15 @@ func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
 			Host:       cfg.Storage.SFTP.Host,
 			Port:       fmt.Sprintf("%d", cfg.Storage.SFTP.Port),
 			User:       cfg.Storage.SFTP.User,
-			PkeyPath:   cfg.Storage.SFTP.Pass,
+			PkeyPath:   cfg.Storage.SFTP.PKeyPath,
 			Passphrase: cfg.Storage.SFTP.PKeyPass,
 		})
 		if err != nil {
 			return nil, err
 		}
+		remotePath := filepath.ToSlash(filepath.Join(cfg.Storage.SFTP.BaseDir, baseDir))
 		return &st.TransformingStorage{
-			Backend:      st.NewSFTPStorage(client.SFTPClient(), baseDir),
+			Backend:      st.NewSFTPStorage(client.SFTPClient(), remotePath),
 			Crypter:      crypter,
 			Compressor:   compressor,
 			Decompressor: decompressor,

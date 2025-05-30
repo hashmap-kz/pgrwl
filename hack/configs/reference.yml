@@ -40,6 +40,7 @@ storage:                                 # Optional
     pass: "${PGRWL_VM_PASSWORD}"         # SFTP password (from env)
     pkey_path: "/home/user/.ssh/id_rsa"  # Path to SSH private key (optional)
     pkey_pass: "${PGRWL_SSH_PKEY_PASS}"  # Required if the private key is password-protected
+    base_dir: "/mnt/wal-archive"         # Base directory with sufficient user permissions
   s3:                                    # Required section for 's3' storage
     url: https://s3.example.com          # S3-compatible endpoint URL
     access_key_id: AKIAEXAMPLE           # AWS access key ID

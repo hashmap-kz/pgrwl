@@ -193,6 +193,9 @@ type SFTPConfig struct {
 
 	// PKeyPass is the passphrase for the private key, if encrypted.
 	PKeyPass string `json:"pkey_pass,omitempty"`
+
+	// Base directory with sufficient user permissions
+	BaseDir string `json:"base_dir,omitempty"`
 }
 
 // S3Config defines configuration for S3-compatible object storage.
@@ -409,6 +412,9 @@ func validate(c *Config, mode string) error {
 		}
 		if sftp.Pass == "" && sftp.PKeyPath == "" {
 			errs = append(errs, "either storage.sftp.pass or storage.sftp.pkey_path must be provided for sftp storage")
+		}
+		if sftp.BaseDir == "" {
+			errs = append(errs, "storage.sftp.base_dir is required for sftp storage")
 		}
 	default:
 		errs = append(errs, fmt.Sprintf("unknown storage.name: %q (must be %q or %q)", c.Storage.Name, StorageNameS3, StorageNameSFTP))
