@@ -46,7 +46,7 @@ data:
       slot: pgrwl_v5
       no_loop: true
     log:
-      level: trace
+      level: info
       format: text
       add_source: true
     metrics:
@@ -59,7 +59,7 @@ data:
       retention:
         enable: true
         sync_interval: 10s
-        keep_period: "1m"      
+        keep_period: "1m"
       compression:
         algo: gzip
       encryption:
