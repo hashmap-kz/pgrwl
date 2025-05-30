@@ -10,7 +10,7 @@ ENV PG_MAJOR=17
 RUN apt-get update && \
     apt-get install -y wget curl gnupg lsb-release ca-certificates && \
     apt-get update && \
-    apt-get install -y postgresql-common openssh-server sudo vim net-tools mc && \
+    apt-get install -y postgresql-common openssh-server sudo vim net-tools telnet mc && \
     apt-get clean && \
     mkdir /var/run/sshd
 

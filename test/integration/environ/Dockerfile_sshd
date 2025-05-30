@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 # Install OpenSSH
-RUN apk update && apk add --no-cache openssh sudo bash mc vim
+RUN apk update && apk add --no-cache openssh sudo bash mc vim inetutils-telnet
 
 # For shell PS1
 RUN echo "export PS1='\\u@\\h:\\w\\$ '" >> /etc/profile
