@@ -28,7 +28,12 @@ func TestOpenWalFile_CreateAndTruncate(t *testing.T) {
 	lsn := pglogrepl.LSN(0x0)
 
 	err := stream.OpenWalFile(lsn)
-	defer stream.CloseWalFile()
+	defer func(stream *StreamCtl) {
+		err := stream.CloseWalFile()
+		if err != nil {
+			t.Log("error closing walfile ", t.Name())
+		}
+	}(stream)
 	assert.NoError(t, err)
 	assert.NotNil(t, stream.walfile)
 	assert.FileExists(t, stream.walfile.pathname)
@@ -41,7 +46,12 @@ func TestOpenWalFile_CreateAndTruncate(t *testing.T) {
 func TestWriteAtWalFile(t *testing.T) {
 	stream := setupTestStreamCtl(t)
 	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
-	defer stream.CloseWalFile()
+	defer func(stream *StreamCtl) {
+		err := stream.CloseWalFile()
+		if err != nil {
+			t.Log("error closing walfile ", t.Name())
+		}
+	}(stream)
 
 	n, err := stream.WriteAtWalFile([]byte("hello wal"), 0)
 	assert.NoError(t, err)
@@ -51,7 +61,12 @@ func TestWriteAtWalFile(t *testing.T) {
 func TestWriteAtWalFile_LoopAndVerify(t *testing.T) {
 	stream := setupTestStreamCtl(t)
 	err := stream.OpenWalFile(pglogrepl.LSN(0))
-	defer stream.CloseWalFile()
+	defer func(stream *StreamCtl) {
+		err := stream.CloseWalFile()
+		if err != nil {
+			t.Log("error closing walfile ", t.Name())
+		}
+	}(stream)
 	assert.NoError(t, err)
 	assert.NotNil(t, stream.walfile)
 
@@ -90,7 +105,12 @@ func TestWriteAtWalFile_OffsetConversionFails(t *testing.T) {
 
 	stream := setupTestStreamCtl(t)
 	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
-	defer stream.CloseWalFile()
+	defer func(stream *StreamCtl) {
+		err := stream.CloseWalFile()
+		if err != nil {
+			t.Log("error closing walfile ", t.Name())
+		}
+	}(stream)
 
 	n, err := stream.WriteAtWalFile([]byte("invalid"), invalidOffset)
 	assert.Error(t, err)
@@ -119,7 +139,12 @@ func TestWriteAtWalFile_StreamWalfileNil(t *testing.T) {
 func TestWriteAtWalFile_AppendIncreasesCurrpos(t *testing.T) {
 	stream := setupTestStreamCtl(t)
 	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
-	defer stream.CloseWalFile()
+	defer func(stream *StreamCtl) {
+		err := stream.CloseWalFile()
+		if err != nil {
+			t.Log("error closing walfile ", t.Name())
+		}
+	}(stream)
 
 	data := []byte("12345")
 	_, err := stream.WriteAtWalFile(data, 0)
@@ -143,7 +168,12 @@ func TestWriteAtWalFile_WriteFails(t *testing.T) {
 func TestSyncWalFile(t *testing.T) {
 	stream := setupTestStreamCtl(t)
 	assert.NoError(t, stream.OpenWalFile(pglogrepl.LSN(0)))
-	defer stream.CloseWalFile()
+	defer func(stream *StreamCtl) {
+		err := stream.CloseWalFile()
+		if err != nil {
+			t.Log("error closing walfile ", t.Name())
+		}
+	}(stream)
 
 	err := stream.SyncWalFile()
 	assert.NoError(t, err)
