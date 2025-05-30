@@ -30,8 +30,8 @@ func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
 		return nil, err
 	}
 
-	// local
-	if strings.EqualFold(cfg.Storage.Name, config.StorageNameLocalFS) {
+	// localFS by default
+	if strings.EqualFold(cfg.Storage.Name, config.StorageNameLocalFS) || strings.TrimSpace(cfg.Storage.Name) == "" {
 		local, err := st.NewLocal(&st.LocalStorageOpts{
 			BaseDir:      filepath.ToSlash(filepath.Join(baseDir, config.LocalFSStorageSubpath)),
 			FsyncOnWrite: true,

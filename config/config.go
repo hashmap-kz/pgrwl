@@ -341,20 +341,23 @@ func validate(c *Config, mode string) error {
 
 	// Storage
 
-	if c.Storage.Name == "" {
-		errs = append(errs, "storage.name cannot be empty")
+	// uploader conf is required:
+	// * when external storage is used
+	// * when local storage used with compression || encryption configured
+
+	if c.isExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
+		// uploader
+		syncIntervalUploader := c.Storage.Uploader.SyncInterval
+		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
+			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
+		} else {
+			c.Storage.Uploader.SyncIntervalParsed = duration
+		}
+		if c.Storage.Uploader.MaxConcurrency <= 0 {
+			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
+		}
 	}
 
-	// uploader
-	syncIntervalUploader := c.Storage.Uploader.SyncInterval
-	if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
-		errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
-	} else {
-		c.Storage.Uploader.SyncIntervalParsed = duration
-	}
-	if c.Storage.Uploader.MaxConcurrency <= 0 {
-		errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
-	}
 	// retention
 	if c.Storage.Retention.Enable {
 		syncIntervalRetention := c.Storage.Retention.SyncInterval
@@ -374,7 +377,7 @@ func validate(c *Config, mode string) error {
 
 	// Validate storage
 	switch c.Storage.Name {
-	case "":
+	case "", StorageNameLocalFS:
 		// ok, storage is optional
 	case StorageNameS3:
 		s3 := c.Storage.S3
@@ -407,7 +410,6 @@ func validate(c *Config, mode string) error {
 		if sftp.Pass == "" && sftp.PKeyPath == "" {
 			errs = append(errs, "either storage.sftp.pass or storage.sftp.pkey_path must be provided for sftp storage")
 		}
-	case StorageNameLocalFS:
 	default:
 		errs = append(errs, fmt.Sprintf("unknown storage.name: %q (must be %q or %q)", c.Storage.Name, StorageNameS3, StorageNameSFTP))
 	}
@@ -433,4 +435,13 @@ func validate(c *Config, mode string) error {
 		return errors.New("invalid config:\n  - " + strings.Join(errs, "\n  - "))
 	}
 	return nil
+}
+
+func (c *Config) isExternalStor() bool {
+	switch c.Storage.Name {
+	case StorageNameS3, StorageNameSFTP:
+		return true
+	default:
+		return false
+	}
 }
