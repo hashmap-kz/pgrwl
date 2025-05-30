@@ -345,7 +345,7 @@ func validate(c *Config, mode string) error {
 	// * when external storage is used
 	// * when local storage used with compression || encryption configured
 
-	if c.isExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
+	if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
 		// uploader
 		syncIntervalUploader := c.Storage.Uploader.SyncInterval
 		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
@@ -437,11 +437,11 @@ func validate(c *Config, mode string) error {
 	return nil
 }
 
-func (c *Config) isExternalStor() bool {
-	switch c.Storage.Name {
-	case StorageNameS3, StorageNameSFTP:
-		return true
-	default:
-		return false
-	}
+func (c *Config) IsExternalStor() bool {
+	return !c.IsLocalStor()
+}
+
+func (c *Config) IsLocalStor() bool {
+	return strings.EqualFold(c.Storage.Name, StorageNameLocalFS) ||
+		strings.TrimSpace(c.Storage.Name) == ""
 }

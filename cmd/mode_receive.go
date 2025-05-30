@@ -5,8 +5,11 @@ import (
 	"log"
 	"log/slog"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
+
+	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 
@@ -55,12 +58,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		log.Fatal(err)
 	}
 
-	stor, err := supervisor.SetupStorage(opts.ReceiveDirectory)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := supervisor.CheckManifest(cfg); err != nil {
-		log.Fatal(err)
+	var stor *st.TransformingStorage
+	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
+	if needSupervisorLoop {
+		stor, err = supervisor.SetupStorage(opts.ReceiveDirectory)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := supervisor.CheckManifest(cfg); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// Use WaitGroup to wait for all goroutines to finish
@@ -113,28 +120,30 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	}()
 
 	// ArchiveSupervisor
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				loggr.Error("upload loop panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "uploader"),
-				)
+	if needSupervisorLoop {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					loggr.Error("upload loop panicked",
+						slog.Any("panic", r),
+						slog.String("goroutine", "uploader"),
+					)
+				}
+			}()
+			u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
+				ReceiveDirectory: opts.ReceiveDirectory,
+				PGRW:             pgrw,
+				Verbose:          opts.Verbose,
+			})
+			if cfg.Storage.Retention.Enable {
+				u.RunWithRetention(ctx)
+			} else {
+				u.RunUploader(ctx)
 			}
 		}()
-		u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
-			ReceiveDirectory: opts.ReceiveDirectory,
-			PGRW:             pgrw,
-			Verbose:          opts.Verbose,
-		})
-		if cfg.Storage.Retention.Enable {
-			u.RunWithRetention(ctx)
-		} else {
-			u.RunUploader(ctx)
-		}
-	}()
+	}
 
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
@@ -143,4 +152,22 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
+}
+
+// needSupervisorLoop decides whether we actually need to boot the storage
+// we don't need if:
+// * it's a localfs storage configured with no compression/encryption/retain
+func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
+	if cfg.IsLocalStor() {
+		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
+			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
+			cfg.Storage.Retention.Enable
+		if !hasCfg {
+			slog.Info("supervisor loop is skipped",
+				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
+			)
+		}
+		return hasCfg
+	}
+	return true
 }

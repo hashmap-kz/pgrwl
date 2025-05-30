@@ -132,7 +132,10 @@ func loadConfig(c *cli.Command) *config.Config {
 	cfg := config.MustLoad(configPath, mode)
 
 	// debug config (NOTE: sensitive fields are hidden)
-	_, _ = fmt.Fprintf(os.Stderr, "STARTING WITH CONFIGURATION:\n%s\n\n", cfg.String())
+	_, _ = fmt.Fprintf(os.Stderr, "STARTING WITH CONFIGURATION (%s):\n%s\n\n",
+		filepath.ToSlash(configPath),
+		cfg.String(),
+	)
 
 	logger.Init(&logger.Opts{
 		Level:     cfg.Log.Level,
