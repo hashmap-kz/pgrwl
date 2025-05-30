@@ -62,9 +62,15 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, keepPeriod tim
 		}
 	}
 
-	u.log().Debug("begin to retain files", slog.Int("cnt", len(olderThan)))
+	u.log().Info("begin to retain files", slog.Int("cnt", len(olderThan)))
 	if err := u.stor.DeleteAllBulk(ctx, olderThan); err != nil {
 		return err
+	}
+
+	for i := range olderThan {
+		u.log().Info("retained",
+			slog.String("path", olderThan[i]),
+		)
 	}
 
 	metrics.PgrwlMetricsCollector.AddWALFilesDeleted(float64(len(olderThan)))

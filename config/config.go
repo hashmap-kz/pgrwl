@@ -28,6 +28,12 @@ const (
 	// StorageNameSFTP is the identifier for the SFTP storage backend.
 	StorageNameSFTP = "sftp"
 
+	// StorageNameLocalFS is the identifier for the local storage.
+	StorageNameLocalFS = "local"
+
+	// LocalFSStorageSubpath when storage name is 'local', uploader worker uses this as a storage.
+	LocalFSStorageSubpath = "wal-archive"
+
 	// RepoEncryptorAes256Gcm is the AES-256-GCM encryption algorithm identifier.
 	RepoEncryptorAes256Gcm = "aes-256-gcm"
 
@@ -213,14 +219,6 @@ type S3Config struct {
 	DisableSSL bool `json:"disable_ssl,omitempty"`
 }
 
-func (c *Config) HasExternalStorageConfigured() bool {
-	switch c.Storage.Name {
-	case StorageNameS3, StorageNameSFTP:
-		return true
-	}
-	return false
-}
-
 // String returns a pretty-printed structure where sensitive fields are hidden.
 func (c *Config) String() string {
 	// Step 1: Make a shallow copy
@@ -341,7 +339,13 @@ func validate(c *Config, mode string) error {
 		}
 	}
 
-	if c.Storage.Name != "" {
+	// Storage
+
+	// uploader conf is required:
+	// * when external storage is used
+	// * when local storage used with compression || encryption configured
+
+	if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
 		// uploader
 		syncIntervalUploader := c.Storage.Uploader.SyncInterval
 		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
@@ -352,28 +356,28 @@ func validate(c *Config, mode string) error {
 		if c.Storage.Uploader.MaxConcurrency <= 0 {
 			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
 		}
+	}
 
-		// retention
-		if c.Storage.Retention.Enable {
-			syncIntervalRetention := c.Storage.Retention.SyncInterval
-			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
-			} else {
-				c.Storage.Retention.SyncIntervalParsed = duration
-			}
+	// retention
+	if c.Storage.Retention.Enable {
+		syncIntervalRetention := c.Storage.Retention.SyncInterval
+		if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
+			errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
+		} else {
+			c.Storage.Retention.SyncIntervalParsed = duration
+		}
 
-			keepPeriodRetention := c.Storage.Retention.KeepPeriod
-			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
-			} else {
-				c.Storage.Retention.KeepPeriodParsed = duration
-			}
+		keepPeriodRetention := c.Storage.Retention.KeepPeriod
+		if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
+			errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
+		} else {
+			c.Storage.Retention.KeepPeriodParsed = duration
 		}
 	}
 
 	// Validate storage
 	switch c.Storage.Name {
-	case "":
+	case "", StorageNameLocalFS:
 		// ok, storage is optional
 	case StorageNameS3:
 		s3 := c.Storage.S3
@@ -431,4 +435,13 @@ func validate(c *Config, mode string) error {
 		return errors.New("invalid config:\n  - " + strings.Join(errs, "\n  - "))
 	}
 	return nil
+}
+
+func (c *Config) IsExternalStor() bool {
+	return !c.IsLocalStor()
+}
+
+func (c *Config) IsLocalStor() bool {
+	return strings.EqualFold(c.Storage.Name, StorageNameLocalFS) ||
+		strings.TrimSpace(c.Storage.Name) == ""
 }

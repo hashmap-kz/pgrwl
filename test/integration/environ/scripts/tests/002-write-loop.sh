@@ -46,6 +46,9 @@ x_backup_restore() {
   xpg_rebuild
   xpg_start
 
+  # start receiving from the fresh WAL that is identical for both receivers
+  psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx (id serial);'
+
   # run wal-receivers
   echo_delim "running wal-receivers"
   # run wal-receiver
@@ -64,7 +67,7 @@ x_backup_restore() {
     --verbose
 
   # trying to write ~100 of WAL files as quick as possible
-  for ((i=0; i<100; i++)); do
+  for ((i = 0; i < 100; i++)); do
     psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);'
   done
 
@@ -115,6 +118,7 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
+  find "${WAL_PATH}" -type f -name "*.json" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 

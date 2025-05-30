@@ -5,16 +5,17 @@ import (
 	"log"
 	"log/slog"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
+
+	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 
 	"github.com/hashmap-kz/pgrwl/config"
-
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
@@ -57,15 +58,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		log.Fatal(err)
 	}
 
-	// TODO: config.Check() method at the boot stage
-	var stor *storage.TransformingStorage
-	if cfg.HasExternalStorageConfigured() {
+	var stor *st.TransformingStorage
+	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
+	if needSupervisorLoop {
 		stor, err = supervisor.SetupStorage(opts.ReceiveDirectory)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err := supervisor.CheckManifest(cfg)
-		if err != nil {
+		if err := supervisor.CheckManifest(cfg); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -120,7 +120,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	}()
 
 	// ArchiveSupervisor
-	if cfg.HasExternalStorageConfigured() {
+	if needSupervisorLoop {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -152,4 +152,22 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
+}
+
+// needSupervisorLoop decides whether we actually need to boot the storage
+// we don't need if:
+// * it's a localfs storage configured with no compression/encryption/retain
+func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
+	if cfg.IsLocalStor() {
+		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
+			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
+			cfg.Storage.Retention.Enable
+		if !hasCfg {
+			l.Info("supervisor loop is skipped",
+				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
+			)
+		}
+		return hasCfg
+	}
+	return true
 }

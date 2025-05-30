@@ -73,6 +73,9 @@ x_backup_restore() {
   xpg_rebuild
   xpg_start
 
+  # start receiving from the fresh WAL that is identical for both receivers
+  psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx (id serial);'
+
   # run wal-receivers
   echo_delim "running wal-receivers"
   # run wal-receiver
@@ -169,6 +172,7 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
+  find "${WAL_PATH}" -type f -name "*.json" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
 
   # run receivers with a new timeline
@@ -183,6 +187,7 @@ EOF
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal with a new timeline stream"
+  find "${WAL_PATH}" -type f -name "*.json" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 

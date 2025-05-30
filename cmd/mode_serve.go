@@ -11,8 +11,6 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
@@ -32,17 +30,13 @@ func RunServeMode(opts *ServeModeOpts) {
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	var stor *storage.TransformingStorage
-	if cfg.HasExternalStorageConfigured() {
-		stor, err = supervisor.SetupStorage(opts.Directory)
-		if err != nil {
-			//nolint:gocritic
-			log.Fatal(err)
-		}
-		err = supervisor.CheckManifest(cfg)
-		if err != nil {
-			log.Fatal(err)
-		}
+	stor, err := supervisor.SetupStorage(opts.Directory)
+	if err != nil {
+		//nolint:gocritic
+		log.Fatal(err)
+	}
+	if err := supervisor.CheckManifest(cfg); err != nil {
+		log.Fatal(err)
 	}
 
 	// Use WaitGroup to wait for all goroutines to finish
