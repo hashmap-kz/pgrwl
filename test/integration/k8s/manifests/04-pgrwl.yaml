@@ -38,7 +38,8 @@ metadata:
   name: pgrwl-receive-config
   namespace: pgrwl-test
 data:
-  config.yml: |
+  ###### s3-setup #######
+  config-s3.yml: |
     main:
       listen_port: 7070
       directory: "/wals/wal-archive"
@@ -73,6 +74,35 @@ data:
         region: main
         use_path_style: true
         disable_ssl: true
+
+  ####### localfs-setup #######
+  config-localfs.yml: |
+    main:
+      listen_port: 7070
+      directory: "/wals/wal-archive"
+    receiver:
+      slot: pgrwl_v5
+      no_loop: true
+    log:
+      level: info
+      format: text
+      add_source: true
+    metrics:
+      enable: true
+    storage:
+      name: local
+      uploader:
+        sync_interval: 10s
+        max_concurrency: 4
+      retention:
+        enable: true
+        sync_interval: 10s
+        keep_period: "1m"
+      compression:
+        algo: gzip
+      encryption:
+        algo: aes-256-gcm
+        pass: qwerty123
 
 ---
 apiVersion: v1
@@ -135,10 +165,14 @@ spec:
         - name: *app
           image: "localhost:5000/pgrwl:latest"
           imagePullPolicy: Always
-          args: ["start", "-c", "/tmp/configs/config.yml"]
+          args: ["start"]
           env:
             - name: PGRWL_MODE
               value: "receive"
+            # "/tmp/configs/config-s3.yml"
+            # "/tmp/configs/config-localfs.yml"
+            - name: PGRWL_CONFIG_PATH
+              value: "/tmp/configs/config-localfs.yml"
           ports:
             - containerPort: 7070
               name: http
