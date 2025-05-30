@@ -28,6 +28,12 @@ const (
 	// StorageNameSFTP is the identifier for the SFTP storage backend.
 	StorageNameSFTP = "sftp"
 
+	// StorageNameLocalFS is the identifier for the local storage.
+	StorageNameLocalFS = "local"
+
+	// LocalFSStorageSubpath when storage name is 'local', uploader worker uses this as a storage.
+	LocalFSStorageSubpath = "wal-archive"
+
 	// RepoEncryptorAes256Gcm is the AES-256-GCM encryption algorithm identifier.
 	RepoEncryptorAes256Gcm = "aes-256-gcm"
 
@@ -213,14 +219,6 @@ type S3Config struct {
 	DisableSSL bool `json:"disable_ssl,omitempty"`
 }
 
-func (c *Config) HasExternalStorageConfigured() bool {
-	switch c.Storage.Name {
-	case StorageNameS3, StorageNameSFTP:
-		return true
-	}
-	return false
-}
-
 // String returns a pretty-printed structure where sensitive fields are hidden.
 func (c *Config) String() string {
 	// Step 1: Make a shallow copy
@@ -341,33 +339,36 @@ func validate(c *Config, mode string) error {
 		}
 	}
 
-	if c.Storage.Name != "" {
-		// uploader
-		syncIntervalUploader := c.Storage.Uploader.SyncInterval
-		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
-			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
+	// Storage
+
+	if c.Storage.Name == "" {
+		errs = append(errs, "storage.name cannot be empty")
+	}
+
+	// uploader
+	syncIntervalUploader := c.Storage.Uploader.SyncInterval
+	if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
+		errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
+	} else {
+		c.Storage.Uploader.SyncIntervalParsed = duration
+	}
+	if c.Storage.Uploader.MaxConcurrency <= 0 {
+		errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
+	}
+	// retention
+	if c.Storage.Retention.Enable {
+		syncIntervalRetention := c.Storage.Retention.SyncInterval
+		if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
+			errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
 		} else {
-			c.Storage.Uploader.SyncIntervalParsed = duration
-		}
-		if c.Storage.Uploader.MaxConcurrency <= 0 {
-			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
+			c.Storage.Retention.SyncIntervalParsed = duration
 		}
 
-		// retention
-		if c.Storage.Retention.Enable {
-			syncIntervalRetention := c.Storage.Retention.SyncInterval
-			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
-			} else {
-				c.Storage.Retention.SyncIntervalParsed = duration
-			}
-
-			keepPeriodRetention := c.Storage.Retention.KeepPeriod
-			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
-			} else {
-				c.Storage.Retention.KeepPeriodParsed = duration
-			}
+		keepPeriodRetention := c.Storage.Retention.KeepPeriod
+		if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
+			errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
+		} else {
+			c.Storage.Retention.KeepPeriodParsed = duration
 		}
 	}
 
@@ -406,6 +407,7 @@ func validate(c *Config, mode string) error {
 		if sftp.Pass == "" && sftp.PKeyPath == "" {
 			errs = append(errs, "either storage.sftp.pass or storage.sftp.pkey_path must be provided for sftp storage")
 		}
+	case StorageNameLocalFS:
 	default:
 		errs = append(errs, fmt.Sprintf("unknown storage.name: %q (must be %q or %q)", c.Storage.Name, StorageNameS3, StorageNameSFTP))
 	}

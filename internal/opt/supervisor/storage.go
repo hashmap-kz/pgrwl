@@ -30,6 +30,23 @@ func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
 		return nil, err
 	}
 
+	// local
+	if strings.EqualFold(cfg.Storage.Name, config.StorageNameLocalFS) {
+		local, err := st.NewLocal(&st.LocalStorageOpts{
+			BaseDir:      filepath.ToSlash(filepath.Join(baseDir, config.LocalFSStorageSubpath)),
+			FsyncOnWrite: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &st.TransformingStorage{
+			Backend:      local,
+			Crypter:      crypter,
+			Compressor:   compressor,
+			Decompressor: decompressor,
+		}, nil
+	}
+
 	// sftp
 	if strings.EqualFold(cfg.Storage.Name, config.StorageNameSFTP) {
 		client, err := clients.NewSFTPClient(&clients.SFTPConfig{

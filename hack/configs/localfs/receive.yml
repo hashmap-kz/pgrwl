@@ -14,3 +14,18 @@ log:
   level: trace
   format: text
   add_source: true
+
+storage:
+  name: "local"
+  uploader:
+    sync_interval: 10s
+    max_concurrency: 4
+  retention:
+    enable: true
+    sync_interval: 10s
+    keep_period: "30s"
+  compression:
+    algo: gzip
+  encryption:
+    algo: aes-256-gcm
+    pass: qwerty123

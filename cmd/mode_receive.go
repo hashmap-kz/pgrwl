@@ -14,8 +14,6 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/config"
 
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
-
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
@@ -57,17 +55,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		log.Fatal(err)
 	}
 
-	// TODO: config.Check() method at the boot stage
-	var stor *storage.TransformingStorage
-	if cfg.HasExternalStorageConfigured() {
-		stor, err = supervisor.SetupStorage(opts.ReceiveDirectory)
-		if err != nil {
-			log.Fatal(err)
-		}
-		err := supervisor.CheckManifest(cfg)
-		if err != nil {
-			log.Fatal(err)
-		}
+	stor, err := supervisor.SetupStorage(opts.ReceiveDirectory)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := supervisor.CheckManifest(cfg); err != nil {
+		log.Fatal(err)
 	}
 
 	// Use WaitGroup to wait for all goroutines to finish
@@ -120,30 +113,28 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	}()
 
 	// ArchiveSupervisor
-	if cfg.HasExternalStorageConfigured() {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					loggr.Error("upload loop panicked",
-						slog.Any("panic", r),
-						slog.String("goroutine", "uploader"),
-					)
-				}
-			}()
-			u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
-				ReceiveDirectory: opts.ReceiveDirectory,
-				PGRW:             pgrw,
-				Verbose:          opts.Verbose,
-			})
-			if cfg.Storage.Retention.Enable {
-				u.RunWithRetention(ctx)
-			} else {
-				u.RunUploader(ctx)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				loggr.Error("upload loop panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "uploader"),
+				)
 			}
 		}()
-	}
+		u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
+			ReceiveDirectory: opts.ReceiveDirectory,
+			PGRW:             pgrw,
+			Verbose:          opts.Verbose,
+		})
+		if cfg.Storage.Retention.Enable {
+			u.RunWithRetention(ctx)
+		} else {
+			u.RunUploader(ctx)
+		}
+	}()
 
 	// Wait for signal (context cancellation)
 	<-ctx.Done()

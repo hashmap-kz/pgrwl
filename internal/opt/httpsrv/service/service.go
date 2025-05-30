@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/config"
+
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"
@@ -145,6 +147,8 @@ func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
 }
 
 func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error) {
+	cfg := config.Cfg()
+
 	// 1) Fast-path: check that file exists locally
 	// 2) Check *.partial file locally
 	// 3) Fetch from storage (if it's not nil)
@@ -171,6 +175,9 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 
 	// 3) trying remote
 	if s.storage != nil {
+		if cfg.Storage.Name == config.StorageNameLocalFS {
+			filePath = filepath.Join(s.baseDir, config.LocalFSStorageSubpath, filename)
+		}
 		s.log().Debug("wal-restore, fetching remote file", slog.String("filename", filename))
 		return s.storage.Get(ctx, filename)
 	}
