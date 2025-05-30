@@ -7,14 +7,10 @@ receiver:                                # Required for 'receive' mode
   slot: replication_slot                 # Replication slot to use
   no_loop: false                         # If true, do not loop on connection loss
 
-uploader:                                # Optional (used in receive mode)
-  sync_interval: 10s                     # Interval for the upload worker to check for new files
-  max_concurrency: 4                     # Maximum number of files to upload concurrently
-
-retention:                               # Optional (used in receive mode)
-  enable: true                           # Perform retention rules
-  sync_interval: 10s                     # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-  keep_period: "1m"                      # Remove WAL files older than given period
+log:                                     # Optional
+  level: info                            # One of: trace / debug / info / warn / error
+  format: text                           # One of: text / json
+  add_source: true                       # Include file:line in log messages (for local development)
 
 metrics:
   enable: true                           # Optional (used in receive mode: http://host:port/metrics)
@@ -23,13 +19,15 @@ dev_config:                              # Optional (various dev options)
   pprof:
     enable: true
 
-log:                                     # Optional
-  level: info                            # One of: trace / debug / info / warn / error
-  format: text                           # One of: text / json
-  add_source: true                       # Include file:line in log messages (for local development)
-
 storage:                                 # Optional
   name: s3                               # One of: s3 / sftp
+  uploader:                              # Required for non-local storage type
+    sync_interval: 10s                   # Interval for the upload worker to check for new files
+    max_concurrency: 4                   # Maximum number of files to upload concurrently
+  retention:                             # Optional
+    enable: true                         # Perform retention rules
+    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
+    keep_period: "1m"                    # Remove WAL files older than given period
   compression:                           # Optional
     algo: gzip                           # One of: gzip / zstd
   encryption:                            # Optional

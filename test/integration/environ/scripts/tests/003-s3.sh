@@ -32,12 +32,12 @@ x_remake_dirs() {
     "format": "text",
     "add_source": true
   },
-  "uploader": {
-    "sync_interval": "5s",
-    "max_concurrency": 4
-  },
   "storage": {
     "name": "s3",
+    "uploader": {
+      "sync_interval": "5s",
+      "max_concurrency": 4
+    },
     "compression": {
       "algo": "gzip"
     },

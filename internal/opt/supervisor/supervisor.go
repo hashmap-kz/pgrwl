@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
-
 	"github.com/hashmap-kz/pgrwl/config"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
@@ -55,9 +53,7 @@ func (u *ArchiveSupervisor) log() *slog.Logger {
 }
 
 func (u *ArchiveSupervisor) RunUploader(ctx context.Context) {
-	syncInterval := optutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
-
-	ticker := time.NewTicker(syncInterval)
+	ticker := time.NewTicker(u.cfg.Storage.Uploader.SyncIntervalParsed)
 	defer ticker.Stop()
 
 	for {
@@ -76,12 +72,9 @@ func (u *ArchiveSupervisor) RunUploader(ctx context.Context) {
 	}
 }
 
-func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, daysKeepRetention time.Duration) {
-	syncInterval := optutils.ParseDurationOrDefault(u.cfg.Uploader.SyncInterval, 30*time.Second)
-	retentionInterval := optutils.ParseDurationOrDefault(u.cfg.Retention.SyncInterval, 24*time.Hour)
-
-	uploadTicker := time.NewTicker(syncInterval)
-	retentionTicker := time.NewTicker(retentionInterval)
+func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context) {
+	uploadTicker := time.NewTicker(u.cfg.Storage.Uploader.SyncIntervalParsed)
+	retentionTicker := time.NewTicker(u.cfg.Storage.Retention.SyncIntervalParsed)
 	defer uploadTicker.Stop()
 	defer retentionTicker.Stop()
 
@@ -102,7 +95,7 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, daysKeepRetent
 		case <-retentionTicker.C:
 			u.log().Debug("retention worker is running")
 			u.mu.Lock()
-			err := u.performRetention(ctx, daysKeepRetention)
+			err := u.performRetention(ctx, u.cfg.Storage.Retention.KeepPeriodParsed)
 			u.mu.Unlock()
 			u.log().Debug("retention worker is done")
 			if err != nil {

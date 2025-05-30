@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"sigs.k8s.io/yaml"
 )
@@ -48,14 +49,12 @@ var (
 // Config is the root configuration for the WAL receiver application.
 // Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
-	Main      MainConfig      `json:"main,omitempty"`       // Main application settings.
-	Receiver  ReceiveConfig   `json:"receiver,omitempty"`   // WAL receiver configuration.
-	Uploader  UploadConfig    `json:"uploader,omitempty"`   // Uploader worker configuration.
-	Retention RetentionConfig `json:"retention,omitempty"`  // Retention policy configuration.
-	Metrics   MetricsConfig   `json:"metrics,omitempty"`    // Prometheus metrics configuration.
-	Log       LogConfig       `json:"log,omitempty"`        // Logging configuration.
-	Storage   StorageConfig   `json:"storage,omitempty"`    // Storage backend configuration.
-	DevConfig DevConfig       `json:"dev_config,omitempty"` // Various dev options.
+	Main      MainConfig    `json:"main,omitempty"`       // Main application settings.
+	Receiver  ReceiveConfig `json:"receiver,omitempty"`   // WAL receiver configuration.
+	Metrics   MetricsConfig `json:"metrics,omitempty"`    // Prometheus metrics configuration.
+	Log       LogConfig     `json:"log,omitempty"`        // Logging configuration.
+	Storage   StorageConfig `json:"storage,omitempty"`    // Storage backend configuration.
+	DevConfig DevConfig     `json:"dev_config,omitempty"` // Various dev options.
 }
 
 // MainConfig holds top-level application settings.
@@ -90,7 +89,8 @@ type ReceiveConfig struct {
 type UploadConfig struct {
 	// SyncInterval is the interval between upload checks (e.g., "10s", "5m").
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval string `json:"sync_interval"`
+	SyncInterval       string        `json:"sync_interval"`
+	SyncIntervalParsed time.Duration `json:"-"`
 
 	// MaxConcurrency is the maximum number of concurrent upload tasks.
 	MaxConcurrency int `json:"max_concurrency"`
@@ -103,10 +103,12 @@ type RetentionConfig struct {
 
 	// SyncInterval is the interval between retention scans (e.g., "12h").
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval string `json:"sync_interval"`
+	SyncInterval       string        `json:"sync_interval"`
+	SyncIntervalParsed time.Duration `json:"-"`
 
 	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
-	KeepPeriod string `json:"keep_period,omitempty"`
+	KeepPeriod       string        `json:"keep_period,omitempty"`
+	KeepPeriodParsed time.Duration `json:"-"`
 }
 
 // MetricsConfig enables or disables Prometheus metrics exposure.
@@ -143,6 +145,12 @@ type StorageConfig struct {
 
 	// S3 holds configuration specific to the S3 backend.
 	S3 S3Config `json:"s3,omitempty"`
+
+	// Uploader worker configuration.
+	Uploader UploadConfig `json:"uploader,omitempty"`
+
+	// Retention policy configuration.
+	Retention RetentionConfig `json:"retention,omitempty"`
 }
 
 // CompressionConfig defines the compression algorithm to use.
@@ -262,9 +270,12 @@ func Cfg() *Config {
 	return config
 }
 
-func MustLoad(path string) *Config {
+func MustLoad(path, mode string) *Config {
 	once.Do(func() {
 		config = mustLoadCfg(path)
+		if err := validate(config, mode); err != nil {
+			log.Fatalf("Invalid config: %v", err)
+		}
 	})
 	return config
 }
@@ -291,10 +302,10 @@ func mustLoadCfg(path string) *Config {
 	return &cfg
 }
 
-// Validate checks that all required fields in the config are set appropriately.
+// validate checks that all required fields in the config are set appropriately.
 //
 //nolint:gocyclo
-func (c *Config) Validate(mode string) error {
+func validate(c *Config, mode string) error {
 	var errs []string
 
 	// Validate mode
@@ -317,26 +328,6 @@ func (c *Config) Validate(mode string) error {
 		}
 	}
 
-	// Validate uploader (optional, but if provided, must be valid)
-	if mode == ModeReceive && (c.Uploader.SyncInterval != "" || c.Uploader.MaxConcurrency != 0) {
-		if c.Uploader.SyncInterval == "" {
-			errs = append(errs, "uploader.sync_interval is required if uploader is configured")
-		}
-		if c.Uploader.MaxConcurrency <= 0 {
-			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
-		}
-	}
-
-	// Validate retention (optional)
-	if mode == ModeReceive && c.Retention.Enable {
-		if c.Retention.SyncInterval == "" {
-			errs = append(errs, "retention.sync_interval is required if retention is enabled")
-		}
-		if c.Retention.KeepPeriod == "" {
-			errs = append(errs, "retention.keep_period is required if retention is enabled")
-		}
-	}
-
 	// Validate log (optional)
 	if c.Log.Level != "" {
 		validLevels := map[string]bool{"trace": true, "debug": true, "info": true, "warn": true, "error": true}
@@ -347,6 +338,36 @@ func (c *Config) Validate(mode string) error {
 	if c.Log.Format != "" {
 		if c.Log.Format != "text" && c.Log.Format != "json" {
 			errs = append(errs, fmt.Sprintf("log.format must be 'text' or 'json' (got: %s)", c.Log.Format))
+		}
+	}
+
+	if c.Storage.Name != "" {
+		// uploader
+		syncIntervalUploader := c.Storage.Uploader.SyncInterval
+		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
+			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
+		} else {
+			c.Storage.Uploader.SyncIntervalParsed = duration
+		}
+		if c.Storage.Uploader.MaxConcurrency <= 0 {
+			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
+		}
+
+		// retention
+		if c.Storage.Retention.Enable {
+			syncIntervalRetention := c.Storage.Retention.SyncInterval
+			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
+				errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
+			} else {
+				c.Storage.Retention.SyncIntervalParsed = duration
+			}
+
+			keepPeriodRetention := c.Storage.Retention.KeepPeriod
+			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
+				errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
+			} else {
+				c.Storage.Retention.KeepPeriodParsed = duration
+			}
 		}
 	}
 

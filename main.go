@@ -126,13 +126,10 @@ func loadConfig(c *cli.Command) *config.Config {
 		log.Fatal("config path is not defined")
 	}
 	mode := c.String("mode")
-	if configPath == "" {
+	if mode == "" {
 		log.Fatal("mode is not defined")
 	}
-	cfg := config.MustLoad(configPath)
-	if err := cfg.Validate(mode); err != nil {
-		log.Fatalf("Invalid config: %v", err)
-	}
+	cfg := config.MustLoad(configPath, mode)
 
 	// debug config (NOTE: sensitive fields are hidden)
 	_, _ = fmt.Fprintf(os.Stderr, "STARTING WITH CONFIGURATION:\n%s\n\n", cfg.String())

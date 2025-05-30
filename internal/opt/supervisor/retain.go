@@ -27,8 +27,8 @@ func (u *ArchiveSupervisor) filterOlderThan(
 	return result
 }
 
-func (u *ArchiveSupervisor) performRetention(ctx context.Context, daysKeepRetention time.Duration) error {
-	cutoff := time.Now().UTC().Add(-daysKeepRetention)
+func (u *ArchiveSupervisor) performRetention(ctx context.Context, keepPeriod time.Duration) error {
+	cutoff := time.Now().UTC().Add(-keepPeriod)
 	u.log().Debug("retention cutoff", slog.String("cutoff", cutoff.Format(time.DateTime)))
 
 	fileInfos, err := u.stor.ListInfo(ctx, "")
