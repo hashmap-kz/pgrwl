@@ -163,7 +163,7 @@ func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
 			cfg.Storage.Retention.Enable
 		if !hasCfg {
-			slog.Info("supervisor loop is skipped",
+			l.Info("supervisor loop is skipped",
 				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
 			)
 		}
