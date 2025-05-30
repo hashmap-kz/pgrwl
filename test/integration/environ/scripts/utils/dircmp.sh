@@ -27,6 +27,9 @@ for k in "${!filesA[@]}"; do all_keys+=("$k"); done
 for k in "${!filesB[@]}"; do all_keys+=("$k"); done
 unique_keys=($(printf "%s\n" "${all_keys[@]}" | sort -u))
 
+# Track if any differences were found
+exit_code=0
+
 # Compare files
 for key in "${unique_keys[@]}"; do
   pathA="${filesA[$key]-}"
@@ -34,13 +37,18 @@ for key in "${unique_keys[@]}"; do
 
   if [[ -z "$pathA" ]]; then
     echo "$key is missing in ${DIR_A}"
+    exit_code=1
   elif [[ -z "$pathB" ]]; then
     echo "$key is missing in ${DIR_B}"
+    exit_code=2
   else
     sumA=$(sha256sum "$pathA" | awk '{print $1}')
     sumB=$(sha256sum "$pathB" | awk '{print $1}')
     if [[ "$sumA" != "$sumB" ]]; then
       echo "$key differs"
+      exit_code=3
     fi
   fi
 done
+
+exit $exit_code
