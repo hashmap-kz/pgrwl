@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var PgrwlMetricsCollector pgrwlMetrics = &pgrwlMetricsNoop{}
+var M pgrwlMetrics = &pgrwlMetricsNoop{}
 
 type pgrwlMetrics interface {
 	MetricsEnabled() bool
@@ -15,6 +15,10 @@ type pgrwlMetrics interface {
 	IncWALFilesUploaded()
 	IncWALFilesDeleted()
 	AddWALFilesDeleted(f float64)
+	IncJobsSubmitted(name string)
+	IncJobsExecuted(name string)
+	IncJobsDropped(name string)
+	ObserveJobDuration(name string, f float64)
 }
 
 // noop
@@ -23,12 +27,16 @@ type pgrwlMetricsNoop struct{}
 
 var _ pgrwlMetrics = &pgrwlMetricsNoop{}
 
-func (p pgrwlMetricsNoop) MetricsEnabled() bool          { return false }
-func (p pgrwlMetricsNoop) AddWALBytesReceived(_ float64) {}
-func (p pgrwlMetricsNoop) IncWALFilesReceived()          {}
-func (p pgrwlMetricsNoop) IncWALFilesUploaded()          {}
-func (p pgrwlMetricsNoop) IncWALFilesDeleted()           {}
-func (p pgrwlMetricsNoop) AddWALFilesDeleted(_ float64)  {}
+func (p pgrwlMetricsNoop) MetricsEnabled() bool                   { return false }
+func (p pgrwlMetricsNoop) AddWALBytesReceived(_ float64)          {}
+func (p pgrwlMetricsNoop) IncWALFilesReceived()                   {}
+func (p pgrwlMetricsNoop) IncWALFilesUploaded()                   {}
+func (p pgrwlMetricsNoop) IncWALFilesDeleted()                    {}
+func (p pgrwlMetricsNoop) AddWALFilesDeleted(_ float64)           {}
+func (p pgrwlMetricsNoop) IncJobsSubmitted(_ string)              {}
+func (p pgrwlMetricsNoop) IncJobsExecuted(_ string)               {}
+func (p pgrwlMetricsNoop) IncJobsDropped(_ string)                {}
+func (p pgrwlMetricsNoop) ObserveJobDuration(_ string, _ float64) {}
 
 // prom
 
@@ -52,7 +60,7 @@ func InitPromMetrics() {
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	prometheus.Unregister(collectors.NewGoCollector())
 
-	PgrwlMetricsCollector = &pgrwlMetricsProm{
+	M = &pgrwlMetricsProm{
 		walBytesReceived: promauto.NewCounter(prometheus.CounterOpts{
 			Name: "pgrwl_wal_bytes_received_total",
 			Help: "Total number of WAL bytes received from PostgreSQL.",
@@ -95,6 +103,8 @@ func (p *pgrwlMetricsProm) MetricsEnabled() bool {
 	return true
 }
 
+// receive, manage, etc...
+
 func (p *pgrwlMetricsProm) AddWALBytesReceived(f float64) {
 	p.walBytesReceived.Add(f)
 }
@@ -113,4 +123,22 @@ func (p *pgrwlMetricsProm) IncWALFilesDeleted() {
 
 func (p *pgrwlMetricsProm) AddWALFilesDeleted(f float64) {
 	p.walFilesDeleted.Add(f)
+}
+
+// job-queue
+
+func (p *pgrwlMetricsProm) IncJobsSubmitted(name string) {
+	p.jobsSubmitted.WithLabelValues(name).Inc()
+}
+
+func (p *pgrwlMetricsProm) IncJobsExecuted(name string) {
+	p.jobsExecuted.WithLabelValues(name).Inc()
+}
+
+func (p *pgrwlMetricsProm) IncJobsDropped(name string) {
+	p.jobsDropped.WithLabelValues(name).Inc()
+}
+
+func (p *pgrwlMetricsProm) ObserveJobDuration(name string, f float64) {
+	p.jobDuration.WithLabelValues(name).Observe(f)
 }
