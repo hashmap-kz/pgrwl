@@ -119,6 +119,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			Verbose:     opts.Verbose,
 			RunningMode: config.ModeReceive,
 			Storage:     stor,
+			JobQueue:    jobQueue,
 		})
 		srv := httpsrv.NewHTTPSrv(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {

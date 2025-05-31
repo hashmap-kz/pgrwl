@@ -23,23 +23,19 @@ func (c *ControlController) StatusHandler(w http.ResponseWriter, _ *http.Request
 	optutils.WriteJSON(w, http.StatusOK, status)
 }
 
-func (c *ControlController) ArchiveSizeHandler(w http.ResponseWriter, _ *http.Request) {
-	sizeInfo, err := c.Service.WALArchiveSize()
+func (c *ControlController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *http.Request) {
+	filename, err := optutils.PathValueString(r, "filename")
 	if err != nil {
+		http.Error(w, "expect filename path-param", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.Service.DeleteWALsBefore(filename); err != nil {
 		optutils.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
-	optutils.WriteJSON(w, http.StatusOK, sizeInfo)
-}
-
-func (c *ControlController) RetentionHandler(w http.ResponseWriter, _ *http.Request) {
-	if err := c.Service.RetainWALs(); err != nil {
-		optutils.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	optutils.WriteJSON(w, http.StatusOK, map[string]string{"status": "cleanup done"})
+	optutils.WriteJSON(w, http.StatusOK, map[string]string{"status": "scheduled"})
 }
 
 func (c *ControlController) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request) {

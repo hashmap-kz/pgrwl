@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/jobq"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"
@@ -20,13 +20,8 @@ import (
 
 type ControlService interface {
 	Status() *model.PgRwlStatus
-	RetainWALs() error
-	WALArchiveSize() (*model.WALArchiveSize, error)
+	DeleteWALsBefore(walFileName string) error
 	GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error)
-}
-type lockInfo struct {
-	task     string
-	acquired time.Time
 }
 
 type controlSvc struct {
@@ -35,10 +30,7 @@ type controlSvc struct {
 	baseDir     string
 	runningMode string
 	storage     *storage.TransformingStorage
-
-	mu   sync.Mutex // protects access to `lock`
-	held bool       // is the lock currently held?
-	info lockInfo   // metadata about the lock
+	jobQueue    *jobq.JobQueue // optional, nil in 'serve' mode
 }
 
 var _ ControlService = &controlSvc{}
@@ -48,6 +40,7 @@ type ControlServiceOpts struct {
 	BaseDir     string
 	RunningMode string
 	Storage     *storage.TransformingStorage
+	JobQueue    *jobq.JobQueue // optional, nil in 'serve' mode
 }
 
 func NewControlService(opts *ControlServiceOpts) ControlService {
@@ -57,33 +50,8 @@ func NewControlService(opts *ControlServiceOpts) ControlService {
 		baseDir:     opts.BaseDir,
 		runningMode: opts.RunningMode,
 		storage:     opts.Storage,
+		jobQueue:    opts.JobQueue,
 	}
-}
-
-// tryLock attempts to acquire the operation lock
-func (s *controlSvc) tryLock(task string) (bool, *lockInfo) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.held {
-		// Copy so caller can safely read
-		info := s.info
-		return false, &info
-	}
-
-	s.held = true
-	s.info = lockInfo{
-		task:     task,
-		acquired: time.Now(),
-	}
-	return true, nil
-}
-
-func (s *controlSvc) unlock() {
-	s.mu.Lock()
-	s.held = false
-	s.info = lockInfo{} // clear metadata
-	s.mu.Unlock()
 }
 
 func (s *controlSvc) log() *slog.Logger {
@@ -94,8 +62,6 @@ func (s *controlSvc) log() *slog.Logger {
 }
 
 func (s *controlSvc) Status() *model.PgRwlStatus {
-	// read-only; doesn’t need to block
-
 	s.log().Debug("querying status")
 
 	var streamStatusResp *model.StreamStatus
@@ -115,33 +81,15 @@ func (s *controlSvc) Status() *model.PgRwlStatus {
 	}
 }
 
-func (s *controlSvc) RetainWALs() error {
-	ok, current := s.tryLock("RetainWALs")
-	if !ok {
-		return fmt.Errorf("cannot run RetainWALs: %s is already running since %s",
-			current.task, current.acquired.Format(time.RFC3339))
+func (s *controlSvc) DeleteWALsBefore(walFileName string) error {
+	if s.jobQueue != nil {
+		s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
+			// Long-running cleanup here...
+			s.log().Info("deleting WAL files")
+			time.Sleep(14 * time.Second)
+		})
 	}
-	defer s.unlock()
-
-	// Long-running cleanup here...
-	time.Sleep(5 * time.Second)
 	return nil
-}
-
-func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
-	// read-only; doesn’t need to block
-
-	size, err := optutils.DirSize(s.baseDir, &optutils.DirSizeOpts{
-		IgnoreErrPermission: true,
-		IgnoreErrNotExist:   true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &model.WALArchiveSize{
-		Bytes: size,
-		IEC:   optutils.ByteCountIEC(size),
-	}, nil
 }
 
 func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error) {
@@ -149,7 +97,6 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 	// 2) Check *.partial file locally
 	// 3) Fetch from storage (if it's not nil)
 
-	// TODO: local storage
 	// TODO: send checksum in headers
 
 	s.log().Debug("fetching WAL file", slog.String("filename", filename))
