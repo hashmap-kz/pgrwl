@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"errors"
 	"io"
 	"net/http"
+
+	"github.com/hashmap-kz/pgrwl/internal/jobq"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
@@ -31,6 +34,10 @@ func (c *ControlController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *ht
 	}
 
 	if err := c.Service.DeleteWALsBefore(filename); err != nil {
+		if errors.Is(err, jobq.ErrJobQueueFull) {
+			optutils.WriteJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+			return
+		}
 		optutils.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}

@@ -83,11 +83,14 @@ func (s *controlSvc) Status() *model.PgRwlStatus {
 
 func (s *controlSvc) DeleteWALsBefore(walFileName string) error {
 	if s.jobQueue != nil {
-		s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
+		err := s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
 			// Long-running cleanup here...
 			s.log().Info("deleting WAL files")
 			time.Sleep(14 * time.Second)
 		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -2,8 +2,12 @@ package jobq
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 )
+
+var ErrJobQueueFull = errors.New("job queue full")
 
 type Job func(ctx context.Context)
 
@@ -49,9 +53,12 @@ func (q *JobQueue) Start(ctx context.Context) {
 	}()
 }
 
-func (q *JobQueue) Submit(name string, jobFunc func(ctx context.Context)) {
-	q.jobs <- NamedJob{
-		Name: name,
-		Run:  jobFunc,
+func (q *JobQueue) Submit(name string, jobFunc func(ctx context.Context)) error {
+	job := NamedJob{Name: name, Run: jobFunc}
+	select {
+	case q.jobs <- job:
+		return nil
+	default:
+		return fmt.Errorf("%w: %s", ErrJobQueueFull, name)
 	}
 }

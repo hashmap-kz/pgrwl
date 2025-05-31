@@ -62,7 +62,7 @@ func (u *ArchiveSupervisor) RunUploader(ctx context.Context, queue *jobq.JobQueu
 			u.log().Info("context is done, exiting...")
 			return
 		case <-ticker.C:
-			queue.Submit("upload", func(ctx context.Context) {
+			err := queue.Submit("upload", func(ctx context.Context) {
 				u.log().Debug("upload worker is running")
 				err := u.performUploads(ctx)
 				if err != nil {
@@ -70,6 +70,9 @@ func (u *ArchiveSupervisor) RunUploader(ctx context.Context, queue *jobq.JobQueu
 				}
 				u.log().Debug("upload worker is done")
 			})
+			if err != nil {
+				u.log().Error("error submit upload files job", slog.Any("err", err))
+			}
 		}
 	}
 }
@@ -86,7 +89,7 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.Jo
 			u.log().Info("context is done, exiting...")
 			return
 		case <-uploadTicker.C:
-			queue.Submit("upload", func(ctx context.Context) {
+			err := queue.Submit("upload", func(ctx context.Context) {
 				u.log().Debug("upload worker is running")
 				err := u.performUploads(ctx)
 				if err != nil {
@@ -94,8 +97,11 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.Jo
 				}
 				u.log().Debug("upload worker is done")
 			})
+			if err != nil {
+				u.log().Error("error submit upload files job", slog.Any("err", err))
+			}
 		case <-retentionTicker.C:
-			queue.Submit("retain", func(ctx context.Context) {
+			err := queue.Submit("retain", func(ctx context.Context) {
 				u.log().Debug("retention worker is running")
 				err := u.performRetention(ctx, u.cfg.Storage.Retention.KeepPeriodParsed)
 				if err != nil {
@@ -103,6 +109,9 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.Jo
 				}
 				u.log().Debug("retention worker is done")
 			})
+			if err != nil {
+				u.log().Error("error submit retain files job", slog.Any("err", err))
+			}
 		}
 	}
 }
