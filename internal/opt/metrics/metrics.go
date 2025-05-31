@@ -37,6 +37,12 @@ type pgrwlMetricsProm struct {
 	walFilesReceived prometheus.Counter
 	walFilesUploaded prometheus.Counter
 	walFilesDeleted  prometheus.Counter
+
+	// job-queue
+	jobsSubmitted *prometheus.CounterVec
+	jobsExecuted  *prometheus.CounterVec
+	jobsDropped   *prometheus.CounterVec
+	jobDuration   *prometheus.HistogramVec
 }
 
 var _ pgrwlMetrics = &pgrwlMetricsProm{}
@@ -63,6 +69,25 @@ func InitPromMetrics() {
 			Name: "pgrwl_wal_files_deleted_total",
 			Help: "Number of WAL segments deleted by retention logic.",
 		}),
+
+		// job-queue
+		jobsSubmitted: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "pgrwl_jobq_jobs_submitted_total",
+			Help: "Total number of jobs submitted to the queue.",
+		}, []string{"name"}),
+		jobsExecuted: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "pgrwl_jobq_jobs_executed_total",
+			Help: "Total number of jobs executed from the queue.",
+		}, []string{"name"}),
+		jobsDropped: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "pgrwl_jobq_jobs_dropped_total",
+			Help: "Number of jobs dropped (duplicate or queue full).",
+		}, []string{"name", "reason"}),
+		jobDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "pgrwl_jobq_job_duration_seconds",
+			Help:    "Duration of job executions.",
+			Buckets: prometheus.DefBuckets,
+		}, []string{"name"}),
 	}
 }
 
