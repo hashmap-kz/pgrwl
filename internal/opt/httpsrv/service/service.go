@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/jobq"
@@ -81,11 +82,21 @@ func (s *controlSvc) Status() *model.PgRwlStatus {
 	}
 }
 
+// filterWalBefore returns a list of WAL file paths where the file name is lexically less than the cutoff WAL name.
 func filterWalBefore(walFiles []string, cutoff string) []string {
+	slices.Sort(walFiles)
+
 	toDelete := []string{}
-	for _, wal := range walFiles {
-		if wal < cutoff {
-			toDelete = append(toDelete, wal)
+	for _, walPath := range walFiles {
+		filename := filepath.Base(walPath)
+		if len(filename) < xlog.XLogFileNameLen {
+			continue
+		}
+		if !xlog.IsXLogFileName(filename[:24]) {
+			continue
+		}
+		if filename < cutoff {
+			toDelete = append(toDelete, walPath)
 		}
 	}
 	return toDelete
