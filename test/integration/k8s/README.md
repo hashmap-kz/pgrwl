@@ -24,6 +24,22 @@ curl -X GET http://localhost:5000/v2/_catalog
 curl -X GET http://localhost:5000/v2/pgrwl/tags/list
 ```
 
+### Endpoints:
+
+- grafana: http://localhost:30270
+
+  ```
+  User: admin
+  Pass: admin
+  ```
+
+- minio: https://localhost:30267
+
+  ```
+  User: minioadmin
+  Pass: minioadmin123
+  ```
+
 ### Verification:
 
 ```
