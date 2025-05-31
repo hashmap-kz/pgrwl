@@ -40,6 +40,7 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 		RunningMode: opts.RunningMode,
 		Storage:     opts.Storage,
 		JobQueue:    opts.JobQueue,
+		Verbose:     opts.Verbose,
 	})
 	controller := controlCrt.NewController(service)
 

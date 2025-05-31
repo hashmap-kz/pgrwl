@@ -33,7 +33,7 @@ func (c *ControlController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := c.Service.DeleteWALsBefore(filename); err != nil {
+	if err := c.Service.DeleteWALsBefore(r.Context(), filename); err != nil {
 		if errors.Is(err, jobq.ErrJobQueueFull) {
 			optutils.WriteJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
 			return
