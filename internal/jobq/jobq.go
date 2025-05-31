@@ -41,9 +41,9 @@ func (q *JobQueue) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case job := <-q.jobs:
-				q.log().Info("running job", slog.String("job-name", job.Name))
+				q.log().Info("run job", slog.String("job-name", job.Name))
 				job.Run(ctx)
-				q.log().Info("finished job", slog.String("job-name", job.Name))
+				q.log().Info("fin job", slog.String("job-name", job.Name))
 			}
 		}
 	}()
