@@ -4,10 +4,10 @@ For anyone looking to get involved to this project, we are glad to hear from you
 that we would be interested in hearing about.
 
 - Bug fixes
-    - If you find a bug, please first report it using Github Issues.
+    - If you find a bug, please first report it using GitHub Issues.
 - New Features
     - If you'd like to accomplish something in the plugin that it doesn't already do, describe the problem in a new
-      Github Issue.
+      GitHub Issue.
     - If you'd like to implement the new feature, please wait for feedback from the project maintainers before spending
       too much time writing the code. In some cases, `enhancement`s may not align well with the project objectives at
       the time.
