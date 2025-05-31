@@ -11,14 +11,24 @@ type NamedJob struct {
 	Name string
 	Run  func(ctx context.Context)
 }
+
 type JobQueue struct {
+	l    *slog.Logger
 	jobs chan NamedJob
 }
 
 func NewJobQueue(bufferSize int) *JobQueue {
 	return &JobQueue{
+		l:    slog.With("component", "job-queue"),
 		jobs: make(chan NamedJob, bufferSize),
 	}
+}
+
+func (q *JobQueue) log() *slog.Logger {
+	if q.l != nil {
+		return q.l
+	}
+	return slog.With("component", "job-queue")
 }
 
 func (q *JobQueue) Start(ctx context.Context) {
@@ -28,9 +38,9 @@ func (q *JobQueue) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case job := <-q.jobs:
-				slog.Info("running job", slog.String("name", job.Name))
+				q.log().Info("running job", slog.String("job-name", job.Name))
 				job.Run(ctx)
-				slog.Info("finished job", slog.String("name", job.Name))
+				q.log().Info("finished job", slog.String("job-name", job.Name))
 			}
 		}
 	}()
