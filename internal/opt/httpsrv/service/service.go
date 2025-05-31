@@ -81,6 +81,16 @@ func (s *controlSvc) Status() *model.PgRwlStatus {
 	}
 }
 
+func filterWalBefore(walFiles []string, cutoff string) []string {
+	toDelete := []string{}
+	for _, wal := range walFiles {
+		if wal < cutoff {
+			toDelete = append(toDelete, wal)
+		}
+	}
+	return toDelete
+}
+
 func (s *controlSvc) DeleteWALsBefore(walFileName string) error {
 	if s.jobQueue != nil {
 		err := s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
