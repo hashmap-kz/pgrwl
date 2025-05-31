@@ -60,7 +60,7 @@ data:
       retention:
         enable: true
         sync_interval: 10s
-        keep_period: "1m"
+        keep_period: "5m"
       compression:
         algo: gzip
       encryption:
@@ -172,7 +172,7 @@ spec:
             # "/tmp/configs/config-s3.yml"
             # "/tmp/configs/config-localfs.yml"
             - name: PGRWL_CONFIG_PATH
-              value: "/tmp/configs/config-localfs.yml"
+              value: "/tmp/configs/config-s3.yml"
           ports:
             - containerPort: 7070
               name: http
