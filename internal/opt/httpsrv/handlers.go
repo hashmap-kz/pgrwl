@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 
+	"github.com/hashmap-kz/pgrwl/internal/jobq"
+
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -25,6 +27,7 @@ type HTTPHandlersOpts struct {
 	Verbose     bool
 	RunningMode string
 	Storage     *storage.TransformingStorage
+	JobQueue    *jobq.JobQueue // optional, nil in 'serve' mode
 }
 
 func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
@@ -36,6 +39,8 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 		BaseDir:     opts.BaseDir,
 		RunningMode: opts.RunningMode,
 		Storage:     opts.Storage,
+		JobQueue:    opts.JobQueue,
+		Verbose:     opts.Verbose,
 	})
 	controller := controlCrt.NewController(service)
 
@@ -65,10 +70,9 @@ func InitHTTPHandlers(opts *HTTPHandlersOpts) http.Handler {
 
 	// Streaming mode (requires that wal-streaming process is running)
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
-	mux.Handle("POST /retention", secureChain(http.HandlerFunc(controller.RetentionHandler)))
+	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
 
 	// Standalone mode (i.e. just serving wal-archive during restore)
-	mux.Handle("/archive/size", secureChain(http.HandlerFunc(controller.ArchiveSizeHandler)))
 	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
 	if cfg.Metrics.Enable {

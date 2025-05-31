@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sync"
-	"time"
+	"slices"
 
+	"github.com/hashmap-kz/pgrwl/internal/core/logger"
+
+	"github.com/hashmap-kz/pgrwl/internal/jobq"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"
@@ -20,13 +22,8 @@ import (
 
 type ControlService interface {
 	Status() *model.PgRwlStatus
-	RetainWALs() error
-	WALArchiveSize() (*model.WALArchiveSize, error)
+	DeleteWALsBefore(ctx context.Context, walFileName string) error
 	GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error)
-}
-type lockInfo struct {
-	task     string
-	acquired time.Time
 }
 
 type controlSvc struct {
@@ -35,10 +32,8 @@ type controlSvc struct {
 	baseDir     string
 	runningMode string
 	storage     *storage.TransformingStorage
-
-	mu   sync.Mutex // protects access to `lock`
-	held bool       // is the lock currently held?
-	info lockInfo   // metadata about the lock
+	jobQueue    *jobq.JobQueue // optional, nil in 'serve' mode
+	verbose     bool
 }
 
 var _ ControlService = &controlSvc{}
@@ -48,6 +43,8 @@ type ControlServiceOpts struct {
 	BaseDir     string
 	RunningMode string
 	Storage     *storage.TransformingStorage
+	JobQueue    *jobq.JobQueue // optional, nil in 'serve' mode
+	Verbose     bool
 }
 
 func NewControlService(opts *ControlServiceOpts) ControlService {
@@ -57,33 +54,9 @@ func NewControlService(opts *ControlServiceOpts) ControlService {
 		baseDir:     opts.BaseDir,
 		runningMode: opts.RunningMode,
 		storage:     opts.Storage,
+		jobQueue:    opts.JobQueue,
+		verbose:     opts.Verbose,
 	}
-}
-
-// tryLock attempts to acquire the operation lock
-func (s *controlSvc) tryLock(task string) (bool, *lockInfo) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.held {
-		// Copy so caller can safely read
-		info := s.info
-		return false, &info
-	}
-
-	s.held = true
-	s.info = lockInfo{
-		task:     task,
-		acquired: time.Now(),
-	}
-	return true, nil
-}
-
-func (s *controlSvc) unlock() {
-	s.mu.Lock()
-	s.held = false
-	s.info = lockInfo{} // clear metadata
-	s.mu.Unlock()
 }
 
 func (s *controlSvc) log() *slog.Logger {
@@ -94,8 +67,6 @@ func (s *controlSvc) log() *slog.Logger {
 }
 
 func (s *controlSvc) Status() *model.PgRwlStatus {
-	// read-only; doesn’t need to block
-
 	s.log().Debug("querying status")
 
 	var streamStatusResp *model.StreamStatus
@@ -115,33 +86,66 @@ func (s *controlSvc) Status() *model.PgRwlStatus {
 	}
 }
 
-func (s *controlSvc) RetainWALs() error {
-	ok, current := s.tryLock("RetainWALs")
-	if !ok {
-		return fmt.Errorf("cannot run RetainWALs: %s is already running since %s",
-			current.task, current.acquired.Format(time.RFC3339))
-	}
-	defer s.unlock()
+// filterWalBefore returns a list of WAL file paths where the file name is lexically less than the cutoff WAL name.
+func filterWalBefore(walFiles []string, cutoff string) []string {
+	slices.Sort(walFiles)
 
-	// Long-running cleanup here...
-	time.Sleep(5 * time.Second)
-	return nil
+	toDelete := []string{}
+	for _, walPath := range walFiles {
+		filename := filepath.Base(walPath)
+		if len(filename) < xlog.XLogFileNameLen {
+			continue
+		}
+		if !xlog.IsXLogFileName(filename[:24]) {
+			continue
+		}
+		if filename < cutoff {
+			toDelete = append(toDelete, walPath)
+		}
+	}
+	return toDelete
 }
 
-func (s *controlSvc) WALArchiveSize() (*model.WALArchiveSize, error) {
-	// read-only; doesn’t need to block
+func (s *controlSvc) DeleteWALsBefore(_ context.Context, walFileName string) error {
+	if s.jobQueue != nil {
+		err := s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
+			s.log().Info("deleting WAL files")
+			walFilesInStorage, err := s.storage.List(context.Background(), "")
+			if err != nil {
+				s.log().Error("cannot delete WAL files",
+					slog.String("before", walFileName),
+					slog.Any("err", err),
+				)
+				return
+			}
+			walFilesToDelete := filterWalBefore(walFilesInStorage, walFileName)
+			if len(walFilesToDelete) == 0 {
+				return
+			}
 
-	size, err := optutils.DirSize(s.baseDir, &optutils.DirSizeOpts{
-		IgnoreErrPermission: true,
-		IgnoreErrNotExist:   true,
-	})
-	if err != nil {
-		return nil, err
+			if s.verbose {
+				s.log().LogAttrs(context.Background(), logger.LevelTrace, "begin to delete wal files")
+				for _, w := range walFilesToDelete {
+					s.log().LogAttrs(context.Background(), logger.LevelTrace, "wal file to delete",
+						slog.String("name", w),
+					)
+				}
+			}
+
+			err = s.storage.DeleteAllBulk(context.Background(), walFilesToDelete)
+			if err != nil {
+				s.log().Error("cannot delete WAL files",
+					slog.String("before", walFileName),
+					slog.Any("err", err),
+				)
+				return
+			}
+		})
+		if err != nil {
+			return err
+		}
 	}
-	return &model.WALArchiveSize{
-		Bytes: size,
-		IEC:   optutils.ByteCountIEC(size),
-	}, nil
+	return nil
 }
 
 func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error) {
@@ -149,7 +153,6 @@ func (s *controlSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCl
 	// 2) Check *.partial file locally
 	// 3) Fetch from storage (if it's not nil)
 
-	// TODO: local storage
 	// TODO: send checksum in headers
 
 	s.log().Debug("fetching WAL file", slog.String("filename", filename))
