@@ -3,7 +3,6 @@ package supervisor
 import (
 	"context"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/jobq"
@@ -26,7 +25,6 @@ type uploadBundle struct {
 
 type ArchiveSupervisor struct {
 	l       *slog.Logger
-	mu      sync.Mutex
 	cfg     *config.Config
 	stor    storage.Storage
 	opts    *ArchiveSupervisorOpts
@@ -66,8 +64,6 @@ func (u *ArchiveSupervisor) RunUploader(ctx context.Context, queue *jobq.JobQueu
 		case <-ticker.C:
 			queue.Submit("upload", func(ctx context.Context) {
 				u.log().Debug("upload worker is running")
-				u.mu.Lock()
-				defer u.mu.Unlock()
 				err := u.performUploads(ctx)
 				if err != nil {
 					u.log().Error("error upload files", slog.Any("err", err))
@@ -92,8 +88,6 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.Jo
 		case <-uploadTicker.C:
 			queue.Submit("upload", func(ctx context.Context) {
 				u.log().Debug("upload worker is running")
-				u.mu.Lock()
-				defer u.mu.Unlock()
 				err := u.performUploads(ctx)
 				if err != nil {
 					u.log().Error("error upload files", slog.Any("err", err))
@@ -103,8 +97,6 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.Jo
 		case <-retentionTicker.C:
 			queue.Submit("retain", func(ctx context.Context) {
 				u.log().Debug("retention worker is running")
-				u.mu.Lock()
-				defer u.mu.Unlock()
 				err := u.performRetention(ctx, u.cfg.Storage.Retention.KeepPeriodParsed)
 				if err != nil {
 					u.log().Error("error retain files", slog.Any("err", err))
