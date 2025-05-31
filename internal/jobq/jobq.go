@@ -18,6 +18,9 @@ type JobQueue struct {
 }
 
 func NewJobQueue(bufferSize int) *JobQueue {
+	if bufferSize <= 0 {
+		bufferSize = 1
+	}
 	return &JobQueue{
 		l:    slog.With("component", "job-queue"),
 		jobs: make(chan NamedJob, bufferSize),
