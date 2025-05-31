@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/jobq"
+
 	"github.com/hashmap-kz/pgrwl/config"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
@@ -52,7 +54,7 @@ func (u *ArchiveSupervisor) log() *slog.Logger {
 	return slog.With(slog.String("component", "archive-supervisor"))
 }
 
-func (u *ArchiveSupervisor) RunUploader(ctx context.Context) {
+func (u *ArchiveSupervisor) RunUploader(ctx context.Context, queue *jobq.JobQueue) {
 	ticker := time.NewTicker(u.cfg.Storage.Uploader.SyncIntervalParsed)
 	defer ticker.Stop()
 
@@ -62,17 +64,21 @@ func (u *ArchiveSupervisor) RunUploader(ctx context.Context) {
 			u.log().Info("context is done, exiting...")
 			return
 		case <-ticker.C:
-			u.log().Debug("upload worker is running")
-			err := u.performUploads(ctx)
-			u.log().Debug("upload worker is done")
-			if err != nil {
-				u.log().Error("error upload files", slog.Any("err", err))
-			}
+			queue.Submit("upload", func(ctx context.Context) {
+				u.log().Debug("upload worker is running")
+				u.mu.Lock()
+				defer u.mu.Unlock()
+				err := u.performUploads(ctx)
+				if err != nil {
+					u.log().Error("error upload files", slog.Any("err", err))
+				}
+				u.log().Debug("upload worker is done")
+			})
 		}
 	}
 }
 
-func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context) {
+func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.JobQueue) {
 	uploadTicker := time.NewTicker(u.cfg.Storage.Uploader.SyncIntervalParsed)
 	retentionTicker := time.NewTicker(u.cfg.Storage.Retention.SyncIntervalParsed)
 	defer uploadTicker.Stop()
@@ -84,23 +90,27 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context) {
 			u.log().Info("context is done, exiting...")
 			return
 		case <-uploadTicker.C:
-			u.log().Debug("upload worker is running")
-			u.mu.Lock()
-			err := u.performUploads(ctx)
-			u.mu.Unlock()
-			u.log().Debug("upload worker is done")
-			if err != nil {
-				u.log().Error("error upload files", slog.Any("err", err))
-			}
+			queue.Submit("upload", func(ctx context.Context) {
+				u.log().Debug("upload worker is running")
+				u.mu.Lock()
+				defer u.mu.Unlock()
+				err := u.performUploads(ctx)
+				if err != nil {
+					u.log().Error("error upload files", slog.Any("err", err))
+				}
+				u.log().Debug("upload worker is done")
+			})
 		case <-retentionTicker.C:
-			u.log().Debug("retention worker is running")
-			u.mu.Lock()
-			err := u.performRetention(ctx, u.cfg.Storage.Retention.KeepPeriodParsed)
-			u.mu.Unlock()
-			u.log().Debug("retention worker is done")
-			if err != nil {
-				u.log().Error("error retain files", slog.Any("err", err))
-			}
+			queue.Submit("retain", func(ctx context.Context) {
+				u.log().Debug("retention worker is running")
+				u.mu.Lock()
+				defer u.mu.Unlock()
+				err := u.performRetention(ctx, u.cfg.Storage.Retention.KeepPeriodParsed)
+				if err != nil {
+					u.log().Error("error retain files", slog.Any("err", err))
+				}
+				u.log().Debug("retention worker is done")
+			})
 		}
 	}
 }

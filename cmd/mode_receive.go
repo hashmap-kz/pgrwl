@@ -9,6 +9,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hashmap-kz/pgrwl/internal/jobq"
+
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
@@ -37,6 +39,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
+
+	// setup job queue
+	loggr.Info("running job queue")
+	jobQueue := jobq.NewJobQueue(5)
+	jobQueue.Start(ctx)
 
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
@@ -138,9 +145,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				Verbose:          opts.Verbose,
 			})
 			if cfg.Storage.Retention.Enable {
-				u.RunWithRetention(ctx)
+				u.RunWithRetention(ctx, jobQueue)
 			} else {
-				u.RunUploader(ctx)
+				u.RunUploader(ctx, jobQueue)
 			}
 		}()
 	}
