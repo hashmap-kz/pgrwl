@@ -59,3 +59,44 @@ func TestJobQueue_JobOrder(t *testing.T) {
 	assert.Equal(t, []string{"job1", "job2"}, results)
 	mu.Unlock()
 }
+
+func TestSubmit_ExecutesJob(t *testing.T) {
+	queue := NewJobQueue(2)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var ran bool
+
+	queue.Start(ctx)
+
+	wg.Add(1)
+	err := queue.Submit("test-job", func(_ context.Context) {
+		defer wg.Done()
+		ran = true
+	})
+	assert.NoError(t, err)
+
+	wg.Wait()
+	assert.True(t, ran, "job should have run")
+}
+
+func TestSubmit_ReturnsErrWhenQueueIsFull(t *testing.T) {
+	queue := NewJobQueue(1)
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	blocked := make(chan struct{})
+
+	// Fill the queue with a blocking job
+	err := queue.Submit("job1", func(_ context.Context) {
+		<-blocked // block forever
+	})
+	assert.NoError(t, err)
+
+	// Try to submit another job — should fail
+	err = queue.Submit("job2", func(_ context.Context) {})
+	assert.ErrorIs(t, err, ErrJobQueueFull)
+	assert.Contains(t, err.Error(), "job2")
+	close(blocked) // cleanup
+}
