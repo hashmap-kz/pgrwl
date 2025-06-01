@@ -36,3 +36,27 @@ Don't forget to give the project a star ⭐!
 3. Commit your Changes (`git commit -m 'Implement new_feature, ...'`)
 4. Push to the Branch (`git push origin feature/new_feature`)
 5. Open a Pull Request
+
+### Local Development Guide
+
+Thanks for your interest in contributing! Below are the steps to build, lint, test, and verify the project locally.
+
+```bash
+# Compile the project
+make build
+
+# Run linter (should pass without errors)
+# Requires golangci-lint to be installed
+make lint
+
+# Run all fast unit tests. They should pass before submitting a PR.
+make test
+
+# Run integration tests (slow, but critical)
+# Requires Docker and Docker Compose to be installed
+make test-integ-scripts
+
+# This builds the release artifacts using GoReleaser in snapshot mode (nothing is published).
+# Requires goreleaser to be installed
+make snapshot
+```
