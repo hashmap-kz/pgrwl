@@ -50,7 +50,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 
 	// metrics
 	if cfg.Metrics.Enable {
-		metrics.InitPromMetrics()
+		metrics.InitPromMetrics(ctx)
 	}
 
 	// setup wal-receiver
