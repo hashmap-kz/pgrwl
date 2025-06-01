@@ -18,7 +18,6 @@ integration with Kubernetes environments.
 
 ## Table of Contents
 
-- [pgrwl](#pgrwl)
   - [Table of Contents](#table-of-contents)
   - [About](#about)
   - [Usage](#usage)
