@@ -48,7 +48,6 @@ integration with Kubernetes environments.
     - [Source Code Structure](#source-code-structure)
     - [Links](#links)
 - [License](#license)
-
 ---
 
 ## About
@@ -76,7 +75,7 @@ integration with Kubernetes environments.
 
 `Receive` mode is _the main loop of the WAL receiver_.
 
-```bash
+```yaml
 cat <<EOF >config.yml
 main:
   listen_port: 7070
@@ -88,6 +87,9 @@ log:
   format: text
   add_source: true
 EOF
+```
+
+```bash
 
 export PGHOST=localhost
 export PGPORT=5432
@@ -102,7 +104,7 @@ pgrwl -c config.yml
 
 `Serve` mode is _used during restore to serve archived WAL files from storage_.
 
-```bash
+```yaml
 cat <<EOF >config.yml
 main:
   listen_port: 7070
@@ -112,7 +114,8 @@ log:
   format: text
   add_source: true
 EOF
-
+```
+```bash
 export PGRWL_MODE=serve
 
 pgrwl -c config.yml
@@ -122,7 +125,7 @@ pgrwl -c config.yml
 
 `restore_command` example for postgresql.conf:
 
-```
+```ini
 # where 'k8s-worker5:30266' represents the host and port
 # of a 'pgrwl' instance running in 'serve' mode.
 restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
@@ -137,7 +140,7 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
-```
+```yaml
 main:                                    # Required for both modes: 'receive' / 'serve'
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
@@ -198,7 +201,7 @@ storage:                                 # Optional
 
 ### Docker images are available at [quay.io/hashmap_kz/pgrwl](https://quay.io/repository/hashmap_kz/pgrwl)
 
-```
+```bash
 docker pull quay.io/hashmap_kz/pgrwl:latest
 ```
 
@@ -228,7 +231,7 @@ chmod +x /usr/local/bin/pgrwl
 
 #### Debian
 
-```
+```bash
 sudo apt update -y && sudo apt install -y curl
 curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linux_amd64.deb
 sudo dpkg -i pgrwl_linux_amd64.deb
@@ -236,7 +239,7 @@ sudo dpkg -i pgrwl_linux_amd64.deb
 
 #### Apline Linux
 
-```
+```bash
 apk update && apk add --no-cache bash curl
 curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linux_amd64.apk
 apk add pgrwl_linux_amd64.apk --allow-untrusted
@@ -250,7 +253,7 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
-- You have a cron job that performs a _base backup_ of your cluster every three days.
+- You have a cron job that performs a **base backup** of your cluster every three days.
 - You run `pgrwl` as a systemd unit or a Kubernetes pod (depending on your infrastructure).
 - You have a configured retention worker that prunes WAL files older than three days.
 - With this setup, you're able to restore your cluster - in the event of a crash - to any second within the past three
@@ -384,7 +387,7 @@ It also checks that the WAL files generated are byte-for-byte identical to those
 
 ### To contribute or verify the project locally, the following `make` targets should all pass:
 
-```
+```bash
 # Compile the project
 make build
 
@@ -406,7 +409,7 @@ make snapshot
 
 ### Source Code Structure
 
-```
+```go
 internal/xlog/pg_receivewal.go
   → Entry point for WAL receiving logic.
     Based on the logic found in PostgreSQL:
