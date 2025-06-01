@@ -11,7 +11,7 @@ jobs:
       - name: Post welcome message
         uses: peter-evans/create-or-update-comment@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.HM_GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             🎉 Thanks for opening this pull request and contributing to `pgrwl`!
