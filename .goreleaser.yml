@@ -9,6 +9,7 @@ builds:
     binary: pgrwl
     ldflags:
       - -s -w
+      - -X 'github.com/hashmap-kz/pgrwl/version.Version={{.Version}}'
     env:
       - CGO_ENABLED=0
     goos:
