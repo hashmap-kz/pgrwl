@@ -11,6 +11,7 @@ import (
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+	"github.com/hashmap-kz/pgrwl/internal/version"
 	"github.com/urfave/cli/v3"
 )
 
@@ -108,6 +109,15 @@ func App() *cli.Command {
 							Addr: c.String("serve-addr"),
 						},
 					)
+				},
+			},
+			{
+				Name:    "version",
+				Aliases: []string{"v"},
+				Usage:   "Show version information",
+				Action: func(_ context.Context, c *cli.Command) error {
+					fmt.Println(version.Version)
+					return nil
 				},
 			},
 		},
