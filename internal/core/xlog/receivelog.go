@@ -483,7 +483,7 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 		xlogoff += bytesToWrite
 
 		// NOTE:metrics
-		metrics.PgrwlMetricsCollector.AddWALBytesReceived(float64(bytesToWrite))
+		metrics.M.AddWALBytesReceived(float64(bytesToWrite))
 
 		/* Did we reach the end of a WAL segment? */
 		xlSegOff := XLogSegmentOffset(stream.blockPos, stream.walSegSz)
