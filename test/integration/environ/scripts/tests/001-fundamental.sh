@@ -166,9 +166,9 @@ EOF
   # read the latest rec
   echo_delim "read latest applied records"
   echo "table content:"
-  psql -c "select * from public.tslog;"
+  psql --pset pager=off -c "select * from public.tslog;"
   echo "insert log content:"
-  tail /tmp/insert-ts.log
+  tail -10 /tmp/insert-ts.log
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"

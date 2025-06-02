@@ -1,12 +1,19 @@
 package metrics
 
 import (
+	"context"
+	"sync"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var M pgrwlMetrics = &pgrwlMetricsNoop{}
+var (
+	M            pgrwlMetrics = &pgrwlMetricsNoop{}
+	processStart              = time.Now()
+)
 
 type pgrwlMetrics interface {
 	MetricsEnabled() bool
@@ -19,6 +26,8 @@ type pgrwlMetrics interface {
 	IncJobsExecuted(name string)
 	IncJobsDropped(name string)
 	ObserveJobDuration(name string, f float64)
+	UptimeSet()
+	StartUptimeReporter(ctx context.Context)
 }
 
 // noop
@@ -37,6 +46,8 @@ func (p pgrwlMetricsNoop) IncJobsSubmitted(_ string)              {}
 func (p pgrwlMetricsNoop) IncJobsExecuted(_ string)               {}
 func (p pgrwlMetricsNoop) IncJobsDropped(_ string)                {}
 func (p pgrwlMetricsNoop) ObserveJobDuration(_ string, _ float64) {}
+func (p pgrwlMetricsNoop) UptimeSet()                             {}
+func (p pgrwlMetricsNoop) StartUptimeReporter(_ context.Context)  {}
 
 // prom
 
@@ -51,11 +62,15 @@ type pgrwlMetricsProm struct {
 	jobsExecuted  *prometheus.CounterVec
 	jobsDropped   *prometheus.CounterVec
 	jobDuration   *prometheus.HistogramVec
+
+	// maintenance
+	uptime     prometheus.Gauge
+	uptimeOnce sync.Once
 }
 
 var _ pgrwlMetrics = &pgrwlMetricsProm{}
 
-func InitPromMetrics() {
+func InitPromMetrics(ctx context.Context) {
 	// Unregister default prometheus collectors so we don't collect a bunch of pointless metrics
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	prometheus.Unregister(collectors.NewGoCollector())
@@ -96,7 +111,15 @@ func InitPromMetrics() {
 			Help:    "Duration of job executions.",
 			Buckets: prometheus.DefBuckets,
 		}, []string{"name"}),
+
+		// maintenance
+		uptime: promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "pgrwl_uptime_seconds",
+			Help: "Time in seconds since the process started.",
+		}),
 	}
+
+	M.StartUptimeReporter(ctx)
 }
 
 func (p *pgrwlMetricsProm) MetricsEnabled() bool {
@@ -141,4 +164,27 @@ func (p *pgrwlMetricsProm) IncJobsDropped(name string) {
 
 func (p *pgrwlMetricsProm) ObserveJobDuration(name string, f float64) {
 	p.jobDuration.WithLabelValues(name).Observe(f)
+}
+
+// maintenance
+
+func (p *pgrwlMetricsProm) UptimeSet() {
+	p.uptime.Set(time.Since(processStart).Seconds())
+}
+
+func (p *pgrwlMetricsProm) StartUptimeReporter(ctx context.Context) {
+	p.uptimeOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					p.UptimeSet()
+				}
+			}
+		}()
+	})
 }
