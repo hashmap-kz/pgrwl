@@ -113,6 +113,20 @@ func App() *cli.Command {
 					)
 				},
 			},
+			// Validate command
+			{
+				Name:  "validate",
+				Usage: "Validate the config file without running the application",
+				Flags: []cli.Flag{
+					configFlag,
+					modeFlag,
+				},
+				Action: func(_ context.Context, c *cli.Command) error {
+					_ = loadConfig(c)
+					fmt.Println("✅ Configuration is valid.")
+					return nil
+				},
+			},
 		},
 	}
 
