@@ -28,6 +28,70 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.0.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "pgrwl_uptime_seconds",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Uptime",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -49,7 +113,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 3
       },
       "id": 3,
       "options": {
@@ -112,7 +176,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 3
       },
       "id": 2,
       "options": {
@@ -211,7 +275,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 9
       },
       "id": 1,
       "options": {
@@ -270,7 +334,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 9
       },
       "id": 4,
       "options": {
@@ -368,7 +432,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 15
       },
       "id": 5,
       "options": {
@@ -460,7 +524,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 15
       },
       "id": 6,
       "options": {
@@ -552,7 +616,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 23
       },
       "id": 8,
       "options": {
@@ -644,7 +708,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 23
       },
       "id": 7,
       "options": {
