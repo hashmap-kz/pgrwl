@@ -18,22 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - id: go-cache-paths
-        run: |
-          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-
-      - name: Go Build Cache
-        uses: actions/cache@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          path: ${{ steps.go-cache-paths.outputs.go-build }}
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}-linux-amd64
-
-      - name: Go Mod Cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.go-cache-paths.outputs.go-mod }}
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}-linux-amd64
+          go-version-file: go.mod
+          cache: true
 
       - name: Ensure gofmt
         run: test -z "$(gofmt -s -d .)"
