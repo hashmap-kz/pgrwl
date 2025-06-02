@@ -123,7 +123,7 @@ func App() *cli.Command {
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					_ = loadConfig(c)
-					fmt.Println("✅ Configuration is valid.")
+					fmt.Println("Configuration is valid.")
 					return nil
 				},
 			},
