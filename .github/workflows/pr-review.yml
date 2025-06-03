@@ -1,0 +1,40 @@
+name: Basic PR Review
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened, edited ]
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Check PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for conventional commit format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          if ! echo "$PR_TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?: .+$'; then
+            echo "Warning: PR title doesn't follow conventional commit format."
+            echo "Expected format: 'type(scope): description' where type is one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+            echo "Example: 'feat(ui): add new login screen'"
+            exit 1
+          fi
+
+  conventional-commits:
+    name: Check Conventional Commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Basic Commit Message Check
+        run: |
+          # Check if any commit message doesn't follow conventional format
+          git log origin/master..HEAD --format=%B | while read line; do
+            if [[ ! "$line" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z]+\))?: ]]; then
+              if [[ ! -z "$line" ]]; then
+                echo "Warning: Commit message '$line' doesn't follow conventional format"
+              fi
+            fi
+          done
