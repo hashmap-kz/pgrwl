@@ -4,18 +4,28 @@ name: Lint
 on:
   push:
     branches:
-      - master
+      - "master"
       - "release/**"
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "examples/**"
+      - "hack/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
   pull_request:
     branches:
-      - master
+      - "master"
       - "release/**"
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
-  workflow_dispatch:
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "examples/**"
+      - "hack/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
 
 jobs:
   lint:
