@@ -7,7 +7,6 @@ on:
       - "master"
       - "release/**"
     paths-ignore:
-      - ".github/**"
       - "docs/**"
       - "examples/**"
       - "hack/**"
@@ -19,7 +18,6 @@ on:
       - "master"
       - "release/**"
     paths-ignore:
-      - ".github/**"
       - "docs/**"
       - "examples/**"
       - "hack/**"
