@@ -84,8 +84,8 @@ services:
   createbuckets:
     build:
       context: .
-      dockerfile: ./dockerfiles/minio/Dockerfile
-    image: pgrwl/minio
+      dockerfile: ./dockerfiles/minio_mc/Dockerfile
+    image: pgrwl/minio-mc
     depends_on:
       minio:
         condition: service_healthy

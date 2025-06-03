@@ -17,6 +17,7 @@ env:
   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+  CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
   #IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
 
 jobs:
@@ -41,6 +42,7 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
+            ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
           #key: ${{ env.IMAGES_CACHE_KEY }}
           key: ${{ steps.cache-key.outputs.value }}
 
@@ -57,12 +59,13 @@ jobs:
       - name: Build Docker images and cache them
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
-          docker compose -f test/integration/environ/docker-compose.yml build pg-primary pg-standby sshd minio
+          docker compose -f test/integration/environ/docker-compose.yml build pg-primary pg-standby sshd minio createbuckets
           mkdir -p ${{ env.CACHE_FOLDER }}
           docker save pgrwl/pg-primary | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
           docker save pgrwl/pg-standby | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
           docker save pgrwl/sshd | gzip -c > ${{ env.CACHE_FILE_DOCKER_SSHD }}
           docker save pgrwl/minio | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO }}
+          docker save pgrwl/minio_mc | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
           ls -lah ${{ env.CACHE_FOLDER }}
 
   test:
@@ -92,6 +95,7 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
+            ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
           #key: ${{ env.IMAGES_CACHE_KEY }}
           key: ${{ steps.cache-key.outputs.value }}
 
@@ -107,6 +111,7 @@ jobs:
           gunzip -c ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }} | docker load
           gunzip -c ${{ env.CACHE_FILE_DOCKER_SSHD }} | docker load
           gunzip -c ${{ env.CACHE_FILE_DOCKER_MINIO }} | docker load
+          gunzip -c ${{ env.CACHE_FILE_DOCKER_MINIO_MC }} | docker load
 
       - name: Run tests
         run: |
