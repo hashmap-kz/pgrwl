@@ -24,6 +24,7 @@ on:
       - "**/*.md"
       - "**/*.gitignore"
       - "**/*.gitattributes"
+  workflow_dispatch:
 
 env:
   CACHE_FOLDER: docker-cache

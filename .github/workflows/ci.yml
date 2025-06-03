@@ -26,6 +26,7 @@ on:
       - "**/*.md"
       - "**/*.gitignore"
       - "**/*.gitattributes"
+  workflow_dispatch:
 
 jobs:
   ci_job:
