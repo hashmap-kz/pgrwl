@@ -2,7 +2,7 @@ services:
   pg-primary:
     build:
       context: .
-      dockerfile: ./dockerfiles/pg/Dockerfile
+      dockerfile: ./dockerfiles/pg-17-primary/Dockerfile
     image: pgrwl/pg-primary
     container_name: pg-primary
     restart: unless-stopped
@@ -15,7 +15,10 @@ services:
       - pg-primary-data:/var/lib/postgresql/17/main
 
   pg-standby:
-    image: postgres:17
+    build:
+      context: .
+      dockerfile: ./dockerfiles/pg-17-standby/Dockerfile
+    image: pgrwl/pg-standby
     container_name: pg-standby
     depends_on:
       - pg-primary

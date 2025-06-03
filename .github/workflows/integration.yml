@@ -15,6 +15,7 @@ env:
   CACHE_FOLDER: docker-cache
   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+  CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
   #IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
 
@@ -29,7 +30,7 @@ jobs:
       - name: Compute image cache key
         id: cache-key
         ## TODO: dockerfiles, shell changes
-        run: echo "value=cache-${{ hashFiles('test/integration/environ/**') }}" >> $GITHUB_OUTPUT
+        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**') }}" >> $GITHUB_OUTPUT
 
       - name: Restore Docker image cache
         id: cache-images
@@ -37,6 +38,7 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+            ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
           #key: ${{ env.IMAGES_CACHE_KEY }}
@@ -55,9 +57,10 @@ jobs:
       - name: Build Docker images and cache them
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
-          docker compose -f test/integration/environ/docker-compose.yml build pg-primary sshd minio 
+          docker compose -f test/integration/environ/docker-compose.yml build pg-primary pg-standby sshd minio
           mkdir -p ${{ env.CACHE_FOLDER }}
           docker save pgrwl/pg-primary | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+          docker save pgrwl/pg-standby | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
           docker save pgrwl/sshd | gzip -c > ${{ env.CACHE_FILE_DOCKER_SSHD }}
           docker save pgrwl/minio | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO }}
           ls -lah ${{ env.CACHE_FOLDER }}
@@ -65,7 +68,7 @@ jobs:
   test:
     name: Run integration tests
     runs-on: ubuntu-latest
-    needs: [ build_images ]
+    needs: [build_images]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,7 +76,7 @@ jobs:
       - name: Compute image cache key
         id: cache-key
         ## TODO: dockerfiles, shell changes
-        run: echo "value=cache-${{ hashFiles('test/integration/environ/**') }}" >> $GITHUB_OUTPUT
+        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**') }}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -86,6 +89,7 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+            ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
           #key: ${{ env.IMAGES_CACHE_KEY }}
@@ -100,6 +104,7 @@ jobs:
       - name: Load Docker images from cache
         run: |
           gunzip -c ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }} | docker load
+          gunzip -c ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }} | docker load
           gunzip -c ${{ env.CACHE_FILE_DOCKER_SSHD }} | docker load
           gunzip -c ${{ env.CACHE_FILE_DOCKER_MINIO }} | docker load
 
