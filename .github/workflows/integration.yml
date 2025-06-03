@@ -121,3 +121,4 @@ jobs:
           docker ps
           docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
           docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
+
