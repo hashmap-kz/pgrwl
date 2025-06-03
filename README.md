@@ -63,7 +63,7 @@ integration with Kubernetes environments.
 - The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
   container running PostgreSQL.
 
-![Architecture Diagram](assets/diagrams/loop-v1.png)
+![Architecture Diagram](docs/assets/diagrams/loop-v1.png)
 
 ---
 

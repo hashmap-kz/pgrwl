@@ -2,4 +2,4 @@ test/integration/** linguist-vendored
 testdata/** linguist-vendored
 examples/** linguist-vendored
 hack/** linguist-vendored
-assets/** linguist-vendored
+docs/** linguist-vendored
