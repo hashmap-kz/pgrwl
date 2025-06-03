@@ -6,10 +6,25 @@ on:
     branches:
       - "master"
       - "release/**"
+    paths-ignore:
+      - "docs/**"
+      - "examples/**"
+      - "hack/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
   pull_request:
     branches:
       - "master"
       - "release/**"
+    paths-ignore:
+      - "docs/**"
+      - "examples/**"
+      - "hack/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
+  workflow_dispatch:
 
 env:
   CACHE_FOLDER: docker-cache
@@ -32,7 +47,7 @@ jobs:
       - name: Compute image cache key
         id: cache-key
         ## TODO: dockerfiles, shell changes
-        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
+        run: echo "value=cache-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
 
       - name: Restore Docker image cache
         id: cache-images
@@ -80,7 +95,7 @@ jobs:
       - name: Compute image cache key
         id: cache-key
         ## TODO: dockerfiles, shell changes
-        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
+        run: echo "value=cache-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -121,3 +136,4 @@ jobs:
           docker ps
           docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
           docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
+

@@ -6,10 +6,27 @@ on:
     branches:
       - "master"
       - "release/**"
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "examples/**"
+      - "hack/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
   pull_request:
     branches:
       - "master"
       - "release/**"
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "examples/**"
+      - "hack/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
+  workflow_dispatch:
 
 jobs:
   ci_job:

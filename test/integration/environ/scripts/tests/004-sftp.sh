@@ -46,7 +46,7 @@ x_remake_dirs() {
       "pass": "qwerty123"
     },
     "sftp": {
-      "host": "vm",
+      "host": "sshd",
       "port": 22,
       "base_dir": "/home/testuser",
       "user": "testuser",
