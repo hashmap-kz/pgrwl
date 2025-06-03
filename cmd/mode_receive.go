@@ -9,7 +9,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/jobq"
+	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 
