@@ -117,5 +117,6 @@ jobs:
         run: |
           docker images
           docker compose -f test/integration/environ/docker-compose.yml up -d
-          docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
-          docker exec -it pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
+          docker ps
+          docker compose exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
+          docker compose exec -T pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
