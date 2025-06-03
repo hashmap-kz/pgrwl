@@ -1,3 +1,10 @@
 .idea
 .git
 .golangci.yml
+.github
+.vscode
+nohup.out
+hack/
+examples/
+test/
+bin/
