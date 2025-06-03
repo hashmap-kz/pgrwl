@@ -18,6 +18,7 @@ env:
   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+  COMPOSE_FILE: "test/integration/environ/docker-compose.yml"
   #IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
 
 jobs:
@@ -59,7 +60,7 @@ jobs:
       - name: Build Docker images and cache them
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
-          docker compose -f test/integration/environ/docker-compose.yml build pg-primary pg-standby sshd minio createbuckets
+          docker compose -f ${{ env.COMPOSE_FILE }} build pg-primary pg-standby sshd minio createbuckets
           mkdir -p ${{ env.CACHE_FOLDER }}
           docker save pgrwl/pg-primary | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
           docker save pgrwl/pg-standby | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
@@ -116,7 +117,7 @@ jobs:
       - name: Run tests
         run: |
           docker images
-          docker compose -f test/integration/environ/docker-compose.yml up -d
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d
           docker ps
-          docker compose exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
-          docker compose exec -T pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
+          docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
+          docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
