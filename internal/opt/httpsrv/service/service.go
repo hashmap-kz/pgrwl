@@ -9,9 +9,10 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
+
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 
-	"github.com/hashmap-kz/pgrwl/internal/jobq"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/model"

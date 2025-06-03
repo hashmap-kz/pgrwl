@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/hashmap-kz/pgrwl/internal/jobq"
+	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"

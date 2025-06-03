@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 
-	"github.com/hashmap-kz/pgrwl/internal/jobq"
+	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
