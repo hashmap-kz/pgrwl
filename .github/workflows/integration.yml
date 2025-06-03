@@ -65,7 +65,7 @@ jobs:
           docker save pgrwl/pg-standby | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
           docker save pgrwl/sshd | gzip -c > ${{ env.CACHE_FILE_DOCKER_SSHD }}
           docker save pgrwl/minio | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO }}
-          docker save pgrwl/minio_mc | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
+          docker save pgrwl/minio-mc | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
           ls -lah ${{ env.CACHE_FOLDER }}
 
   test:
@@ -115,6 +115,7 @@ jobs:
 
       - name: Run tests
         run: |
+          docker images
           docker compose -f test/integration/environ/docker-compose.yml up -d
           docker exec -it pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
           docker exec -it pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
