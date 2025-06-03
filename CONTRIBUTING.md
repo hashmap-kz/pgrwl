@@ -37,6 +37,20 @@ Don't forget to give the project a star ⭐!
 4. Push to the Branch (`git push origin feature/new_feature`)
 5. Open a Pull Request
 
+### Commits
+
+We use conventional commits to ensure consistent commit messages:
+
+- `feat:` New features
+- `fix:` Bug fixes
+- `docs:` Documentation changes
+- `ci:` Maintenance tasks
+- `refactor:` Code changes that neither fix bugs nor add features
+
+Example: `fix(scan): fix a typo`
+
+You can read more about Conventional Commits [here](https://www.conventionalcommits.org/en/v1.0.0/).
+
 ### Local Development Guide
 
 Thanks for your interest in contributing! Below are the steps to build, lint, test, and verify the project locally.
