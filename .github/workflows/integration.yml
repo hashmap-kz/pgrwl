@@ -31,7 +31,7 @@ jobs:
       - name: Compute image cache key
         id: cache-key
         ## TODO: dockerfiles, shell changes
-        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**') }}" >> $GITHUB_OUTPUT
+        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**', '.github/workflow/integration.yml') }}" >> $GITHUB_OUTPUT
 
       - name: Restore Docker image cache
         id: cache-images
@@ -79,7 +79,7 @@ jobs:
       - name: Compute image cache key
         id: cache-key
         ## TODO: dockerfiles, shell changes
-        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**') }}" >> $GITHUB_OUTPUT
+        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**', '.github/workflow/integration.yml') }}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
         uses: actions/setup-go@v5
