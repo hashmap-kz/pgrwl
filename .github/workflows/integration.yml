@@ -1,0 +1,123 @@
+---
+name: Integration Tests
+
+on:
+  push:
+    branches:
+      - "master"
+      - "release/**"
+  pull_request:
+    branches:
+      - "master"
+      - "release/**"
+
+env:
+  CACHE_FOLDER: docker-cache
+  CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+  CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+  CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+  CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+  CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+  COMPOSE_FILE: "test/integration/environ/docker-compose.yml"
+  #IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
+
+jobs:
+  build_images:
+    name: Build images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compute image cache key
+        id: cache-key
+        ## TODO: dockerfiles, shell changes
+        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
+
+      - name: Restore Docker image cache
+        id: cache-images
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+            ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
+            ${{ env.CACHE_FILE_DOCKER_SSHD }}
+            ${{ env.CACHE_FILE_DOCKER_MINIO }}
+            ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
+          #key: ${{ env.IMAGES_CACHE_KEY }}
+          key: ${{ steps.cache-key.outputs.value }}
+
+      - name: Set up Go
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Prepare Binary
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        run: (make build && mv bin test/integration/environ)
+
+      - name: Build Docker images and cache them
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        run: |
+          docker compose -f ${{ env.COMPOSE_FILE }} build pg-primary pg-standby sshd minio createbuckets
+          mkdir -p ${{ env.CACHE_FOLDER }}
+          docker save pgrwl/pg-primary | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+          docker save pgrwl/pg-standby | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
+          docker save pgrwl/sshd | gzip -c > ${{ env.CACHE_FILE_DOCKER_SSHD }}
+          docker save pgrwl/minio | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO }}
+          docker save pgrwl/minio-mc | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
+          ls -lah ${{ env.CACHE_FOLDER }}
+
+  test:
+    name: Run integration tests
+    runs-on: ubuntu-latest
+    needs: [build_images]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compute image cache key
+        id: cache-key
+        ## TODO: dockerfiles, shell changes
+        run: echo "value=docker-images-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Restore Docker image cache
+        id: cache-images
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+            ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
+            ${{ env.CACHE_FILE_DOCKER_SSHD }}
+            ${{ env.CACHE_FILE_DOCKER_MINIO }}
+            ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
+          #key: ${{ env.IMAGES_CACHE_KEY }}
+          key: ${{ steps.cache-key.outputs.value }}
+
+      - name: Fail if cache is missing
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        run: |
+          echo "Docker image cache not found!"
+          exit 1
+
+      - name: Load Docker images from cache
+        run: |
+          gunzip -c ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }} | docker load
+          gunzip -c ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }} | docker load
+          gunzip -c ${{ env.CACHE_FILE_DOCKER_SSHD }} | docker load
+          gunzip -c ${{ env.CACHE_FILE_DOCKER_MINIO }} | docker load
+          gunzip -c ${{ env.CACHE_FILE_DOCKER_MINIO_MC }} | docker load
+
+      - name: Run tests
+        run: |
+          docker images
+          docker compose -f ${{ env.COMPOSE_FILE }} up -d
+          docker ps
+          docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
+          docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh

@@ -1,4 +1,5 @@
-name: Dependabot
+---
+name: Dependabot Auto-Merge
 
 on:
   pull_request:

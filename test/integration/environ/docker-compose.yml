@@ -2,7 +2,8 @@ services:
   pg-primary:
     build:
       context: .
-      dockerfile: ./Dockerfile_pg
+      dockerfile: ./dockerfiles/pg-17-primary/Dockerfile
+    image: pgrwl/pg-primary
     container_name: pg-primary
     restart: unless-stopped
     environment:
@@ -14,7 +15,10 @@ services:
       - pg-primary-data:/var/lib/postgresql/17/main
 
   pg-standby:
-    image: postgres:17
+    build:
+      context: .
+      dockerfile: ./dockerfiles/pg-17-standby/Dockerfile
+    image: pgrwl/pg-standby
     container_name: pg-standby
     depends_on:
       - pg-primary
@@ -44,18 +48,22 @@ services:
         ",
       ]
 
-  vm:
+  sshd:
     build:
       context: .
-      dockerfile: ./Dockerfile_sshd
-    container_name: vm
+      dockerfile: ./dockerfiles/sshd/Dockerfile
+    image: pgrwl/sshd
+    container_name: pgrwl_sshd
     restart: unless-stopped
     ports:
       - "2525:22"
 
   minio:
-    image: minio/minio:latest
-    container_name: minio
+    build:
+      context: .
+      dockerfile: ./dockerfiles/minio/Dockerfile
+    image: pgrwl/minio
+    container_name: pgrwl_minio
     ports:
       - "9000:9000" # S3 API
       - "9001:9001" # Console
@@ -74,7 +82,10 @@ services:
     restart: unless-stopped
 
   createbuckets:
-    image: minio/mc:latest
+    build:
+      context: .
+      dockerfile: ./dockerfiles/minio_mc/Dockerfile
+    image: pgrwl/minio-mc
     depends_on:
       minio:
         condition: service_healthy
