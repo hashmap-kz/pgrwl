@@ -36,5 +36,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `**Welcome**, new contributor! Please make sure you've read our [contributing guide](CONTRIBUTING.md) and we look forward to reviewing your Pull request shortly ✨`
+              body: `**Welcome**, new contributor! Please make sure you've read our [contributing guide](https://github.com/hashmap-kz/pgrwl/blob/master/CONTRIBUTING.md) and we look forward to reviewing your Pull request shortly ✨`
             })
