@@ -7,22 +7,20 @@ import (
 	"testing"
 	"time"
 
+	stormock "github.com/hashmap-kz/pgrwl/internal/opt/supervisor/mock"
+
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"github.com/stretchr/testify/assert"
 )
-
-type PgReceiveWal interface {
-	Run(ctx context.Context) error
-	Status() *xlog.StreamStatus
-	CurrentOpenWALFileName() string
-}
 
 type MockPgReceiveWal struct {
 	CurrentWAL string
 	RunFunc    func(ctx context.Context) error
 	StatusFunc func() *xlog.StreamStatus
 }
+
+var _ xlog.PgReceiveWal = &MockPgReceiveWal{}
 
 func (m *MockPgReceiveWal) CurrentOpenWALFileName() string {
 	return m.CurrentWAL
@@ -55,7 +53,7 @@ func TestArchiveSupervisor_PerformUploads(t *testing.T) {
 	err = os.WriteFile(file2, []byte("wal2"), 0o600)
 	assert.NoError(t, err)
 
-	mockWal := &MockPgReceiveWal{
+	mockPGRW := &MockPgReceiveWal{
 		CurrentWAL: "000000010000000000000002",
 		StatusFunc: func() *xlog.StreamStatus {
 			return &xlog.StreamStatus{
@@ -77,10 +75,10 @@ func TestArchiveSupervisor_PerformUploads(t *testing.T) {
 		},
 	}
 
-	stor := NewInMemoryStorage()
+	stor := stormock.NewInMemoryStorage()
 	sup := NewArchiveSupervisor(cfg, stor, &ArchiveSupervisorOpts{
 		ReceiveDirectory: dir,
-		PGRW:             mockWal,
+		PGRW:             mockPGRW,
 	})
 
 	// Only file1 should be uploaded and deleted
@@ -88,7 +86,7 @@ func TestArchiveSupervisor_PerformUploads(t *testing.T) {
 	assert.NoError(t, err)
 
 	// file1 should be in memory storage
-	assert.Contains(t, stor.files, "000000010000000000000001")
+	assert.Contains(t, stor.Files, "000000010000000000000001")
 
 	// file1 should be removed from disk
 	_, err = os.Stat(file1)
@@ -106,14 +104,14 @@ func TestArchiveSupervisor_UploadOneFile(t *testing.T) {
 
 	assert.NoError(t, os.WriteFile(walFile, []byte("testwal"), 0o600))
 
-	stor := NewInMemoryStorage()
+	stor := stormock.NewInMemoryStorage()
 	cfg := &config.Config{}
 	sup := NewArchiveSupervisor(cfg, stor, &ArchiveSupervisorOpts{})
 
 	err := sup.uploadOneFile(ctx, uploadBundle{walFilePath: walFile})
 	assert.NoError(t, err)
 
-	assert.Contains(t, stor.files, "000000010000000000000003")
+	assert.Contains(t, stor.Files, "000000010000000000000003")
 
 	_, err = os.Stat(walFile)
 	assert.True(t, os.IsNotExist(err))

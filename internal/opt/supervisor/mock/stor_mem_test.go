@@ -1,4 +1,4 @@
-package supervisor
+package mock
 
 import (
 	"bytes"
@@ -25,6 +25,7 @@ func TestInMemoryStorage_PutAndGet(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", buf.String())
 }
+
 func TestInMemoryStorage_Exists(t *testing.T) {
 	ctx := context.Background()
 	s := NewInMemoryStorage()
@@ -103,6 +104,7 @@ func TestInMemoryStorage_List(t *testing.T) {
 		assert.True(t, expected[file], "unexpected file listed: %s", file)
 	}
 }
+
 func TestInMemoryStorage_ListInfo(t *testing.T) {
 	ctx := context.Background()
 	s := NewInMemoryStorage()
