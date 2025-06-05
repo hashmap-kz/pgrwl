@@ -92,6 +92,33 @@ func App() *cli.Command {
 				},
 			},
 
+			// basebackup restore
+			{
+				Name:  "restore",
+				Usage: "Retrieve basebackup",
+				Flags: []cli.Flag{
+					configFlag,
+					&cli.StringFlag{
+						Name:     "id",
+						Usage:    "Backup id to restore (20060102150405)",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "dest",
+						Usage:    "Restore to destination",
+						Required: true,
+					},
+				},
+				Action: func(_ context.Context, c *cli.Command) error {
+					cfg := loadConfig(c, config.ModeRestore)
+					err := RestoreBaseBackup(context.Background(), cfg,
+						c.String("id"),
+						c.String("dest"),
+					)
+					return err
+				},
+			},
+
 			// restore-command
 			{
 				Name:  "restore-command",

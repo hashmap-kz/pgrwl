@@ -25,6 +25,9 @@ const (
 	// ModeBackup used in pgrwl backup CLI command.
 	ModeBackup = "backup"
 
+	// ModeRestore used in pgrwl restore CLI command.
+	ModeRestore = "restore"
+
 	// StorageNameS3 is the identifier for the S3 storage backend.
 	StorageNameS3 = "s3"
 
@@ -320,7 +323,7 @@ func validate(c *Config, mode string) error {
 	}
 
 	// Validate mode
-	if mode != ModeReceive && mode != ModeServe && mode != ModeBackup {
+	if mode != ModeReceive && mode != ModeServe && mode != ModeBackup && mode != ModeRestore {
 		errs = append(errs, fmt.Sprintf("invalid mode: %q (must be %q or %q)", mode, ModeReceive, ModeServe))
 	}
 
