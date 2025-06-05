@@ -4,7 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"os/signal"
+	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/opt/basebackup"
@@ -24,10 +26,13 @@ func RunBaseBackup(opts *BaseBackupCmdOpts) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	// timestamp
+	ts := time.Now().UTC().Format("20060102150405")
+
 	// setup storage
 	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
 		BaseDir: opts.Directory,
-		SubPath: config.BaseBackupSubpath,
+		SubPath: filepath.ToSlash(filepath.Join(config.BaseBackupSubpath, ts)),
 	})
 	if err != nil {
 		loggr.Error("cannot init storage", slog.Any("err", err))

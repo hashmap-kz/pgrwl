@@ -319,15 +319,8 @@ func validate(c *Config, mode string) error {
 		return fmt.Errorf("config.validate: mode is required")
 	}
 
-	if mode == ModeBackup {
-		if c.Main.Directory == "" {
-			return fmt.Errorf("main.directory is required")
-		}
-		return nil
-	}
-
 	// Validate mode
-	if mode != ModeReceive && mode != ModeServe {
+	if mode != ModeReceive && mode != ModeServe && mode != ModeBackup {
 		errs = append(errs, fmt.Sprintf("invalid mode: %q (must be %q or %q)", mode, ModeReceive, ModeServe))
 	}
 
