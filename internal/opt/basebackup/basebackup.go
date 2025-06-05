@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -39,7 +41,7 @@ func NewBaseBackup(conn *pgconn.PgConn, storage st.Storage, timestamp string) (B
 		return nil, fmt.Errorf("basebackup: timestamp is required")
 	}
 	return &baseBackup{
-		l:       slog.With("component", "basebackup"),
+		l:       slog.With(slog.String("component", "basebackup"), slog.String("id", timestamp)),
 		conn:    conn,
 		storage: storage,
 	}, nil
@@ -49,7 +51,7 @@ func (bb *baseBackup) log() *slog.Logger {
 	if bb.l != nil {
 		return bb.l
 	}
-	return slog.With("component", "basebackup")
+	return slog.With(slog.String("component", "basebackup"), slog.String("id", bb.timestamp))
 }
 
 func (bb *baseBackup) StreamBackup(ctx context.Context) error {
@@ -85,6 +87,8 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) error {
 		return nil
 	}
 
+	var remotePath string
+
 	for {
 		msg, err := bb.conn.ReceiveMessage(ctx)
 		if err != nil {
@@ -115,13 +119,16 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) error {
 					return err
 				}
 
-				remotePath := strings.TrimPrefix(filename, "./")
+				remotePath = strings.TrimPrefix(filename, "./")
 				pr, pw := io.Pipe()
 				pipeWriter = pw
 				putDone = make(chan struct{})
 
 				go func(path string, r io.Reader) {
-					defer close(putDone)
+					defer func() {
+						bb.log().Info("closing", slog.String("file", path))
+						close(putDone)
+					}()
 					putErr = bb.storage.Put(ctx, path, r)
 				}(remotePath, pr)
 
@@ -150,7 +157,9 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) error {
 					//nolint:gosec
 					bytesDone := int64(binary.BigEndian.Uint64(m.Data[1:9]))
 					bb.log().Info("progress",
-						slog.Int64("bytes streamed from current file", bytesDone),
+						slog.String("file", remotePath),
+						slog.Int64("bytes streamed", bytesDone),
+						slog.String("bytes streamed IEC", optutils.ByteCountIEC(bytesDone)),
 					)
 				}
 

@@ -20,7 +20,6 @@ type BaseBackupCmdOpts struct {
 
 func RunBaseBackup(opts *BaseBackupCmdOpts) error {
 	var err error
-	loggr := slog.With("component", "basebackup")
 
 	// setup context
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -28,6 +27,7 @@ func RunBaseBackup(opts *BaseBackupCmdOpts) error {
 
 	// timestamp
 	ts := time.Now().UTC().Format("20060102150405")
+	loggr := slog.With(slog.String("component", "basebackup"), slog.String("id", ts))
 
 	// setup storage
 	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
