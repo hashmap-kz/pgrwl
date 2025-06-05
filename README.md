@@ -90,7 +90,6 @@ EOF
 ```
 
 ```bash
-
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
@@ -115,6 +114,7 @@ log:
   add_source: true
 EOF
 ```
+
 ```bash
 export PGRWL_MODE=serve
 
@@ -129,6 +129,30 @@ pgrwl -c config.yml
 # where 'k8s-worker5:30266' represents the host and port
 # of a 'pgrwl' instance running in 'serve' mode.
 restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
+```
+
+### Base Backup
+
+```yaml
+cat <<EOF >config.yml
+main:
+  listen_port: 7070
+  directory: wals
+log:
+  level: trace
+  format: text
+  add_source: true
+EOF
+```
+
+```bash
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=postgres
+
+pgrwl backup -c config.yml
+
 ```
 
 ---

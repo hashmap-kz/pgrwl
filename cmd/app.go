@@ -34,7 +34,7 @@ func App() *cli.Command {
 
 	app := &cli.Command{
 		Name:    "pgrwl",
-		Usage:   "PostgreSQL WAL receiver and restore tool",
+		Usage:   "Cloud-Native PostgreSQL WAL receiver",
 		Version: version.Version,
 		Commands: []*cli.Command{
 			// server modes
