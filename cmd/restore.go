@@ -14,19 +14,26 @@ import (
 )
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
-	_ = slog.With(slog.String("component", "restore"), slog.String("id", id))
+	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
+
+	// TODO: refuse if dest dir exists and not empty
+
+	loggr.Info("destination", slog.String("dest", filepath.ToSlash(dest)))
+	if err := os.MkdirAll(filepath.ToSlash(dest), 0o750); err != nil {
+		return err
+	}
 
 	// setup storage
 	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
+		SubPath: filepath.ToSlash(filepath.Join(config.BaseBackupSubpath, id)),
 	})
 	if err != nil {
 		return err
 	}
 
 	// cat backup path -> fixed directory + timestamp (id)
-	backupPath := filepath.ToSlash(filepath.Join(config.BaseBackupSubpath, id))
-	list, err := stor.List(ctx, backupPath)
+	list, err := stor.List(ctx, "")
 	if err != nil {
 		return err
 	}
@@ -34,19 +41,24 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	// TODO: tablespaces
 	// untar archives
 	for _, f := range list {
+		slog.Debug("restoring file", slog.String("path", filepath.ToSlash(f)))
+
 		rc, err := stor.Get(ctx, f)
 		if err != nil {
 			return fmt.Errorf("get %s: %w", id, err)
 		}
-		defer rc.Close()
-		if err := untar(rc, dest); err != nil {
+		// TODO: log() func
+		if err := untar(rc, dest, loggr); err != nil {
 			return fmt.Errorf("untar %s: %w", id, err)
+		}
+		if err := rc.Close(); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func untar(r io.Reader, dest string) error {
+func untar(r io.Reader, dest string, loggr *slog.Logger) error {
 	tr := tar.NewReader(r)
 	for {
 		hdr, err := tr.Next()
@@ -57,7 +69,9 @@ func untar(r io.Reader, dest string) error {
 		}
 
 		//nolint:gosec
-		target := filepath.Join(dest, hdr.Name)
+		target := filepath.ToSlash(filepath.Join(dest, hdr.Name))
+		loggr.Debug("tar target", slog.String("path", target))
+
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0o700); err != nil {
