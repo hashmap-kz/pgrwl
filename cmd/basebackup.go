@@ -47,7 +47,7 @@ func RunBaseBackup(opts *BaseBackupCmdOpts) error {
 	}
 
 	// init module
-	baseBackup, err := basebackup.NewBaseBackup(conn, stor)
+	baseBackup, err := basebackup.NewBaseBackup(conn, stor, ts)
 	if err != nil {
 		loggr.Error("cannot init basebackup module", slog.Any("err", err))
 		return err

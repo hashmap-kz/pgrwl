@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"strings"
-	"time"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 	"github.com/jackc/pglogrepl"
@@ -23,17 +22,21 @@ type BaseBackup interface {
 }
 
 type baseBackup struct {
-	l       *slog.Logger
-	conn    *pgconn.PgConn
-	storage st.Storage
+	l         *slog.Logger
+	conn      *pgconn.PgConn
+	storage   st.Storage
+	timestamp string
 }
 
-func NewBaseBackup(conn *pgconn.PgConn, storage st.Storage) (BaseBackup, error) {
+func NewBaseBackup(conn *pgconn.PgConn, storage st.Storage, timestamp string) (BaseBackup, error) {
 	if conn == nil {
 		return nil, fmt.Errorf("basebackup: connection is required")
 	}
 	if storage == nil {
 		return nil, fmt.Errorf("basebackup: storage is required")
+	}
+	if timestamp == "" {
+		return nil, fmt.Errorf("basebackup: timestamp is required")
 	}
 	return &baseBackup{
 		l:       slog.With("component", "basebackup"),
@@ -51,7 +54,7 @@ func (bb *baseBackup) log() *slog.Logger {
 
 func (bb *baseBackup) StreamBackup(ctx context.Context) error {
 	startResp, err := pglogrepl.StartBaseBackup(ctx, bb.conn, pglogrepl.BaseBackupOptions{
-		Label:         fmt.Sprintf("pgrwl_%s", time.Now().UTC().Format("20060102150405")),
+		Label:         fmt.Sprintf("pgrwl_%s", bb.timestamp),
 		Progress:      false,
 		Fast:          true,
 		WAL:           false,
