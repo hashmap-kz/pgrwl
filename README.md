@@ -156,7 +156,6 @@ export PGUSER=postgres
 export PGPASSWORD=postgres
 
 pgrwl backup -c config.yml
-
 ```
 
 ---
