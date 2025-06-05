@@ -1,5 +1,7 @@
 # pgrwl
 
+> Stream PostgreSQL WALs with Zero Data Loss
+
 [![License](https://img.shields.io/github/license/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgrwl)](https://goreportcard.com/report/github.com/hashmap-kz/pgrwl)
 [![Go Reference](https://pkg.go.dev/badge/github.com/hashmap-kz/pgrwl.svg)](https://pkg.go.dev/github.com/hashmap-kz/pgrwl)
@@ -36,8 +38,8 @@ integration with Kubernetes environments.
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
     - [Design Notes](#design-notes)
-    - [Notes on `fsync`](#-notes-on-fsync-since-the-utility-works-in-synchronous-mode-only)
-    - [Notes on `archive_command` and `archive_timeout`](#-notes-on-archive_command-and-archive_timeout)
+    - [Durability & `fsync`](#durability--fsync)
+    - [Why Not archive_command `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
 - [Developer Notes](#developer-notes)
     - [Developer Postulates](#developer-postulates)
@@ -61,8 +63,7 @@ integration with Kubernetes environments.
 - The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
   streaming into partial files, extensive error checking and more.
 
-- The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
-  container running PostgreSQL.
+- Install as a single binary. Debug with your favorite editor and a local PostgreSQL container ([local-dev-infra](test/integration/environ/)).
 
 ![Architecture Diagram](docs/assets/diagrams/loop-v1.png)
 
@@ -315,14 +316,14 @@ In short: **PostgreSQL requires acknowledgments for commits in synchronous setup
 critical paths (like WAL streaming) could introduce unacceptable delays or failures. This architecture mitigates that
 risk.
 
-### 💾 Notes on `fsync` (since the utility works in synchronous mode **only**)
+### Durability & `fsync`
 
 - After each WAL segment is written, an `fsync` is performed on the currently open WAL file to ensure durability.
 - An `fsync` is triggered when a WAL segment is completed and the `*.partial` file is renamed to its final form.
 - An `fsync` is triggered when a keepalive message is received from the server with the `reply_requested` option set.
 - Additionally, `fsync` is called whenever an error occurs during the receive-copy loop.
 
-### 🔁 Notes on `archive_command` and `archive_timeout`
+### Why Not `archive_command`?
 
 There’s a significant difference between using `archive_command` and archiving WAL files via the streaming replication
 protocol.
