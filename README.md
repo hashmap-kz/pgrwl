@@ -1,5 +1,7 @@
 # pgrwl
 
+> Stream PostgreSQL WALs with Zero Data Loss
+
 [![License](https://img.shields.io/github/license/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgrwl)](https://goreportcard.com/report/github.com/hashmap-kz/pgrwl)
 [![Go Reference](https://pkg.go.dev/badge/github.com/hashmap-kz/pgrwl.svg)](https://pkg.go.dev/github.com/hashmap-kz/pgrwl)
@@ -7,6 +9,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/issues)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/go.mod#L3)
 [![Latest Release](https://img.shields.io/github/v/release/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/releases/latest)
+[![Start contributing](https://img.shields.io/github/issues/hashmap-kz/pgrwl/good%20first%20issue?color=7057ff&label=Contribute)](https://github.com/hashmap-kz/pgrwl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22)
 
 **pgrwl** is a PostgreSQL write-ahead log (WAL) receiver written in Go. It’s a drop-in, container-friendly alternative
 to `pg_receivewal`, supporting streaming replication, encryption, compression, and remote storage (S3, SFTP).
@@ -23,6 +26,7 @@ integration with Kubernetes environments.
     - [Receive Mode](#receive-mode)
     - [Serve Mode](#serve-mode)
     - [Restore Command](#restore-command)
+    - [Base Backup Command](#base-backup-command)
 - [Quick Start](examples)
     - [Docker Compose (Basic Setup)](examples/docker-compose-quick-start/)
     - [Docker Compose (Archive And Recovery)](examples/docker-compose-recovery-example/)
@@ -35,8 +39,8 @@ integration with Kubernetes environments.
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
     - [Design Notes](#design-notes)
-    - [Notes on `fsync`](#-notes-on-fsync-since-the-utility-works-in-synchronous-mode-only)
-    - [Notes on `archive_command` and `archive_timeout`](#-notes-on-archive_command-and-archive_timeout)
+    - [Durability & `fsync`](#durability--fsync)
+    - [Why Not archive_command `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
 - [Developer Notes](#developer-notes)
     - [Developer Postulates](#developer-postulates)
@@ -60,8 +64,7 @@ integration with Kubernetes environments.
 - The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
   streaming into partial files, extensive error checking and more.
 
-- The tool is easy to install as a single binary and simple to debug - just use your preferred editor and a Docker
-  container running PostgreSQL.
+- Install as a single binary. Debug with your favorite editor and a local PostgreSQL container ([local-dev-infra](test/integration/environ/)).
 
 ![Architecture Diagram](docs/assets/diagrams/loop-v1.png)
 
@@ -90,7 +93,6 @@ EOF
 ```
 
 ```bash
-
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
@@ -115,6 +117,7 @@ log:
   add_source: true
 EOF
 ```
+
 ```bash
 export PGRWL_MODE=serve
 
@@ -129,6 +132,31 @@ pgrwl -c config.yml
 # where 'k8s-worker5:30266' represents the host and port
 # of a 'pgrwl' instance running in 'serve' mode.
 restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
+```
+
+### Base Backup Command
+
+Streaming base backup to the configured storage:
+
+```yaml
+cat <<EOF >config.yml
+main:
+  listen_port: 7070
+  directory: wals
+log:
+  level: trace
+  format: text
+  add_source: true
+EOF
+```
+
+```bash
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=postgres
+
+pgrwl backup -c config.yml
 ```
 
 ---
@@ -288,14 +316,14 @@ In short: **PostgreSQL requires acknowledgments for commits in synchronous setup
 critical paths (like WAL streaming) could introduce unacceptable delays or failures. This architecture mitigates that
 risk.
 
-### 💾 Notes on `fsync` (since the utility works in synchronous mode **only**):
+### Durability & `fsync`
 
 - After each WAL segment is written, an `fsync` is performed on the currently open WAL file to ensure durability.
 - An `fsync` is triggered when a WAL segment is completed and the `*.partial` file is renamed to its final form.
 - An `fsync` is triggered when a keepalive message is received from the server with the `reply_requested` option set.
 - Additionally, `fsync` is called whenever an error occurs during the receive-copy loop.
 
-### 🔁 Notes on `archive_command` and `archive_timeout`
+### Why Not `archive_command`?
 
 There’s a significant difference between using `archive_command` and archiving WAL files via the streaming replication
 protocol.
@@ -356,9 +384,9 @@ clarity:
 - **Metrics**: Prometheus-compatible metrics are exposed for observability, health checks, and integration with
   monitoring dashboards.
 
-### Integration Testing:
+### Integration Testing
 
-Here an example of a 'golden' fundamental test.
+Here an example of a [golden fundamental test](test/integration/environ/scripts/tests/001-fundamental.sh).
 It verifies that we can restore to the latest committed transaction after an abrupt system crash.
 It also checks that the WAL files generated are byte-for-byte identical to those generated by `pg_receivewal`.
 

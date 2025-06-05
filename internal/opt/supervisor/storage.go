@@ -22,8 +22,18 @@ type StorageManifest struct {
 	EncryptionAlgo  string `json:"encryption_algo,omitempty"`
 }
 
-func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
+type SetupStorageOpts struct {
+	BaseDir string
+	SubPath string // for lacalfs storage, or basebackups
+}
+
+func SetupStorage(opts *SetupStorageOpts) (*st.TransformingStorage, error) {
 	cfg := config.Cfg()
+
+	baseDir := filepath.ToSlash(opts.BaseDir)
+	if strings.TrimSpace(opts.SubPath) != "" {
+		baseDir = filepath.ToSlash(filepath.Join(opts.BaseDir, opts.SubPath))
+	}
 
 	compressor, decompressor, crypter, err := decideCompressorEncryptor(cfg)
 	if err != nil {
@@ -32,8 +42,11 @@ func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
 
 	// localFS by default
 	if cfg.IsLocalStor() {
+		if opts.SubPath == "" {
+			return nil, fmt.Errorf("for localfs storage subpath is required")
+		}
 		local, err := st.NewLocal(&st.LocalStorageOpts{
-			BaseDir:      filepath.ToSlash(filepath.Join(baseDir, config.LocalFSStorageSubpath)),
+			BaseDir:      baseDir,
 			FsyncOnWrite: true,
 		})
 		if err != nil {

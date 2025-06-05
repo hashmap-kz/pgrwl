@@ -34,7 +34,7 @@ func App() *cli.Command {
 
 	app := &cli.Command{
 		Name:    "pgrwl",
-		Usage:   "PostgreSQL WAL receiver and restore tool",
+		Usage:   "Cloud-Native PostgreSQL WAL receiver",
 		Version: version.Version,
 		Commands: []*cli.Command{
 			// server modes
@@ -46,11 +46,12 @@ func App() *cli.Command {
 					modeFlag,
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
-					cfg := loadConfig(c)
 					mode := c.String("mode")
 					if mode == "" {
 						log.Fatal("required flag 'mode' is empty")
 					}
+
+					cfg := loadConfig(c, mode)
 
 					//nolint:staticcheck
 					if mode == config.ModeReceive {
@@ -73,6 +74,48 @@ func App() *cli.Command {
 					}
 
 					return nil
+				},
+			},
+
+			// basebackup command
+			{
+				Name:  "backup",
+				Usage: "Create basebackup using streaming replication protocol",
+				Flags: []cli.Flag{
+					configFlag,
+				},
+				Action: func(_ context.Context, c *cli.Command) error {
+					checkPgEnvsAreSet()
+					cfg := loadConfig(c, config.ModeBackup)
+					err := RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
+					return err
+				},
+			},
+
+			// basebackup restore
+			{
+				Name:  "restore",
+				Usage: "Retrieve basebackup",
+				Flags: []cli.Flag{
+					configFlag,
+					&cli.StringFlag{
+						Name:     "id",
+						Usage:    "Backup id to restore (20060102150405)",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "dest",
+						Usage:    "Restore to destination",
+						Required: true,
+					},
+				},
+				Action: func(_ context.Context, c *cli.Command) error {
+					cfg := loadConfig(c, config.ModeRestore)
+					err := RestoreBaseBackup(context.Background(), cfg,
+						c.String("id"),
+						c.String("dest"),
+					)
+					return err
 				},
 			},
 
@@ -122,7 +165,11 @@ func App() *cli.Command {
 					modeFlag,
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
-					_ = loadConfig(c)
+					mode := c.String("mode")
+					if mode == "" {
+						log.Fatal("required flag 'mode' is empty")
+					}
+					_ = loadConfig(c, mode)
 					fmt.Println("Configuration is valid.")
 					return nil
 				},
@@ -133,14 +180,10 @@ func App() *cli.Command {
 	return app
 }
 
-func loadConfig(c *cli.Command) *config.Config {
+func loadConfig(c *cli.Command, mode string) *config.Config {
 	configPath := c.String("config")
 	if configPath == "" {
 		log.Fatal("config path is not defined")
-	}
-	mode := c.String("mode")
-	if mode == "" {
-		log.Fatal("mode is not defined")
 	}
 	cfg := config.MustLoad(configPath, mode)
 

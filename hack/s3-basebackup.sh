@@ -5,6 +5,8 @@ export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
-export PGRWL_MODE=receive
 
-go run ../main.go start -c configs/localfs/receive.yml
+# test/integration/environ
+export PGRWL_MINIO_URL="https://localhost:9000"
+
+go run ../main.go backup -c configs/s3/receive.yml

@@ -7,4 +7,4 @@ export PGUSER=postgres
 export PGPASSWORD=postgres
 export PGRWL_MODE=receive
 
-go run ../main.go start -c configs/s3/receive.json
+go run ../main.go start -c configs/s3/receive.yml
