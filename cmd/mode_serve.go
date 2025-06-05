@@ -30,7 +30,10 @@ func RunServeMode(opts *ServeModeOpts) {
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	stor, err := supervisor.SetupStorage(opts.Directory)
+	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+		BaseDir: opts.Directory,
+		SubPath: config.LocalFSStorageSubpath,
+	})
 	if err != nil {
 		//nolint:gocritic
 		log.Fatal(err)

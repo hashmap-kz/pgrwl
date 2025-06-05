@@ -22,7 +22,12 @@ type StorageManifest struct {
 	EncryptionAlgo  string `json:"encryption_algo,omitempty"`
 }
 
-func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
+type SetupStorageOpts struct {
+	BaseDir string
+	SubPath string // for lacalfs storage, or basebackups
+}
+
+func SetupStorage(opts *SetupStorageOpts) (*st.TransformingStorage, error) {
 	cfg := config.Cfg()
 
 	compressor, decompressor, crypter, err := decideCompressorEncryptor(cfg)
@@ -32,8 +37,11 @@ func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
 
 	// localFS by default
 	if cfg.IsLocalStor() {
+		if opts.SubPath == "" {
+			return nil, fmt.Errorf("for localfs storage subpath is required")
+		}
 		local, err := st.NewLocal(&st.LocalStorageOpts{
-			BaseDir:      filepath.ToSlash(filepath.Join(baseDir, config.LocalFSStorageSubpath)),
+			BaseDir:      filepath.ToSlash(filepath.Join(opts.BaseDir, opts.SubPath)),
 			FsyncOnWrite: true,
 		})
 		if err != nil {
@@ -59,7 +67,7 @@ func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
 		if err != nil {
 			return nil, err
 		}
-		remotePath := filepath.ToSlash(filepath.Join(cfg.Storage.SFTP.BaseDir, baseDir))
+		remotePath := filepath.ToSlash(filepath.Join(cfg.Storage.SFTP.BaseDir, opts.BaseDir))
 		return &st.TransformingStorage{
 			Backend:      st.NewSFTPStorage(client.SFTPClient(), remotePath),
 			Crypter:      crypter,
@@ -83,7 +91,7 @@ func SetupStorage(baseDir string) (*st.TransformingStorage, error) {
 			return nil, err
 		}
 		return &st.TransformingStorage{
-			Backend:      st.NewS3Storage(client.Client(), cfg.Storage.S3.Bucket, baseDir),
+			Backend:      st.NewS3Storage(client.Client(), cfg.Storage.S3.Bucket, opts.BaseDir),
 			Crypter:      crypter,
 			Compressor:   compressor,
 			Decompressor: decompressor,

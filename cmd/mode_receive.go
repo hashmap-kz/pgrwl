@@ -68,7 +68,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	var stor *st.TransformingStorage
 	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
 	if needSupervisorLoop {
-		stor, err = supervisor.SetupStorage(opts.ReceiveDirectory)
+		stor, err = supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+			BaseDir: opts.ReceiveDirectory,
+			SubPath: config.LocalFSStorageSubpath,
+		})
 		if err != nil {
 			log.Fatal(err)
 		}

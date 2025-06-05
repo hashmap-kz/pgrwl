@@ -22,6 +22,9 @@ const (
 	// ModeServe represents the HTTP API serving mode.
 	ModeServe = "serve"
 
+	// ModeBackup used in pgrwl backup CLI command.
+	ModeBackup = "backup"
+
 	// StorageNameS3 is the identifier for the S3 storage backend.
 	StorageNameS3 = "s3"
 
@@ -33,6 +36,9 @@ const (
 
 	// LocalFSStorageSubpath when storage name is 'local', uploader worker uses this as a storage.
 	LocalFSStorageSubpath = "wal-archive"
+
+	// BaseBackupSubpath when storage name is 'local', put basebackups to this directory.
+	BaseBackupSubpath = "backups"
 
 	// RepoEncryptorAes256Gcm is the AES-256-GCM encryption algorithm identifier.
 	RepoEncryptorAes256Gcm = "aes-256-gcm"
@@ -308,6 +314,17 @@ func mustLoadCfg(path string) *Config {
 //nolint:gocyclo
 func validate(c *Config, mode string) error {
 	var errs []string
+
+	if strings.TrimSpace(mode) == "" {
+		return fmt.Errorf("config.validate: mode is required")
+	}
+
+	if mode == ModeBackup {
+		if c.Main.Directory == "" {
+			return fmt.Errorf("main.directory is required")
+		}
+		return nil
+	}
 
 	// Validate mode
 	if mode != ModeReceive && mode != ModeServe {
