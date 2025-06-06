@@ -1,4 +1,13 @@
+# Separate stage to cache mc binary download
+FROM alpine AS mc-downloader
+
+ARG MC_VERSION=mc.RELEASE.2025-05-21T01-59-54Z
+RUN wget -q https://dl.min.io/client/mc/release/linux-amd64/${MC_VERSION} \
+    -O /minio-mc && chmod +x /minio-mc
+
 FROM debian:bookworm
+
+COPY --from=mc-downloader /minio-mc /usr/local/bin/minio-mc
 
 # Environment
 ENV DEBIAN_FRONTEND=noninteractive
@@ -17,6 +26,8 @@ RUN apt-get update && \
 RUN apt install -y postgresql-common && \
     YES=true /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh && \
     apt install -y postgresql-${PG_MAJOR} postgresql-client-${PG_MAJOR}
+
+RUN rm -rf "/var/lib/postgresql/${PG_MAJOR}" && mkdir -p "/var/lib/postgresql/${PG_MAJOR}/main/pgdata"
 
 ######################################################################
 ## TZ settings

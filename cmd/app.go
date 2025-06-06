@@ -99,9 +99,8 @@ func App() *cli.Command {
 				Flags: []cli.Flag{
 					configFlag,
 					&cli.StringFlag{
-						Name:     "id",
-						Usage:    "Backup id to restore (20060102150405)",
-						Required: true,
+						Name:  "id",
+						Usage: "Backup id to restore (20060102150405), the 'latest' will be used if not set",
 					},
 					&cli.StringFlag{
 						Name:     "dest",

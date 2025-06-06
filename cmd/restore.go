@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
@@ -16,7 +19,15 @@ import (
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
 
-	// TODO: refuse if dest dir exists and not empty
+	// safe check
+	// refusing to restore, if a target dir exists and it's not empty
+	dirExistsAndNotEmpty, err := optutils.DirExistsAndNotEmpty(dest)
+	if err != nil {
+		return err
+	}
+	if dirExistsAndNotEmpty {
+		return fmt.Errorf("refusing to restore in a non-empty dir: %s", dest)
+	}
 
 	loggr.Info("destination", slog.String("dest", filepath.ToSlash(dest)))
 	if err := os.MkdirAll(filepath.ToSlash(dest), 0o750); err != nil {
@@ -26,22 +37,47 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	// setup storage
 	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
-		SubPath: filepath.ToSlash(filepath.Join(config.BaseBackupSubpath, id)),
+		SubPath: config.BaseBackupSubpath,
 	})
 	if err != nil {
 		return err
 	}
 
-	// cat backup path -> fixed directory + timestamp (id)
-	list, err := stor.List(ctx, "")
+	// get all backups available
+	backupsTs, err := stor.ListTopLevelDirs(ctx, "")
+	if err != nil {
+		return err
+	}
+
+	// sort backup ids, decide which to use for restore
+	iDsSortedDesc := backupIDsSortedDesc(backupsTs)
+	var backupID string
+	if id != "" {
+		if !backupIDInList(id, iDsSortedDesc) {
+			// given backup ID is not present in backups list
+			return fmt.Errorf("no such backup: %s", id)
+		}
+		backupID = id
+	} else {
+		// a backup ID was not given, and there are no backups available, warn and return
+		if len(iDsSortedDesc) == 0 {
+			loggr.Warn("no backups in a storage")
+			return nil
+		}
+		// get the 'latest' backup available
+		backupID = iDsSortedDesc[0]
+	}
+
+	// get backup files for restore (*.tar)
+	backupFiles, err := stor.List(ctx, backupID)
 	if err != nil {
 		return err
 	}
 
 	// TODO: tablespaces
 	// untar archives
-	for _, f := range list {
-		slog.Debug("restoring file", slog.String("path", filepath.ToSlash(f)))
+	for _, f := range backupFiles {
+		loggr.Debug("restoring file", slog.String("path", filepath.ToSlash(f)))
 
 		rc, err := stor.Get(ctx, f)
 		if err != nil {
@@ -96,4 +132,24 @@ func untar(r io.Reader, dest string, loggr *slog.Logger) error {
 		}
 	}
 	return nil
+}
+
+func backupIDsSortedDesc(topLevel map[string]bool) []string {
+	r := []string{}
+	for k := range topLevel {
+		r = append(r, k)
+	}
+	sort.Slice(r, func(i, j int) bool {
+		return r[i] > r[j] // Descending order
+	})
+	return r
+}
+
+func backupIDInList(id string, list []string) bool {
+	for _, s := range list {
+		if s == id {
+			return true
+		}
+	}
+	return false
 }
