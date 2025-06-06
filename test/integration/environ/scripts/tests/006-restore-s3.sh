@@ -6,17 +6,40 @@ x_remake_config() {
   cat <<EOF >/tmp/config.json
 {
   "main": {
-    "listen_port": 7070,
-    "directory": "/tmp/wal-archive"
+     "listen_port": 7070,
+     "directory": "${WAL_PATH}"
   },
   "receiver": {
-    "slot": "pgrwl_v5",
-    "no_loop": true
+     "slot": "pgrwl_v5",
+     "no_loop": true
   },
   "log": {
     "level": "trace",
     "format": "text",
     "add_source": true
+  },
+  "storage": {
+    "name": "s3",
+    "uploader": {
+      "sync_interval": "5s",
+      "max_concurrency": 4
+    },
+    "compression": {
+      "algo": "gzip"
+    },
+    "encryption": {
+      "algo": "aes-256-gcm",
+      "pass": "qwerty123"
+    },
+    "s3": {
+      "url": "https://minio:9000",
+      "access_key_id": "minioadmin",
+      "secret_access_key": "minioadmin123",
+      "bucket": "backups",
+      "region": "main",
+      "use_path_style": true,
+      "disable_ssl": true
+    }
   }
 }
 EOF
@@ -39,8 +62,6 @@ x_backup_restore() {
   echo_delim "running wal-receivers"
   # run wal-receiver
   nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
-  # run pg_receivewal
-  bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
 
   # make a backup before doing anything
   echo_delim "creating backup"
@@ -68,7 +89,6 @@ x_backup_restore() {
 
   # restore from backup
   echo_delim "restoring backup"
-  #BACKUP_ID=$(find /tmp/wal-archive/backups -mindepth 1 -maxdepth 1 -type d -printf "%T@ %f\n" | sort -n | tail -1 | cut -d' ' -f2)
   /usr/local/bin/pgrwl restore --dest="${PGDATA}" -c "/tmp/config.json"
   chmod 0750 "${PGDATA}"
   chown -R postgres:postgres "${PGDATA}"
@@ -76,7 +96,6 @@ x_backup_restore() {
 
   # prepare archive (all partial files contain valid wal-segments)
   find "${WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
-  find "${WAL_PATH_PG_RECEIVEWAL}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
 
   # fix configs
   xpg_config
@@ -110,12 +129,6 @@ EOF
   psql --pset pager=off -c "select * from public.tslog;"
   echo "insert log content:"
   tail -10 /tmp/insert-ts.log
-
-  # compare with pg_receivewal
-  echo_delim "compare wal-archive with pg_receivewal"
-  find "${WAL_PATH}" -type f -name "*.json" -delete
-  rm -rf "${WAL_PATH}/backups"
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
 }
 
 x_backup_restore "${@}"

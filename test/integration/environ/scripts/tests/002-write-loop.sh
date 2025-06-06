@@ -1,24 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-. /var/lib/postgresql/scripts/pg/pg.sh
+. /var/lib/postgresql/scripts/tests/utils.sh
 
-export BASEBACKUP_PATH="/tmp/basebackup"
-export WAL_PATH="/tmp/wal-archive"
-export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
-export LOG_FILE="/tmp/pgrwl.log"
-
-# Default environment
-export PGHOST="localhost"
-export PGPORT="5432"
-export PGUSER="postgres"
-export PGPASSWORD="postgres"
-
-x_remake_dirs() {
-  # cleanup possible state
-  rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
-  rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
-  rm -rf "${WAL_PATH_PG_RECEIVEWAL}" && mkdir -p "${WAL_PATH_PG_RECEIVEWAL}"
-
+x_remake_config() {
   cat <<EOF >/tmp/config.json
 {
   "main": {
@@ -39,7 +23,9 @@ EOF
 }
 
 x_backup_restore() {
+  echo_delim "cleanup state"
   x_remake_dirs
+  x_remake_config
 
   # rerun the cluster
   echo_delim "init and run a cluster"
