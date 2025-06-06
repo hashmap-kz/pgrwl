@@ -81,3 +81,24 @@ func IsFileStable(path string, minAge time.Duration) (bool, error) {
 	isStab := time.Since(info.ModTime()) > minAge
 	return isStab, nil
 }
+
+func DirExistsAndNotEmpty(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // Directory does not exist
+		}
+		return false, err // Other error
+	}
+
+	if !info.IsDir() {
+		return false, fmt.Errorf("path exists but is not a directory")
+	}
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false, err
+	}
+
+	return len(entries) > 0, nil
+}
