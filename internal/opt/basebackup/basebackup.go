@@ -41,9 +41,10 @@ func NewBaseBackup(conn *pgconn.PgConn, storage st.Storage, timestamp string) (B
 		return nil, fmt.Errorf("basebackup: timestamp is required")
 	}
 	return &baseBackup{
-		l:       slog.With(slog.String("component", "basebackup"), slog.String("id", timestamp)),
-		conn:    conn,
-		storage: storage,
+		l:         slog.With(slog.String("component", "basebackup"), slog.String("id", timestamp)),
+		conn:      conn,
+		storage:   storage,
+		timestamp: timestamp,
 	}, nil
 }
 
@@ -60,7 +61,9 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) error {
 		return err
 	}
 	// upload *.done marker
-	err = bb.storage.Put(ctx, bb.timestamp+".done", io.NopCloser(bytes.NewReader([]byte{})))
+	markerFileName := bb.timestamp + ".done"
+	bb.log().Debug("uploading marker file", slog.String("name", markerFileName))
+	err = bb.storage.Put(ctx, markerFileName, io.NopCloser(bytes.NewReader([]byte{})))
 	if err != nil {
 		return err
 	}
