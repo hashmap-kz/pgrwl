@@ -55,6 +55,19 @@ func (bb *baseBackup) log() *slog.Logger {
 }
 
 func (bb *baseBackup) StreamBackup(ctx context.Context) error {
+	err := bb.streamBaseBackup(ctx)
+	if err != nil {
+		return err
+	}
+	// upload *.done marker
+	err = bb.storage.Put(ctx, bb.timestamp+".done", io.NopCloser(bytes.NewReader([]byte{})))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bb *baseBackup) streamBaseBackup(ctx context.Context) error {
 	startResp, err := pglogrepl.StartBaseBackup(ctx, bb.conn, pglogrepl.BaseBackupOptions{
 		Label:         fmt.Sprintf("pgrwl_%s", bb.timestamp),
 		Progress:      false,
