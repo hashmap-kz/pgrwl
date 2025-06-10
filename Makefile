@@ -84,4 +84,4 @@ pprof1:
 
 .PHONY: clean
 clean:
-	@rm -rf "dist/" "test/integration/environ/bin/" "*.log"
+	@rm -rf "bin/" "dist/" "test/integration/environ/bin/" "*.log"
