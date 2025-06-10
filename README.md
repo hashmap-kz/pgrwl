@@ -57,7 +57,7 @@ integration with Kubernetes environments.
 
 - Install as a single binary. Debug with your favorite editor and a local PostgreSQL container ([local-dev-infra](test/integration/environ/)).
 
-![Architecture Diagram](docs/assets/diagrams/loop-v1.png)
+![Architecture Diagram](https://github.com/hashmap-kz/assets/blob/main/pgrwl/loop-v1.png)
 
 ---
 
@@ -339,7 +339,7 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 Contributions are welcomed and greatly appreciated. See [CONTRIBUTING.md](./CONTRIBUTING.md)
 for details on submitting patches and the contribution workflow.
 
-Check also the [Developer Notes](docs/developer_notes.md) for additional information and guidelines. 
+Check also the [Developer Notes](docs/developer_notes.md) for additional information and guidelines.
 
 ---
 
