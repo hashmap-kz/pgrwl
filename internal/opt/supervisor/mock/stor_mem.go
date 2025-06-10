@@ -129,3 +129,8 @@ func (s *InMemoryStorage) ListInfo(_ context.Context, path string) ([]storage.Fi
 	}
 	return infos, nil
 }
+
+func (s *InMemoryStorage) ListTopLevelDirs(_ context.Context, _ string) (map[string]bool, error) {
+	// TODO implement me
+	panic("implement me")
+}
