@@ -396,7 +396,7 @@ func validate(c *Config, mode string) error {
 	// * when external storage is used
 	// * when local storage used with compression || encryption configured
 
-	if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
+	if mode == ModeReceive && (c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "") {
 		// uploader
 		syncIntervalUploader := c.Receiver.Uploader.SyncInterval
 		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
