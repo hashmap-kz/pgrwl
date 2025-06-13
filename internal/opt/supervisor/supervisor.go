@@ -53,7 +53,7 @@ func (u *ArchiveSupervisor) log() *slog.Logger {
 }
 
 func (u *ArchiveSupervisor) RunUploader(ctx context.Context, queue *jobq.JobQueue) {
-	ticker := time.NewTicker(u.cfg.Storage.Uploader.SyncIntervalParsed)
+	ticker := time.NewTicker(u.cfg.Receiver.Uploader.SyncIntervalParsed)
 	defer ticker.Stop()
 
 	for {
@@ -78,8 +78,8 @@ func (u *ArchiveSupervisor) RunUploader(ctx context.Context, queue *jobq.JobQueu
 }
 
 func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.JobQueue) {
-	uploadTicker := time.NewTicker(u.cfg.Storage.Uploader.SyncIntervalParsed)
-	retentionTicker := time.NewTicker(u.cfg.Storage.Retention.SyncIntervalParsed)
+	uploadTicker := time.NewTicker(u.cfg.Receiver.Uploader.SyncIntervalParsed)
+	retentionTicker := time.NewTicker(u.cfg.Receiver.Retention.SyncIntervalParsed)
 	defer uploadTicker.Stop()
 	defer retentionTicker.Stop()
 
@@ -103,7 +103,7 @@ func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.Jo
 		case <-retentionTicker.C:
 			err := queue.Submit("retain", func(ctx context.Context) {
 				u.log().Debug("retention worker is running")
-				err := u.performRetention(ctx, u.cfg.Storage.Retention.KeepPeriodParsed)
+				err := u.performRetention(ctx, u.cfg.Receiver.Retention.KeepPeriodParsed)
 				if err != nil {
 					u.log().Error("error retain files", slog.Any("err", err))
 				}

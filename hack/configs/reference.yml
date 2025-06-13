@@ -6,6 +6,13 @@ main:                                    # Required for both modes: receive/serv
 receiver:                                # Required for 'receive' mode
   slot: replication_slot                 # Replication slot to use
   no_loop: false                         # If true, do not loop on connection loss
+  uploader:                              # Required for non-local storage type
+    sync_interval: 10s                   # Interval for the upload worker to check for new files
+    max_concurrency: 4                   # Maximum number of files to upload concurrently
+  retention:                             # Optional
+    enable: true                         # Perform retention rules
+    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
+    keep_period: "1m"                    # Remove WAL files older than given period
 
 backup:                                  # Required for 'backup' mode
   cron: ""                               # Basebackup cron schedule
@@ -28,13 +35,6 @@ dev_config:                              # Optional (various dev options)
 
 storage:                                 # Optional
   name: s3                               # One of: s3 / sftp
-  uploader:                              # Required for non-local storage type
-    sync_interval: 10s                   # Interval for the upload worker to check for new files
-    max_concurrency: 4                   # Maximum number of files to upload concurrently
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-    keep_period: "1m"                    # Remove WAL files older than given period
   compression:                           # Optional
     algo: gzip                           # One of: gzip / zstd
   encryption:                            # Optional

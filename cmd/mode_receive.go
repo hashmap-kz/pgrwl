@@ -148,7 +148,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				PGRW:             pgrw,
 				Verbose:          opts.Verbose,
 			})
-			if cfg.Storage.Retention.Enable {
+			if cfg.Receiver.Retention.Enable {
 				u.RunWithRetention(ctx, jobQueue)
 			} else {
 				u.RunUploader(ctx, jobQueue)
@@ -172,7 +172,7 @@ func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 	if cfg.IsLocalStor() {
 		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
 			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
-			cfg.Storage.Retention.Enable
+			cfg.Receiver.Retention.Enable
 		if !hasCfg {
 			l.Info("supervisor loop is skipped",
 				slog.String("reason", "no compression/encryption or retention configs for local-storage"),

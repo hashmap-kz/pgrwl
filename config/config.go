@@ -98,6 +98,12 @@ type ReceiveConfig struct {
 
 	// NoLoop disables automatic reconnection loops on connection loss.
 	NoLoop bool `json:"no_loop,omitempty"`
+
+	// Uploader worker configuration.
+	Uploader UploadConfig `json:"uploader,omitempty"`
+
+	// Retention policy configuration.
+	Retention RetentionConfig `json:"retention,omitempty"`
 }
 
 // UploadConfig configures the uploader worker.
@@ -160,12 +166,6 @@ type StorageConfig struct {
 
 	// S3 holds configuration specific to the S3 backend.
 	S3 S3Config `json:"s3,omitempty"`
-
-	// Uploader worker configuration.
-	Uploader UploadConfig `json:"uploader,omitempty"`
-
-	// Retention policy configuration.
-	Retention RetentionConfig `json:"retention,omitempty"`
 }
 
 // CompressionConfig defines the compression algorithm to use.
@@ -363,31 +363,31 @@ func validate(c *Config, mode string) error {
 
 	if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
 		// uploader
-		syncIntervalUploader := c.Storage.Uploader.SyncInterval
+		syncIntervalUploader := c.Receiver.Uploader.SyncInterval
 		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
 			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
 		} else {
-			c.Storage.Uploader.SyncIntervalParsed = duration
+			c.Receiver.Uploader.SyncIntervalParsed = duration
 		}
-		if c.Storage.Uploader.MaxConcurrency <= 0 {
+		if c.Receiver.Uploader.MaxConcurrency <= 0 {
 			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
 		}
 	}
 
 	// retention
-	if c.Storage.Retention.Enable {
-		syncIntervalRetention := c.Storage.Retention.SyncInterval
+	if c.Receiver.Retention.Enable {
+		syncIntervalRetention := c.Receiver.Retention.SyncInterval
 		if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
 			errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
 		} else {
-			c.Storage.Retention.SyncIntervalParsed = duration
+			c.Receiver.Retention.SyncIntervalParsed = duration
 		}
 
-		keepPeriodRetention := c.Storage.Retention.KeepPeriod
+		keepPeriodRetention := c.Receiver.Retention.KeepPeriod
 		if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
 			errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
 		} else {
-			c.Storage.Retention.KeepPeriodParsed = duration
+			c.Receiver.Retention.KeepPeriodParsed = duration
 		}
 	}
 
