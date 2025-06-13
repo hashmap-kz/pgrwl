@@ -13,11 +13,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type CmdOpts struct {
+type CreateBaseBackupOpts struct {
 	Directory string
 }
 
-func Run(opts *CmdOpts) error {
+func CreateBaseBackup(opts *CreateBaseBackupOpts) error {
 	var err error
 
 	// setup context

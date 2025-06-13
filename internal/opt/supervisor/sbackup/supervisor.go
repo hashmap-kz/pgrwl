@@ -57,7 +57,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 	_, err := c.AddFunc(u.cfg.Backup.Cron, func() {
 		u.log().Info("starting scheduled basebackup")
 		// create backup
-		err := basebackup.Run(&basebackup.CmdOpts{Directory: u.opts.Directory})
+		err := basebackup.CreateBaseBackup(&basebackup.CreateBaseBackupOpts{Directory: u.opts.Directory})
 		if err != nil {
 			u.log().Error("basebackup failed", slog.Any("err", err))
 		} else {

@@ -372,23 +372,24 @@ func validate(c *Config, mode string) error {
 		}
 	}
 
+	// TODO: fix, there are backup-cli and backup-streaming
 	// Backup
-	if mode == ModeBackup {
-		if c.Backup.Cron == "" {
-			errs = append(errs, "backup.cron is required in backup mode")
-		}
-		if c.Backup.Retention.Enable {
-			basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.KeepPeriod)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf(
-					"backup.retention.keep_period cannot parse: %s, %v",
-					c.Backup.Retention.KeepPeriod, err),
-				)
-			} else {
-				c.Backup.Retention.KeepPeriodParsed = basebackupKeepPeriodParsed
-			}
-		}
-	}
+	// if mode == ModeBackup {
+	// 	if c.Backup.Cron == "" {
+	// 		errs = append(errs, "backup.cron is required in backup mode")
+	// 	}
+	// 	if c.Backup.Retention.Enable {
+	// 		basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.KeepPeriod)
+	// 		if err != nil {
+	// 			errs = append(errs, fmt.Sprintf(
+	// 				"backup.retention.keep_period cannot parse: %s, %v",
+	// 				c.Backup.Retention.KeepPeriod, err),
+	// 			)
+	// 		} else {
+	// 			c.Backup.Retention.KeepPeriodParsed = basebackupKeepPeriodParsed
+	// 		}
+	// 	}
+	// }
 
 	// Storage
 
