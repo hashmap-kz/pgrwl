@@ -18,7 +18,6 @@ backup:                                  # Required for 'backup' mode
   cron: ""                               # Basebackup cron schedule
   retention:                             # Optional
     enable: true                         # Perform retention rules
-    sync_interval: 12h                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
     keep_period: "48h"                   # Remove backups older than given period
 
 log:                                     # Optional

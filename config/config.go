@@ -70,6 +70,7 @@ type Config struct {
 	Log       LogConfig     `json:"log,omitempty"`        // Logging configuration.
 	Storage   StorageConfig `json:"storage,omitempty"`    // Storage backend configuration.
 	DevConfig DevConfig     `json:"dev_config,omitempty"` // Various dev options.
+	Backup    BackupConfig  `json:"backup,omitempty"`     // Streaming basebackup options.
 }
 
 // MainConfig holds top-level application settings.
@@ -89,6 +90,22 @@ type DevConfig struct {
 // DevConfigPprof configures pprof.
 type DevConfigPprof struct {
 	Enable bool `json:"enable,omitempty"`
+}
+
+// BackupConfig configures streaming basebackup properties.
+type BackupConfig struct {
+	Cron      string                `json:"cron"`
+	Retention BackupRetentionConfig `json:"retention,omitempty"`
+}
+
+// BackupRetentionConfig configures retention for basebackups.
+type BackupRetentionConfig struct {
+	// Enable determines whether retention logic is active.
+	Enable bool `json:"enable,omitempty"`
+
+	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
+	KeepPeriod       string        `json:"keep_period,omitempty"`
+	KeepPeriodParsed time.Duration `json:"-"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.
@@ -352,6 +369,24 @@ func validate(c *Config, mode string) error {
 	if c.Log.Format != "" {
 		if c.Log.Format != "text" && c.Log.Format != "json" {
 			errs = append(errs, fmt.Sprintf("log.format must be 'text' or 'json' (got: %s)", c.Log.Format))
+		}
+	}
+
+	// Backup
+	if mode == ModeBackup {
+		if c.Backup.Cron == "" {
+			errs = append(errs, "backup.cron is required in backup mode")
+		}
+		if c.Backup.Retention.Enable {
+			basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.KeepPeriod)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf(
+					"backup.retention.keep_period cannot parse: %s, %v",
+					c.Backup.Retention.KeepPeriod, err),
+				)
+			} else {
+				c.Backup.Retention.KeepPeriodParsed = basebackupKeepPeriodParsed
+			}
 		}
 	}
 
