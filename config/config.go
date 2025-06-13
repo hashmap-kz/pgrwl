@@ -404,25 +404,25 @@ func checkReceiverConfig(c *Config, mode string, errs []string) []string {
 			// uploader
 			syncIntervalUploader := c.Receiver.Uploader.SyncInterval
 			if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
-				errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
+				errs = append(errs, fmt.Sprintf("receiver.uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
 			} else {
 				c.Receiver.Uploader.SyncIntervalParsed = duration
 			}
 			if c.Receiver.Uploader.MaxConcurrency <= 0 {
-				errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
+				errs = append(errs, "receiver.uploader.max_concurrency must be > 0 if uploader is configured")
 			}
 		}
 		// retention
 		if c.Receiver.Retention.Enable {
 			syncIntervalRetention := c.Receiver.Retention.SyncInterval
 			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
+				errs = append(errs, fmt.Sprintf("receiver.retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
 			} else {
 				c.Receiver.Retention.SyncIntervalParsed = duration
 			}
 			keepPeriodRetention := c.Receiver.Retention.KeepPeriod
 			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
+				errs = append(errs, fmt.Sprintf("receiver.retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
 			} else {
 				c.Receiver.Retention.KeepPeriodParsed = duration
 			}
