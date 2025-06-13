@@ -27,7 +27,7 @@ checksum:
   name_template: checksums.txt
 
 archives:
-  - builds:
+  - ids:
       - pgrwl
     name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: "false"
