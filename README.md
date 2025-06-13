@@ -65,6 +65,10 @@ integration with Kubernetes environments.
 
 ![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/serve-mode.png)
 
+**`pgrwl` running in `backup` mode**
+
+![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/backup-mode.png)
+
 ---
 
 ## Usage

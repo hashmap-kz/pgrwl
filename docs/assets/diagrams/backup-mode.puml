@@ -1,0 +1,40 @@
+@startuml flow
+
+title "PGRWL (PostgreSQL WAL Receiver) — Backup Flow"
+footer Cloud-Native PostgreSQL WAL Receiver - pgrwl
+header "v1"
+scale max 860 height
+
+skinparam TitleFontSize 28
+
+box "PostgreSQL Server" #LightBlue
+  database "PostgreSQL" as PG #DeepSkyBlue
+end box
+
+box "Components" #HoneyDew
+  participant "Backup Scheduler" as Scheduler #LightYellow
+  participant "Backup Executor" as BackupExec #Thistle
+  participant "Backup Retainer" as Retainer #MistyRose
+end box
+
+box "Remote Storage" #AliceBlue
+  database "S3 / SFTP / etc." as Storage #LightCyan
+end box
+
+group #LightYellow Scheduled Base Backup
+  Scheduler -> Scheduler: Periodic Cron Schedule → trigger backup
+  Scheduler --> BackupExec: Trigger createBasebackup()
+end
+
+group #Thistle Base Backup Flow
+  BackupExec -> PG: Initiate basebackup (start_backup / stop_backup)
+  BackupExec -> Storage: Stream → Compress → Encrypt → Upload basebackup
+  BackupExec -> BackupExec: On success → optionally trigger WAL archive cleanup
+end
+
+group #MistyRose Backup Retention (if enabled)
+  Retainer -> Storage: List backups
+  Retainer -> Storage: Delete older than KeepPeriod
+end
+
+@enduml
