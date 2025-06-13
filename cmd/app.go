@@ -93,7 +93,7 @@ func App() *cli.Command {
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					checkPgEnvsAreSet()
-					cfg := loadConfig(c, config.ModeBackup)
+					cfg := loadConfig(c, config.ModeBackupCMD)
 					err := RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
 					return err
 				},
@@ -116,7 +116,7 @@ func App() *cli.Command {
 					},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
-					cfg := loadConfig(c, config.ModeRestore)
+					cfg := loadConfig(c, config.ModeRestoreCMD)
 					err := RestoreBaseBackup(context.Background(), cfg,
 						c.String("id"),
 						c.String("dest"),
