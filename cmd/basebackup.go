@@ -54,7 +54,7 @@ func RunBaseBackup(opts *BaseBackupCmdOpts) error {
 	}
 
 	// stream basebackup to defined storage
-	err = baseBackup.StreamBackup(ctx)
+	_, err = baseBackup.StreamBackup(ctx)
 	if err != nil {
 		loggr.Error("cannot create basebackup", slog.Any("err", err))
 		return err

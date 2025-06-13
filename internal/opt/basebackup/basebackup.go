@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,8 +20,23 @@ import (
 
 // https://www.postgresql.org/docs/current/protocol-replication.html#PROTOCOL-REPLICATION-BASE-BACKUP
 
+// BaseBackup is an API for streaming basebackup
 type BaseBackup interface {
-	StreamBackup(ctx context.Context) error
+	StreamBackup(ctx context.Context) (*Result, error)
+}
+
+// Tablespace represents a tablespace in the backup
+type Tablespace struct {
+	OID      int32  `json:"oid,omitempty"`
+	Location string `json:"location,omitempty"`
+	Size     int8   `json:"size,omitempty"`
+}
+
+// Result will hold the return values  of the BaseBackup command
+type Result struct {
+	LSN         pglogrepl.LSN `json:"lsn,omitempty"`
+	TimelineID  int32         `json:"timeline_id,omitempty"`
+	Tablespaces []Tablespace  `json:"tablespaces,omitempty"`
 }
 
 type baseBackup struct {
@@ -55,22 +71,26 @@ func (bb *baseBackup) log() *slog.Logger {
 	return slog.With(slog.String("component", "basebackup"), slog.String("id", bb.timestamp))
 }
 
-func (bb *baseBackup) StreamBackup(ctx context.Context) error {
-	err := bb.streamBaseBackup(ctx)
+func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
+	result, err := bb.streamBaseBackup(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	// upload *.done marker
-	markerFileName := bb.timestamp + ".done"
+	// upload marker
+	markerFileName := bb.timestamp + ".json"
 	bb.log().Debug("uploading marker file", slog.String("name", markerFileName))
-	err = bb.storage.Put(ctx, markerFileName, io.NopCloser(bytes.NewReader([]byte{})))
+	markerFileData, err := json.Marshal(result)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	err = bb.storage.Put(ctx, markerFileName, io.NopCloser(bytes.NewReader(markerFileData)))
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-func (bb *baseBackup) streamBaseBackup(ctx context.Context) error {
+func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 	startResp, err := pglogrepl.StartBaseBackup(ctx, bb.conn, pglogrepl.BaseBackupOptions{
 		Label:         fmt.Sprintf("pgrwl_%s", bb.timestamp),
 		Progress:      false,
@@ -81,7 +101,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) error {
 		TablespaceMap: true,
 	})
 	if err != nil {
-		return fmt.Errorf("start base backup: %w", err)
+		return nil, fmt.Errorf("start base backup: %w", err)
 	}
 
 	bb.log().Info("started backup",
@@ -110,7 +130,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) error {
 		if err != nil {
 			//nolint:errcheck
 			_ = cleanup() // still try to cleanup
-			return fmt.Errorf("receive message: %w", err)
+			return nil, fmt.Errorf("receive message: %w", err)
 		}
 
 		switch m := msg.(type) {
@@ -121,18 +141,18 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) error {
 			switch m.Data[0] {
 			case 'n':
 				if err := cleanup(); err != nil {
-					return err
+					return nil, err
 				}
 
 				buf := m.Data[1:]
 				filename, rest, err := readCString(buf)
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				tsPath, _, err := readCString(rest)
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				remotePath = strings.TrimPrefix(filename, "./")
@@ -157,12 +177,12 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) error {
 				if pipeWriter == nil {
 					//nolint:errcheck
 					_ = cleanup()
-					return fmt.Errorf("received data but no active file")
+					return nil, fmt.Errorf("received data but no active file")
 				}
 				if _, err := pipeWriter.Write(m.Data[1:]); err != nil {
 					//nolint:errcheck
 					_ = cleanup()
-					return fmt.Errorf("write to pipe: %w", err)
+					return nil, fmt.Errorf("write to pipe: %w", err)
 				}
 
 			case 'm':
@@ -187,20 +207,32 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) error {
 
 		case *pgproto3.CopyDone:
 			if err := cleanup(); err != nil {
-				return err
+				return nil, err
 			}
 			bb.log().Info("backup stream complete")
 
 			stopRes, err := pglogrepl.FinishBaseBackup(ctx, bb.conn)
 			if err != nil {
-				return fmt.Errorf("finish base backup: %w", err)
+				return nil, fmt.Errorf("finish base backup: %w", err)
 			}
 
 			bb.log().Info("finished backup", slog.String("LSN", stopRes.LSN.String()))
-			return nil
+			var tablespaces []Tablespace
+			for _, ts := range stopRes.Tablespaces {
+				tablespaces = append(tablespaces, Tablespace{
+					OID:      ts.OID,
+					Location: ts.Location,
+					Size:     ts.Size,
+				})
+			}
+			return &Result{
+				LSN:         stopRes.LSN,
+				TimelineID:  stopRes.TimelineID,
+				Tablespaces: tablespaces,
+			}, nil
 
 		default:
-			return fmt.Errorf("unexpected message type: %T", msg)
+			return nil, fmt.Errorf("unexpected message type: %T", msg)
 		}
 	}
 }
