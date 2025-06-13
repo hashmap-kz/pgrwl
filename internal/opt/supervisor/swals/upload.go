@@ -1,4 +1,4 @@
-package supervisor
+package swals
 
 import (
 	"context"
@@ -52,7 +52,7 @@ func (u *ArchiveSupervisor) filterFilesToUpload(files []os.DirEntry) []uploadBun
 }
 
 func (u *ArchiveSupervisor) uploadFiles(ctx context.Context, files []uploadBundle) error {
-	workerCount := u.cfg.Storage.Uploader.MaxConcurrency
+	workerCount := u.cfg.Receiver.Uploader.MaxConcurrency
 	if workerCount <= 0 {
 		workerCount = 1
 	}

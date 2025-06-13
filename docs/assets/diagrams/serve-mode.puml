@@ -1,0 +1,28 @@
+@startuml flow
+
+title "PGRWL (PostgreSQL WAL Receiver) — WAL Serving Flow"
+footer Cloud-Native PostgreSQL WAL Receiver - pgrwl
+header "v1"
+scale max 860 height
+
+skinparam TitleFontSize 28
+
+box "PostgreSQL Server" #LightBlue
+  database "PostgreSQL" as PG #DeepSkyBlue
+end box
+
+box "Components" #HoneyDew
+  participant "HTTP Server\n(Serve Mode)" as HttpServer #LightYellow
+end box
+
+box "Remote Storage" #AliceBlue
+  database "S3 / SFTP / etc." as Storage #LightCyan
+end box
+
+group #LightYellow HTTP WAL Serving
+  PG -> HttpServer: restore_command requests WAL segment
+  HttpServer -> Storage: Fetch WAL file (may decompress & decrypt)
+  HttpServer -> PG: Return WAL file content
+end
+
+@enduml

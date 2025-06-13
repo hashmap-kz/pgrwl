@@ -1,4 +1,4 @@
-package cmd
+package basebackup
 
 import (
 	"archive/tar"
@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+	"strings"
 
 	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 )
 
@@ -78,6 +78,10 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	// untar archives
 	for _, f := range backupFiles {
 		loggr.Debug("restoring file", slog.String("path", filepath.ToSlash(f)))
+		// skip internals
+		if strings.Contains(f, backupID+".json") {
+			continue
+		}
 
 		rc, err := stor.Get(ctx, f)
 		if err != nil {

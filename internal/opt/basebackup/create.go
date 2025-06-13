@@ -1,4 +1,4 @@
-package cmd
+package basebackup
 
 import (
 	"context"
@@ -9,16 +9,15 @@ import (
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/basebackup"
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type BaseBackupCmdOpts struct {
+type CreateBaseBackupOpts struct {
 	Directory string
 }
 
-func RunBaseBackup(opts *BaseBackupCmdOpts) error {
+func CreateBaseBackup(opts *CreateBaseBackupOpts) error {
 	var err error
 
 	// setup context
@@ -47,14 +46,14 @@ func RunBaseBackup(opts *BaseBackupCmdOpts) error {
 	}
 
 	// init module
-	baseBackup, err := basebackup.NewBaseBackup(conn, stor, ts)
+	baseBackup, err := NewBaseBackup(conn, stor, ts)
 	if err != nil {
 		loggr.Error("cannot init basebackup module", slog.Any("err", err))
 		return err
 	}
 
 	// stream basebackup to defined storage
-	err = baseBackup.StreamBackup(ctx)
+	_, err = baseBackup.StreamBackup(ctx)
 	if err != nil {
 		loggr.Error("cannot create basebackup", slog.Any("err", err))
 		return err

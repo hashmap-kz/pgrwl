@@ -14,6 +14,11 @@ func TestNeedSupervisorLoop(t *testing.T) {
 
 	t.Run("localfs-1 with no compression, encryption, retention", func(t *testing.T) {
 		cfg := &config.Config{
+			Receiver: config.ReceiveConfig{
+				Retention: config.RetentionConfig{
+					Enable: false,
+				},
+			},
 			Storage: config.StorageConfig{
 				Name: "local",
 				Compression: config.CompressionConfig{
@@ -22,9 +27,6 @@ func TestNeedSupervisorLoop(t *testing.T) {
 				Encryption: config.EncryptionConfig{
 					Algo: "",
 				},
-				Retention: config.RetentionConfig{
-					Enable: false,
-				},
 			},
 		}
 		assert.False(t, needSupervisorLoop(cfg, logger))
@@ -32,6 +34,11 @@ func TestNeedSupervisorLoop(t *testing.T) {
 
 	t.Run("localfs-2 with no compression, encryption, retention", func(t *testing.T) {
 		cfg := &config.Config{
+			Receiver: config.ReceiveConfig{
+				Retention: config.RetentionConfig{
+					Enable: false,
+				},
+			},
 			Storage: config.StorageConfig{
 				Name: "",
 				Compression: config.CompressionConfig{
@@ -39,9 +46,6 @@ func TestNeedSupervisorLoop(t *testing.T) {
 				},
 				Encryption: config.EncryptionConfig{
 					Algo: "",
-				},
-				Retention: config.RetentionConfig{
-					Enable: false,
 				},
 			},
 		}
@@ -74,11 +78,13 @@ func TestNeedSupervisorLoop(t *testing.T) {
 
 	t.Run("localfs with retention enabled", func(t *testing.T) {
 		cfg := &config.Config{
-			Storage: config.StorageConfig{
-				Name: "local",
+			Receiver: config.ReceiveConfig{
 				Retention: config.RetentionConfig{
 					Enable: true,
 				},
+			},
+			Storage: config.StorageConfig{
+				Name: "local",
 			},
 		}
 		assert.True(t, needSupervisorLoop(cfg, logger))

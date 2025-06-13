@@ -52,6 +52,7 @@ func App() *cli.Command {
 					}
 
 					cfg := loadConfig(c, mode)
+					verbose := strings.EqualFold(cfg.Log.Level, "trace")
 
 					//nolint:staticcheck
 					if mode == config.ModeReceive {
@@ -61,13 +62,19 @@ func App() *cli.Command {
 							ListenPort:       cfg.Main.ListenPort,
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
-							Verbose:          strings.EqualFold(cfg.Log.Level, "trace"),
+							Verbose:          verbose,
 						})
 					} else if mode == config.ModeServe {
 						RunServeMode(&ServeModeOpts{
 							Directory:  filepath.ToSlash(cfg.Main.Directory),
 							ListenPort: cfg.Main.ListenPort,
-							Verbose:    strings.EqualFold(cfg.Log.Level, "trace"),
+							Verbose:    verbose,
+						})
+					} else if mode == config.ModeBackup {
+						checkPgEnvsAreSet()
+						RunBackupMode(&BackupModeOpts{
+							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
+							Verbose:          verbose,
 						})
 					} else {
 						log.Fatalf("unknown mode: %s", mode)
@@ -77,7 +84,7 @@ func App() *cli.Command {
 				},
 			},
 
-			// basebackup command
+			// basebackup create
 			{
 				Name:  "backup",
 				Usage: "Create basebackup using streaming replication protocol",
@@ -86,7 +93,7 @@ func App() *cli.Command {
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					checkPgEnvsAreSet()
-					cfg := loadConfig(c, config.ModeBackup)
+					cfg := loadConfig(c, config.ModeBackupCMD)
 					err := RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
 					return err
 				},
@@ -109,7 +116,7 @@ func App() *cli.Command {
 					},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
-					cfg := loadConfig(c, config.ModeRestore)
+					cfg := loadConfig(c, config.ModeRestoreCMD)
 					err := RestoreBaseBackup(context.Background(), cfg,
 						c.String("id"),
 						c.String("dest"),

@@ -79,3 +79,9 @@ pprof1:
 	go tool pprof -web http://127.0.0.1:7070/debug/pprof/heap
 	go tool pprof -web http://127.0.0.1:7070/debug/pprof/profile?seconds=10
 	curl -s http://127.0.0.1:7070/debug/pprof/trace\?seconds\=10 | go tool trace /dev/stdin
+
+# Cleanup
+
+.PHONY: clean
+clean:
+	@rm -rf bin/ dist/ test/integration/environ/bin/ *.log

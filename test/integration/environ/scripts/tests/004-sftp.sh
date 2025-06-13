@@ -11,7 +11,11 @@ x_remake_config() {
   },
   "receiver": {
      "slot": "pgrwl_v5",
-     "no_loop": true
+     "no_loop": true,
+     "uploader": {
+       "sync_interval": "5s",
+       "max_concurrency": 4
+     }
   },
   "log": {
     "level": "trace",
@@ -20,10 +24,6 @@ x_remake_config() {
   },
   "storage": {
     "name": "sftp",
-    "uploader": {
-      "sync_interval": "5s",
-      "max_concurrency": 4
-    },
     "compression": {
       "algo": "gzip"
     },

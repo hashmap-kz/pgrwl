@@ -5,6 +5,19 @@ main:
 
 receiver:
   slot: pgrwl_v5
+  #uploader:
+  #  sync_interval: 10s
+  #  max_concurrency: 4
+  #retention:
+  #  enable: true
+  #  sync_interval: 10s
+  #  keep_period: "30s"
+
+backup:
+  cron: "0 * * * * *"
+  retention:
+    enable: true
+    keep_period: "48h"
 
 dev_config:
   pprof:
@@ -17,13 +30,6 @@ log:
 
 #storage:
 #  name: "local"
-#  uploader:
-#    sync_interval: 10s
-#    max_concurrency: 4
-#  retention:
-#    enable: true
-#    sync_interval: 10s
-#    keep_period: "30s"
 #  compression:
 #    algo: gzip
 #  encryption:

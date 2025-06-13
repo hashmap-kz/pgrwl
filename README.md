@@ -57,7 +57,17 @@ integration with Kubernetes environments.
 
 - Install as a single binary. Debug with your favorite editor and a local PostgreSQL container ([local-dev-infra](test/integration/environ/)).
 
-![Architecture Diagram](docs/assets/diagrams/loop-v1.png)
+**`pgrwl` running in `receive` mode**
+
+![Receive Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/loop-v1.png)
+
+**`pgrwl` running in `serve` mode**
+
+![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/serve-mode.png)
+
+**`pgrwl` running in `backup` mode**
+
+![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/backup-mode.png)
 
 ---
 
@@ -69,7 +79,7 @@ integration with Kubernetes environments.
 
 `Receive` mode is _the main loop of the WAL receiver_.
 
-```yaml
+```bash
 cat <<EOF >config.yml
 main:
   listen_port: 7070
@@ -81,9 +91,7 @@ log:
   format: text
   add_source: true
 EOF
-```
 
-```bash
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
@@ -97,7 +105,7 @@ pgrwl -c config.yml
 
 `Serve` mode is _used during restore to serve archived WAL files from storage_.
 
-```yaml
+```bash
 cat <<EOF >config.yml
 main:
   listen_port: 7070
@@ -107,9 +115,7 @@ log:
   format: text
   add_source: true
 EOF
-```
 
-```bash
 export PGRWL_MODE=serve
 
 pgrwl -c config.yml
@@ -129,7 +135,7 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 
 Streaming base backup to the configured storage:
 
-```yaml
+```bash
 cat <<EOF >config.yml
 main:
   listen_port: 7070
@@ -139,9 +145,7 @@ log:
   format: text
   add_source: true
 EOF
-```
 
-```bash
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
@@ -160,13 +164,26 @@ The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
 ```yaml
-main:                                    # Required for both modes: 'receive' / 'serve'
+main:                                    # Required for both modes: receive/serve
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
 
 receiver:                                # Required for 'receive' mode
   slot: replication_slot                 # Replication slot to use
   no_loop: false                         # If true, do not loop on connection loss
+  uploader:                              # Required for non-local storage type
+    sync_interval: 10s                   # Interval for the upload worker to check for new files
+    max_concurrency: 4                   # Maximum number of files to upload concurrently
+  retention:                             # Optional
+    enable: true                         # Perform retention rules
+    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
+    keep_period: "1m"                    # Remove WAL files older than given period
+
+backup:                                  # Required for 'backup' mode
+  cron: ""                               # Basebackup cron schedule
+  retention:                             # Optional
+    enable: true                         # Perform retention rules
+    keep_period: "48h"                   # Remove backups older than given period
 
 log:                                     # Optional
   level: info                            # One of: trace / debug / info / warn / error
@@ -182,13 +199,6 @@ dev_config:                              # Optional (various dev options)
 
 storage:                                 # Optional
   name: s3                               # One of: s3 / sftp
-  uploader:                              # Required for non-local storage type
-    sync_interval: 10s                   # Interval for the upload worker to check for new files
-    max_concurrency: 4                   # Maximum number of files to upload concurrently
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-    keep_period: "1m"                    # Remove WAL files older than given period
   compression:                           # Optional
     algo: gzip                           # One of: gzip / zstd
   encryption:                            # Optional
@@ -339,7 +349,7 @@ This approach provides true zero data loss (**RPO=0**), making it ideal for high
 Contributions are welcomed and greatly appreciated. See [CONTRIBUTING.md](./CONTRIBUTING.md)
 for details on submitting patches and the contribution workflow.
 
-Check also the [Developer Notes](docs/developer_notes.md) for additional information and guidelines. 
+Check also the [Developer Notes](docs/developer_notes.md) for additional information and guidelines.
 
 ---
 

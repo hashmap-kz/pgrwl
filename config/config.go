@@ -22,11 +22,14 @@ const (
 	// ModeServe represents the HTTP API serving mode.
 	ModeServe = "serve"
 
-	// ModeBackup used in pgrwl backup CLI command.
+	// ModeBackup used in pgrwl streaming basebackup mode.
 	ModeBackup = "backup"
 
-	// ModeRestore used in pgrwl restore CLI command.
-	ModeRestore = "restore"
+	// ModeBackupCMD used in pgrwl backup CLI command.
+	ModeBackupCMD = "backup-cmd"
+
+	// ModeRestoreCMD used in pgrwl restore CLI command.
+	ModeRestoreCMD = "restore"
 
 	// StorageNameS3 is the identifier for the S3 storage backend.
 	StorageNameS3 = "s3"
@@ -59,6 +62,16 @@ var (
 
 	// config holds the global application configuration.
 	config *Config
+
+	modes = []string{
+		// CMD
+		ModeBackupCMD,
+		ModeRestoreCMD,
+		// serving
+		ModeBackup,
+		ModeReceive,
+		ModeServe,
+	}
 )
 
 // Config is the root configuration for the WAL receiver application.
@@ -70,6 +83,7 @@ type Config struct {
 	Log       LogConfig     `json:"log,omitempty"`        // Logging configuration.
 	Storage   StorageConfig `json:"storage,omitempty"`    // Storage backend configuration.
 	DevConfig DevConfig     `json:"dev_config,omitempty"` // Various dev options.
+	Backup    BackupConfig  `json:"backup,omitempty"`     // Streaming basebackup options.
 }
 
 // MainConfig holds top-level application settings.
@@ -91,6 +105,22 @@ type DevConfigPprof struct {
 	Enable bool `json:"enable,omitempty"`
 }
 
+// BackupConfig configures streaming basebackup properties.
+type BackupConfig struct {
+	Cron      string                `json:"cron"`
+	Retention BackupRetentionConfig `json:"retention,omitempty"`
+}
+
+// BackupRetentionConfig configures retention for basebackups.
+type BackupRetentionConfig struct {
+	// Enable determines whether retention logic is active.
+	Enable bool `json:"enable,omitempty"`
+
+	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
+	KeepPeriod       string        `json:"keep_period,omitempty"`
+	KeepPeriodParsed time.Duration `json:"-"`
+}
+
 // ReceiveConfig configures the WAL receiving logic.
 type ReceiveConfig struct {
 	// Slot is the replication slot name used to stream WAL from PostgreSQL.
@@ -98,6 +128,12 @@ type ReceiveConfig struct {
 
 	// NoLoop disables automatic reconnection loops on connection loss.
 	NoLoop bool `json:"no_loop,omitempty"`
+
+	// Uploader worker configuration.
+	Uploader UploadConfig `json:"uploader,omitempty"`
+
+	// Retention policy configuration.
+	Retention RetentionConfig `json:"retention,omitempty"`
 }
 
 // UploadConfig configures the uploader worker.
@@ -160,12 +196,6 @@ type StorageConfig struct {
 
 	// S3 holds configuration specific to the S3 backend.
 	S3 S3Config `json:"s3,omitempty"`
-
-	// Uploader worker configuration.
-	Uploader UploadConfig `json:"uploader,omitempty"`
-
-	// Retention policy configuration.
-	Retention RetentionConfig `json:"retention,omitempty"`
 }
 
 // CompressionConfig defines the compression algorithm to use.
@@ -313,8 +343,6 @@ func mustLoadCfg(path string) *Config {
 }
 
 // validate checks that all required fields in the config are set appropriately.
-//
-//nolint:gocyclo
 func validate(c *Config, mode string) error {
 	var errs []string
 
@@ -322,11 +350,37 @@ func validate(c *Config, mode string) error {
 		return fmt.Errorf("config.validate: mode is required")
 	}
 
-	// Validate mode
-	if mode != ModeReceive && mode != ModeServe && mode != ModeBackup && mode != ModeRestore {
-		errs = append(errs, fmt.Sprintf("invalid mode: %q (must be %q or %q)", mode, ModeReceive, ModeServe))
-	}
+	errs = checkMode(mode, errs)
+	errs = checkMainConfig(c, errs)
+	errs = checkReceiverConfig(c, mode, errs)
+	errs = checkBackupConfig(c, mode, errs)
+	errs = checkLogConfig(c, errs)
+	errs = checkStorageConfig(c, errs)
+	errs = checkStorageModifiersConfig(c, errs)
 
+	if len(errs) > 0 {
+		return errors.New("invalid config:\n  - " + strings.Join(errs, "\n  - "))
+	}
+	return nil
+}
+
+// checks
+
+func checkMode(mode string, errs []string) []string {
+	found := false
+	for _, m := range modes {
+		if strings.EqualFold(m, mode) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		errs = append(errs, fmt.Sprintf("invalid mode: %q (must be %q)", mode, strings.Join(modes, "|")))
+	}
+	return errs
+}
+
+func checkMainConfig(c *Config, errs []string) []string {
 	// Validate main section
 	if c.Main.ListenPort == 0 {
 		errs = append(errs, "main.listen_port is required")
@@ -334,63 +388,70 @@ func validate(c *Config, mode string) error {
 	if strings.TrimSpace(c.Main.Directory) == "" {
 		errs = append(errs, "main.directory is required")
 	}
+	return errs
+}
 
+func checkReceiverConfig(c *Config, mode string, errs []string) []string {
 	// Validate receiver (only in receive mode)
 	if mode == ModeReceive {
 		if strings.TrimSpace(c.Receiver.Slot) == "" {
 			errs = append(errs, "receiver.slot is required in receive mode")
 		}
-	}
-
-	// Validate log (optional)
-	if c.Log.Level != "" {
-		validLevels := map[string]bool{"trace": true, "debug": true, "info": true, "warn": true, "error": true}
-		if !validLevels[strings.ToLower(c.Log.Level)] {
-			errs = append(errs, fmt.Sprintf("log.level must be one of: trace/debug/info/warn/error (got: %s)", c.Log.Level))
+		// uploader conf is required:
+		// * when external storage is used
+		// * when local storage used with compression || encryption configured
+		if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
+			// uploader
+			syncIntervalUploader := c.Receiver.Uploader.SyncInterval
+			if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
+				errs = append(errs, fmt.Sprintf("receiver.uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
+			} else {
+				c.Receiver.Uploader.SyncIntervalParsed = duration
+			}
+			if c.Receiver.Uploader.MaxConcurrency <= 0 {
+				errs = append(errs, "receiver.uploader.max_concurrency must be > 0 if uploader is configured")
+			}
+		}
+		// retention
+		if c.Receiver.Retention.Enable {
+			syncIntervalRetention := c.Receiver.Retention.SyncInterval
+			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
+				errs = append(errs, fmt.Sprintf("receiver.retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
+			} else {
+				c.Receiver.Retention.SyncIntervalParsed = duration
+			}
+			keepPeriodRetention := c.Receiver.Retention.KeepPeriod
+			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
+				errs = append(errs, fmt.Sprintf("receiver.retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
+			} else {
+				c.Receiver.Retention.KeepPeriodParsed = duration
+			}
 		}
 	}
-	if c.Log.Format != "" {
-		if c.Log.Format != "text" && c.Log.Format != "json" {
-			errs = append(errs, fmt.Sprintf("log.format must be 'text' or 'json' (got: %s)", c.Log.Format))
-		}
-	}
+	return errs
+}
 
-	// Storage
-
-	// uploader conf is required:
-	// * when external storage is used
-	// * when local storage used with compression || encryption configured
-
-	if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
-		// uploader
-		syncIntervalUploader := c.Storage.Uploader.SyncInterval
-		if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
-			errs = append(errs, fmt.Sprintf("uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
-		} else {
-			c.Storage.Uploader.SyncIntervalParsed = duration
-		}
-		if c.Storage.Uploader.MaxConcurrency <= 0 {
-			errs = append(errs, "uploader.max_concurrency must be > 0 if uploader is configured")
-		}
-	}
-
-	// retention
-	if c.Storage.Retention.Enable {
-		syncIntervalRetention := c.Storage.Retention.SyncInterval
-		if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
-			errs = append(errs, fmt.Sprintf("retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
-		} else {
-			c.Storage.Retention.SyncIntervalParsed = duration
-		}
-
-		keepPeriodRetention := c.Storage.Retention.KeepPeriod
-		if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
-			errs = append(errs, fmt.Sprintf("retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
-		} else {
-			c.Storage.Retention.KeepPeriodParsed = duration
+func checkStorageModifiersConfig(c *Config, errs []string) []string {
+	// Validate optional compression
+	if c.Storage.Compression.Algo != "" {
+		if c.Storage.Compression.Algo != RepoCompressorGzip && c.Storage.Compression.Algo != RepoCompressorZstd {
+			errs = append(errs, fmt.Sprintf("unsupported compression algo: %s", c.Storage.Compression.Algo))
 		}
 	}
 
+	// Validate optional encryption
+	if c.Storage.Encryption.Algo != "" {
+		if c.Storage.Encryption.Algo != RepoEncryptorAes256Gcm {
+			errs = append(errs, fmt.Sprintf("unsupported encryption algo: %s", c.Storage.Encryption.Algo))
+		}
+		if c.Storage.Encryption.Pass == "" {
+			errs = append(errs, "storage.encryption.pass is required if encryption is enabled")
+		}
+	}
+	return errs
+}
+
+func checkStorageConfig(c *Config, errs []string) []string {
 	// Validate storage
 	switch c.Storage.Name {
 	case "", StorageNameLocalFS:
@@ -432,29 +493,47 @@ func validate(c *Config, mode string) error {
 	default:
 		errs = append(errs, fmt.Sprintf("unknown storage.name: %q (must be %q or %q)", c.Storage.Name, StorageNameS3, StorageNameSFTP))
 	}
-
-	// Validate optional compression
-	if c.Storage.Compression.Algo != "" {
-		if c.Storage.Compression.Algo != RepoCompressorGzip && c.Storage.Compression.Algo != RepoCompressorZstd {
-			errs = append(errs, fmt.Sprintf("unsupported compression algo: %s", c.Storage.Compression.Algo))
-		}
-	}
-
-	// Validate optional encryption
-	if c.Storage.Encryption.Algo != "" {
-		if c.Storage.Encryption.Algo != RepoEncryptorAes256Gcm {
-			errs = append(errs, fmt.Sprintf("unsupported encryption algo: %s", c.Storage.Encryption.Algo))
-		}
-		if c.Storage.Encryption.Pass == "" {
-			errs = append(errs, "storage.encryption.pass is required if encryption is enabled")
-		}
-	}
-
-	if len(errs) > 0 {
-		return errors.New("invalid config:\n  - " + strings.Join(errs, "\n  - "))
-	}
-	return nil
+	return errs
 }
+
+func checkBackupConfig(c *Config, mode string, errs []string) []string {
+	// Backup
+	if mode == ModeBackup {
+		if c.Backup.Cron == "" {
+			errs = append(errs, "backup.cron is required in backup mode")
+		}
+		if c.Backup.Retention.Enable {
+			basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.KeepPeriod)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf(
+					"backup.retention.keep_period cannot parse: %s, %v",
+					c.Backup.Retention.KeepPeriod, err),
+				)
+			} else {
+				c.Backup.Retention.KeepPeriodParsed = basebackupKeepPeriodParsed
+			}
+		}
+	}
+	return errs
+}
+
+func checkLogConfig(c *Config, errs []string) []string {
+	// Validate log (optional)
+	if c.Log.Level != "" {
+		validLevels := map[string]bool{"trace": true, "debug": true, "info": true, "warn": true, "error": true}
+		if !validLevels[strings.ToLower(c.Log.Level)] {
+			errs = append(errs, fmt.Sprintf("log.level must be one of: trace/debug/info/warn/error (got: %s)", c.Log.Level))
+		}
+	}
+	if c.Log.Format != "" {
+		if c.Log.Format != "text" && c.Log.Format != "json" {
+			errs = append(errs, fmt.Sprintf("log.format must be 'text' or 'json' (got: %s)", c.Log.Format))
+		}
+	}
+	return errs
+}
+
+// helpers
 
 func (c *Config) IsExternalStor() bool {
 	return !c.IsLocalStor()

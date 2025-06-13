@@ -9,13 +9,14 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor/swals"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 
 	"github.com/hashmap-kz/pgrwl/config"
 
@@ -83,6 +84,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
+	// Signal channel to indicate that pgrw.Run() has started
+	started := make(chan struct{})
+
 	// main streaming loop
 	wg.Add(1)
 	go func() {
@@ -96,11 +100,18 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 
+		// Signal that we are starting Run()
+		close(started)
+
 		if err := pgrw.Run(ctx); err != nil {
 			loggr.Error("streaming failed", slog.Any("err", err))
 			cancel() // cancel everything on error
 		}
 	}()
+
+	// Wait until pgrw.Run() has started
+	<-started
+	loggr.Info("wal-receiver started")
 
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
@@ -139,16 +150,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				if r := recover(); r != nil {
 					loggr.Error("upload loop panicked",
 						slog.Any("panic", r),
-						slog.String("goroutine", "uploader"),
+						slog.String("goroutine", "wal-supervisor"),
 					)
 				}
 			}()
-			u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
+			u := swals.NewArchiveSupervisor(cfg, stor, &swals.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 				Verbose:          opts.Verbose,
 			})
-			if cfg.Storage.Retention.Enable {
+			if cfg.Receiver.Retention.Enable {
 				u.RunWithRetention(ctx, jobQueue)
 			} else {
 				u.RunUploader(ctx, jobQueue)
@@ -172,7 +183,7 @@ func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 	if cfg.IsLocalStor() {
 		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
 			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
-			cfg.Storage.Retention.Enable
+			cfg.Receiver.Retention.Enable
 		if !hasCfg {
 			l.Info("supervisor loop is skipped",
 				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
