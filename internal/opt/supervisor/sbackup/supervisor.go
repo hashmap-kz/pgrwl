@@ -136,6 +136,7 @@ func (u *BaseBackupSupervisor) retainBackups(ctx context.Context, cfg *config.Co
 				if err != nil {
 					return err
 				}
+				u.log().Info("backup retained", slog.String("path", b))
 			}
 		}
 	}
