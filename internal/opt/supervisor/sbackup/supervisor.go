@@ -44,26 +44,38 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 	return slog.With(slog.String("component", "basebackup-supervisor"))
 }
 
-func (u *BaseBackupSupervisor) Run(_ context.Context, _ *jobq.JobQueue) {
+func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 	c := cron.New(cron.WithSeconds()) // enables support for seconds (optional)
 
 	// example: "0 * * * * *"
 
 	_, err := c.AddFunc(u.cfg.Backup.Cron, func() {
 		u.log().Info("starting scheduled basebackup")
+		// create backup
 		err := basebackup.Run(&basebackup.CmdOpts{Directory: u.opts.Directory})
 		if err != nil {
 			u.log().Error("basebackup failed", slog.Any("err", err))
 		} else {
 			u.log().Info("basebackup completed")
 		}
+		// retain previous
+		if u.cfg.Backup.Retention.Enable {
+			u.log().Info("starting retain backups")
+			if err := u.retainBackups(ctx); err != nil {
+				u.log().Error("basebackup retain failed", slog.Any("err", err))
+			}
+		}
 	})
 	if err != nil {
 		u.log().Error("failed to add cron", slog.Any("err", err))
 		os.Exit(1)
 	}
-
 	c.Start()
+}
 
-	// TODO: retention goroutine
+func (u *BaseBackupSupervisor) retainBackups(_ context.Context) error {
+	if !u.cfg.Backup.Retention.Enable {
+		return nil
+	}
+	return nil
 }
