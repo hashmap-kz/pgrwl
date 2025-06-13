@@ -73,6 +73,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 	c.Start()
 }
 
+//nolint:unparam
 func (u *BaseBackupSupervisor) retainBackups(_ context.Context) error {
 	if !u.cfg.Backup.Retention.Enable {
 		return nil
