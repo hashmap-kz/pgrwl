@@ -57,7 +57,13 @@ integration with Kubernetes environments.
 
 - Install as a single binary. Debug with your favorite editor and a local PostgreSQL container ([local-dev-infra](test/integration/environ/)).
 
-![Architecture Diagram](https://github.com/hashmap-kz/assets/blob/main/pgrwl/loop-v1.png)
+**`pgrwl` running in `receive` mode**
+
+![Receive Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/loop-v1.png)
+
+**`pgrwl` running in `serve` mode**
+
+![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/serve-mode.png)
 
 ---
 
