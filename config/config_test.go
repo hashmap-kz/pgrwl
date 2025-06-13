@@ -95,6 +95,15 @@ func TestValidate_Config(t *testing.T) {
 				},
 				Receiver: ReceiveConfig{
 					Slot: "slot1",
+					Uploader: UploadConfig{
+						SyncInterval:   "10s",
+						MaxConcurrency: 2,
+					},
+					Retention: RetentionConfig{
+						Enable:       true,
+						SyncInterval: "12h",
+						KeepPeriod:   "24h",
+					},
 				},
 				Storage: StorageConfig{
 					Name: StorageNameS3,
@@ -104,15 +113,6 @@ func TestValidate_Config(t *testing.T) {
 						SecretAccessKey: "secret",
 						Bucket:          "bucket",
 						Region:          "us-east-1",
-					},
-					Uploader: UploadConfig{
-						SyncInterval:   "10s",
-						MaxConcurrency: 2,
-					},
-					Retention: RetentionConfig{
-						Enable:       true,
-						SyncInterval: "12h",
-						KeepPeriod:   "24h",
 					},
 				},
 			},
@@ -139,16 +139,8 @@ func TestValidate_Config(t *testing.T) {
 					ListenPort: 1,
 					Directory:  "/pgwal",
 				},
-				Receiver: ReceiveConfig{Slot: "slot"},
-				Storage: StorageConfig{
-					Name: StorageNameS3,
-					S3: S3Config{
-						URL:             "x",
-						AccessKeyID:     "x",
-						SecretAccessKey: "x",
-						Bucket:          "x",
-						Region:          "x",
-					},
+				Receiver: ReceiveConfig{
+					Slot: "slot",
 					Uploader: UploadConfig{
 						SyncInterval:   "bad",
 						MaxConcurrency: 0,
@@ -157,6 +149,16 @@ func TestValidate_Config(t *testing.T) {
 						Enable:       true,
 						SyncInterval: "nope",
 						KeepPeriod:   "never",
+					},
+				},
+				Storage: StorageConfig{
+					Name: StorageNameS3,
+					S3: S3Config{
+						URL:             "x",
+						AccessKeyID:     "x",
+						SecretAccessKey: "x",
+						Bucket:          "x",
+						Region:          "x",
 					},
 				},
 			},
@@ -176,7 +178,13 @@ func TestValidate_Config(t *testing.T) {
 					ListenPort: 1234,
 					Directory:  "/data",
 				},
-				Receiver: ReceiveConfig{Slot: "slot"},
+				Receiver: ReceiveConfig{
+					Slot: "slot",
+					Uploader: UploadConfig{
+						SyncInterval:   "10s",
+						MaxConcurrency: 1,
+					},
+				},
 				Storage: StorageConfig{
 					Name: StorageNameSFTP,
 					SFTP: SFTPConfig{
@@ -184,10 +192,6 @@ func TestValidate_Config(t *testing.T) {
 						Port: 22,
 						User: "user",
 						// Missing Pass and PKeyPath
-					},
-					Uploader: UploadConfig{
-						SyncInterval:   "10s",
-						MaxConcurrency: 1,
 					},
 				},
 			},
@@ -208,7 +212,7 @@ func TestValidate_Config(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, 10*time.Second, tt.cfg.Storage.Uploader.SyncIntervalParsed)
+				assert.Equal(t, 10*time.Second, tt.cfg.Receiver.Uploader.SyncIntervalParsed)
 			}
 		})
 	}
@@ -222,17 +226,17 @@ func TestValidate_SuccessMinimalReceiveConfig(t *testing.T) {
 		},
 		Receiver: ReceiveConfig{
 			Slot: "replication_slot",
-		},
-		Storage: StorageConfig{
-			Name: "s3",
 			Uploader: UploadConfig{
 				SyncInterval:   "10s",
 				MaxConcurrency: 1,
 			},
 		},
+		Storage: StorageConfig{
+			Name: "s3",
+		},
 	}
 
 	err := validate(cfg, ModeReceive)
 	assert.Error(t, err)
-	assert.Equal(t, 10*time.Second, cfg.Storage.Uploader.SyncIntervalParsed)
+	assert.Equal(t, 10*time.Second, cfg.Receiver.Uploader.SyncIntervalParsed)
 }
