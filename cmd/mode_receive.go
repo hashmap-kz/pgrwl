@@ -84,6 +84,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
+	// Signal channel to indicate that pgrw.Run() has started
+	started := make(chan struct{})
+
 	// main streaming loop
 	wg.Add(1)
 	go func() {
@@ -97,11 +100,18 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 
+		// Signal that we are starting Run()
+		close(started)
+
 		if err := pgrw.Run(ctx); err != nil {
 			loggr.Error("streaming failed", slog.Any("err", err))
 			cancel() // cancel everything on error
 		}
 	}()
+
+	// Wait until pgrw.Run() has started
+	<-started
+	loggr.Info("wal-receiver started")
 
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
