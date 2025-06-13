@@ -11,10 +11,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 )
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {

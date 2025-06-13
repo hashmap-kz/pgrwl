@@ -8,9 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
+
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/opt/basebackup"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 

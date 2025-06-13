@@ -13,6 +13,12 @@ receiver:
   #  sync_interval: 10s
   #  keep_period: "30s"
 
+backup:
+  cron: "0 * * * * *"
+  retention:
+    enable: true
+    keep_period: "48h"
+
 dev_config:
   pprof:
     enable: true

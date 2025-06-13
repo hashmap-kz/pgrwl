@@ -9,13 +9,14 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor/swals"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 
 	"github.com/hashmap-kz/pgrwl/config"
 
@@ -139,11 +140,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				if r := recover(); r != nil {
 					loggr.Error("upload loop panicked",
 						slog.Any("panic", r),
-						slog.String("goroutine", "uploader"),
+						slog.String("goroutine", "wal-supervisor"),
 					)
 				}
 			}()
-			u := supervisor.NewArchiveSupervisor(cfg, stor, &supervisor.ArchiveSupervisorOpts{
+			u := swals.NewArchiveSupervisor(cfg, stor, &swals.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 				Verbose:          opts.Verbose,
