@@ -132,7 +132,7 @@ func (u *BaseBackupSupervisor) retainBackups(ctx context.Context, cfg *config.Co
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
 			if filepath.Base(b) == filepath.Base(toDelete) {
-				err := stor.DeleteAll(ctx, b)
+				err := stor.DeleteAll(ctx, b+"/")
 				if err != nil {
 					return err
 				}
