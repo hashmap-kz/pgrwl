@@ -136,7 +136,8 @@ backup:
   cron: "0 0 0 */3 * *"
   retention:
     enable: true
-    keep_period: "96h"
+    type: time
+    value: "96h"
 log:
   level: trace
   format: text
@@ -172,48 +173,49 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
-```yaml
-main: # Required for both modes: receive/serve
+```
+main:                                    # Required for both modes: receive/serve
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
 
-receiver: # Required for 'receive' mode
+receiver:                                # Required for 'receive' mode
   slot: replication_slot                 # Replication slot to use
   no_loop: false                         # If true, do not loop on connection loss
-  uploader: # Required for non-local storage type
+  uploader:                              # Required for non-local storage type
     sync_interval: 10s                   # Interval for the upload worker to check for new files
     max_concurrency: 4                   # Maximum number of files to upload concurrently
-  retention: # Optional
+  retention:                             # Optional
     enable: true                         # Perform retention rules
     sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
     keep_period: "1m"                    # Remove WAL files older than given period
 
-backup: # Required for 'backup' mode
-  cron: ""                               # Basebackup cron schedule
-  retention: # Optional
+backup:                                  # Required for 'backup' mode
+  cron: "0 0 0 */3 * *"                  # Basebackup cron schedule
+  retention:                             # Optional
     enable: true                         # Perform retention rules
-    keep_period: "48h"                   # Remove backups older than given period
+    type: time                           # One of: (time / count)
+    value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
 
-log: # Optional
-  level: info                            # One of: trace / debug / info / warn / error
-  format: text                           # One of: text / json
+log:                                     # Optional
+  level: info                            # One of: (trace / debug / info / warn / error)
+  format: text                           # One of: (text / json)
   add_source: true                       # Include file:line in log messages (for local development)
 
 metrics:
   enable: true                           # Optional (used in receive mode: http://host:port/metrics)
 
-dev_config: # Optional (various dev options)
+dev_config:                              # Optional (various dev options)
   pprof:
     enable: true
 
-storage: # Optional
-  name: s3                               # One of: s3 / sftp
-  compression: # Optional
-    algo: gzip                           # One of: gzip / zstd
-  encryption: # Optional
-    algo: aesgcm                         # One of: aes-256-gcm
+storage:                                 # Optional
+  name: s3                               # One of: (s3 / sftp)
+  compression:                           # Optional
+    algo: gzip                           # One of: (gzip / zstd)
+  encryption:                            # Optional
+    algo: aes-256-gcm                    # One of: (aes-256-gcm)
     pass: "${PGRWL_ENCRYPT_PASSWD}"      # Encryption password (from env)
-  sftp: # Required section for 'sftp' storage
+  sftp:                                  # Required section for 'sftp' storage
     host: sftp.example.com               # SFTP server hostname
     port: 22                             # SFTP server port
     user: backupuser                     # SFTP username
@@ -221,7 +223,7 @@ storage: # Optional
     pkey_path: "/home/user/.ssh/id_rsa"  # Path to SSH private key (optional)
     pkey_pass: "${PGRWL_SSH_PKEY_PASS}"  # Required if the private key is password-protected
     base_dir: "/mnt/wal-archive"         # Base directory with sufficient user permissions
-  s3: # Required section for 's3' storage
+  s3:                                    # Required section for 's3' storage
     url: https://s3.example.com          # S3-compatible endpoint URL
     access_key_id: AKIAEXAMPLE           # AWS access key ID
     secret_access_key: "${PGRWL_AWS_SK}" # AWS secret access key (from env)

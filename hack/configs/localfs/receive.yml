@@ -17,7 +17,8 @@ backup:
   cron: "0 * * * * *"
   retention:
     enable: true
-    keep_period: "48h"
+    type: time
+    value: "48h"
 
 dev_config:
   pprof:

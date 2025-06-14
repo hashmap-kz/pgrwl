@@ -45,7 +45,8 @@ data:
       cron: "0 * * * * *"
       retention:
         enable: true
-        keep_period: "5m"
+        type: time
+        value: "5m"
     log:
       level: trace
       format: text
@@ -77,7 +78,8 @@ data:
       cron: "0 * * * * *"
       retention:
         enable: true
-        keep_period: "5m"
+        type: time
+        value: "5m"
     log:
       level: trace
       format: text

@@ -64,9 +64,9 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 			u.log().Info("basebackup completed")
 		}
 		// retain previous
-		if u.cfg.Backup.Retention.Enable {
-			u.log().Info("starting retain backups")
-			if err := u.retainBackups(ctx, u.cfg); err != nil {
+		if u.cfg.Backup.Retention.Enable && u.cfg.Backup.Retention.Type == config.BackupRetentionTypeTime {
+			u.log().Info("starting retain backups (time-based)")
+			if err := u.retainBackupsTimeBased(ctx, u.cfg); err != nil {
 				u.log().Error("basebackup retain failed", slog.Any("err", err))
 			}
 		}
@@ -78,7 +78,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 	c.Start()
 }
 
-func (u *BaseBackupSupervisor) retainBackups(ctx context.Context, cfg *config.Config) error {
+func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *config.Config) error {
 	if !u.cfg.Backup.Retention.Enable {
 		return nil
 	}
@@ -114,7 +114,7 @@ func (u *BaseBackupSupervisor) retainBackups(ctx context.Context, cfg *config.Co
 	for k := range backupTs {
 		backupsList = append(backupsList, filepath.Base(k))
 	}
-	backupsToDelete := filterBackupsToDelete(backupsList, cfg.Backup.Retention.KeepPeriodParsed, time.Now())
+	backupsToDelete := filterBackupsToDelete(backupsList, cfg.Backup.Retention.KeepDurationParsed, time.Now())
 	if len(backupsToDelete) == 0 {
 		return nil
 	}

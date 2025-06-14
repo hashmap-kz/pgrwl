@@ -15,14 +15,15 @@ receiver:                                # Required for 'receive' mode
     keep_period: "1m"                    # Remove WAL files older than given period
 
 backup:                                  # Required for 'backup' mode
-  cron: ""                               # Basebackup cron schedule
+  cron: "0 0 0 */3 * *"                  # Basebackup cron schedule
   retention:                             # Optional
     enable: true                         # Perform retention rules
-    keep_period: "48h"                   # Remove backups older than given period
+    type: time                           # One of: (time / count)
+    value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
 
 log:                                     # Optional
-  level: info                            # One of: trace / debug / info / warn / error
-  format: text                           # One of: text / json
+  level: info                            # One of: (trace / debug / info / warn / error)
+  format: text                           # One of: (text / json)
   add_source: true                       # Include file:line in log messages (for local development)
 
 metrics:
@@ -33,11 +34,11 @@ dev_config:                              # Optional (various dev options)
     enable: true
 
 storage:                                 # Optional
-  name: s3                               # One of: s3 / sftp
+  name: s3                               # One of: (s3 / sftp)
   compression:                           # Optional
-    algo: gzip                           # One of: gzip / zstd
+    algo: gzip                           # One of: (gzip / zstd)
   encryption:                            # Optional
-    algo: aesgcm                         # One of: aes-256-gcm
+    algo: aes-256-gcm                    # One of: (aes-256-gcm)
     pass: "${PGRWL_ENCRYPT_PASSWD}"      # Encryption password (from env)
   sftp:                                  # Required section for 'sftp' storage
     host: sftp.example.com               # SFTP server hostname

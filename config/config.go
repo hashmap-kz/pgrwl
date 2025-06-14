@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,6 +55,9 @@ const (
 
 	// RepoCompressorZstd is the Zstandard compression algorithm identifier.
 	RepoCompressorZstd = "zstd"
+
+	BackupRetentionTypeTime  = "time"
+	BackupRetentionTypeCount = "count"
 )
 
 var (
@@ -116,9 +120,11 @@ type BackupRetentionConfig struct {
 	// Enable determines whether retention logic is active.
 	Enable bool `json:"enable,omitempty"`
 
-	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
-	KeepPeriod       string        `json:"keep_period,omitempty"`
-	KeepPeriodParsed time.Duration `json:"-"`
+	Type  string `json:"type,omitempty"`
+	Value string `json:"value,omitempty"`
+
+	KeepDurationParsed time.Duration `json:"-"`
+	KeepCountParsed    int64         `json:"-"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.
@@ -503,14 +509,36 @@ func checkBackupConfig(c *Config, mode string, errs []string) []string {
 			errs = append(errs, "backup.cron is required in backup mode")
 		}
 		if c.Backup.Retention.Enable {
-			basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.KeepPeriod)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf(
-					"backup.retention.keep_period cannot parse: %s, %v",
-					c.Backup.Retention.KeepPeriod, err),
-				)
+			if c.Backup.Retention.Type == BackupRetentionTypeTime || c.Backup.Retention.Type == BackupRetentionTypeCount {
+
+				// time-based retention
+				if c.Backup.Retention.Type == BackupRetentionTypeTime {
+					basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.Value)
+					if err != nil {
+						errs = append(errs, fmt.Sprintf(
+							"backup.retention.value cannot parse duration: %s, %v",
+							c.Backup.Retention.Value, err),
+						)
+					} else {
+						c.Backup.Retention.KeepDurationParsed = basebackupKeepPeriodParsed
+					}
+				}
+
+				// count-based retention
+				if c.Backup.Retention.Type == BackupRetentionTypeCount {
+					backupCountParsed, err := strconv.ParseInt(c.Backup.Retention.Value, 10, 32)
+					if err != nil || backupCountParsed <= 0 {
+						errs = append(errs, fmt.Sprintf(
+							"backup.retention.value cannot parse count: %s, %v",
+							c.Backup.Retention.Value, err),
+						)
+					} else {
+						c.Backup.Retention.KeepCountParsed = backupCountParsed
+					}
+				}
+
 			} else {
-				c.Backup.Retention.KeepPeriodParsed = basebackupKeepPeriodParsed
+				errs = append(errs, "backup.retention.type: must be one of: time/count (got: %q)", c.Backup.Retention.Type)
 			}
 		}
 	}
