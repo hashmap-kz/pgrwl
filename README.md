@@ -43,6 +43,7 @@ integration with Kubernetes environments.
     - [Why Not archive_command `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
 - [License](#license)
+
 ---
 
 ## About
@@ -55,7 +56,8 @@ integration with Kubernetes environments.
 - The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
   streaming into partial files, extensive error checking and more.
 
-- Install as a single binary. Debug with your favorite editor and a local PostgreSQL container ([local-dev-infra](test/integration/environ/)).
+- Install as a single binary. Debug with your favorite editor and a local PostgreSQL
+  container ([local-dev-infra](test/integration/environ/)).
 
 **`pgrwl` running in `receive` mode**
 
@@ -98,7 +100,7 @@ export PGUSER=postgres
 export PGPASSWORD=postgres
 export PGRWL_MODE=receive
 
-pgrwl -c config.yml
+pgrwl start -c config.yml
 ```
 
 ### Serve Mode
@@ -118,28 +120,23 @@ EOF
 
 export PGRWL_MODE=serve
 
-pgrwl -c config.yml
+pgrwl start -c config.yml
 ```
 
-### Restore Command
+### Backup Mode
 
-`restore_command` example for postgresql.conf:
-
-```ini
-# where 'k8s-worker5:30266' represents the host and port
-# of a 'pgrwl' instance running in 'serve' mode.
-restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
-```
-
-### Base Backup Command
-
-Streaming base backup to the configured storage:
+`Backup` mode performs a full base backup of your PostgreSQL cluster on a configured schedule. 
 
 ```bash
 cat <<EOF >config.yml
 main:
   listen_port: 7070
   directory: wals
+backup:
+  cron: "0 0 0 */3 * *"
+  retention:
+    enable: true
+    keep_period: "96h"
 log:
   level: trace
   format: text
@@ -150,8 +147,20 @@ export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
+export PGRWL_MODE=backup
 
-pgrwl backup -c config.yml
+pgrwl start -c config.yml
+```
+
+
+### Restore Command
+
+`restore_command` example for postgresql.conf:
+
+```ini
+# where 'k8s-worker5:30266' represents the host and port
+# of a 'pgrwl' instance running in 'serve' mode.
+restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 ```
 
 ---
@@ -164,28 +173,28 @@ The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
 ```yaml
-main:                                    # Required for both modes: receive/serve
+main: # Required for both modes: receive/serve
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
 
-receiver:                                # Required for 'receive' mode
+receiver: # Required for 'receive' mode
   slot: replication_slot                 # Replication slot to use
   no_loop: false                         # If true, do not loop on connection loss
-  uploader:                              # Required for non-local storage type
+  uploader: # Required for non-local storage type
     sync_interval: 10s                   # Interval for the upload worker to check for new files
     max_concurrency: 4                   # Maximum number of files to upload concurrently
-  retention:                             # Optional
+  retention: # Optional
     enable: true                         # Perform retention rules
     sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
     keep_period: "1m"                    # Remove WAL files older than given period
 
-backup:                                  # Required for 'backup' mode
+backup: # Required for 'backup' mode
   cron: ""                               # Basebackup cron schedule
-  retention:                             # Optional
+  retention: # Optional
     enable: true                         # Perform retention rules
     keep_period: "48h"                   # Remove backups older than given period
 
-log:                                     # Optional
+log: # Optional
   level: info                            # One of: trace / debug / info / warn / error
   format: text                           # One of: text / json
   add_source: true                       # Include file:line in log messages (for local development)
@@ -193,18 +202,18 @@ log:                                     # Optional
 metrics:
   enable: true                           # Optional (used in receive mode: http://host:port/metrics)
 
-dev_config:                              # Optional (various dev options)
+dev_config: # Optional (various dev options)
   pprof:
     enable: true
 
-storage:                                 # Optional
+storage: # Optional
   name: s3                               # One of: s3 / sftp
-  compression:                           # Optional
+  compression: # Optional
     algo: gzip                           # One of: gzip / zstd
-  encryption:                            # Optional
+  encryption: # Optional
     algo: aesgcm                         # One of: aes-256-gcm
     pass: "${PGRWL_ENCRYPT_PASSWD}"      # Encryption password (from env)
-  sftp:                                  # Required section for 'sftp' storage
+  sftp: # Required section for 'sftp' storage
     host: sftp.example.com               # SFTP server hostname
     port: 22                             # SFTP server port
     user: backupuser                     # SFTP username
@@ -212,7 +221,7 @@ storage:                                 # Optional
     pkey_path: "/home/user/.ssh/id_rsa"  # Path to SSH private key (optional)
     pkey_pass: "${PGRWL_SSH_PKEY_PASS}"  # Required if the private key is password-protected
     base_dir: "/mnt/wal-archive"         # Base directory with sufficient user permissions
-  s3:                                    # Required section for 's3' storage
+  s3: # Required section for 's3' storage
     url: https://s3.example.com          # S3-compatible endpoint URL
     access_key_id: AKIAEXAMPLE           # AWS access key ID
     secret_access_key: "${PGRWL_AWS_SK}" # AWS secret access key (from env)
@@ -282,11 +291,24 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
-- You have a cron job that performs a **base backup** of your cluster every three days.
-- You run `pgrwl` as a systemd unit or a Kubernetes pod (depending on your infrastructure).
-- You have a configured retention worker that prunes WAL files older than three days.
-- With this setup, you're able to restore your cluster - in the event of a crash - to any second within the past three
-  days.
+- A typical production setup runs **two `pgrwl` StatefulSets** in the cluster:  
+  one in `receive` mode for **continuous WAL streaming**, and another in `backup` mode for scheduled **base backups**.
+
+- In `receive` mode, `pgrwl` continuously **streams WAL files**, applies optional **compression** and **encryption**,
+  uploads them to **remote storage** (such as S3 or SFTP), and enforces **retention policies** - for example, keeping
+  WAL files for **four days**.
+
+- In `backup` mode, it performs a **full base backup** of your PostgreSQL cluster on a configured schedule -  
+  for instance, **once every three days** - using **streaming basebackup**, with optional **compression**
+  and **encryption**. The resulting backup is also uploaded to the configured **remote storage**,
+  and subject to **retention policies** for cleanup. The built-in cron scheduler enables fully automated backups without
+  requiring external orchestration.
+
+- During recovery, the same `receive` StatefulSet can be reconfigured to run in `serve` mode,  
+  exposing previously archived WALs via HTTP to support **Point-in-Time Recovery (PITR)** through `restore_command`.
+
+- With this setup, you're able to restore your cluster - in the event of a crash -
+  to **any second within the past three days**, using the most recent base backup and available WAL segments.
 
 ---
 
