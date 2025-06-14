@@ -3,19 +3,12 @@ main:
   listen_port: 7070
   directory: wals
 
-receiver:
-  slot: pgrwl_v5
-  #uploader:
-  #  sync_interval: 10s
-  #  max_concurrency: 4
-  #retention:
-  #  enable: true
-  #  sync_interval: 10s
-  #  keep_period: "30s"
-
-dev_config:
-  pprof:
+backup:
+  cron: "0 * * * * *"
+  retention:
     enable: true
+    type: time
+    value: "2m"
 
 log:
   level: trace

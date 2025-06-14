@@ -64,10 +64,18 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 			u.log().Info("basebackup completed")
 		}
 		// retain previous
-		if u.cfg.Backup.Retention.Enable && u.cfg.Backup.Retention.Type == config.BackupRetentionTypeTime {
-			u.log().Info("starting retain backups (time-based)")
-			if err := u.retainBackupsTimeBased(ctx, u.cfg); err != nil {
-				u.log().Error("basebackup retain failed", slog.Any("err", err))
+		if u.cfg.Backup.Retention.Enable {
+			if u.cfg.Backup.Retention.Type == config.BackupRetentionTypeTime {
+				u.log().Info("starting retain backups (time-based)")
+				if err := u.retainBackupsTimeBased(ctx, u.cfg); err != nil {
+					u.log().Error("basebackup retain failed", slog.Any("err", err))
+				}
+			}
+			if u.cfg.Backup.Retention.Type == config.BackupRetentionTypeCount {
+				u.log().Info("starting retain backups (count-based)")
+				if err := u.retainBackupsCountBased(ctx, u.cfg); err != nil {
+					u.log().Error("basebackup retain failed", slog.Any("err", err))
+				}
 			}
 		}
 	})
@@ -114,7 +122,73 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 	for k := range backupTs {
 		backupsList = append(backupsList, filepath.Base(k))
 	}
-	backupsToDelete := filterBackupsToDelete(backupsList, cfg.Backup.Retention.KeepDurationParsed, time.Now())
+	backupsToDelete := filterBackupsToDeleteTimeBased(backupsList, cfg.Backup.Retention.KeepDurationParsed, time.Now())
+	if len(backupsToDelete) == 0 {
+		return nil
+	}
+
+	// list backups to delete
+	if u.verbose {
+		for _, k := range backupsToDelete {
+			u.log().LogAttrs(ctx, logger.LevelTrace, "backups to delete",
+				slog.String("path", k),
+			)
+		}
+	}
+
+	// purge
+	for b := range backupTs {
+		for _, toDelete := range backupsToDelete {
+			if filepath.Base(b) == filepath.Base(toDelete) {
+				err := stor.DeleteAll(ctx, b+"/")
+				if err != nil {
+					return err
+				}
+				u.log().Info("backup retained", slog.String("path", b))
+			}
+		}
+	}
+
+	return nil
+}
+
+func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg *config.Config) error {
+	if !u.cfg.Backup.Retention.Enable {
+		return nil
+	}
+	// setup storage
+	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+		BaseDir: filepath.ToSlash(cfg.Main.Directory),
+		SubPath: config.BaseBackupSubpath,
+	})
+	if err != nil {
+		return err
+	}
+
+	// get all backups available
+	backupTs, err := stor.ListTopLevelDirs(ctx, "")
+	if err != nil {
+		return err
+	}
+	if len(backupTs) == 0 {
+		return nil
+	}
+
+	// list backups in storage
+	if u.verbose {
+		for k := range backupTs {
+			u.log().LogAttrs(ctx, logger.LevelTrace, "backups in storage",
+				slog.String("path", k),
+			)
+		}
+	}
+
+	// decide which may be pruned
+	backupsList := []string{}
+	for k := range backupTs {
+		backupsList = append(backupsList, filepath.Base(k))
+	}
+	backupsToDelete := filterBackupsToDeleteCountBased(backupsList, int(cfg.Backup.Retention.KeepCountParsed))
 	if len(backupsToDelete) == 0 {
 		return nil
 	}

@@ -510,7 +510,6 @@ func checkBackupConfig(c *Config, mode string, errs []string) []string {
 		}
 		if c.Backup.Retention.Enable {
 			if c.Backup.Retention.Type == BackupRetentionTypeTime || c.Backup.Retention.Type == BackupRetentionTypeCount {
-
 				// time-based retention
 				if c.Backup.Retention.Type == BackupRetentionTypeTime {
 					basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.Value)
@@ -536,7 +535,6 @@ func checkBackupConfig(c *Config, mode string, errs []string) []string {
 						c.Backup.Retention.KeepCountParsed = backupCountParsed
 					}
 				}
-
 			} else {
 				errs = append(errs, "backup.retention.type: must be one of: time/count (got: %q)", c.Backup.Retention.Type)
 			}
