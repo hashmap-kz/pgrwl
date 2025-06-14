@@ -1,4 +1,4 @@
-package basebackup
+package backup
 
 import (
 	"bytes"

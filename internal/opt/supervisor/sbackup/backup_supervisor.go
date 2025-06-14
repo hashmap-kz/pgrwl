@@ -7,12 +7,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/basebackup"
+	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backup"
 
 	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	"github.com/robfig/cron/v3"
 )
@@ -57,7 +56,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 	_, err := c.AddFunc(u.cfg.Backup.Cron, func() {
 		u.log().Info("starting scheduled basebackup")
 		// create backup
-		err := basebackup.CreateBaseBackup(&basebackup.CreateBaseBackupOpts{Directory: u.opts.Directory})
+		err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: u.opts.Directory})
 		if err != nil {
 			u.log().Error("basebackup failed", slog.Any("err", err))
 		} else {
@@ -91,7 +90,7 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 		return nil
 	}
 	// setup storage
-	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
 		SubPath: config.BaseBackupSubpath,
 	})
@@ -157,7 +156,7 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 		return nil
 	}
 	// setup storage
-	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
 		SubPath: config.BaseBackupSubpath,
 	})

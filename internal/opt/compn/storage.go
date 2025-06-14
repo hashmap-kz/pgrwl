@@ -1,4 +1,4 @@
-package supervisor
+package compn
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ type StorageManifest struct {
 
 type SetupStorageOpts struct {
 	BaseDir string
-	SubPath string // for lacalfs storage, or basebackups
+	SubPath string // for localfs storage, or basebackups
 }
 
 func SetupStorage(opts *SetupStorageOpts) (*st.TransformingStorage, error) {

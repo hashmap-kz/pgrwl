@@ -1,4 +1,4 @@
-package basebackup
+package backup
 
 import (
 	"archive/tar"
@@ -10,9 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
+
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
 )
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
@@ -34,7 +35,7 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// setup storage
-	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
 		SubPath: config.BaseBackupSubpath,
 	})

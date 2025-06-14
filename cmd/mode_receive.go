@@ -9,7 +9,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
+	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
+	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor/swals"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
@@ -21,7 +23,6 @@ import (
 	"github.com/hashmap-kz/pgrwl/config"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
 type ReceiveModeOpts struct {
@@ -69,14 +70,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	var stor *st.TransformingStorage
 	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
 	if needSupervisorLoop {
-		stor, err = supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+		stor, err = compn.SetupStorage(&compn.SetupStorageOpts{
 			BaseDir: opts.ReceiveDirectory,
 			SubPath: config.LocalFSStorageSubpath,
 		})
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := supervisor.CheckManifest(cfg); err != nil {
+		if err := compn.CheckManifest(cfg); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -127,15 +128,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 
-		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
-			PGRW:        pgrw,
-			BaseDir:     opts.ReceiveDirectory,
-			Verbose:     opts.Verbose,
-			RunningMode: config.ModeReceive,
-			Storage:     stor,
-			JobQueue:    jobQueue,
+		handlers := receiveAPI.Init(&receiveAPI.Opts{
+			PGRW:     pgrw,
+			BaseDir:  opts.ReceiveDirectory,
+			Verbose:  opts.Verbose,
+			Storage:  stor,
+			JobQueue: jobQueue,
 		})
-		srv := httpsrv.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := compn.NewHTTPSrv(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}

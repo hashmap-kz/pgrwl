@@ -8,10 +8,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
+	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
+	serveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
 type ServeModeOpts struct {
@@ -30,7 +30,7 @@ func RunServeMode(opts *ServeModeOpts) {
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	stor, err := supervisor.SetupStorage(&supervisor.SetupStorageOpts{
+	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
 		BaseDir: opts.Directory,
 		SubPath: config.LocalFSStorageSubpath,
 	})
@@ -38,7 +38,7 @@ func RunServeMode(opts *ServeModeOpts) {
 		//nolint:gocritic
 		log.Fatal(err)
 	}
-	if err := supervisor.CheckManifest(cfg); err != nil {
+	if err := compn.CheckManifest(cfg); err != nil {
 		log.Fatal(err)
 	}
 
@@ -59,13 +59,12 @@ func RunServeMode(opts *ServeModeOpts) {
 			}
 		}()
 
-		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
-			BaseDir:     opts.Directory,
-			Verbose:     opts.Verbose,
-			RunningMode: config.ModeServe,
-			Storage:     stor,
+		handlers := serveAPI.Init(&serveAPI.Opts{
+			BaseDir: opts.Directory,
+			Verbose: opts.Verbose,
+			Storage: stor,
 		})
-		srv := httpsrv.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := compn.NewHTTPSrv(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Info("http server failed", slog.Any("err", err))
 			cancel()
