@@ -26,12 +26,12 @@ log:                                     # Optional
   format: text                           # One of: (text / json)
   add_source: true                       # Include file:line in log messages (for local development)
 
-metrics:
+metrics:                                 # Optional
   enable: true                           # Optional (used in receive mode: http://host:port/metrics)
 
 dev_config:                              # Optional (various dev options)
-  pprof:
-    enable: true
+  pprof:                                 # pprof settings
+    enable: true                         # Enable pprof handlers
 
 storage:                                 # Optional
   name: s3                               # One of: (s3 / sftp)

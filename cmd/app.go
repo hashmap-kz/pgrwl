@@ -8,11 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
+
 	"github.com/hashmap-kz/pgrwl/internal/version"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 	"github.com/urfave/cli/v3"
 )
 
@@ -130,7 +131,7 @@ func App() *cli.Command {
 				Name:  "restore-command",
 				Usage: "Fetch a single WAL file by name",
 
-				Description: optutils.HeredocTrim(`
+				Description: strx.HeredocTrim(`
 				Implements PostgreSQL restore_command.
 
 				Example usage in postgresql.conf:

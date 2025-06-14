@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/cmdx"
 )
 
 type RestoreCommandOpts struct {
@@ -20,7 +20,7 @@ func ExecRestoreCommand(walFileName, walFilePath string, opts *RestoreCommandOpt
 		slog.String("p", walFilePath),
 	)
 
-	addr, err := optutils.Addr(opts.Addr)
+	addr, err := cmdx.Addr(opts.Addr)
 	if err != nil {
 		return err
 	}
