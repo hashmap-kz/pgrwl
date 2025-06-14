@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 	"github.com/jackc/pglogrepl"
@@ -195,7 +195,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 					bb.log().Info("progress",
 						slog.String("file", remotePath),
 						slog.Int64("bytes streamed", bytesDone),
-						slog.String("bytes streamed IEC", optutils.ByteCountIEC(bytesDone)),
+						slog.String("bytes streamed IEC", fsx.ByteCountIEC(bytesDone)),
 					)
 				}
 

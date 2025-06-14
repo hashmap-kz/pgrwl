@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 )
 
 func (u *ArchiveSupervisor) performUploads(ctx context.Context) error {
@@ -41,7 +41,7 @@ func (u *ArchiveSupervisor) filterFilesToUpload(files []os.DirEntry) []uploadBun
 			continue
 		}
 		walFilePath := filepath.ToSlash(filepath.Join(u.opts.ReceiveDirectory, name))
-		if !optutils.FileExists(walFilePath) {
+		if !fsx.FileExists(walFilePath) {
 			continue
 		}
 		r = append(r, uploadBundle{

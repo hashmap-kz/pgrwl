@@ -8,10 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
+
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 )
 
 type ServeModeService interface {
@@ -64,11 +65,11 @@ func (s *serveModeSvc) GetWalFile(ctx context.Context, filename string) (io.Read
 	partialFilePath := filePath + xlog.PartialSuffix
 
 	s.log().Debug("wal-restore, fetching local file", slog.String("path", filePath))
-	if optutils.FileExists(filePath) {
+	if fsx.FileExists(filePath) {
 		s.log().Debug("wal-restore, found local file", slog.String("path", filePath))
 		return os.Open(filePath)
 	}
-	if optutils.FileExists(partialFilePath) {
+	if fsx.FileExists(partialFilePath) {
 		s.log().Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
 		return os.Open(partialFilePath)
 	}

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
 	serveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
 )
@@ -30,7 +30,7 @@ func RunServeMode(opts *ServeModeOpts) {
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
 		BaseDir: opts.Directory,
 		SubPath: config.LocalFSStorageSubpath,
 	})
@@ -38,7 +38,7 @@ func RunServeMode(opts *ServeModeOpts) {
 		//nolint:gocritic
 		log.Fatal(err)
 	}
-	if err := compn.CheckManifest(cfg); err != nil {
+	if err := shared.CheckManifest(cfg); err != nil {
 		log.Fatal(err)
 	}
 
@@ -64,7 +64,7 @@ func RunServeMode(opts *ServeModeOpts) {
 			Verbose: opts.Verbose,
 			Storage: stor,
 		})
-		srv := compn.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Info("http server failed", slog.Any("err", err))
 			cancel()

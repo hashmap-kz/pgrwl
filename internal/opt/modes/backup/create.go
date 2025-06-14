@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -30,7 +30,7 @@ func CreateBaseBackup(opts *CreateBaseBackupOpts) error {
 	loggr := slog.With(slog.String("component", "basebackup"), slog.String("id", ts))
 
 	// setup storage
-	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
 		BaseDir: opts.Directory,
 		SubPath: filepath.ToSlash(filepath.Join(config.BaseBackupSubpath, ts)),
 	})

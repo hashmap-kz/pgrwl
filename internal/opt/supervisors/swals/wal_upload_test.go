@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	stormock "github.com/hashmap-kz/pgrwl/internal/opt/supervisor/mock"
+	stormock "github.com/hashmap-kz/pgrwl/internal/opt/supervisors/mock"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"

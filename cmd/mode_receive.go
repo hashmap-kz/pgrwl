@@ -9,10 +9,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
 	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor/swals"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/swals"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
@@ -70,14 +70,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	var stor *st.TransformingStorage
 	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
 	if needSupervisorLoop {
-		stor, err = compn.SetupStorage(&compn.SetupStorageOpts{
+		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
 			BaseDir: opts.ReceiveDirectory,
 			SubPath: config.LocalFSStorageSubpath,
 		})
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := compn.CheckManifest(cfg); err != nil {
+		if err := shared.CheckManifest(cfg); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -135,7 +135,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			Storage:  stor,
 			JobQueue: jobQueue,
 		})
-		srv := compn.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}

@@ -11,7 +11,7 @@ import (
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor/sbackup"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/sbackup"
 )
 
 type BackupModeOpts struct {

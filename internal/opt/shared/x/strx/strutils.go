@@ -1,4 +1,4 @@
-package optutils
+package strx
 
 import (
 	"bufio"

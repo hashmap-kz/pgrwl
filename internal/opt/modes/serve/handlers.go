@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn/middleware"
 	serveCtr "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve/controller"
 	serveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve/service"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
@@ -49,6 +49,6 @@ func Init(opts *Opts) http.Handler {
 	// Standalone mode (i.e. just serving wal-archive during restore)
 	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
-	compn.InitOptionalHandlers(cfg, mux, l)
+	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
 }

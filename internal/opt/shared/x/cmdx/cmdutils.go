@@ -1,4 +1,4 @@
-package optutils
+package cmdx
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package compn
+package shared
 
 import (
 	"context"

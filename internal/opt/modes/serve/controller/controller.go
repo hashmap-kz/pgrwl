@@ -4,9 +4,9 @@ import (
 	"io"
 	"net/http"
 
-	serveModeSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve/service"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
+	serveModeSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve/service"
 )
 
 type ServeModeController struct {
@@ -20,7 +20,7 @@ func NewServeModeController(s serveModeSvc.ServeModeService) *ServeModeControlle
 }
 
 func (c *ServeModeController) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request) {
-	filename, err := optutils.PathValueString(r, "filename")
+	filename, err := httpx.PathValueString(r, "filename")
 	if err != nil {
 		http.Error(w, "expect filename path-param", http.StatusBadRequest)
 		return

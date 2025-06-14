@@ -4,11 +4,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn/middleware"
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	receiveCrt "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/controller"
 	receiveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/service"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
@@ -62,6 +62,6 @@ func Init(opts *Opts) http.Handler {
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
 
-	compn.InitOptionalHandlers(cfg, mux, l)
+	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
 }

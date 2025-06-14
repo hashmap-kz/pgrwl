@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/optutils"
 )
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
@@ -21,7 +23,7 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 
 	// safe check
 	// refusing to restore, if a target dir exists and it's not empty
-	dirExistsAndNotEmpty, err := optutils.DirExistsAndNotEmpty(dest)
+	dirExistsAndNotEmpty, err := fsx.DirExistsAndNotEmpty(dest)
 	if err != nil {
 		return err
 	}
@@ -35,7 +37,7 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// setup storage
-	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
 		SubPath: config.BaseBackupSubpath,
 	})
@@ -50,10 +52,10 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// sort backup ids, decide which to use for restore
-	iDsSortedDesc := optutils.SortDesc(backupsTs)
+	iDsSortedDesc := strx.SortDesc(backupsTs)
 	var backupID string
 	if id != "" {
-		if !optutils.IsInList(id, iDsSortedDesc) {
+		if !strx.IsInList(id, iDsSortedDesc) {
 			// given backup ID is not present in backups list
 			return fmt.Errorf("no such backup: %s", id)
 		}

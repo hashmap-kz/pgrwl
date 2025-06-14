@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/compn"
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backup"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
@@ -90,7 +90,7 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 		return nil
 	}
 	// setup storage
-	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
 		SubPath: config.BaseBackupSubpath,
 	})
@@ -156,7 +156,7 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 		return nil
 	}
 	// setup storage
-	stor, err := compn.SetupStorage(&compn.SetupStorageOpts{
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),
 		SubPath: config.BaseBackupSubpath,
 	})
