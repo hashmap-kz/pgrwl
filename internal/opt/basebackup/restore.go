@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/hashmap-kz/pgrwl/config"
@@ -50,10 +49,10 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// sort backup ids, decide which to use for restore
-	iDsSortedDesc := backupIDsSortedDesc(backupsTs)
+	iDsSortedDesc := optutils.SortDesc(backupsTs)
 	var backupID string
 	if id != "" {
-		if !backupIDInList(id, iDsSortedDesc) {
+		if !optutils.IsInList(id, iDsSortedDesc) {
 			// given backup ID is not present in backups list
 			return fmt.Errorf("no such backup: %s", id)
 		}
@@ -136,24 +135,4 @@ func untar(r io.Reader, dest string, loggr *slog.Logger) error {
 		}
 	}
 	return nil
-}
-
-func backupIDsSortedDesc(topLevel map[string]bool) []string {
-	r := []string{}
-	for k := range topLevel {
-		r = append(r, k)
-	}
-	sort.Slice(r, func(i, j int) bool {
-		return r[i] > r[j] // Descending order
-	})
-	return r
-}
-
-func backupIDInList(id string, list []string) bool {
-	for _, s := range list {
-		if s == id {
-			return true
-		}
-	}
-	return false
 }
