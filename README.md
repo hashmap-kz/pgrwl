@@ -100,7 +100,7 @@ export PGUSER=postgres
 export PGPASSWORD=postgres
 export PGRWL_MODE=receive
 
-pgrwl -c config.yml
+pgrwl start -c config.yml
 ```
 
 ### Serve Mode
@@ -120,28 +120,23 @@ EOF
 
 export PGRWL_MODE=serve
 
-pgrwl -c config.yml
+pgrwl start -c config.yml
 ```
 
-### Restore Command
+### Backup Mode
 
-`restore_command` example for postgresql.conf:
-
-```ini
-# where 'k8s-worker5:30266' represents the host and port
-# of a 'pgrwl' instance running in 'serve' mode.
-restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
-```
-
-### Base Backup Command
-
-Streaming base backup to the configured storage:
+`Backup` mode performs a full base backup of your PostgreSQL cluster on a configured schedule. 
 
 ```bash
 cat <<EOF >config.yml
 main:
   listen_port: 7070
   directory: wals
+backup:
+  cron: "0 0 0 */3 * *"
+  retention:
+    enable: true
+    keep_period: "96h"
 log:
   level: trace
   format: text
@@ -152,8 +147,20 @@ export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
+export PGRWL_MODE=backup
 
-pgrwl backup -c config.yml
+pgrwl start -c config.yml
+```
+
+
+### Restore Command
+
+`restore_command` example for postgresql.conf:
+
+```ini
+# where 'k8s-worker5:30266' represents the host and port
+# of a 'pgrwl' instance running in 'serve' mode.
+restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 ```
 
 ---
