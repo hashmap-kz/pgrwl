@@ -1,4 +1,4 @@
-## Usage
+## A brief example of usage
 
 ### Prerequisites:
 
@@ -15,6 +15,13 @@ bash 00-setup-kind.sh
 
 # deploy
 bash 01-deploy.sh
+```
+
+### Check Local Registry:
+
+```
+curl -X GET http://localhost:5000/v2/_catalog
+curl -X GET http://localhost:5000/v2/pgrwl/tags/list
 ```
 
 ### Endpoints:
@@ -62,4 +69,4 @@ kubectl -n pgrwl-test exec -it postgres-0 -- psql -U postgres -c "drop table if 
 
 ### Dashboard Basic Example (available in current grafana setup):
 
-![Basic Example](assets/dashboard.png)
+![Basic Dashboard](https://github.com/hashmap-kz/assets/blob/main/pgrwl/dashboards/01-basic.png)
