@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: &app pgrwl
+  name: &app pgrwl-receive
   namespace: pgrwl-test
   labels:
     app: *app
@@ -20,7 +20,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: &app pgrwl
+  name: &app pgrwl-receive
   namespace: pgrwl-test
   labels:
     app: *app
@@ -54,7 +54,7 @@ data:
         sync_interval: 10s
         keep_period: "5m"      
     log:
-      level: info
+      level: trace
       format: text
       add_source: true
     metrics:
@@ -108,10 +108,9 @@ data:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pgrwl-data
+  name: pgrwl-receive-data
   namespace: pgrwl-test
 spec:
-  # NOTE: replace with pvc you're using in your infra.
   storageClassName: standard
   volumeMode: Filesystem
   accessModes:
@@ -124,7 +123,7 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: &app pgrwl
+  name: &app pgrwl-receive
   namespace: pgrwl-test
 spec:
   replicas: 1
@@ -137,11 +136,10 @@ spec:
       labels:
         app: *app
     spec:
-      # NOTE: replace with pvc you're using in your infra.
       volumes:
         - name: storage
           persistentVolumeClaim:
-            claimName: pgrwl-data
+            claimName: pgrwl-receive-data
             readOnly: false
         - name: pgrwl-receive-config
           configMap:

@@ -42,18 +42,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	// setup job queue
-	loggr.Info("running job queue")
-	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
-
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	// metrics
-	if cfg.Metrics.Enable {
-		metrics.InitPromMetrics(ctx)
-	}
+	//////////////////////////////////////////////////////////////////////
+	// Init WAL-receiver loop first
 
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
@@ -65,21 +58,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	if err != nil {
 		//nolint:gocritic
 		log.Fatal(err)
-	}
-
-	var stor *st.TransformingStorage
-	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
-	if needSupervisorLoop {
-		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
-			BaseDir: opts.ReceiveDirectory,
-			SubPath: config.LocalFSStorageSubpath,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := shared.CheckManifest(cfg); err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	// Use WaitGroup to wait for all goroutines to finish
@@ -113,6 +91,35 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait until pgrw.Run() has started
 	<-started
 	loggr.Info("wal-receiver started")
+
+	//////////////////////////////////////////////////////////////////////
+	// Init OPT components
+
+	// setup job queue
+	loggr.Info("running job queue")
+	jobQueue := jobq.NewJobQueue(5)
+	jobQueue.Start(ctx)
+
+	// metrics
+	if cfg.Metrics.Enable {
+		loggr.Debug("init prom metrics")
+		metrics.InitPromMetrics(ctx)
+	}
+
+	var stor *st.TransformingStorage
+	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
+	if needSupervisorLoop {
+		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
+			BaseDir: opts.ReceiveDirectory,
+			SubPath: config.LocalFSStorageSubpath,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := shared.CheckManifest(cfg); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
