@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: &app pgrwl-receive
+  name: &app pgrwl-backup
   namespace: pgrwl-test
   labels:
     app: *app
@@ -11,7 +11,7 @@ spec:
   ports:
     - port: 7070
       targetPort: 7070
-      nodePort: 30266
+      nodePort: 30271
       name: http
   selector:
     app: *app
@@ -20,7 +20,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: &app pgrwl-receive
+  name: &app pgrwl-backup
   namespace: pgrwl-test
   labels:
     app: *app
@@ -35,7 +35,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pgrwl-receive-config
+  name: pgrwl-backup-config
   namespace: pgrwl-test
 data:
   ###### s3-setup #######
@@ -43,16 +43,12 @@ data:
     main:
       listen_port: 7070
       directory: "/wals/wal-archive"
-    receiver:
-      slot: pgrwl_v5
-      no_loop: true
-      uploader:
-        sync_interval: 10s
-        max_concurrency: 4
+    backup:
+      cron: "0 * * * * *"
       retention:
         enable: true
-        sync_interval: 10s
-        keep_period: "5m"
+        type: time
+        value: "5m"
     log:
       level: trace
       format: text
@@ -80,18 +76,14 @@ data:
     main:
       listen_port: 7070
       directory: "/wals/wal-archive"
-    receiver:
-      slot: pgrwl_v5
-      no_loop: true
-      uploader:
-        sync_interval: 10s
-        max_concurrency: 4
+    backup:
+      cron: "0 * * * * *"
       retention:
         enable: true
-        sync_interval: 10s
-        keep_period: "1m"
+        type: time
+        value: "5m"
     log:
-      level: info
+      level: trace
       format: text
       add_source: true
     metrics:
@@ -108,7 +100,7 @@ data:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: pgrwl-receive-data
+  name: pgrwl-backup-data
   namespace: pgrwl-test
 spec:
   storageClassName: standard
@@ -123,7 +115,7 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: &app pgrwl-receive
+  name: &app pgrwl-backup
   namespace: pgrwl-test
 spec:
   replicas: 1
@@ -139,11 +131,11 @@ spec:
       volumes:
         - name: storage
           persistentVolumeClaim:
-            claimName: pgrwl-receive-data
+            claimName: pgrwl-backup-data
             readOnly: false
-        - name: pgrwl-receive-config
+        - name: pgrwl-backup-config
           configMap:
-            name: pgrwl-receive-config
+            name: pgrwl-backup-config
 
       initContainers:
         - name: wait-db
@@ -161,12 +153,12 @@ spec:
 
       containers:
         - name: *app
-          image: "localhost:5000/pgrwl:latest"
+          image: "quay.io/hashmap_kz/pgrwl:latest"
           imagePullPolicy: Always
           args: ["start"]
           env:
             - name: PGRWL_MODE
-              value: "receive"
+              value: "backup"
             # "/tmp/configs/config-s3.yml"
             # "/tmp/configs/config-localfs.yml"
             - name: PGRWL_CONFIG_PATH
@@ -188,4 +180,4 @@ spec:
             - mountPath: /wals
               name: storage
             - mountPath: /tmp/configs
-              name: pgrwl-receive-config
+              name: pgrwl-backup-config

@@ -161,7 +161,7 @@ spec:
 
       containers:
         - name: *app
-          image: "localhost:5000/pgrwl:latest"
+          image: "quay.io/hashmap_kz/pgrwl:latest"
           imagePullPolicy: Always
           args: ["start"]
           env:

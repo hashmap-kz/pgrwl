@@ -9,8 +9,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisor/swals"
+	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/swals"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
@@ -21,7 +23,6 @@ import (
 	"github.com/hashmap-kz/pgrwl/config"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-	"github.com/hashmap-kz/pgrwl/internal/opt/httpsrv"
 )
 
 type ReceiveModeOpts struct {
@@ -41,18 +42,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	// setup job queue
-	loggr.Info("running job queue")
-	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
-
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	// metrics
-	if cfg.Metrics.Enable {
-		metrics.InitPromMetrics(ctx)
-	}
+	//////////////////////////////////////////////////////////////////////
+	// Init WAL-receiver loop first
 
 	// setup wal-receiver
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
@@ -64,21 +58,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	if err != nil {
 		//nolint:gocritic
 		log.Fatal(err)
-	}
-
-	var stor *st.TransformingStorage
-	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
-	if needSupervisorLoop {
-		stor, err = supervisor.SetupStorage(&supervisor.SetupStorageOpts{
-			BaseDir: opts.ReceiveDirectory,
-			SubPath: config.LocalFSStorageSubpath,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := supervisor.CheckManifest(cfg); err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	// Use WaitGroup to wait for all goroutines to finish
@@ -113,6 +92,35 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	<-started
 	loggr.Info("wal-receiver started")
 
+	//////////////////////////////////////////////////////////////////////
+	// Init OPT components
+
+	// setup job queue
+	loggr.Info("running job queue")
+	jobQueue := jobq.NewJobQueue(5)
+	jobQueue.Start(ctx)
+
+	// metrics
+	if cfg.Metrics.Enable {
+		loggr.Debug("init prom metrics")
+		metrics.InitPromMetrics(ctx)
+	}
+
+	var stor *st.TransformingStorage
+	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
+	if needSupervisorLoop {
+		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
+			BaseDir: opts.ReceiveDirectory,
+			SubPath: config.LocalFSStorageSubpath,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := shared.CheckManifest(cfg); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
 	wg.Add(1)
@@ -127,15 +135,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 
-		handlers := httpsrv.InitHTTPHandlers(&httpsrv.HTTPHandlersOpts{
-			PGRW:        pgrw,
-			BaseDir:     opts.ReceiveDirectory,
-			Verbose:     opts.Verbose,
-			RunningMode: config.ModeReceive,
-			Storage:     stor,
-			JobQueue:    jobQueue,
+		handlers := receiveAPI.Init(&receiveAPI.Opts{
+			PGRW:     pgrw,
+			BaseDir:  opts.ReceiveDirectory,
+			Verbose:  opts.Verbose,
+			Storage:  stor,
+			JobQueue: jobQueue,
 		})
-		srv := httpsrv.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}
