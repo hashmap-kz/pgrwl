@@ -34,7 +34,8 @@ type Tablespace struct {
 
 // Result will hold the return values  of the BaseBackup command
 type Result struct {
-	LSN         pglogrepl.LSN `json:"lsn,omitempty"`
+	StartLSN    pglogrepl.LSN `json:"start_lsn,omitempty"`
+	StopLSN     pglogrepl.LSN `json:"stop_lsn,omitempty"`
 	TimelineID  int32         `json:"timeline_id,omitempty"`
 	Tablespaces []Tablespace  `json:"tablespaces,omitempty"`
 }
@@ -104,8 +105,13 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 		return nil, fmt.Errorf("start base backup: %w", err)
 	}
 
+	streamBackupResult := &Result{
+		StartLSN:   startResp.LSN,
+		TimelineID: startResp.TimelineID,
+	}
+
 	bb.log().Info("started backup",
-		slog.String("LSN", startResp.LSN.String()),
+		slog.String("StopLSN", startResp.LSN.String()),
 	)
 
 	var pipeWriter *io.PipeWriter
@@ -216,7 +222,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 				return nil, fmt.Errorf("finish base backup: %w", err)
 			}
 
-			bb.log().Info("finished backup", slog.String("LSN", stopRes.LSN.String()))
+			bb.log().Info("finished backup", slog.String("StopLSN", stopRes.LSN.String()))
 			var tablespaces []Tablespace
 			for _, ts := range stopRes.Tablespaces {
 				tablespaces = append(tablespaces, Tablespace{
@@ -225,11 +231,9 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 					Size:     ts.Size,
 				})
 			}
-			return &Result{
-				LSN:         stopRes.LSN,
-				TimelineID:  stopRes.TimelineID,
-				Tablespaces: tablespaces,
-			}, nil
+			streamBackupResult.StopLSN = stopRes.LSN
+			streamBackupResult.Tablespaces = tablespaces
+			return streamBackupResult, nil
 
 		default:
 			return nil, fmt.Errorf("unexpected message type: %T", msg)

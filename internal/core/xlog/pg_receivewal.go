@@ -192,7 +192,7 @@ func (pgrw *pgReceiveWal) streamLog(ctx context.Context) error {
 
 	// final check
 	if streamStartLSN == 0 || streamStartTimeline == 0 {
-		return fmt.Errorf("cannot find start LSN for streaming")
+		return fmt.Errorf("cannot find start StopLSN for streaming")
 	}
 
 	// 5
