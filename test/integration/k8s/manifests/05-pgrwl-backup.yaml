@@ -49,6 +49,7 @@ data:
         enable: true
         type: time
         value: "5m"
+        keep_last: 2
     log:
       level: trace
       format: text
@@ -82,6 +83,7 @@ data:
         enable: true
         type: time
         value: "5m"
+        keep_last: 2
     log:
       level: trace
       format: text
