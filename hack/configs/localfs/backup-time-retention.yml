@@ -12,13 +12,12 @@ backup:
     keep_last: 3
 #  wals:
 #    manage_cleanup: true
-#    receiver_addr: "pgrwl-receive:7000"
+#    receiver_addr: "pgrwl-receive:7070"
 
 log:
   level: trace
   format: text
   add_source: true
-
 #storage:
 #  name: "local"
 #  compression:

@@ -125,7 +125,7 @@ pgrwl start -c config.yml
 
 ### Backup Mode
 
-`Backup` mode performs a full base backup of your PostgreSQL cluster on a configured schedule. 
+`Backup` mode performs a full base backup of your PostgreSQL cluster on a configured schedule.
 
 ```bash
 cat <<EOF >config.yml
@@ -195,10 +195,10 @@ backup:                                  # Required for 'backup' mode
     enable: true                         # Perform retention rules
     type: time                           # One of: (time / count)
     value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
-    keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')    
+    keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
   wals:                                  # Optional (WAL archive related settings)
     manage_cleanup: true                 # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-    receiver_addr: "pgrwl-receive:7000"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+    receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)
@@ -297,20 +297,20 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
-- A typical production setup runs **two `pgrwl` StatefulSets** in the cluster:  
+- A typical production setup runs **two `pgrwl` StatefulSets** in the cluster:
   one in `receive` mode for **continuous WAL streaming**, and another in `backup` mode for scheduled **base backups**.
 
 - In `receive` mode, `pgrwl` continuously **streams WAL files**, applies optional **compression** and **encryption**,
   uploads them to **remote storage** (such as S3 or SFTP), and enforces **retention policies** - for example, keeping
   WAL files for **four days**.
 
-- In `backup` mode, it performs a **full base backup** of your PostgreSQL cluster on a configured schedule -  
+- In `backup` mode, it performs a **full base backup** of your PostgreSQL cluster on a configured schedule -
   for instance, **once every three days** - using **streaming basebackup**, with optional **compression**
   and **encryption**. The resulting backup is also uploaded to the configured **remote storage**,
   and subject to **retention policies** for cleanup. The built-in cron scheduler enables fully automated backups without
   requiring external orchestration.
 
-- During recovery, the same `receive` StatefulSet can be reconfigured to run in `serve` mode,  
+- During recovery, the same `receive` StatefulSet can be reconfigured to run in `serve` mode,
   exposing previously archived WALs via HTTP to support **Point-in-Time Recovery (PITR)** through `restore_command`.
 
 - With this setup, you're able to restore your cluster - in the event of a crash -
