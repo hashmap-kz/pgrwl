@@ -21,10 +21,8 @@ type BackupModeOpts struct {
 
 func RunBackupMode(opts *BackupModeOpts) {
 	cfg := config.Cfg()
-
 	loggr := slog.With("component", "backup-mode-runner")
 
-	// TODO: this should be checked in config.Validate()
 	if cfg.Backup.Cron == "" {
 		loggr.Error("backup.cron is required")
 		os.Exit(1)

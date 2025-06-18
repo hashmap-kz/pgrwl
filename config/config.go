@@ -125,6 +125,8 @@ type BackupRetentionConfig struct {
 
 	KeepDurationParsed time.Duration `json:"-"`
 	KeepCountParsed    int64         `json:"-"`
+
+	KeepLast *int `json:"keep_last,omitempty"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.

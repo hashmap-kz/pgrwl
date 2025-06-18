@@ -49,9 +49,10 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 }
 
 func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
-	c := cron.New(cron.WithSeconds()) // enables support for seconds (optional)
-
-	// example: "0 * * * * *"
+	// POSIX compatible cron syntax: "* * * * *". Without support of seconds.
+	c := cron.New(cron.WithParser(cron.NewParser(
+		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
+	)))
 
 	_, err := c.AddFunc(u.cfg.Backup.Cron, func() {
 		u.log().Info("starting scheduled basebackup")
@@ -107,6 +108,13 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 		return nil
 	}
 
+	if cfg.Backup.Retention.KeepLast != nil {
+		if len(backupTs) <= *cfg.Backup.Retention.KeepLast {
+			u.log().Debug("backup counts <= keep_last. nothing to purge")
+			return nil
+		}
+	}
+
 	// list backups in storage
 	if u.verbose {
 		for k := range backupTs {
@@ -139,7 +147,7 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
 			if filepath.Base(b) == filepath.Base(toDelete) {
-				err := stor.DeleteAll(ctx, b+"/")
+				err := stor.DeleteAll(ctx, b)
 				if err != nil {
 					return err
 				}
@@ -171,6 +179,13 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 	}
 	if len(backupTs) == 0 {
 		return nil
+	}
+
+	if cfg.Backup.Retention.KeepLast != nil {
+		if len(backupTs) <= *cfg.Backup.Retention.KeepLast {
+			u.log().Debug("backup counts <= keep_last. nothing to purge")
+			return nil
+		}
 	}
 
 	// list backups in storage
@@ -205,7 +220,7 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
 			if filepath.Base(b) == filepath.Base(toDelete) {
-				err := stor.DeleteAll(ctx, b+"/")
+				err := stor.DeleteAll(ctx, b)
 				if err != nil {
 					return err
 				}

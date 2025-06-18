@@ -15,11 +15,12 @@ receiver:                                # Required for 'receive' mode
     keep_period: "1m"                    # Remove WAL files older than given period
 
 backup:                                  # Required for 'backup' mode
-  cron: "0 0 0 */3 * *"                  # Basebackup cron schedule
+  cron: "0 0 */3 * *"                    # Basebackup cron schedule
   retention:                             # Optional
     enable: true                         # Perform retention rules
     type: time                           # One of: (time / count)
     value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
+    keep_last: 1                         # Always keep last N backups
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)

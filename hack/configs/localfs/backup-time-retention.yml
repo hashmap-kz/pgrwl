@@ -4,11 +4,12 @@ main:
   directory: wals
 
 backup:
-  cron: "0 * * * * *"
+  cron: "* * * * *"
   retention:
     enable: true
     type: time
     value: "2m"
+    keep_last: 3
 
 log:
   level: trace
