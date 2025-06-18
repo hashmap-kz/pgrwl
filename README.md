@@ -196,6 +196,9 @@ backup:                                  # Required for 'backup' mode
     type: time                           # One of: (time / count)
     value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
     keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')    
+  wals:                                  # Optional (WAL archive related settings)
+    manage_cleanup: true                 # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
+    receiver_addr: "pgrwl-receive:7000"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)

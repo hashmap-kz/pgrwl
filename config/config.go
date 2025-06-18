@@ -113,6 +113,7 @@ type DevConfigPprof struct {
 type BackupConfig struct {
 	Cron      string                `json:"cron"`
 	Retention BackupRetentionConfig `json:"retention,omitempty"`
+	Wals      BackupWALsConfig      `json:"wals,omitempty"`
 }
 
 // BackupRetentionConfig configures retention for basebackups.
@@ -127,6 +128,12 @@ type BackupRetentionConfig struct {
 	KeepCountParsed    int64         `json:"-"`
 
 	KeepLast *int `json:"keep_last,omitempty"`
+}
+
+// BackupWALsConfig configures related setting for WAL-archive.
+type BackupWALsConfig struct {
+	ManageCleanup bool   `json:"manage_cleanup,omitempty"`
+	ReceiverAddr  string `json:"receiver_addr,omitempty"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.

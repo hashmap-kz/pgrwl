@@ -2,12 +2,20 @@ package sbackup
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/core/conv"
+	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/cmdx"
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backup"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
@@ -49,20 +57,25 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 }
 
 func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
+	// get necessary info
+	conn, err := pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
+	if err != nil {
+		u.log().Error("basebackup create-conn failed", slog.Any("err", err))
+		return
+	}
+	startupInfo, err := xlog.GetStartupInfo(conn)
+	if err != nil {
+		u.log().Error("basebackup get-startup-info failed", slog.Any("err", err))
+		return
+	}
+
 	// POSIX compatible cron syntax: "* * * * *". Without support of seconds.
 	c := cron.New(cron.WithParser(cron.NewParser(
 		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
 	)))
 
-	_, err := c.AddFunc(u.cfg.Backup.Cron, func() {
+	_, err = c.AddFunc(u.cfg.Backup.Cron, func() {
 		u.log().Info("starting scheduled basebackup")
-		// create backup
-		err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: u.opts.Directory})
-		if err != nil {
-			u.log().Error("basebackup failed", slog.Any("err", err))
-		} else {
-			u.log().Info("basebackup completed")
-		}
 		// retain previous
 		if u.cfg.Backup.Retention.Enable {
 			if u.cfg.Backup.Retention.Type == config.BackupRetentionTypeTime {
@@ -78,12 +91,60 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 				}
 			}
 		}
+		// create backup
+		bbResult, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: u.opts.Directory})
+		if err != nil {
+			u.log().Error("basebackup failed", slog.Any("err", err))
+		} else {
+			u.log().Info("basebackup completed")
+
+			// cleanup wal-archive (when basebackup is completed without errors)
+			if u.cfg.Backup.Wals.ManageCleanup {
+				if err := u.cleanupWalArchive(bbResult, startupInfo); err != nil {
+					u.log().Error("wal-archive cleanup failed", slog.Any("err", err))
+				}
+			}
+		}
 	})
 	if err != nil {
 		u.log().Error("failed to add cron", slog.Any("err", err))
 		os.Exit(1)
 	}
 	c.Start()
+}
+
+func (u *BaseBackupSupervisor) cleanupWalArchive(bbResult *backup.Result, startupInfo *xlog.StartupInfo) error {
+	// TODO: it should check receiver.config by API call
+	// TODO: if receiver.retain.enabled we cannot cleanup archive here
+
+	u.log().Info("begin to cleanup wal-archive")
+
+	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
+	if err != nil {
+		return err
+	}
+
+	filename := xlog.XLogFileName(conv.ToUint32(bbResult.TimelineID), uint64(bbResult.StopLSN), startupInfo.WalSegSz)
+	url := fmt.Sprintf("%s/wal-before/%s", addr, filename)
+
+	u.log().Info("cleanup data",
+		slog.String("receiver-addr", addr),
+		slog.String("url", url),
+		slog.String("filename", filename),
+	)
+
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
 }
 
 func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *config.Config) error {
