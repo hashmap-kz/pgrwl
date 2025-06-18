@@ -4,7 +4,7 @@ main:
   directory: wals
 
 backup:
-  cron: "0 * * * * *"
+  cron: "* * * * *"
   retention:
     enable: true
     type: count
