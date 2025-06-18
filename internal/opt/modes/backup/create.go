@@ -18,7 +18,7 @@ type CreateBaseBackupOpts struct {
 	Directory string
 }
 
-func CreateBaseBackup(opts *CreateBaseBackupOpts) error {
+func CreateBaseBackup(opts *CreateBaseBackupOpts) (*Result, error) {
 	var err error
 
 	// setup context
@@ -36,30 +36,30 @@ func CreateBaseBackup(opts *CreateBaseBackupOpts) error {
 	})
 	if err != nil {
 		loggr.Error("cannot init storage", slog.Any("err", err))
-		return err
+		return nil, err
 	}
 
 	// create connection
 	conn, err := pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
 	if err != nil {
 		loggr.Error("cannot establish connection", slog.Any("err", err))
-		return err
+		return nil, err
 	}
 
 	// init module
 	baseBackup, err := NewBaseBackup(conn, stor, ts)
 	if err != nil {
 		loggr.Error("cannot init basebackup module", slog.Any("err", err))
-		return err
+		return nil, err
 	}
 
 	// stream basebackup to defined storage
-	_, err = baseBackup.StreamBackup(ctx)
+	bbResult, err := baseBackup.StreamBackup(ctx)
 	if err != nil {
 		loggr.Error("cannot create basebackup", slog.Any("err", err))
-		return err
+		return nil, err
 	}
 
 	loggr.Info("basebackup successfully created")
-	return nil
+	return bbResult, nil
 }

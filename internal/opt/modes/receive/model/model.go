@@ -12,3 +12,7 @@ type PgRwlStatus struct {
 	RunningMode  string        `json:"running_mode"`
 	StreamStatus *StreamStatus `json:"stream_status,omitempty"`
 }
+
+type BriefConfig struct {
+	RetentionEnable bool `json:"retention_enable"`
+}

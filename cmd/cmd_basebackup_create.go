@@ -9,5 +9,6 @@ type BaseBackupCmdOpts struct {
 }
 
 func RunBaseBackup(opts *BaseBackupCmdOpts) error {
-	return backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: opts.Directory})
+	_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: opts.Directory})
+	return err
 }

@@ -81,6 +81,11 @@ func (s *InMemoryStorage) DeleteAll(ctx context.Context, path string) error {
 	return nil
 }
 
+func (s *InMemoryStorage) DeleteDir(_ context.Context, _ string) error {
+	// TODO: impl
+	return nil
+}
+
 func (s *InMemoryStorage) DeleteAllBulk(ctx context.Context, paths []string) error {
 	for _, p := range paths {
 		if err := s.DeleteAll(ctx, p); err != nil {

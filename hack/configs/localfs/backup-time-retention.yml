@@ -4,17 +4,20 @@ main:
   directory: wals
 
 backup:
-  cron: "0 * * * * *"
+  cron: "* * * * *"
   retention:
     enable: true
     type: time
     value: "2m"
+    keep_last: 3
+  wals:
+    manage_cleanup: true
+    receiver_addr: "pgrwl-receive:7070"
 
 log:
   level: trace
   format: text
   add_source: true
-
 #storage:
 #  name: "local"
 #  compression:

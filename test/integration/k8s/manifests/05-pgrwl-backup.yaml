@@ -44,11 +44,15 @@ data:
       listen_port: 7070
       directory: "/wals/wal-archive"
     backup:
-      cron: "0 * * * * *"
+      cron: "* * * * *"
       retention:
         enable: true
         type: time
         value: "5m"
+        keep_last: 2
+      wals:
+        manage_cleanup: true
+        receiver_addr: "pgrwl-receive:7070"
     log:
       level: trace
       format: text
@@ -77,11 +81,15 @@ data:
       listen_port: 7070
       directory: "/wals/wal-archive"
     backup:
-      cron: "0 * * * * *"
+      cron: "* * * * *"
       retention:
         enable: true
         type: time
         value: "5m"
+        keep_last: 2
+      wals:
+        manage_cleanup: true
+        receiver_addr: "pgrwl-receive:7070"
     log:
       level: trace
       format: text

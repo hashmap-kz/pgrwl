@@ -44,7 +44,7 @@ data:
       listen_port: 7070
       directory: "/wals/wal-archive"
     backup:
-      cron: "0 * * * * *"
+      cron: "* * * * *"
       retention:
         enable: true
         type: time
@@ -77,7 +77,7 @@ data:
       listen_port: 7070
       directory: "/wals/wal-archive"
     backup:
-      cron: "0 * * * * *"
+      cron: "* * * * *"
       retention:
         enable: true
         type: time

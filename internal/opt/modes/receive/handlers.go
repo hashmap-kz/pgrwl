@@ -60,6 +60,7 @@ func Init(opts *Opts) http.Handler {
 
 	// Streaming mode (requires that wal-streaming process is running)
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
+	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
 
 	shared.InitOptionalHandlers(cfg, mux, l)
