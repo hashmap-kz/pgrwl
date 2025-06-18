@@ -10,9 +10,9 @@ backup:
     type: time
     value: "2m"
     keep_last: 3
-#  wals:
-#    manage_cleanup: true
-#    receiver_addr: "pgrwl-receive:7070"
+  wals:
+    manage_cleanup: true
+    receiver_addr: "pgrwl-receive:7070"
 
 log:
   level: trace

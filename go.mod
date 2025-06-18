@@ -3,6 +3,7 @@ module github.com/hashmap-kz/pgrwl
 go 1.24.1
 
 require (
+	github.com/go-resty/resty/v2 v2.16.5
 	github.com/hashmap-kz/storecrypt v1.0.7
 	github.com/hashmap-kz/streamcrypt v1.1.1
 	github.com/jackc/pglogrepl v0.0.0-20250509230407-a9884f6bd75a
@@ -50,6 +51,7 @@ require (
 	github.com/prometheus/common v0.64.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect

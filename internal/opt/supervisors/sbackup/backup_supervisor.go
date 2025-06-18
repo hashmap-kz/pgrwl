@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/model"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
 
@@ -19,11 +20,11 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backup"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
-
+	"github.com/go-resty/resty/v2"
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/robfig/cron/v3"
 )
 
@@ -33,21 +34,26 @@ type BaseBackupSupervisorOpts struct {
 }
 
 type BaseBackupSupervisor struct {
-	l       *slog.Logger
-	cfg     *config.Config
-	opts    *BaseBackupSupervisorOpts
-	verbose bool
+	l           *slog.Logger
+	cfg         *config.Config
+	opts        *BaseBackupSupervisorOpts
+	verbose     bool
+	restyClient *resty.Client
 
 	// opts (for fast-access without traverse the config)
 	storageName string
 }
 
 func NewBaseBackupSupervisor(cfg *config.Config, opts *BaseBackupSupervisorOpts) *BaseBackupSupervisor {
+	client := resty.New()
+	client.SetRetryCount(0)
+	client.SetTimeout(5 * time.Second)
 	return &BaseBackupSupervisor{
 		l:           slog.With(slog.String("component", "basebackup-supervisor")),
 		cfg:         cfg,
 		opts:        opts,
 		verbose:     opts.Verbose,
+		restyClient: client,
 		storageName: cfg.Storage.Name,
 	}
 }
@@ -117,10 +123,18 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 }
 
 func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInfo *xlog.StartupInfo) error {
-	// TODO: it should check receiver.config by API call
-	// TODO: if receiver.retain.enabled we cannot cleanup archive here
-
 	u.log().Info("begin to cleanup wal-archive")
+
+	// check receiver.config by API call
+	// if receiver.retain.enabled we cannot cleanup archive here
+	receiverConfig, err := u.getReceiverConfig()
+	if err != nil {
+		return err
+	}
+
+	if receiverConfig.RetentionEnable {
+		return fmt.Errorf("cannot use both: (receiver.retention.enable && backup.wals.manage_cleanup)")
+	}
 
 	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
 	if err != nil {
@@ -172,18 +186,31 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 		slog.String("filename", filename),
 	)
 
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	resp, err := u.restyClient.R().Delete(url)
 	if err != nil {
 		return err
 	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
+	if resp.IsError() {
+		return fmt.Errorf("cleanupWalArchive() request error: %d", resp.StatusCode())
 	}
-	defer resp.Body.Close()
-
 	return nil
+}
+
+func (u *BaseBackupSupervisor) getReceiverConfig() (*model.BriefConfig, error) {
+	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	var c model.BriefConfig
+	resp, err := u.restyClient.R().SetResult(&c).Get(addr + "/config")
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		return nil, fmt.Errorf("getReceiverConfig() request error: %d", resp.StatusCode())
+	}
+	return &c, nil
 }
 
 func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *config.Config) error {
