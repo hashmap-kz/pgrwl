@@ -147,7 +147,7 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
 			if filepath.Base(b) == filepath.Base(toDelete) {
-				err := stor.DeleteAll(ctx, b)
+				err := stor.DeleteDir(ctx, b)
 				if err != nil {
 					return err
 				}
@@ -220,7 +220,7 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
 			if filepath.Base(b) == filepath.Base(toDelete) {
-				err := stor.DeleteAll(ctx, b)
+				err := stor.DeleteDir(ctx, b)
 				if err != nil {
 					return err
 				}
