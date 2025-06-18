@@ -2,12 +2,15 @@ package sbackup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
@@ -92,7 +95,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 			}
 		}
 		// create backup
-		bbResult, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: u.opts.Directory})
+		_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: u.opts.Directory})
 		if err != nil {
 			u.log().Error("basebackup failed", slog.Any("err", err))
 		} else {
@@ -100,7 +103,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 
 			// cleanup wal-archive (when basebackup is completed without errors)
 			if u.cfg.Backup.Wals.ManageCleanup {
-				if err := u.cleanupWalArchive(bbResult, startupInfo); err != nil {
+				if err := u.cleanupWalArchive(ctx, startupInfo); err != nil {
 					u.log().Error("wal-archive cleanup failed", slog.Any("err", err))
 				}
 			}
@@ -113,7 +116,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 	c.Start()
 }
 
-func (u *BaseBackupSupervisor) cleanupWalArchive(bbResult *backup.Result, startupInfo *xlog.StartupInfo) error {
+func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInfo *xlog.StartupInfo) error {
 	// TODO: it should check receiver.config by API call
 	// TODO: if receiver.retain.enabled we cannot cleanup archive here
 
@@ -124,7 +127,43 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(bbResult *backup.Result, startu
 		return err
 	}
 
-	filename := xlog.XLogFileName(conv.ToUint32(bbResult.TimelineID), uint64(bbResult.StopLSN), startupInfo.WalSegSz)
+	// setup storage
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
+		BaseDir: filepath.ToSlash(u.cfg.Main.Directory),
+		SubPath: config.BaseBackupSubpath,
+	})
+	if err != nil {
+		return err
+	}
+
+	// get all backups available
+	backupTs, err := stor.ListTopLevelDirs(ctx, "")
+	if err != nil {
+		return err
+	}
+	if len(backupTs) == 0 {
+		return nil
+	}
+
+	// sort desc
+	backupsSorted := strx.SortDesc(backupTs)
+	oldest := backupsSorted[len(backupsSorted)-1]
+
+	// get manifest
+	manifestFilename := filepath.Base(oldest) + ".json"
+	manifestRdr, err := stor.Get(ctx, filepath.ToSlash(filepath.Join(filepath.Base(oldest), manifestFilename)))
+	if err != nil {
+		return err
+	}
+	defer manifestRdr.Close()
+
+	// unmarshal
+	var info backup.Result
+	if err := json.NewDecoder(manifestRdr).Decode(&info); err != nil {
+		return err
+	}
+
+	filename := xlog.XLogFileName(conv.ToUint32(info.TimelineID), uint64(info.StopLSN), startupInfo.WalSegSz)
 	url := fmt.Sprintf("%s/wal-before/%s", addr, filename)
 
 	u.log().Info("cleanup data",
