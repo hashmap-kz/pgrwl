@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/hashmap-kz/pgrwl/config"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/model"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
@@ -20,6 +22,7 @@ import (
 type ReceiveModeService interface {
 	Status() *model.PgRwlStatus
 	DeleteWALsBefore(ctx context.Context, walFileName string) error
+	BriefConfig(ctx context.Context) *model.BriefConfig
 }
 
 type receiveModeSvc struct {
@@ -142,4 +145,9 @@ func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string)
 		}
 	}
 	return nil
+}
+
+func (s *receiveModeSvc) BriefConfig(_ context.Context) *model.BriefConfig {
+	cfg := config.Cfg()
+	return &model.BriefConfig{RetentionEnable: cfg.Receiver.Retention.Enable}
 }
