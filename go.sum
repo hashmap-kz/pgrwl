@@ -48,8 +48,8 @@ github.com/go-resty/resty/v2 v2.16.5/go.mod h1:hkJtXbA2iKHzJheXYvQ8snQES5ZLGKMwQ
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/hashmap-kz/storecrypt v1.0.7 h1:hD78Z7hTS47h9tEszWhdad6c4H9XDpsek9qhSEBPqBg=
-github.com/hashmap-kz/storecrypt v1.0.7/go.mod h1:TBvUtlWoYszgGH0JNC03DI9PdM1XeHNLN3mEjitLy6w=
+github.com/hashmap-kz/storecrypt v1.0.8 h1:MpyIwbRX8eI0slltF6nX+I1Qw9R+0Z2zKGJKaAj/fyQ=
+github.com/hashmap-kz/storecrypt v1.0.8/go.mod h1:2Pgy26oBvLdLA+Tx9tnzqH9444Fik7ay94Pi9sgWAOc=
 github.com/hashmap-kz/streamcrypt v1.1.1 h1:bYEcZzwzeYBtIJEykIUOl0Gi4p5VssQXuxFy9T39ibQ=
 github.com/hashmap-kz/streamcrypt v1.1.1/go.mod h1:vgEoWh2wfV/y73c5HA5i4rGCh+3NDBXlE29Ro6uqwiY=
 github.com/jackc/pgio v1.0.0 h1:g12B9UwVnzGhueNavwioyEEpAmqMe1E/BN9ES+8ovkE=

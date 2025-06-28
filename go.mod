@@ -4,7 +4,7 @@ go 1.24.1
 
 require (
 	github.com/go-resty/resty/v2 v2.16.5
-	github.com/hashmap-kz/storecrypt v1.0.7
+	github.com/hashmap-kz/storecrypt v1.0.8
 	github.com/hashmap-kz/streamcrypt v1.1.1
 	github.com/jackc/pglogrepl v0.0.0-20250509230407-a9884f6bd75a
 	github.com/jackc/pgx/v5 v5.7.5
