@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 )
 
 var ErrJobQueueFull = errors.New("job queue full")
@@ -53,8 +53,8 @@ func (q *JobQueue) Start(ctx context.Context) {
 
 				job.Run(ctx)
 
-				metrics.M.IncJobsExecuted(job.Name)
-				metrics.M.ObserveJobDuration(job.Name, time.Since(start).Seconds())
+				receivemetrics.M.IncJobsExecuted(job.Name)
+				receivemetrics.M.ObserveJobDuration(job.Name, time.Since(start).Seconds())
 				q.log().Info("fin job", slog.String("job-name", job.Name))
 			}
 		}
@@ -62,14 +62,14 @@ func (q *JobQueue) Start(ctx context.Context) {
 }
 
 func (q *JobQueue) Submit(name string, jobFunc func(ctx context.Context)) error {
-	metrics.M.IncJobsSubmitted(name)
+	receivemetrics.M.IncJobsSubmitted(name)
 
 	job := NamedJob{Name: name, Run: jobFunc}
 	select {
 	case q.jobs <- job:
 		return nil
 	default:
-		metrics.M.IncJobsDropped(name)
+		receivemetrics.M.IncJobsDropped(name)
 		return fmt.Errorf("%w: %s", ErrJobQueueFull, name)
 	}
 }

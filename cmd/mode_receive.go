@@ -9,16 +9,16 @@ import (
 	"sync"
 	"syscall"
 
-	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+
+	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/swals"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/receivesuperv"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
 
 	"github.com/hashmap-kz/pgrwl/config"
 
@@ -103,7 +103,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// metrics
 	if cfg.Metrics.Enable {
 		loggr.Debug("init prom metrics")
-		metrics.InitPromMetrics(ctx)
+		receivemetrics.InitPromMetrics(ctx)
 	}
 
 	var stor *st.TransformingStorage
@@ -161,7 +161,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 					)
 				}
 			}()
-			u := swals.NewArchiveSupervisor(cfg, stor, &swals.ArchiveSupervisorOpts{
+			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 				Verbose:          opts.Verbose,

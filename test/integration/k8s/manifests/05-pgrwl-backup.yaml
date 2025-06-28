@@ -48,7 +48,7 @@ data:
       retention:
         enable: true
         type: time
-        value: "5m"
+        value: "2m"
         keep_last: 2
       wals:
         manage_cleanup: true

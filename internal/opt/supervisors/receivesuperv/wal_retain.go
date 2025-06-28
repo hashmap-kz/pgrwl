@@ -1,4 +1,4 @@
-package swals
+package receivesuperv
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 
+	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
@@ -73,6 +73,6 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, keepPeriod tim
 		)
 	}
 
-	metrics.M.AddWALFilesDeleted(float64(len(olderThan)))
+	receivemetrics.M.AddWALFilesDeleted(float64(len(olderThan)))
 	return nil
 }

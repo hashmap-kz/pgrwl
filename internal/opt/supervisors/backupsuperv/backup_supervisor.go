@@ -1,4 +1,4 @@
-package sbackup
+package backupsuperv
 
 import (
 	"context"
@@ -9,10 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
+
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/model"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/model"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
 
@@ -21,7 +22,7 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/cmdx"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backup"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backupmode"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hashmap-kz/pgrwl/config"
@@ -104,7 +105,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
 			}
 		}
 		// create backup
-		_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: u.opts.Directory})
+		_, err := backupmode.CreateBaseBackup(&backupmode.CreateBaseBackupOpts{Directory: u.opts.Directory})
 		if err != nil {
 			u.log().Error("basebackup failed", slog.Any("err", err))
 		} else {
@@ -192,7 +193,7 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 	return nil
 }
 
-func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.Storage, backupID string) (*backup.Result, error) {
+func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.Storage, backupID string) (*backupmode.Result, error) {
 	manifestFilename := filepath.Base(backupID) + ".json"
 	manifestRdr, err := stor.Get(ctx, filepath.ToSlash(filepath.Join(filepath.Base(backupID), manifestFilename)))
 	if err != nil {
@@ -201,7 +202,7 @@ func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.St
 	defer manifestRdr.Close()
 
 	// unmarshal
-	var info backup.Result
+	var info backupmode.Result
 	if err := json.NewDecoder(manifestRdr).Decode(&info); err != nil {
 		return nil, err
 	}
@@ -230,38 +231,10 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 	if !u.cfg.Backup.Retention.Enable {
 		return nil
 	}
-	// setup storage
-	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
-		BaseDir: filepath.ToSlash(cfg.Main.Directory),
-		SubPath: config.BaseBackupSubpath,
-	})
+	// setup storage, get backup IDs
+	stor, backupTs, err := u.getBackupIDs(ctx, cfg)
 	if err != nil {
 		return err
-	}
-
-	// get all backups available
-	backupTs, err := stor.ListTopLevelDirs(ctx, "")
-	if err != nil {
-		return err
-	}
-	if len(backupTs) == 0 {
-		return nil
-	}
-
-	if cfg.Backup.Retention.KeepLast != nil {
-		if len(backupTs) <= *cfg.Backup.Retention.KeepLast {
-			u.log().Debug("backup counts <= keep_last. nothing to purge")
-			return nil
-		}
-	}
-
-	// list backups in storage
-	if u.verbose {
-		for k := range backupTs {
-			u.log().LogAttrs(ctx, logger.LevelTrace, "backups in storage",
-				slog.String("path", k),
-			)
-		}
 	}
 
 	// decide which may be pruned
@@ -274,75 +247,18 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 		return nil
 	}
 
-	// list backups to delete
-	if u.verbose {
-		for _, k := range backupsToDelete {
-			u.log().LogAttrs(ctx, logger.LevelTrace, "backups to delete",
-				slog.String("path", k),
-			)
-		}
-	}
-
 	// purge
-	for b := range backupTs {
-		for _, toDelete := range backupsToDelete {
-			if filepath.Base(b) != filepath.Base(toDelete) {
-				continue
-			}
-
-			// ONLY if manifests exists (there may be no manifests for failed backups) -> update metrics
-			info, err := u.readManifest(ctx, stor, toDelete)
-			if err == nil { // NOTE: == nil
-				metrics.M.AddBasebackupBytesDeleted(float64(info.BytesTotal))
-			}
-
-			err = stor.DeleteDir(ctx, b)
-			if err != nil {
-				return err
-			}
-			u.log().Info("backup retained", slog.String("path", b))
-		}
-	}
-
-	return nil
+	return u.purgeBackups(ctx, backupTs, backupsToDelete, stor)
 }
 
 func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg *config.Config) error {
 	if !u.cfg.Backup.Retention.Enable {
 		return nil
 	}
-	// setup storage
-	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
-		BaseDir: filepath.ToSlash(cfg.Main.Directory),
-		SubPath: config.BaseBackupSubpath,
-	})
+	// setup storage, get backup IDs
+	stor, backupTs, err := u.getBackupIDs(ctx, cfg)
 	if err != nil {
 		return err
-	}
-
-	// get all backups available
-	backupTs, err := stor.ListTopLevelDirs(ctx, "")
-	if err != nil {
-		return err
-	}
-	if len(backupTs) == 0 {
-		return nil
-	}
-
-	if cfg.Backup.Retention.KeepLast != nil {
-		if len(backupTs) <= *cfg.Backup.Retention.KeepLast {
-			u.log().Debug("backup counts <= keep_last. nothing to purge")
-			return nil
-		}
-	}
-
-	// list backups in storage
-	if u.verbose {
-		for k := range backupTs {
-			u.log().LogAttrs(ctx, logger.LevelTrace, "backups in storage",
-				slog.String("path", k),
-			)
-		}
 	}
 
 	// decide which may be pruned
@@ -355,6 +271,27 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 		return nil
 	}
 
+	// purge
+	return u.purgeBackups(ctx, backupTs, backupsToDelete, stor)
+}
+
+// internal helpers
+
+func (u *BaseBackupSupervisor) purgeBackups(
+	ctx context.Context,
+	backupTs map[string]bool,
+	backupsToDelete []string,
+	stor storage.Storage,
+) error {
+	// list backups in storage
+	if u.verbose {
+		for k := range backupTs {
+			u.log().LogAttrs(ctx, logger.LevelTrace, "backups in storage",
+				slog.String("path", k),
+			)
+		}
+	}
+
 	// list backups to delete
 	if u.verbose {
 		for _, k := range backupsToDelete {
@@ -364,7 +301,6 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 		}
 	}
 
-	// purge
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
 			if filepath.Base(b) != filepath.Base(toDelete) {
@@ -372,18 +308,48 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 			}
 
 			// ONLY if manifests exists (there may be no manifests for failed backups) -> update metrics
-			info, err := u.readManifest(ctx, stor, toDelete)
-			if err == nil { // NOTE: == nil
-				metrics.M.AddBasebackupBytesDeleted(float64(info.BytesTotal))
-			}
+			info, readManifestErr := u.readManifest(ctx, stor, toDelete)
 
-			err = stor.DeleteDir(ctx, b)
+			err := stor.DeleteDir(ctx, b)
 			if err != nil {
 				return err
 			}
 			u.log().Info("backup retained", slog.String("path", b))
+
+			// if backup was retained, and manifests was present, update metrics
+			if readManifestErr == nil { // NOTE: == nil
+				u.log().Debug("bytes deleted", slog.Int64("total", info.BytesTotal))
+				backupmetrics.M.AddBasebackupBytesDeleted(float64(info.BytesTotal))
+			}
 		}
 	}
-
 	return nil
+}
+
+func (u *BaseBackupSupervisor) getBackupIDs(ctx context.Context, cfg *config.Config) (storage.Storage, map[string]bool, error) {
+	// setup storage
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
+		BaseDir: filepath.ToSlash(cfg.Main.Directory),
+		SubPath: config.BaseBackupSubpath,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// get all backups available
+	backupTs, err := stor.ListTopLevelDirs(ctx, "")
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(backupTs) == 0 {
+		return nil, nil, nil
+	}
+
+	if cfg.Backup.Retention.KeepLast != nil {
+		if len(backupTs) <= *cfg.Backup.Retention.KeepLast {
+			u.log().Debug("backup counts <= keep_last. nothing to purge")
+			return nil, nil, nil
+		}
+	}
+	return stor, backupTs, nil
 }

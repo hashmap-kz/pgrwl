@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/config"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/model"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/model"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 

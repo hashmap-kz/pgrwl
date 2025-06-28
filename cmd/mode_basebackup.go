@@ -8,10 +8,13 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backupmode"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/sbackup"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/backupsuperv"
 )
 
 type BackupModeOpts struct {
@@ -40,11 +43,6 @@ func RunBackupMode(opts *BackupModeOpts) {
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	// metrics
-	if cfg.Metrics.Enable {
-		metrics.InitPromMetrics(ctx)
-	}
-
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
@@ -60,12 +58,37 @@ func RunBackupMode(opts *BackupModeOpts) {
 				)
 			}
 		}()
-		u := sbackup.NewBaseBackupSupervisor(cfg, &sbackup.BaseBackupSupervisorOpts{
+		u := backupsuperv.NewBaseBackupSupervisor(cfg, &backupsuperv.BaseBackupSupervisorOpts{
 			Directory: opts.ReceiveDirectory,
 			Verbose:   opts.Verbose,
 		})
 		u.Run(ctx, jobQueue)
 	}()
+
+	// metrics
+	if cfg.Metrics.Enable {
+		backupmetrics.InitPromMetrics(ctx)
+
+		// HTTP server
+		// It shouldn't cancel() the main streaming loop even on error.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					loggr.Error("http server panicked",
+						slog.Any("panic", r),
+						slog.String("goroutine", "http-server"),
+					)
+				}
+			}()
+
+			srv := shared.NewHTTPSrv(cfg.Main.ListenPort, backupmode.Init())
+			if err := srv.Run(ctx); err != nil {
+				loggr.Error("http server failed", slog.Any("err", err))
+			}
+		}()
+	}
 
 	// Wait for signal (context cancellation)
 	<-ctx.Done()

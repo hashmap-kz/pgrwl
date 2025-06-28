@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backup"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backupmode"
 )
 
 type BaseBackupCmdOpts struct {
@@ -9,6 +9,6 @@ type BaseBackupCmdOpts struct {
 }
 
 func RunBaseBackup(opts *BaseBackupCmdOpts) error {
-	_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: opts.Directory})
+	_, err := backupmode.CreateBaseBackup(&backupmode.CreateBaseBackupOpts{Directory: opts.Directory})
 	return err
 }

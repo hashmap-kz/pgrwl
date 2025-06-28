@@ -1,12 +1,12 @@
-package receive
+package receivemode
 
 import (
 	"log/slog"
 	"net/http"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
-	receiveCrt "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/controller"
-	receiveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/service"
+	receiveCrt "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/controller"
+	receiveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 

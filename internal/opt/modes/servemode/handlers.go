@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	serveCtr "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve/controller"
-	serveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve/service"
+	serveCtr "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode/controller"
+	serveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"

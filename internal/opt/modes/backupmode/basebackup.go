@@ -1,4 +1,4 @@
-package backup
+package backupmode
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 
@@ -92,7 +92,8 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
 		return nil, err
 	}
 	// metrics
-	metrics.M.AddBasebackupBytesReceived(float64(result.BytesTotal))
+	bb.log().Debug("bytes received", slog.Int64("total", result.BytesTotal))
+	backupmetrics.M.AddBasebackupBytesReceived(float64(result.BytesTotal))
 	return result, nil
 }
 

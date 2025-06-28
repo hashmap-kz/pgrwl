@@ -1,4 +1,4 @@
-package sbackup
+package backupsuperv
 
 import (
 	"slices"

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"syscall"
 
-	serveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve"
+	serveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"

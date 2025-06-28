@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
 
-	serveModeSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve/service"
+	serveModeSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode/service"
 )
 
 type ServeModeController struct {

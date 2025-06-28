@@ -1,4 +1,4 @@
-package swals
+package receivesuperv
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 )
 
 func (u *ArchiveSupervisor) performUploads(ctx context.Context) error {
@@ -143,6 +143,6 @@ func (u *ArchiveSupervisor) uploadOneFile(ctx context.Context, bundle uploadBund
 		slog.String("result-path", resultFileName),
 	)
 
-	metrics.M.IncWALFilesUploaded()
+	receivemetrics.M.IncWALFilesUploaded()
 	return nil
 }

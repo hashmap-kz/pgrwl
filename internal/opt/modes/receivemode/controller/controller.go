@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/service"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/service"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 )

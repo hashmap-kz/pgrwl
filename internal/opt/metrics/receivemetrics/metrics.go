@@ -1,4 +1,4 @@
-package metrics
+package receivemetrics
 
 import (
 	"context"
@@ -26,8 +26,6 @@ type pgrwlMetrics interface {
 	IncJobsExecuted(name string)
 	IncJobsDropped(name string)
 	ObserveJobDuration(name string, f float64)
-	AddBasebackupBytesReceived(float64)
-	AddBasebackupBytesDeleted(float64)
 	UptimeSet()
 	StartUptimeReporter(ctx context.Context)
 }
@@ -48,8 +46,6 @@ func (p pgrwlMetricsNoop) IncJobsSubmitted(_ string)              {}
 func (p pgrwlMetricsNoop) IncJobsExecuted(_ string)               {}
 func (p pgrwlMetricsNoop) IncJobsDropped(_ string)                {}
 func (p pgrwlMetricsNoop) ObserveJobDuration(_ string, _ float64) {}
-func (p pgrwlMetricsNoop) AddBasebackupBytesReceived(_ float64)   {}
-func (p pgrwlMetricsNoop) AddBasebackupBytesDeleted(_ float64)    {}
 func (p pgrwlMetricsNoop) UptimeSet()                             {}
 func (p pgrwlMetricsNoop) StartUptimeReporter(_ context.Context)  {}
 
@@ -66,10 +62,6 @@ type pgrwlMetricsProm struct {
 	jobsExecuted  *prometheus.CounterVec
 	jobsDropped   *prometheus.CounterVec
 	jobDuration   *prometheus.HistogramVec
-
-	// basebackup
-	bbBytesReceived prometheus.Counter
-	bbBytesDeleted  prometheus.Counter
 
 	// maintenance
 	uptime     prometheus.Gauge
@@ -119,16 +111,6 @@ func InitPromMetrics(ctx context.Context) {
 			Help:    "Duration of job executions.",
 			Buckets: prometheus.DefBuckets,
 		}, []string{"name"}),
-
-		// basebackup
-		bbBytesReceived: promauto.NewCounter(prometheus.CounterOpts{
-			Name: "pgrwl_basebackup_bytes_received_total",
-			Help: "Total number of basebackup bytes received.",
-		}),
-		bbBytesDeleted: promauto.NewCounter(prometheus.CounterOpts{
-			Name: "pgrwl_basebackup_bytes_deleted_total",
-			Help: "Total number of basebackup bytes deleted.",
-		}),
 
 		// maintenance
 		uptime: promauto.NewGauge(prometheus.GaugeOpts{
@@ -182,16 +164,6 @@ func (p *pgrwlMetricsProm) IncJobsDropped(name string) {
 
 func (p *pgrwlMetricsProm) ObserveJobDuration(name string, f float64) {
 	p.jobDuration.WithLabelValues(name).Observe(f)
-}
-
-// basebackup
-
-func (p *pgrwlMetricsProm) AddBasebackupBytesReceived(f float64) {
-	p.bbBytesReceived.Add(f)
-}
-
-func (p *pgrwlMetricsProm) AddBasebackupBytesDeleted(f float64) {
-	p.bbBytesDeleted.Add(f)
 }
 
 // maintenance
