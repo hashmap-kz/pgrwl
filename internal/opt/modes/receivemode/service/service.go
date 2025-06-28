@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 	"log/slog"
 	"path/filepath"
 	"slices"
@@ -139,6 +140,9 @@ func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string)
 				)
 				return
 			}
+
+			// update metrics
+			receivemetrics.M.AddWALFilesDeleted(float64(len(walFilesToDelete)))
 		})
 		if err != nil {
 			return err
