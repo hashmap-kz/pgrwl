@@ -13,7 +13,6 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/backupsuperv"
 )
 
@@ -34,11 +33,6 @@ func RunBackupMode(opts *BackupModeOpts) {
 	// setup context
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-
-	// setup job queue
-	loggr.Info("running job queue")
-	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
 
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
@@ -62,7 +56,7 @@ func RunBackupMode(opts *BackupModeOpts) {
 			Directory: opts.ReceiveDirectory,
 			Verbose:   opts.Verbose,
 		})
-		u.Run(ctx, jobQueue)
+		u.Run(ctx)
 	}()
 
 	// metrics

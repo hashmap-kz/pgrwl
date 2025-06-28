@@ -27,7 +27,6 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/robfig/cron/v3"
 )
@@ -69,7 +68,7 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 	return slog.With(slog.String("component", "basebackup-supervisor"))
 }
 
-func (u *BaseBackupSupervisor) Run(ctx context.Context, _ *jobq.JobQueue) {
+func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 	// get necessary info
 	conn, err := pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
 	if err != nil {
