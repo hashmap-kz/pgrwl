@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/storecrypt/pkg/storage"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receive/model"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
@@ -164,19 +167,12 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 	oldest := backupsSorted[len(backupsSorted)-1]
 
 	// get manifest
-	manifestFilename := filepath.Base(oldest) + ".json"
-	manifestRdr, err := stor.Get(ctx, filepath.ToSlash(filepath.Join(filepath.Base(oldest), manifestFilename)))
+	info, err := u.readManifest(ctx, stor, oldest)
 	if err != nil {
 		return err
 	}
-	defer manifestRdr.Close()
 
-	// unmarshal
-	var info backup.Result
-	if err := json.NewDecoder(manifestRdr).Decode(&info); err != nil {
-		return err
-	}
-
+	// get WAL filename as a starting point (to clean everything before that name)
 	filename := xlog.XLogFileName(conv.ToUint32(info.TimelineID), uint64(info.StopLSN), startupInfo.WalSegSz)
 	url := fmt.Sprintf("%s/wal-before/%s", addr, filename)
 
@@ -194,6 +190,23 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 		return fmt.Errorf("cleanupWalArchive() request error: %d", resp.StatusCode())
 	}
 	return nil
+}
+
+func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.Storage, backupID string) (*backup.Result, error) {
+	manifestFilename := filepath.Base(backupID) + ".json"
+	manifestRdr, err := stor.Get(ctx, filepath.ToSlash(filepath.Join(filepath.Base(backupID), manifestFilename)))
+	if err != nil {
+		return nil, err
+	}
+	defer manifestRdr.Close()
+
+	// unmarshal
+	var info backup.Result
+	if err := json.NewDecoder(manifestRdr).Decode(&info); err != nil {
+		return nil, err
+	}
+
+	return &info, nil
 }
 
 func (u *BaseBackupSupervisor) getReceiverConfig() (*model.BriefConfig, error) {
@@ -273,13 +286,21 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 	// purge
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
-			if filepath.Base(b) == filepath.Base(toDelete) {
-				err := stor.DeleteDir(ctx, b)
-				if err != nil {
-					return err
-				}
-				u.log().Info("backup retained", slog.String("path", b))
+			if filepath.Base(b) != filepath.Base(toDelete) {
+				continue
 			}
+
+			// ONLY if manifests exists (there may be no manifests for failed backups) -> update metrics
+			info, err := u.readManifest(ctx, stor, toDelete)
+			if err == nil { // NOTE: == nil
+				metrics.M.AddBasebackupBytesDeleted(float64(info.BytesTotal))
+			}
+
+			err = stor.DeleteDir(ctx, b)
+			if err != nil {
+				return err
+			}
+			u.log().Info("backup retained", slog.String("path", b))
 		}
 	}
 
@@ -346,13 +367,21 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 	// purge
 	for b := range backupTs {
 		for _, toDelete := range backupsToDelete {
-			if filepath.Base(b) == filepath.Base(toDelete) {
-				err := stor.DeleteDir(ctx, b)
-				if err != nil {
-					return err
-				}
-				u.log().Info("backup retained", slog.String("path", b))
+			if filepath.Base(b) != filepath.Base(toDelete) {
+				continue
 			}
+
+			// ONLY if manifests exists (there may be no manifests for failed backups) -> update metrics
+			info, err := u.readManifest(ctx, stor, toDelete)
+			if err == nil { // NOTE: == nil
+				metrics.M.AddBasebackupBytesDeleted(float64(info.BytesTotal))
+			}
+
+			err = stor.DeleteDir(ctx, b)
+			if err != nil {
+				return err
+			}
+			u.log().Info("backup retained", slog.String("path", b))
 		}
 	}
 

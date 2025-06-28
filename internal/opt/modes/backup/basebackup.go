@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
@@ -38,6 +40,7 @@ type Result struct {
 	StopLSN     pglogrepl.LSN `json:"stop_lsn,omitempty"`
 	TimelineID  int32         `json:"timeline_id,omitempty"`
 	Tablespaces []Tablespace  `json:"tablespaces,omitempty"`
+	BytesTotal  int64         `json:"bytes_total,omitempty"`
 }
 
 type baseBackup struct {
@@ -88,6 +91,8 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	// metrics
+	metrics.M.AddBasebackupBytesReceived(float64(result.BytesTotal))
 	return result, nil
 }
 
@@ -130,6 +135,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 	}
 
 	var remotePath string
+	var totalBytes int64
 
 	for {
 		msg, err := bb.conn.ReceiveMessage(ctx)
@@ -198,6 +204,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 				if len(m.Data) >= 9 {
 					//nolint:gosec
 					bytesDone := int64(binary.BigEndian.Uint64(m.Data[1:9]))
+					totalBytes += bytesDone
 					bb.log().Info("progress",
 						slog.String("file", remotePath),
 						slog.Int64("bytes streamed", bytesDone),
@@ -233,6 +240,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 			}
 			streamBackupResult.StopLSN = stopRes.LSN
 			streamBackupResult.Tablespaces = tablespaces
+			streamBackupResult.BytesTotal = totalBytes
 			return streamBackupResult, nil
 
 		default:
