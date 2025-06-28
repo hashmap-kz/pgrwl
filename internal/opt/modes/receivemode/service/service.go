@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 	"log/slog"
 	"path/filepath"
 	"slices"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 
 	"github.com/hashmap-kz/pgrwl/config"
 
