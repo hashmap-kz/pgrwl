@@ -1,4 +1,4 @@
-package model
+package receivemode
 
 type StreamStatus struct {
 	Slot         string `json:"slot,omitempty"`

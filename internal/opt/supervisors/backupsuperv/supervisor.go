@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
 
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/model"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
 
@@ -209,13 +209,13 @@ func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.St
 	return &info, nil
 }
 
-func (u *BaseBackupSupervisor) getReceiverConfig() (*model.BriefConfig, error) {
+func (u *BaseBackupSupervisor) getReceiverConfig() (*receivemode.BriefConfig, error) {
 	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	var c model.BriefConfig
+	var c receivemode.BriefConfig
 	resp, err := u.restyClient.R().SetResult(&c).Get(addr + "/config")
 	if err != nil {
 		return nil, err

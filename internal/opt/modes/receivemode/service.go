@@ -1,4 +1,4 @@
-package service
+package receivemode
 
 import (
 	"context"
@@ -10,8 +10,6 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/config"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/model"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
@@ -21,10 +19,10 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 )
 
-type ReceiveModeService interface {
-	Status() *model.PgRwlStatus
+type Service interface {
+	Status() *PgRwlStatus
 	DeleteWALsBefore(ctx context.Context, walFileName string) error
-	BriefConfig(ctx context.Context) *model.BriefConfig
+	BriefConfig(ctx context.Context) *BriefConfig
 }
 
 type receiveModeSvc struct {
@@ -37,7 +35,7 @@ type receiveModeSvc struct {
 	verbose     bool
 }
 
-var _ ReceiveModeService = &receiveModeSvc{}
+var _ Service = &receiveModeSvc{}
 
 type ReceiveServiceOpts struct {
 	PGRW        xlog.PgReceiveWal
@@ -48,7 +46,7 @@ type ReceiveServiceOpts struct {
 	Verbose     bool
 }
 
-func NewReceiveModeService(opts *ReceiveServiceOpts) ReceiveModeService {
+func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
 	return &receiveModeSvc{
 		l:           slog.With("component", "receive-service"),
 		pgrw:        opts.PGRW,
@@ -67,13 +65,13 @@ func (s *receiveModeSvc) log() *slog.Logger {
 	return slog.With("component", "receive-service")
 }
 
-func (s *receiveModeSvc) Status() *model.PgRwlStatus {
+func (s *receiveModeSvc) Status() *PgRwlStatus {
 	s.log().Debug("querying status")
 
-	var streamStatusResp *model.StreamStatus
+	var streamStatusResp *StreamStatus
 	if s.pgrw != nil {
 		streamStatus := s.pgrw.Status()
-		streamStatusResp = &model.StreamStatus{
+		streamStatusResp = &StreamStatus{
 			Slot:         streamStatus.Slot,
 			Timeline:     streamStatus.Timeline,
 			LastFlushLSN: streamStatus.LastFlushLSN,
@@ -81,7 +79,7 @@ func (s *receiveModeSvc) Status() *model.PgRwlStatus {
 			Running:      streamStatus.Running,
 		}
 	}
-	return &model.PgRwlStatus{
+	return &PgRwlStatus{
 		RunningMode:  s.runningMode,
 		StreamStatus: streamStatusResp,
 	}
@@ -152,7 +150,7 @@ func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string)
 	return nil
 }
 
-func (s *receiveModeSvc) BriefConfig(_ context.Context) *model.BriefConfig {
+func (s *receiveModeSvc) BriefConfig(_ context.Context) *BriefConfig {
 	cfg := config.Cfg()
-	return &model.BriefConfig{RetentionEnable: cfg.Receiver.Retention.Enable}
+	return &BriefConfig{RetentionEnable: cfg.Receiver.Retention.Enable}
 }

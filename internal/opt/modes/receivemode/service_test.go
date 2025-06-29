@@ -1,4 +1,4 @@
-package service
+package receivemode
 
 import (
 	"testing"

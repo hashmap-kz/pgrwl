@@ -1,4 +1,4 @@
-package service
+package servemode
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 )
 
-type ServeModeService interface {
+type Service interface {
 	GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error)
 }
 
@@ -26,15 +26,15 @@ type serveModeSvc struct {
 	verbose bool
 }
 
-var _ ServeModeService = &serveModeSvc{}
+var _ Service = &serveModeSvc{}
 
-type Opts struct {
+type SvcOpts struct {
 	BaseDir string
 	Storage *storage.TransformingStorage
 	Verbose bool
 }
 
-func NewServeModeService(opts *Opts) ServeModeService {
+func NewServeModeService(opts *SvcOpts) Service {
 	return &serveModeSvc{
 		l:       slog.With("component", "serve-service"),
 		baseDir: opts.BaseDir,

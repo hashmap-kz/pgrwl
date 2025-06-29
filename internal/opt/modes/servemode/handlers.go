@@ -1,33 +1,31 @@
-package receive
+package servemode
 
 import (
 	"log/slog"
 	"net/http"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	serveCtr "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode/controller"
-	serveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
-type Opts struct {
+type HandlerOpts struct {
 	BaseDir string
 	Verbose bool
 	Storage *storage.TransformingStorage
 }
 
-func Init(opts *Opts) http.Handler {
+func Init(opts *HandlerOpts) http.Handler {
 	cfg := config.Cfg()
 	l := slog.With("component", "serve-api")
 
-	service := serveSvc.NewServeModeService(&serveSvc.Opts{
+	service := NewServeModeService(&SvcOpts{
 		BaseDir: opts.BaseDir,
 		Storage: opts.Storage,
 		Verbose: opts.Verbose,
 	})
-	controller := serveCtr.NewServeModeController(service)
+	controller := NewServeModeController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{

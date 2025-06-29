@@ -1,25 +1,23 @@
-package controller
+package servemode
 
 import (
 	"io"
 	"net/http"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
-
-	serveModeSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode/service"
 )
 
-type ServeModeController struct {
-	Service serveModeSvc.ServeModeService
+type Controller struct {
+	Service Service
 }
 
-func NewServeModeController(s serveModeSvc.ServeModeService) *ServeModeController {
-	return &ServeModeController{
+func NewServeModeController(s Service) *Controller {
+	return &Controller{
 		Service: s,
 	}
 }
 
-func (c *ServeModeController) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request) {
 	filename, err := httpx.PathValueString(r, "filename")
 	if err != nil {
 		http.Error(w, "expect filename path-param", http.StatusBadRequest)

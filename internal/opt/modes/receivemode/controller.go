@@ -1,4 +1,4 @@
-package controller
+package receivemode
 
 import (
 	"errors"
@@ -6,16 +6,14 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/service"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 )
 
 type ReceiveController struct {
-	Service service.ReceiveModeService
+	Service Service
 }
 
-func NewReceiveController(s service.ReceiveModeService) *ReceiveController {
+func NewReceiveController(s Service) *ReceiveController {
 	return &ReceiveController{
 		Service: s,
 	}

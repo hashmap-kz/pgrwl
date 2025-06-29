@@ -5,8 +5,6 @@ import (
 	"net/http"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
-	receiveCrt "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/controller"
-	receiveSvc "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode/service"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 
@@ -29,14 +27,14 @@ func Init(opts *Opts) http.Handler {
 	cfg := config.Cfg()
 	l := slog.With("component", "receive-api")
 
-	service := receiveSvc.NewReceiveModeService(&receiveSvc.ReceiveServiceOpts{
+	service := NewReceiveModeService(&ReceiveServiceOpts{
 		PGRW:     opts.PGRW,
 		BaseDir:  opts.BaseDir,
 		Storage:  opts.Storage,
 		JobQueue: opts.JobQueue,
 		Verbose:  opts.Verbose,
 	})
-	controller := receiveCrt.NewReceiveController(service)
+	controller := NewReceiveController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
