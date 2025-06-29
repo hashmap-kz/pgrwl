@@ -13,6 +13,8 @@ on:
       - "**/*.md"
       - "**/*.gitignore"
       - "**/*.gitattributes"
+      - "Makefile"
+      - ".golangci.yml"
   pull_request:
     branches:
       - "master"
@@ -24,6 +26,8 @@ on:
       - "**/*.md"
       - "**/*.gitignore"
       - "**/*.gitattributes"
+      - "Makefile"
+      - ".golangci.yml"
   workflow_dispatch:
 
 env:
