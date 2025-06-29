@@ -1,10 +1,13 @@
+######################################################################
 # prometheus
+######################################################################
+
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-config
-  namespace: pgrwl-test
+  namespace: mon
 data:
   prometheus.yml: |+
     global:
@@ -12,17 +15,17 @@ data:
     scrape_configs:
       - job_name: 'prometheus'
         static_configs:
-          - targets: ['localhost:9090']
+          - targets: [ 'localhost:9090' ]
       - job_name: 'pgrwl'
         static_configs:
-          - targets: ['pgrwl-receive:7070', 'pgrwl-backup:7070']
+          - targets: [ 'pgrwl-receive:7070', 'pgrwl-backup:7070' ]
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: prometheus-data
-  namespace: pgrwl-test
+  namespace: mon
 spec:
   storageClassName: standard
   volumeMode: Filesystem
@@ -37,7 +40,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: prometheus
-  namespace: pgrwl-test
+  namespace: mon
 spec:
   type: NodePort
   selector:
@@ -53,7 +56,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: prometheus
-  namespace: pgrwl-test
+  namespace: mon
 spec:
   replicas: 1
   serviceName: prometheus
@@ -67,7 +70,7 @@ spec:
     spec:
       containers:
         - name: prometheus
-          image: prom/prometheus:latest
+          image: "prom/prometheus:v3.4.1"
           args:
             - "--config.file=/etc/prometheus/prometheus.yml"
           ports:
@@ -77,7 +80,7 @@ spec:
               mountPath: /etc/prometheus
             - name: data-volume
               mountPath: /prometheus
-          resources: {}
+          resources: { }
       volumes:
         - name: config-volume
           configMap:
@@ -87,13 +90,16 @@ spec:
             claimName: prometheus-data
             readOnly: false
 
+######################################################################
 # grafana
+######################################################################
+
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: grafana-data
-  namespace: pgrwl-test
+  namespace: mon
 spec:
   storageClassName: standard
   volumeMode: Filesystem
@@ -108,7 +114,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: grafana
-  namespace: pgrwl-test
+  namespace: mon
 spec:
   type: NodePort
   selector:
@@ -124,7 +130,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-datasources
-  namespace: pgrwl-test
+  namespace: mon
   labels:
     grafana_datasource: "1"
 data:
@@ -136,13 +142,19 @@ data:
         access: proxy
         url: http://prometheus:9090
         isDefault: true
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        jsonData:
+          maxLines: 1000
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-dashboard-config
-  namespace: pgrwl-test
+  namespace: mon
 data:
   dashboards.yaml: |
     apiVersion: 1
@@ -161,7 +173,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grafana
-  namespace: pgrwl-test
+  namespace: mon
 spec:
   replicas: 1
   selector:
@@ -174,7 +186,7 @@ spec:
     spec:
       containers:
         - name: grafana
-          image: grafana/grafana:latest
+          image: "grafana/grafana:12.0.2"
           ports:
             - containerPort: 3000
           env:
@@ -194,7 +206,7 @@ spec:
             - name: grafana-dashboards
               mountPath: /var/lib/grafana/dashboards
               readOnly: true
-          resources: {}
+          resources: { }
       volumes:
         - name: grafana-storage
           persistentVolumeClaim:
@@ -209,3 +221,203 @@ spec:
         - name: grafana-dashboards
           configMap:
             name: grafana-dashboards
+
+######################################################################
+# loki
+######################################################################
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: mon
+spec:
+  ports:
+    - name: http
+      port: 3100
+      targetPort: 3100
+  selector:
+    app: loki
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data
+  namespace: mon
+spec:
+  storageClassName: standard
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki
+  namespace: mon
+spec:
+  selector:
+    matchLabels:
+      app: loki
+  serviceName: loki
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      containers:
+        - name: loki
+          image: "grafana/loki:2.9.15"
+          args:
+            - "-config.file=/etc/loki/loki-config.yml"
+          ports:
+            - containerPort: 3100
+          volumeMounts:
+            - name: config
+              mountPath: /etc/loki
+            - name: loki-data
+              mountPath: /data/loki
+          resources: { }
+      volumes:
+        - name: config
+          configMap:
+            name: loki-config.yml
+        - name: loki-data
+          persistentVolumeClaim:
+            claimName: loki-data
+            readOnly: false
+
+######################################################################
+# promtail
+######################################################################
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promtail
+  namespace: mon
+  labels:
+    app: promtail
+
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: promtail
+  labels:
+    app: promtail
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs:
+      - get
+      - watch
+      - list
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: promtail
+  labels:
+    app: promtail
+subjects:
+  - kind: ServiceAccount
+    name: promtail
+    namespace: mon
+roleRef:
+  kind: ClusterRole
+  name: promtail
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail
+  namespace: mon
+  labels:
+    app: promtail
+spec:
+  selector:
+    matchLabels:
+      app: promtail
+  template:
+    metadata:
+      labels:
+        app: promtail
+    spec:
+      serviceAccountName: promtail
+      enableServiceLinks: true
+      securityContext:
+        runAsGroup: 0
+        runAsUser: 0
+      containers:
+        - name: promtail
+          image: "docker.io/grafana/promtail:2.9.15"
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-config.file=/etc/promtail/promtail-config.yml"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/promtail
+            - mountPath: /run/promtail
+              name: run
+            - mountPath: /var/lib/docker/containers
+              name: containers
+              readOnly: true
+            - mountPath: /var/log/pods
+              name: pods
+              readOnly: true
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: TZ
+              value: Asia/Aqtau
+          ports:
+            - name: http-metrics
+              containerPort: 3101
+              protocol: TCP
+          resources: { }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      volumes:
+        - name: config
+          configMap:
+            name: promtail-config.yml
+        - hostPath:
+            path: /run/promtail
+          name: run
+        - hostPath:
+            path: /var/lib/docker/containers
+          name: containers
+        - hostPath:
+            path: /var/log/pods
+          name: pods
