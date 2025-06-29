@@ -8,7 +8,7 @@ import (
 	"sync"
 	"syscall"
 
-	serveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/serve"
+	serveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
@@ -59,7 +59,7 @@ func RunServeMode(opts *ServeModeOpts) {
 			}
 		}()
 
-		handlers := serveAPI.Init(&serveAPI.Opts{
+		handlers := serveAPI.Init(&serveAPI.HandlerOpts{
 			BaseDir: opts.Directory,
 			Verbose: opts.Verbose,
 			Storage: stor,

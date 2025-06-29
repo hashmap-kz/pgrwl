@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
+	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
@@ -483,7 +483,7 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 		xlogoff += bytesToWrite
 
 		// NOTE:metrics
-		metrics.M.AddWALBytesReceived(float64(bytesToWrite))
+		receivemetrics.M.AddWALBytesReceived(float64(bytesToWrite))
 
 		/* Did we reach the end of a WAL segment? */
 		xlSegOff := XLogSegmentOffset(stream.blockPos, stream.walSegSz)

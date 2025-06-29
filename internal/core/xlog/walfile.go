@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+
 	"github.com/hashmap-kz/pgrwl/internal/core/conv"
 	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics"
-
 	"github.com/jackc/pglogrepl"
 )
 
@@ -291,7 +291,7 @@ func (stream *StreamCtl) closeAndRename() error {
 	}
 
 	// NOTE:metrics
-	metrics.M.IncWALFilesReceived()
+	receivemetrics.M.IncWALFilesReceived()
 
 	l.Info("segment is complete")
 	return nil
