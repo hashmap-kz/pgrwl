@@ -1,0 +1,19 @@
+{{- if .Values.receive.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "pgrwl.receiveFullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "pgrwl.receiveLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - {{ .Values.receive.persistence.accessMode }}
+  storageClassName: {{ .Values.receive.persistence.storageClassName }}
+  volumeMode: {{ .Values.receive.persistence.volumeMode }}
+  resources:
+    requests:
+      storage: {{ .Values.receive.persistence.size }}
+{{- end }}

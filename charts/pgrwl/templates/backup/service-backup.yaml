@@ -1,0 +1,18 @@
+{{- if .Values.backup.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pgrwl.backupFullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "pgrwl.backupLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.backup.service.type }}
+  ports:
+    - port: {{ .Values.backup.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "pgrwl.backupSelectorLabels" . | nindent 4 }}
+{{- end }}

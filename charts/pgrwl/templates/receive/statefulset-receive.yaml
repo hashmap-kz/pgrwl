@@ -1,0 +1,112 @@
+{{- if .Values.receive.enabled -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pgrwl.receiveFullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "pgrwl.receiveLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: {{ include "pgrwl.receiveFullname" . }}
+  selector:
+    matchLabels:
+      {{- include "pgrwl.receiveSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.receive.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "pgrwl.receiveLabels" . | nindent 8 }}
+        {{- with .Values.receive.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "pgrwl.serviceAccountName" . }}
+      {{- with .Values.receive.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.receive.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.receive.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.receive.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: {{ include "pgrwl.receiveFullname" . }}
+            readOnly: false
+        - name: pgrwl-config
+          configMap:
+            name: {{ include "pgrwl.receiveFullname" . }}
+      initContainers:
+        - name: wait-db
+          image: "busybox:latest"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -euc
+            - |
+              while ! nc -z "${PGHOST}" "${PGPORT}"; do
+                echo "Waiting for PostgreSQL to boot";
+                sleep 5;
+              done;
+              echo "PostgreSQL is ready";
+          envFrom:
+            - secretRef:
+                name: {{ include "pgrwl.receiveFullname" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.receive.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.receive.args }}
+          args: {{- include "pgrwl.tplvalues.render" (dict "value" .Values.receive.args "context" $) | nindent 12 }}
+          {{- end }}
+          env:
+          {{- range $key, $val := .Values.receive.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+          {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ include "pgrwl.receiveFullname" . }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.receive.service.port }}
+              protocol: TCP
+          {{- with .Values.receive.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.receive.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.receive.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /wals
+              name: storage
+            - mountPath: /etc/pgrwl
+              name: pgrwl-config
+{{- end }}

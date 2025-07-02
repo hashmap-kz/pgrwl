@@ -1,0 +1,12 @@
+{{- if .Values.receive.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pgrwl.receiveFullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "pgrwl.receiveLabels" . | nindent 4 }}
+data:
+  config.yml: |
+    {{- tpl (mergeOverwrite (tpl .Values.receive.config . | fromYaml) .Values.structuredConfig | toYaml) . | nindent 4 }}
+{{- end }}
