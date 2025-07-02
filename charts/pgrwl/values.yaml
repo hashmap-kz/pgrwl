@@ -1,0 +1,144 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+image:
+  registry: "quay.io"
+  repository: "hashmap_kz/pgrwl"
+  tag: ""
+  pullPolicy: IfNotPresent
+
+######################################################################
+## GENERIC CONFIGURATION
+######################################################################
+
+pgconn:
+  PGHOST: "postgres"
+  PGPORT: "5432"
+  PGUSER: "postgres"
+  PGPASSWORD: "postgres"
+
+structuredConfig:
+  main:
+    listen_port: 7070
+    directory: "/wals/wal-archive"
+  log:
+    level: trace
+    format: text
+    add_source: true
+  metrics:
+    enable: true
+  storage:
+    name: s3
+    compression:
+      algo: gzip
+    encryption:
+      algo: aes-256-gcm
+      pass: qwerty123
+    s3:
+      url: https://minio:9000
+      access_key_id: minioadmin
+      secret_access_key: minioadmin123
+      bucket: backups
+      region: main
+      use_path_style: true
+      disable_ssl: true
+#   sftp:
+#     host: sftp.example.com
+#     port: 22
+#     user: backupuser
+#     pass: ""
+#     pkey_path: "/home/user/.ssh/id_rsa"
+#     pkey_pass: ""
+#     base_dir: "/mnt/wal-archive"
+
+######################################################################
+## RECEIVE MODE
+######################################################################
+
+receive:
+  enabled: true
+  # required section
+  persistence:
+    storageClassName: standard
+    accessMode: ReadWriteOnce
+    volumeMode: Filesystem
+    size: 16Gi
+  service:
+    type: ClusterIP
+    port: 7070
+  args: ["start"]
+  env:
+    PGRWL_MODE: "receive"
+    PGRWL_CONFIG_PATH: "/etc/pgrwl/config.yml"
+  config: |
+    receiver:
+      slot: pgrwl_v5
+      no_loop: true
+      uploader:
+        sync_interval: 10s
+        max_concurrency: 4
+      retention:
+        enable: true
+        sync_interval: 10s
+        keep_period: "5m"
+  # optional section
+  livenessProbe: {}
+  readinessProbe: {}
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  resources: {}
+
+######################################################################
+## BACKUP MODE
+######################################################################
+
+backup:
+  enabled: true
+  # required section
+  persistence:
+    storageClassName: standard
+    accessMode: ReadWriteOnce
+    volumeMode: Filesystem
+    size: 16Gi
+  service:
+    type: ClusterIP
+    port: 7070
+  args: ["start"]
+  env:
+    PGRWL_MODE: "backup"
+    PGRWL_CONFIG_PATH: "/etc/pgrwl/config.yml"
+  config: |
+    backup:
+      cron: "* * * * *"
+      retention:
+        enable: true
+        type: time
+        value: "5m"
+  # optional section
+  livenessProbe: {}
+  readinessProbe: {}
+  podAnnotations: {}
+  podLabels: {}
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  resources: {}
+
+######################################################################
+## ETC
+######################################################################
+
+serviceAccount:
+  create: false
+  automount: true
+  annotations: {}
+  name: ""

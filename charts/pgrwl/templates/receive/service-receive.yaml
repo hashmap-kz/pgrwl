@@ -1,0 +1,18 @@
+{{- if .Values.receive.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pgrwl.receiveFullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "pgrwl.receiveLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.receive.service.type }}
+  ports:
+    - port: {{ .Values.receive.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "pgrwl.receiveSelectorLabels" . | nindent 4 }}
+{{- end }}
