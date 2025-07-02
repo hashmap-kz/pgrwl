@@ -292,6 +292,8 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 ### Helm Chart
 
+See [pgrwl-helm-chart](charts/pgrwl)
+
 ```bash
 helm repo add pgrwl https://hashmap-kz.github.io/pgrwl
 helm repo update
