@@ -36,6 +36,7 @@ integration with Kubernetes environments.
     - [Docker Images](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
     - [Binaries](#manual-installation)
     - [Packages](#package-based-installation-suitable-in-cicd)
+    - [Helm Chart](#helm-chart)
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
     - [Design Notes](#design-notes)
@@ -288,6 +289,20 @@ apk update && apk add --no-cache bash curl
 curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linux_amd64.apk
 apk add pgrwl_linux_amd64.apk --allow-untrusted
 ```
+
+### Helm Chart
+
+```bash
+helm repo add pgrwl https://hashmap-kz.github.io/pgrwl
+helm repo update
+```
+
+To install the chart with the release name `pgrwl`:
+
+```bash
+helm install pgrwl pgrwl/pgrwl
+```
+
 
 ---
 
