@@ -3,3 +3,4 @@ testdata/** linguist-vendored
 examples/** linguist-vendored
 hack/** linguist-vendored
 docs/** linguist-vendored
+charts/** linguist-vendored
