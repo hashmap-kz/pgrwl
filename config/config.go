@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,8 +10,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/sethvargo/go-envconfig"
 
 	"sigs.k8s.io/yaml"
 )
@@ -61,9 +63,6 @@ const (
 )
 
 var (
-	// once ensures config is initialized only once.
-	once sync.Once
-
 	// config holds the global application configuration.
 	config *Config
 
@@ -93,10 +92,10 @@ type Config struct {
 // MainConfig holds top-level application settings.
 type MainConfig struct {
 	// ListenPort is the TCP port for the management HTTP server.
-	ListenPort int `json:"listen_port,omitempty"`
+	ListenPort int `json:"listen_port,omitempty" env:"PGRWL_MAIN_LISTEN_PORT"`
 
 	// Directory is the base directory where WAL files and metadata are stored.
-	Directory string `json:"directory,omitempty"`
+	Directory string `json:"directory,omitempty" env:"PGRWL_MAIN_DIRECTORY"`
 }
 
 // DevConfig configures development-only features like profiling and debug endpoints.
@@ -106,12 +105,12 @@ type DevConfig struct {
 
 // DevConfigPprof configures pprof.
 type DevConfigPprof struct {
-	Enable bool `json:"enable,omitempty"`
+	Enable bool `json:"enable,omitempty" env:"PGRWL_DEV_CONFIG_PPROF_ENABLE"`
 }
 
 // BackupConfig configures streaming basebackup properties.
 type BackupConfig struct {
-	Cron      string                `json:"cron"`
+	Cron      string                `json:"cron" env:"PGRWL_BACKUP_CRON"`
 	Retention BackupRetentionConfig `json:"retention,omitempty"`
 	Wals      BackupWALsConfig      `json:"wals,omitempty"`
 }
@@ -119,30 +118,30 @@ type BackupConfig struct {
 // BackupRetentionConfig configures retention for basebackups.
 type BackupRetentionConfig struct {
 	// Enable determines whether retention logic is active.
-	Enable bool `json:"enable,omitempty"`
+	Enable bool `json:"enable,omitempty" env:"PGRWL_BACKUP_RETENTION_ENABLE"`
 
-	Type  string `json:"type,omitempty"`
-	Value string `json:"value,omitempty"`
+	Type  string `json:"type,omitempty" env:"PGRWL_BACKUP_RETENTION_TYPE"`
+	Value string `json:"value,omitempty" env:"PGRWL_BACKUP_RETENTION_VALUE"`
 
 	KeepDurationParsed time.Duration `json:"-"`
 	KeepCountParsed    int64         `json:"-"`
 
-	KeepLast *int `json:"keep_last,omitempty"`
+	KeepLast *int `json:"keep_last,omitempty" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
 }
 
 // BackupWALsConfig configures related setting for WAL-archive.
 type BackupWALsConfig struct {
-	ManageCleanup bool   `json:"manage_cleanup,omitempty"`
-	ReceiverAddr  string `json:"receiver_addr,omitempty"`
+	ManageCleanup bool   `json:"manage_cleanup,omitempty" env:"PGRWL_BACKUP_WALS_MANAGE_CLEANUP"`
+	ReceiverAddr  string `json:"receiver_addr,omitempty" env:"PGRWL_BACKUP_WALS_RECEIVER_ADDR"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.
 type ReceiveConfig struct {
 	// Slot is the replication slot name used to stream WAL from PostgreSQL.
-	Slot string `json:"slot,omitempty"`
+	Slot string `json:"slot,omitempty" env:"PGRWL_RECEIVER_SLOT"`
 
 	// NoLoop disables automatic reconnection loops on connection loss.
-	NoLoop bool `json:"no_loop,omitempty"`
+	NoLoop bool `json:"no_loop,omitempty" env:"PGRWL_RECEIVER_NO_LOOP"`
 
 	// Uploader worker configuration.
 	Uploader UploadConfig `json:"uploader,omitempty"`
@@ -155,50 +154,47 @@ type ReceiveConfig struct {
 type UploadConfig struct {
 	// SyncInterval is the interval between upload checks (e.g., "10s", "5m").
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval       string        `json:"sync_interval"`
-	SyncIntervalParsed time.Duration `json:"-"`
+	SyncInterval Duration `json:"sync_interval" env:"PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL"`
 
 	// MaxConcurrency is the maximum number of concurrent upload tasks.
-	MaxConcurrency int `json:"max_concurrency"`
+	MaxConcurrency int `json:"max_concurrency" env:"PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY"`
 }
 
 // RetentionConfig configures the WAL file retention worker.
 type RetentionConfig struct {
 	// Enable determines whether retention logic is active.
-	Enable bool `json:"enable,omitempty"`
+	Enable bool `json:"enable,omitempty" env:"PGRWL_RECEIVER_RETENTION_ENABLE"`
 
 	// SyncInterval is the interval between retention scans (e.g., "12h").
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval       string        `json:"sync_interval"`
-	SyncIntervalParsed time.Duration `json:"-"`
+	SyncInterval Duration `json:"sync_interval" env:"PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL"`
 
 	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
-	KeepPeriod       string        `json:"keep_period,omitempty"`
-	KeepPeriodParsed time.Duration `json:"-"`
+	KeepPeriod Duration `json:"keep_period,omitempty" env:"PGRWL_RECEIVER_RETENTION_KEEP_PERIOD"`
 }
 
 // MetricsConfig enables or disables Prometheus metrics exposure.
 type MetricsConfig struct {
 	// Enable turns on Prometheus metrics HTTP endpoint.
-	Enable bool `json:"enable,omitempty"`
+	Enable bool `json:"enable,omitempty" env:"PGRWL_METRICS_ENABLE"`
 }
 
 // LogConfig defines application logging options.
 type LogConfig struct {
 	// Level sets the log level (e.g., "trace", "debug", "info", "warn", "error").
-	Level string `json:"level,omitempty"`
+	Level string `json:"level,omitempty" env:"PGRWL_LOG_LEVEL"`
 
 	// Format sets the log format ("text" or "json").
-	Format string `json:"format,omitempty"`
+	Format string `json:"format,omitempty" env:"PGRWL_LOG_FORMAT"`
 
 	// AddSource includes source file and line in log entries.
-	AddSource bool `json:"add_source,omitempty"`
+	AddSource bool `json:"add_source,omitempty" env:"PGRWL_LOG_ADD_SOURCE"`
 }
 
 // StorageConfig defines which storage backend to use and its options.
 type StorageConfig struct {
 	// Name specifies the storage backend to use ("s3", "sftp", etc.).
-	Name string `json:"name,omitempty"`
+	Name string `json:"name,omitempty" env:"PGRWL_STORAGE_NAME"`
 
 	// Compression defines compression settings for stored WAL files.
 	Compression CompressionConfig `json:"compression,omitempty"`
@@ -216,64 +212,64 @@ type StorageConfig struct {
 // CompressionConfig defines the compression algorithm to use.
 type CompressionConfig struct {
 	// Algo is the compression algorithm ("gzip", "zstd", etc.).
-	Algo string `json:"algo,omitempty"`
+	Algo string `json:"algo,omitempty" env:"PGRWL_STORAGE_COMPRESSION_ALGO"`
 }
 
 // EncryptionConfig defines the encryption algorithm and credentials.
 type EncryptionConfig struct {
 	// Algo is the encryption algorithm identifier ("aes-256-gcm", etc.).
-	Algo string `json:"algo,omitempty"`
+	Algo string `json:"algo,omitempty" env:"PGRWL_STORAGE_ENCRYPTION_ALGO"`
 
 	// Pass is the encryption passphrase.
-	Pass string `json:"pass,omitempty"`
+	Pass string `json:"pass,omitempty" env:"PGRWL_STORAGE_ENCRYPTION_PASS"`
 }
 
 // SFTPConfig defines parameters for connecting to an SFTP server.
 type SFTPConfig struct {
 	// Host is the SFTP server hostname or IP.
-	Host string `json:"host,omitempty"`
+	Host string `json:"host,omitempty" env:"PGRWL_STORAGE_SFTP_HOST"`
 
 	// Port is the TCP port for the SFTP server.
-	Port int `json:"port,omitempty"`
+	Port int `json:"port,omitempty" env:"PGRWL_STORAGE_SFTP_PORT"`
 
 	// User is the username for SFTP authentication.
-	User string `json:"user,omitempty"`
+	User string `json:"user,omitempty" env:"PGRWL_STORAGE_SFTP_USER"`
 
 	// Pass is the password for SFTP authentication (if not using a key).
-	Pass string `json:"pass,omitempty"`
+	Pass string `json:"pass,omitempty" env:"PGRWL_STORAGE_SFTP_PASS"`
 
 	// PKeyPath is the file path to the private key for key-based authentication.
-	PKeyPath string `json:"pkey_path,omitempty"`
+	PKeyPath string `json:"pkey_path,omitempty" env:"PGRWL_STORAGE_SFTP_PKEY_PATH"`
 
 	// PKeyPass is the passphrase for the private key, if encrypted.
-	PKeyPass string `json:"pkey_pass,omitempty"`
+	PKeyPass string `json:"pkey_pass,omitempty" env:"PGRWL_STORAGE_SFTP_PKEY_PASS"`
 
 	// Base directory with sufficient user permissions
-	BaseDir string `json:"base_dir,omitempty"`
+	BaseDir string `json:"base_dir,omitempty" env:"PGRWL_STORAGE_SFTP_BASE_DIR"`
 }
 
 // S3Config defines configuration for S3-compatible object storage.
 type S3Config struct {
 	// URL is the S3-compatible endpoint URL (e.g., "https://s3.amazonaws.com").
-	URL string `json:"url,omitempty"`
+	URL string `json:"url,omitempty" env:"PGRWL_STORAGE_S3_URL"`
 
 	// AccessKeyID is the S3 access key ID.
-	AccessKeyID string `json:"access_key_id,omitempty"`
+	AccessKeyID string `json:"access_key_id,omitempty" env:"PGRWL_STORAGE_S3_ACCESS_KEY_ID"`
 
 	// SecretAccessKey is the S3 secret access key.
-	SecretAccessKey string `json:"secret_access_key,omitempty"`
+	SecretAccessKey string `json:"secret_access_key,omitempty" env:"PGRWL_STORAGE_S3_SECRET_ACCESS_KEY"`
 
 	// Bucket is the name of the S3 bucket to store WAL files.
-	Bucket string `json:"bucket,omitempty"`
+	Bucket string `json:"bucket,omitempty" env:"PGRWL_STORAGE_S3_BUCKET"`
 
 	// Region is the AWS region (for Amazon S3).
-	Region string `json:"region,omitempty"`
+	Region string `json:"region,omitempty" env:"PGRWL_STORAGE_S3_REGION"`
 
 	// UsePathStyle forces path-style requests instead of virtual-hosted style.
-	UsePathStyle bool `json:"use_path_style,omitempty"`
+	UsePathStyle bool `json:"use_path_style,omitempty" env:"PGRWL_STORAGE_S3_USE_PATH_STYLE"`
 
 	// DisableSSL disables HTTPS for connections to the S3 endpoint.
-	DisableSSL bool `json:"disable_ssl,omitempty"`
+	DisableSSL bool `json:"disable_ssl,omitempty" env:"PGRWL_STORAGE_S3_DISABLE_SSL"`
 }
 
 // String returns a pretty-printed structure where sensitive fields are hidden.
@@ -325,13 +321,32 @@ func Cfg() *Config {
 	return config
 }
 
+// MustLoad reads config from file
 func MustLoad(path, mode string) *Config {
-	once.Do(func() {
-		config = mustLoadCfg(path)
-		if err := validate(config, mode); err != nil {
-			log.Fatalf("Invalid config: %v", err)
-		}
-	})
+	if config != nil {
+		log.Fatalf("cannot load config twice, already loaded")
+	}
+
+	config = mustLoadCfg(path)
+	if err := validate(config, mode); err != nil {
+		log.Fatalf("invalid config: %v", err)
+	}
+	return config
+}
+
+// MustEnvconfig build config from envs with go-envconfig
+func MustEnvconfig(mode string) *Config {
+	if config != nil {
+		log.Fatalf("cannot load config twice, already loaded")
+	}
+
+	config = new(Config)
+	if err := envconfig.Process(context.TODO(), config); err != nil {
+		log.Fatalf("cannot load config with envconfig: %v", err)
+	}
+	if err := validate(config, mode); err != nil {
+		log.Fatalf("invalid config: %v", err)
+	}
 	return config
 }
 
@@ -416,30 +431,8 @@ func checkReceiverConfig(c *Config, mode string, errs []string) []string {
 		// * when external storage is used
 		// * when local storage used with compression || encryption configured
 		if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
-			// uploader
-			syncIntervalUploader := c.Receiver.Uploader.SyncInterval
-			if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
-			} else {
-				c.Receiver.Uploader.SyncIntervalParsed = duration
-			}
 			if c.Receiver.Uploader.MaxConcurrency <= 0 {
 				errs = append(errs, "receiver.uploader.max_concurrency must be > 0 if uploader is configured")
-			}
-		}
-		// retention
-		if c.Receiver.Retention.Enable {
-			syncIntervalRetention := c.Receiver.Retention.SyncInterval
-			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
-			} else {
-				c.Receiver.Retention.SyncIntervalParsed = duration
-			}
-			keepPeriodRetention := c.Receiver.Retention.KeepPeriod
-			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
-			} else {
-				c.Receiver.Retention.KeepPeriodParsed = duration
 			}
 		}
 	}
@@ -577,4 +570,19 @@ func (c *Config) IsExternalStor() bool {
 func (c *Config) IsLocalStor() bool {
 	return strings.EqualFold(c.Storage.Name, StorageNameLocalFS) ||
 		strings.TrimSpace(c.Storage.Name) == ""
+}
+
+// helpers
+
+type Duration time.Duration
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	// Strip quotes and parse string as duration
+	s := strings.Trim(string(b), `"`)
+	duration, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	*d = Duration(duration)
+	return nil
 }

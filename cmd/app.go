@@ -19,11 +19,10 @@ import (
 
 func App() *cli.Command {
 	configFlag := &cli.StringFlag{
-		Name:     "config",
-		Usage:    "Path to config file",
-		Aliases:  []string{"c"},
-		Required: true,
-		Sources:  cli.EnvVars("PGRWL_CONFIG_PATH"),
+		Name:    "config",
+		Usage:   "Path to config file",
+		Aliases: []string{"c"},
+		Sources: cli.EnvVars("PGRWL_CONFIG_PATH"),
 	}
 	modeFlag := &cli.StringFlag{
 		Name:     "mode",
@@ -48,10 +47,6 @@ func App() *cli.Command {
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					mode := c.String("mode")
-					if mode == "" {
-						log.Fatal("required flag 'mode' is empty")
-					}
-
 					cfg := loadConfig(c, mode)
 					verbose := strings.EqualFold(cfg.Log.Level, "trace")
 
@@ -188,11 +183,18 @@ func App() *cli.Command {
 }
 
 func loadConfig(c *cli.Command, mode string) *config.Config {
+	// 1) if -c flag is set -> must read config from file
+	// 2) if $PGRWL_CONFIG_PATH is set -> must read config from file
+	// 3) read config with go-envconfig otherwise
+
 	configPath := c.String("config")
+
+	var cfg *config.Config
 	if configPath == "" {
-		log.Fatal("config path is not defined")
+		cfg = config.MustEnvconfig(mode)
+	} else {
+		cfg = config.MustLoad(configPath, mode)
 	}
-	cfg := config.MustLoad(configPath, mode)
 
 	// debug config (NOTE: sensitive fields are hidden)
 	_, _ = fmt.Fprintf(os.Stderr, "STARTING WITH CONFIGURATION (%s):\n%s\n\n",
