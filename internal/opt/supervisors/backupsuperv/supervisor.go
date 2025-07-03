@@ -100,7 +100,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 		}()
 
 		u.log().Info("starting scheduled basebackup")
-		time.Sleep(65 * time.Second)
+
 		// retain previous
 		if u.cfg.Backup.Retention.Enable {
 			if u.cfg.Backup.Retention.Type == config.BackupRetentionTypeTime {
