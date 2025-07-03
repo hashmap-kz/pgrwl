@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# pgconn envs
+######################################################################
+## pgconn envs
+######################################################################
 export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
 
-# pgrwl envs
+######################################################################
+## pgrwl envs
+######################################################################
 export PGRWL_MODE=receive
 export PGRWL_MAIN_LISTEN_PORT=7070
 export PGRWL_MAIN_DIRECTORY=wals
