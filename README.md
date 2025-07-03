@@ -243,45 +243,45 @@ storage:                                 # Optional
 Corresponding env-vars.
 
 ```
-PGRWL_MAIN_LISTEN_PORT                  - HTTP server port (used for management)
-PGRWL_MAIN_DIRECTORY                    - Base directory for storing WAL files
-PGRWL_RECEIVER_SLOT                     - Replication slot to use
-PGRWL_RECEIVER_NO_LOOP                  - If true, do not loop on connection loss
-PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL   - Interval for the upload worker to check for new files
-PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY - Maximum number of files to upload concurrently
-PGRWL_RECEIVER_RETENTION_ENABLE         - Perform retention rules
-PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL  - Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-PGRWL_RECEIVER_RETENTION_KEEP_PERIOD    - Remove WAL files older than given period
-PGRWL_BACKUP_CRON                       - Basebackup cron schedule
-PGRWL_BACKUP_RETENTION_ENABLE           - Perform retention rules
-PGRWL_BACKUP_RETENTION_TYPE             - One of: (time / count)
-PGRWL_BACKUP_RETENTION_VALUE            - Remove backups older than given period (if time), keep last N backups (if count)
-PGRWL_BACKUP_RETENTION_KEEP_LAST        - Always keep last N backups (suitable when 'retention.type = time')
-PGRWL_BACKUP_WALS_MANAGE_CLEANUP        - After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-PGRWL_BACKUP_WALS_RECEIVER_ADDR         - Address or WAL-receiver instance (required when manage_cleanup is set to true)
-PGRWL_LOG_LEVEL                         - One of: (trace / debug / info / warn / error)
-PGRWL_LOG_FORMAT                        - One of: (text / json)
-PGRWL_LOG_ADD_SOURCE                    - Include file:line in log messages (for local development)
-PGRWL_METRICS_ENABLE                    - Optional (used in receive mode: http://host:port/metrics)
-PGRWL_DEV_CONFIG_PPROF_ENABLE           - Enable pprof handlers
-PGRWL_STORAGE_NAME                      - One of: (s3 / sftp)
-PGRWL_STORAGE_COMPRESSION_ALGO          - One of: (gzip / zstd)
-PGRWL_STORAGE_ENCRYPTION_ALGO           - One of: (aes-256-gcm)
-PGRWL_STORAGE_ENCRYPTION_PASS           - Encryption password (from env)
-PGRWL_STORAGE_SFTP_HOST                 - SFTP server hostname
-PGRWL_STORAGE_SFTP_PORT                 - SFTP server port
-PGRWL_STORAGE_SFTP_USER                 - SFTP username
-PGRWL_STORAGE_SFTP_PASS                 - SFTP password (from env)
-PGRWL_STORAGE_SFTP_PKEY_PATH            - Path to SSH private key (optional)
-PGRWL_STORAGE_SFTP_PKEY_PASS            - Required if the private key is password-protected
-PGRWL_STORAGE_SFTP_BASE_DIR             - Base directory with sufficient user permissions
-PGRWL_STORAGE_S3_URL                    - S3-compatible endpoint URL
-PGRWL_STORAGE_S3_ACCESS_KEY_ID          - AWS access key ID
-PGRWL_STORAGE_S3_SECRET_ACCESS_KEY      - AWS secret access key (from env)
-PGRWL_STORAGE_S3_BUCKET                 - Target S3 bucket name
-PGRWL_STORAGE_S3_REGION                 - S3 region
-PGRWL_STORAGE_S3_USE_PATH_STYLE         - Use path-style URLs for S3
-PGRWL_STORAGE_S3_DISABLE_SSL            - Disable SSL
+PGRWL_MAIN_LISTEN_PORT                   # HTTP server port (used for management)
+PGRWL_MAIN_DIRECTORY                     # Base directory for storing WAL files
+PGRWL_RECEIVER_SLOT                      # Replication slot to use
+PGRWL_RECEIVER_NO_LOOP                   # If true, do not loop on connection loss
+PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL    # Interval for the upload worker to check for new files
+PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY  # Maximum number of files to upload concurrently
+PGRWL_RECEIVER_RETENTION_ENABLE          # Perform retention rules
+PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
+PGRWL_RECEIVER_RETENTION_KEEP_PERIOD     # Remove WAL files older than given period
+PGRWL_BACKUP_CRON                        # Basebackup cron schedule
+PGRWL_BACKUP_RETENTION_ENABLE            # Perform retention rules
+PGRWL_BACKUP_RETENTION_TYPE              # One of: (time / count)
+PGRWL_BACKUP_RETENTION_VALUE             # Remove backups older than given period (if time), keep last N backups (if count)
+PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable when 'retention.type = time')
+PGRWL_BACKUP_WALS_MANAGE_CLEANUP         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
+PGRWL_BACKUP_WALS_RECEIVER_ADDR          # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
+PGRWL_LOG_FORMAT                         # One of: (text / json)
+PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)
+PGRWL_METRICS_ENABLE                     # Optional (used in receive mode: http://host:port/metrics)
+PGRWL_DEV_CONFIG_PPROF_ENABLE            # Enable pprof handlers
+PGRWL_STORAGE_NAME                       # One of: (s3 / sftp)
+PGRWL_STORAGE_COMPRESSION_ALGO           # One of: (gzip / zstd)
+PGRWL_STORAGE_ENCRYPTION_ALGO            # One of: (aes-256-gcm)
+PGRWL_STORAGE_ENCRYPTION_PASS            # Encryption password (from env)
+PGRWL_STORAGE_SFTP_HOST                  # SFTP server hostname
+PGRWL_STORAGE_SFTP_PORT                  # SFTP server port
+PGRWL_STORAGE_SFTP_USER                  # SFTP username
+PGRWL_STORAGE_SFTP_PASS                  # SFTP password (from env)
+PGRWL_STORAGE_SFTP_PKEY_PATH             # Path to SSH private key (optional)
+PGRWL_STORAGE_SFTP_PKEY_PASS             # Required if the private key is password-protected
+PGRWL_STORAGE_SFTP_BASE_DIR              # Base directory with sufficient user permissions
+PGRWL_STORAGE_S3_URL                     # S3-compatible endpoint URL
+PGRWL_STORAGE_S3_ACCESS_KEY_ID           # AWS access key ID
+PGRWL_STORAGE_S3_SECRET_ACCESS_KEY       # AWS secret access key (from env)
+PGRWL_STORAGE_S3_BUCKET                  # Target S3 bucket name
+PGRWL_STORAGE_S3_REGION                  # S3 region
+PGRWL_STORAGE_S3_USE_PATH_STYLE          # Use path-style URLs for S3
+PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
 ```
 
 ---
