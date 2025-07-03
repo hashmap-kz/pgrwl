@@ -84,13 +84,13 @@ var (
 // Config is the root configuration for the WAL receiver application.
 // Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
-	Main      MainConfig    `json:"main,omitempty"`       // Main application settings.
-	Receiver  ReceiveConfig `json:"receiver,omitempty"`   // WAL receiver configuration.
-	Metrics   MetricsConfig `json:"metrics,omitempty"`    // Prometheus metrics configuration.
-	Log       LogConfig     `json:"log,omitempty"`        // Logging configuration.
-	Storage   StorageConfig `json:"storage,omitempty"`    // Storage backend configuration.
-	DevConfig DevConfig     `json:"dev_config,omitempty"` // Various dev options.
-	Backup    BackupConfig  `json:"backup,omitempty"`     // Streaming basebackup options.
+	Main      MainConfig    `json:"main,omitempty"`      // Main application settings.
+	Receiver  ReceiveConfig `json:"receiver,omitempty"`  // WAL receiver configuration.
+	Metrics   MetricsConfig `json:"metrics,omitempty"`   // Prometheus metrics configuration.
+	Log       LogConfig     `json:"log,omitempty"`       // Logging configuration.
+	Storage   StorageConfig `json:"storage,omitempty"`   // Storage backend configuration.
+	DevConfig DevConfig     `json:"devconfig,omitempty"` // Various dev options.
+	Backup    BackupConfig  `json:"backup,omitempty"`    // Streaming basebackup options.
 }
 
 // MainConfig holds top-level application settings.
@@ -109,14 +109,14 @@ type DevConfig struct {
 
 // DevConfigPprof configures pprof.
 type DevConfigPprof struct {
-	Enable bool `json:"enable,omitempty" env:"PGRWL_DEV_CONFIG_PPROF_ENABLE"`
+	Enable bool `json:"enable,omitempty" env:"PGRWL_DEVCONFIG_PPROF_ENABLE"`
 }
 
 // BackupConfig configures streaming basebackup properties.
 type BackupConfig struct {
-	Cron      string                `json:"cron" env:"PGRWL_BACKUP_CRON"`
-	Retention BackupRetentionConfig `json:"retention,omitempty"`
-	Wals      BackupWALsConfig      `json:"wals,omitempty"`
+	Cron         string                   `json:"cron" env:"PGRWL_BACKUP_CRON"`
+	Retention    BackupRetentionConfig    `json:"retention,omitempty"`
+	WalRetention BackupWalRetentionConfig `json:"walretention,omitempty"`
 }
 
 // BackupRetentionConfig configures retention for basebackups.
@@ -133,10 +133,10 @@ type BackupRetentionConfig struct {
 	KeepLast *int `json:"keep_last,omitempty" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
 }
 
-// BackupWALsConfig configures related setting for WAL-archive.
-type BackupWALsConfig struct {
-	ManageCleanup bool   `json:"manage_cleanup,omitempty" env:"PGRWL_BACKUP_WALS_MANAGE_CLEANUP"`
-	ReceiverAddr  string `json:"receiver_addr,omitempty" env:"PGRWL_BACKUP_WALS_RECEIVER_ADDR"`
+// BackupWalRetentionConfig configures related setting for WAL-archive.
+type BackupWalRetentionConfig struct {
+	Enable       bool   `json:"enable,omitempty" env:"PGRWL_BACKUP_WALRETENTION_ENABLE"`
+	ReceiverAddr string `json:"receiver_addr,omitempty" env:"PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.

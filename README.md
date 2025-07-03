@@ -199,8 +199,8 @@ backup:                                  # Required for 'backup' mode
     type: time                           # One of: (time / count)
     value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
     keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
-  wals:                                  # Optional (WAL archive related settings)
-    manage_cleanup: true                 # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
+  walretention:                          # Optional (WAL archive cleanup settings)
+    enable: true                         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
     receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 
 log:                                     # Optional
@@ -211,7 +211,7 @@ log:                                     # Optional
 metrics:                                 # Optional
   enable: true                           # Optional (used in receive mode: http://host:port/metrics)
 
-dev_config:                              # Optional (various dev options)
+devconfig:                               # Optional (various dev options)
   pprof:                                 # pprof settings
     enable: true                         # Enable pprof handlers
 
@@ -257,13 +257,13 @@ PGRWL_BACKUP_RETENTION_ENABLE            # Perform retention rules
 PGRWL_BACKUP_RETENTION_TYPE              # One of: (time / count)
 PGRWL_BACKUP_RETENTION_VALUE             # Remove backups older than given period (if time), keep last N backups (if count)
 PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable when 'retention.type = time')
-PGRWL_BACKUP_WALS_MANAGE_CLEANUP         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-PGRWL_BACKUP_WALS_RECEIVER_ADDR          # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+PGRWL_BACKUP_WALRETENTION_ENABLE         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
+PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
 PGRWL_LOG_FORMAT                         # One of: (text / json)
 PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)
 PGRWL_METRICS_ENABLE                     # Optional (used in receive mode: http://host:port/metrics)
-PGRWL_DEV_CONFIG_PPROF_ENABLE            # Enable pprof handlers
+PGRWL_DEVCONFIG_PPROF_ENABLE             # Enable pprof handlers
 PGRWL_STORAGE_NAME                       # One of: (s3 / sftp)
 PGRWL_STORAGE_COMPRESSION_ALGO           # One of: (gzip / zstd)
 PGRWL_STORAGE_ENCRYPTION_ALGO            # One of: (aes-256-gcm)

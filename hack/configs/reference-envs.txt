@@ -12,8 +12,8 @@ PGRWL_BACKUP_RETENTION_ENABLE            # Perform retention rules
 PGRWL_BACKUP_RETENTION_TYPE              # One of: (time / count)
 PGRWL_BACKUP_RETENTION_VALUE             # Remove backups older than given period (if time), keep last N backups (if count)
 PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable when 'retention.type = time')
-PGRWL_BACKUP_WALS_MANAGE_CLEANUP         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-PGRWL_BACKUP_WALS_RECEIVER_ADDR          # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+PGRWL_BACKUP_WALRETENTION_ENABLE         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
+PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
 PGRWL_LOG_FORMAT                         # One of: (text / json)
 PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)

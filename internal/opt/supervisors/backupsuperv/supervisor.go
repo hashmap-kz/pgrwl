@@ -124,7 +124,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 			u.log().Info("basebackup completed")
 
 			// cleanup wal-archive (when basebackup is completed without errors)
-			if u.cfg.Backup.Wals.ManageCleanup {
+			if u.cfg.Backup.WalRetention.Enable {
 				if err := u.cleanupWalArchive(ctx, startupInfo); err != nil {
 					u.log().Error("wal-archive cleanup failed", slog.Any("err", err))
 				}
@@ -152,7 +152,7 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 		return fmt.Errorf("cannot use both: (receiver.retention.enable && backup.wals.manage_cleanup)")
 	}
 
-	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
+	addr, err := cmdx.Addr(u.cfg.Backup.WalRetention.ReceiverAddr)
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.St
 }
 
 func (u *BaseBackupSupervisor) getReceiverConfig() (*receivemode.BriefConfig, error) {
-	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
+	addr, err := cmdx.Addr(u.cfg.Backup.WalRetention.ReceiverAddr)
 	if err != nil {
 		return nil, err
 	}
