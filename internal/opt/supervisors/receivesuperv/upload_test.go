@@ -69,8 +69,8 @@ func TestArchiveSupervisor_PerformUploads(t *testing.T) {
 	cfg := &config.Config{
 		Receiver: config.ReceiveConfig{
 			Uploader: config.UploadConfig{
-				MaxConcurrency:     2,
-				SyncIntervalParsed: 1 * time.Second,
+				MaxConcurrency: 2,
+				SyncInterval:   config.Duration(1 * time.Second),
 			},
 		},
 		Storage: config.StorageConfig{},
