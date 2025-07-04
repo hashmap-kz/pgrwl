@@ -10,8 +10,8 @@ backup:
     type: time
     value: "1m"
     keep_last: 1
-  wals:
-    manage_cleanup: true
+  walretention:
+    enable: true
     receiver_addr: "pgrwl-receive:7070"
 
 log:

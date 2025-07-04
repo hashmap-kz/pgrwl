@@ -23,7 +23,7 @@ integration with Kubernetes environments.
 
 - [About](#about)
 - [Usage](#usage)
-    - [Receive Mode](#receive-mode)
+    - [Receive Mode](#receive-mode-quick-start)
     - [Serve Mode](#serve-mode)
     - [Backup Mode](#backup-mode)
     - [Restore Command](#restore-command)
@@ -78,11 +78,58 @@ integration with Kubernetes environments.
 
 **[`^        back to top        ^`](#table-of-contents)**
 
-### Receive Mode
+### Receive Mode Quick Start
 
 `Receive` mode is _the main loop of the WAL receiver_.
 
 ```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Clone repo
+git clone https://github.com/hashmap-kz/pgrwl.git
+cd pgrwl
+
+# Prepare docker-compose files
+cat <<EOF >pg_hba.conf
+local all         all     trust
+local replication all     trust
+host  all         all all trust
+host  replication all all trust
+EOF
+
+cat <<EOF >docker-compose.yml
+services:
+  pg-primary:
+    image: postgres:17
+    container_name: pg-primary
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "15432:5432"
+    volumes:
+      - pg-primary-data:/var/lib/postgresql/17/main
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    command: -c wal_level=replica
+      -c max_wal_senders=10
+      -c wal_keep_size=64MB
+      -c listen_addresses=*
+      -c log_replication_commands=on
+      -c hba_file=/etc/postgresql/pg_hba.conf
+volumes:
+  pg-primary-data:
+EOF
+
+# Run containers, wait while pg is ready
+docker compose up -d
+until docker exec pg-primary pg_isready -U postgres >/dev/null 2>&1; do
+  echo "Waiting for PostgreSQL to be ready..."
+  sleep 1
+done
+
+# Run WAL receiver with local storage
 cat <<EOF >config.yml
 main:
   listen_port: 7070
@@ -96,12 +143,11 @@ log:
 EOF
 
 export PGHOST=localhost
-export PGPORT=5432
+export PGPORT=15432
 export PGUSER=postgres
 export PGPASSWORD=postgres
 export PGRWL_MODE=receive
-
-pgrwl start -c config.yml
+go run main.go start -c config.yml
 ```
 
 ### Serve Mode
@@ -154,7 +200,6 @@ export PGRWL_MODE=backup
 pgrwl start -c config.yml
 ```
 
-
 ### Restore Command
 
 `restore_command` example for postgresql.conf:
@@ -173,6 +218,9 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 
 The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
+
+You may either use `pgrwl start -c config.yml -m receive` or provide the corresponding environment variables and run
+`pgrwl start`.
 
 ```
 main:                                    # Required for both modes: receive/serve
@@ -197,8 +245,8 @@ backup:                                  # Required for 'backup' mode
     type: time                           # One of: (time / count)
     value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
     keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
-  wals:                                  # Optional (WAL archive related settings)
-    manage_cleanup: true                 # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
+  walretention:                          # Optional (WAL archive cleanup settings)
+    enable: true                         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
     receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 
 log:                                     # Optional
@@ -209,7 +257,7 @@ log:                                     # Optional
 metrics:                                 # Optional
   enable: true                           # Optional (used in receive mode: http://host:port/metrics)
 
-dev_config:                              # Optional (various dev options)
+devconfig:                               # Optional (various dev options)
   pprof:                                 # pprof settings
     enable: true                         # Enable pprof handlers
 
@@ -236,6 +284,50 @@ storage:                                 # Optional
     region: us-east-1                    # S3 region
     use_path_style: true                 # Use path-style URLs for S3
     disable_ssl: false                   # Disable SSL
+```
+
+Corresponding env-vars.
+
+```
+PGRWL_MAIN_LISTEN_PORT                   # HTTP server port (used for management)
+PGRWL_MAIN_DIRECTORY                     # Base directory for storing WAL files
+PGRWL_RECEIVER_SLOT                      # Replication slot to use
+PGRWL_RECEIVER_NO_LOOP                   # If true, do not loop on connection loss
+PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL    # Interval for the upload worker to check for new files
+PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY  # Maximum number of files to upload concurrently
+PGRWL_RECEIVER_RETENTION_ENABLE          # Perform retention rules
+PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
+PGRWL_RECEIVER_RETENTION_KEEP_PERIOD     # Remove WAL files older than given period
+PGRWL_BACKUP_CRON                        # Basebackup cron schedule
+PGRWL_BACKUP_RETENTION_ENABLE            # Perform retention rules
+PGRWL_BACKUP_RETENTION_TYPE              # One of: (time / count)
+PGRWL_BACKUP_RETENTION_VALUE             # Remove backups older than given period (if time), keep last N backups (if count)
+PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable when 'retention.type = time')
+PGRWL_BACKUP_WALRETENTION_ENABLE         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
+PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
+PGRWL_LOG_FORMAT                         # One of: (text / json)
+PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)
+PGRWL_METRICS_ENABLE                     # Optional (used in receive mode: http://host:port/metrics)
+PGRWL_DEVCONFIG_PPROF_ENABLE             # Enable pprof handlers
+PGRWL_STORAGE_NAME                       # One of: (s3 / sftp)
+PGRWL_STORAGE_COMPRESSION_ALGO           # One of: (gzip / zstd)
+PGRWL_STORAGE_ENCRYPTION_ALGO            # One of: (aes-256-gcm)
+PGRWL_STORAGE_ENCRYPTION_PASS            # Encryption password (from env)
+PGRWL_STORAGE_SFTP_HOST                  # SFTP server hostname
+PGRWL_STORAGE_SFTP_PORT                  # SFTP server port
+PGRWL_STORAGE_SFTP_USER                  # SFTP username
+PGRWL_STORAGE_SFTP_PASS                  # SFTP password (from env)
+PGRWL_STORAGE_SFTP_PKEY_PATH             # Path to SSH private key (optional)
+PGRWL_STORAGE_SFTP_PKEY_PASS             # Required if the private key is password-protected
+PGRWL_STORAGE_SFTP_BASE_DIR              # Base directory with sufficient user permissions
+PGRWL_STORAGE_S3_URL                     # S3-compatible endpoint URL
+PGRWL_STORAGE_S3_ACCESS_KEY_ID           # AWS access key ID
+PGRWL_STORAGE_S3_SECRET_ACCESS_KEY       # AWS secret access key (from env)
+PGRWL_STORAGE_S3_BUCKET                  # Target S3 bucket name
+PGRWL_STORAGE_S3_REGION                  # S3 region
+PGRWL_STORAGE_S3_USE_PATH_STYLE          # Use path-style URLs for S3
+PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
 ```
 
 ---
@@ -304,7 +396,6 @@ To install the chart with the release name `pgrwl`:
 ```bash
 helm install pgrwl pgrwl/pgrwl
 ```
-
 
 ---
 

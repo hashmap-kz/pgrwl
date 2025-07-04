@@ -50,8 +50,8 @@ data:
         type: time
         value: "2m"
         keep_last: 2
-      wals:
-        manage_cleanup: true
+      walretention:
+        enable: true
         receiver_addr: "pgrwl-receive:7070"
     log:
       level: trace
@@ -87,8 +87,8 @@ data:
         type: time
         value: "5m"
         keep_last: 2
-      wals:
-        manage_cleanup: true
+      walretention:
+        enable: true
         receiver_addr: "pgrwl-receive:7070"
     log:
       level: trace

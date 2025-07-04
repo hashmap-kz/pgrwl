@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
@@ -37,11 +39,12 @@ type BaseBackupSupervisorOpts struct {
 }
 
 type BaseBackupSupervisor struct {
-	l           *slog.Logger
-	cfg         *config.Config
-	opts        *BaseBackupSupervisorOpts
-	verbose     bool
-	restyClient *resty.Client
+	l             *slog.Logger
+	cfg           *config.Config
+	opts          *BaseBackupSupervisorOpts
+	verbose       bool
+	restyClient   *resty.Client
+	backupRunning tryMutex
 
 	// opts (for fast-access without traverse the config)
 	storageName string
@@ -87,7 +90,17 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 	)))
 
 	_, err = c.AddFunc(u.cfg.Backup.Cron, func() {
+		if !u.backupRunning.TryLock() {
+			u.log().Warn("previous basebackup still running, skipping this run")
+			return
+		}
+		defer func() {
+			u.log().Debug("unlocking tryMutex")
+			u.backupRunning.Unlock()
+		}()
+
 		u.log().Info("starting scheduled basebackup")
+
 		// retain previous
 		if u.cfg.Backup.Retention.Enable {
 			if u.cfg.Backup.Retention.Type == config.BackupRetentionTypeTime {
@@ -111,7 +124,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 			u.log().Info("basebackup completed")
 
 			// cleanup wal-archive (when basebackup is completed without errors)
-			if u.cfg.Backup.Wals.ManageCleanup {
+			if u.cfg.Backup.WalRetention.Enable {
 				if err := u.cleanupWalArchive(ctx, startupInfo); err != nil {
 					u.log().Error("wal-archive cleanup failed", slog.Any("err", err))
 				}
@@ -139,7 +152,7 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 		return fmt.Errorf("cannot use both: (receiver.retention.enable && backup.wals.manage_cleanup)")
 	}
 
-	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
+	addr, err := cmdx.Addr(u.cfg.Backup.WalRetention.ReceiverAddr)
 	if err != nil {
 		return err
 	}
@@ -210,7 +223,7 @@ func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.St
 }
 
 func (u *BaseBackupSupervisor) getReceiverConfig() (*receivemode.BriefConfig, error) {
-	addr, err := cmdx.Addr(u.cfg.Backup.Wals.ReceiverAddr)
+	addr, err := cmdx.Addr(u.cfg.Backup.WalRetention.ReceiverAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -351,4 +364,24 @@ func (u *BaseBackupSupervisor) getBackupIDs(ctx context.Context, cfg *config.Con
 		}
 	}
 	return stor, backupTs, nil
+}
+
+// locsks
+
+type tryMutex struct {
+	locked int32
+	m      sync.Mutex
+}
+
+func (tm *tryMutex) TryLock() bool {
+	if !atomic.CompareAndSwapInt32(&tm.locked, 0, 1) {
+		return false
+	}
+	tm.m.Lock()
+	return true
+}
+
+func (tm *tryMutex) Unlock() {
+	atomic.StoreInt32(&tm.locked, 0)
+	tm.m.Unlock()
 }

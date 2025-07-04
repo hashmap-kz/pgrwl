@@ -13,7 +13,7 @@ receiver:
   #  sync_interval: 10s
   #  keep_period: "30s"
 
-dev_config:
+devconfig:
   pprof:
     enable: true
 
