@@ -117,3 +117,43 @@ func TestInMemoryStorage_ListInfo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, infos, 2)
 }
+
+func TestInMemoryStorage_ListTopLevelDirs(t *testing.T) {
+	ctx := context.Background()
+	s := NewInMemoryStorage()
+
+	err := s.Put(ctx, "prefix/dir1/file1.txt", strings.NewReader("data1"))
+	assert.NoError(t, err)
+	err = s.Put(ctx, "prefix/dir1/subdir/file2.txt", strings.NewReader("data2"))
+	assert.NoError(t, err)
+	err = s.Put(ctx, "prefix/dir2/file3.txt", strings.NewReader("data3"))
+	assert.NoError(t, err)
+	err = s.Put(ctx, "prefix/dir3/nested/file4.txt", strings.NewReader("data4"))
+	assert.NoError(t, err)
+	err = s.Put(ctx, "prefix/file5.txt", strings.NewReader("data5"))
+	assert.NoError(t, err)
+	err = s.Put(ctx, "other/dir4/file6.txt", strings.NewReader("data6"))
+	assert.NoError(t, err)
+
+	result, err := s.ListTopLevelDirs(ctx, "prefix")
+	assert.NoError(t, err)
+
+	expected := map[string]bool{
+		"dir1": true,
+		"dir2": true,
+		"dir3": true,
+	}
+
+	assert.Len(t, result, 3)
+	for dir := range result {
+		assert.True(t, expected[dir], "unexpected directory: %s", dir)
+	}
+
+	result2, err := s.ListTopLevelDirs(ctx, "prefix/")
+	assert.NoError(t, err)
+	assert.Equal(t, result, result2)
+
+	result3, err := s.ListTopLevelDirs(ctx, "nonexistent")
+	assert.NoError(t, err)
+	assert.Empty(t, result3)
+}
