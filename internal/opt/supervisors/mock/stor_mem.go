@@ -135,7 +135,30 @@ func (s *InMemoryStorage) ListInfo(_ context.Context, path string) ([]storage.Fi
 	return infos, nil
 }
 
-func (s *InMemoryStorage) ListTopLevelDirs(_ context.Context, _ string) (map[string]bool, error) {
-	// TODO implement me
-	panic("implement me")
+func (s *InMemoryStorage) ListTopLevelDirs(ctx context.Context, prefix string) (map[string]bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make(map[string]bool)
+	normalizedPrefix := strings.TrimSuffix(prefix, "/") + "/"
+
+	for filePath := range s.Files {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		if strings.HasPrefix(filePath, normalizedPrefix) {
+			relativePath := strings.TrimPrefix(filePath, normalizedPrefix)
+			if idx := strings.Index(relativePath, "/"); idx != -1 {
+				dirname := relativePath[:idx]
+				if dirname != "" {
+					result[dirname] = true
+				}
+			}
+		}
+	}
+
+	return result, nil
 }
