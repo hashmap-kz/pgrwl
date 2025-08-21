@@ -210,14 +210,24 @@ func loadConfig(c *cli.Command, mode string) *config.Config {
 }
 
 func checkPgEnvsAreSet() {
-	// TODO: PGPASSFILE, etc...
 	var emptyEnvs []string
-	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"} {
+	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER"} { //you can add additional fields if needed
 		if os.Getenv(name) == "" {
 			emptyEnvs = append(emptyEnvs, name)
 		}
 	}
+
+	if os.Getenv("PGPASSWORD") == "" && os.Getenv("PGPASSFILE") == "" {
+		emptyEnvs = append(emptyEnvs, "PGPASSWORD or PGPASSFILE")
+	}
+
 	if len(emptyEnvs) > 0 {
 		log.Fatalf("[FATAL] receive: required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
+	}
+
+	if os.Getenv("PGPASSFILE") != "" {
+		if _, err := os.Stat(os.Getenv("PGPASSFILE")); os.IsNotExist(err) {
+			log.Fatalf("[FATAL] PGPASSFILE does not exist: %s", os.Getenv("PGPASSFILE"))
+		}
 	}
 }
