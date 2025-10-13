@@ -13,7 +13,7 @@ require (
 	github.com/sethvargo/go-envconfig v1.3.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.4.1
-	golang.org/x/time v0.12.0
+	golang.org/x/time v0.14.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
