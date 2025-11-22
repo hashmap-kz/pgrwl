@@ -3,7 +3,7 @@ name: Release Helm chart
 
 on:
   push:
-    tags: [ 'chart-v*.*.*' ]
+    tags: [ 'v*.*.*' ]
   workflow_dispatch: { }
 
 jobs:
