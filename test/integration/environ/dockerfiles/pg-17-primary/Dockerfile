@@ -1,7 +1,7 @@
 # Separate stage to cache mc binary download
 FROM alpine AS mc-downloader
 
-ARG MC_VERSION=mc.RELEASE.2025-07-21T05-28-08Z
+ARG MC_VERSION=mc.RELEASE.2025-08-13T08-35-41Z
 RUN wget -q https://dl.min.io/client/mc/release/linux-amd64/${MC_VERSION} \
     -O /minio-mc && chmod +x /minio-mc
 
