@@ -14,10 +14,18 @@ image:
 ######################################################################
 
 pgconn:
-  PGHOST: "postgres"
-  PGPORT: "5432"
-  PGUSER: "postgres"
-  PGPASSWORD: "postgres"
+  # If set, this secret will be used as the base PG env.
+  # If empty, chart will create its own base secret from pgconn.values.
+  existingSecret:
+    enabled: false
+    name: "pg-envs-secret"
+
+  # Base values for secret when chart manages it
+  values:
+    PGHOST: "postgres"
+    PGPORT: "5432"
+    PGUSER: "postgres"
+    PGPASSWORD: "postgres"
 
 structuredConfig:
   main:

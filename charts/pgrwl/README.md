@@ -13,5 +13,5 @@ helm search repo pgrwl
 To install the chart with the release name `pgrwl`:
 
 ```bash
-helm install pgrwl pgrwl/pgrwl
+helm upgrade pgrwl pgrwl/pgrwl --namespace=pgrwl --install --debug --atomic --wait --timeout=10m
 ```
