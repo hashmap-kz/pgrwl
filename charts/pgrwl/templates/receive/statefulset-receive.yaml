@@ -68,7 +68,11 @@ spec:
               echo "PostgreSQL is ready";
           envFrom:
             - secretRef:
+                {{- if .Values.pgconn.existingSecret.enabled }}
+                name: {{ .Values.pgconn.existingSecret.name }}
+                {{- else }}
                 name: {{ include "pgrwl.receiveFullname" . }}
+                {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           {{- with .Values.receive.securityContext }}
@@ -87,7 +91,11 @@ spec:
           {{- end }}
           envFrom:
             - secretRef:
+                {{- if .Values.pgconn.existingSecret.enabled }}
+                name: {{ .Values.pgconn.existingSecret.name }}
+                {{- else }}
                 name: {{ include "pgrwl.receiveFullname" . }}
+                {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.receive.service.port }}
