@@ -211,7 +211,7 @@ func loadConfig(c *cli.Command, mode string) *config.Config {
 
 func checkPgEnvsAreSet() {
 	var emptyEnvs []string
-	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER"} { //you can add additional fields if needed
+	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER"} { // you can add additional fields if needed
 		if os.Getenv(name) == "" {
 			emptyEnvs = append(emptyEnvs, name)
 		}
