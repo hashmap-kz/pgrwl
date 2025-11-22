@@ -68,7 +68,7 @@ jobs:
 
       - name: Set up Go
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -102,7 +102,7 @@ jobs:
         run: echo "value=cache-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
