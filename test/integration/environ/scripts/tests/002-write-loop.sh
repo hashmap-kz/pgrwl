@@ -58,7 +58,7 @@ x_backup_restore() {
   done
 
   # remember the state
-  pg_dumpall -f /tmp/pg_dumpall-before
+  pg_dumpall -f /tmp/pgdumpall-before --restrict-key=0
 
   # stop cluster, cleanup data
   echo_delim "teardown"
@@ -99,8 +99,8 @@ EOF
 
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
-  pg_dumpall -f /tmp/pg_dumpall-arter
-  diff /tmp/pg_dumpall-before /tmp/pg_dumpall-arter
+  pg_dumpall -f /tmp/pgdumpall-after --restrict-key=0
+  diff /tmp/pgdumpall-before /tmp/pgdumpall-after
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
