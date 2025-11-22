@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - "docs/**"
       - "examples/**"
+      - "charts/**"
       - "hack/**"
       - "**/*.md"
       - "**/*.gitignore"
@@ -22,6 +23,7 @@ on:
     paths-ignore:
       - "docs/**"
       - "examples/**"
+      - "charts/**"
       - "hack/**"
       - "**/*.md"
       - "**/*.gitignore"
