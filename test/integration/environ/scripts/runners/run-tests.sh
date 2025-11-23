@@ -2,25 +2,37 @@
 
 results=()
 
+# SECONDS starts from 0 when the shell starts;
+# save the starting point so we can compute total later
+script_start=$SECONDS
+
 while IFS= read -r -d '' filename; do
   echo "----------------------------------------------------------------------"
   echo ">> RUNNING: ${filename}"
   echo "----------------------------------------------------------------------"
 
-  bash "${filename}"
+  # remember start time for this test
+  start=$SECONDS
 
-  if [[ $? -ne 0 ]]; then
-    results+=("$(printf "FAILED: %s\n" "${filename}")")
+  if bash "${filename}"; then
+    status="OK"
   else
-    results+=("$(printf "OK    : %s\n" "${filename}")")
+    status="FAILED"
   fi
 
+  # elapsed time in seconds for this test
+  elapsed=$(( SECONDS - start ))
+
+  results+=("$(printf "%-6s: (%3ds) %s" "${status}" "${elapsed}" "${filename}")")
+
   echo "----------------------------------------------------------------------"
-  echo ">> DONE: ${filename}"
+  echo ">> DONE: ${filename} (time: ${elapsed}s)"
   echo "----------------------------------------------------------------------"
   echo ""
 
 done < <(find "/var/lib/postgresql/scripts/tests" -type f -name '*.sh' -print0 | sort -z)
+
+total_elapsed=$(( SECONDS - script_start ))
 
 echo ""
 echo ">> TOTAL:-------------------------------------------------------------"
@@ -29,3 +41,6 @@ for elem in "${results[@]}"; do
   printf "%03d. %s\n" "${i}" "${elem}"
   ((i++))
 done
+
+echo ""
+echo "Total time: ${total_elapsed}s"
