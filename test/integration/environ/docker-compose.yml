@@ -2,23 +2,28 @@ services:
   pg-primary:
     build:
       context: .
-      dockerfile: ./dockerfiles/pg-17-primary/Dockerfile
-    image: pgrwl/pg-primary
+      dockerfile: dockerfiles/pg-primary/Dockerfile
+      args:
+        PG_MAJOR: ${PG_MAJOR:-17}
+    image: pgrwl/pg-primary-${PG_MAJOR:-17}
     container_name: pg-primary
     restart: unless-stopped
     environment:
       TZ: "Asia/Aqtau"
+      PG_MAJOR: ${PG_MAJOR:-17}
     ports:
       - "15432:5432"
       - "2323:22"
     volumes:
-      - pg-primary-data:/var/lib/postgresql/17/main
+      - pg-primary-data:/var/lib/postgresql/${PG_MAJOR:-17}/main
 
   pg-standby:
     build:
       context: .
-      dockerfile: ./dockerfiles/pg-17-standby/Dockerfile
-    image: pgrwl/pg-standby
+      dockerfile: dockerfiles/pg-standby/Dockerfile
+      args:
+        PG_MAJOR: ${PG_MAJOR:-17}
+    image: pgrwl/pg-standby-${PG_MAJOR:-17}
     container_name: pg-standby
     depends_on:
       - pg-primary
@@ -26,6 +31,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       TZ: "Asia/Aqtau"
+      PG_MAJOR: ${PG_MAJOR:-17}
     ports:
       - "15433:5432"
     volumes:
@@ -33,9 +39,9 @@ services:
       - ./files/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./files/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     entrypoint: [
-        "/bin/bash",
-        "-c",
-        "
+      "/bin/bash",
+      "-c",
+      "
         rm -rf /var/lib/postgresql/data/* &&
         until pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U postgres -Fp -Xs -P -R; do
         echo 'Waiting for primary...';
@@ -46,7 +52,7 @@ services:
         -c config_file=/etc/postgresql/postgresql.conf \
         -c hot_standby=on
         ",
-      ]
+    ]
 
   sshd:
     build:
@@ -75,7 +81,7 @@ services:
       - ./files/minio/certs:/root/.minio/certs:ro
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-k", "https://localhost:9000/minio/health/ready"]
+      test: [ "CMD", "curl", "-k", "https://localhost:9000/minio/health/ready" ]
       interval: 2s
       timeout: 20s
       retries: 30

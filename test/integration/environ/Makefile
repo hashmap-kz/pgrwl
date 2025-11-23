@@ -1,7 +1,8 @@
 # Makefile for controlling PostgreSQL streaming replication mini-cluster
 
 # Variables
-COMPOSE = docker compose
+PG_MAJOR ?= 17
+COMPOSE = PG_MAJOR=$(PG_MAJOR) docker compose
 COMPOSE_FILE = docker-compose.yml
 
 # Targets

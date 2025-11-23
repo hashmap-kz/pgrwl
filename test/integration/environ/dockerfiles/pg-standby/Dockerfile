@@ -1,0 +1,4 @@
+ARG PG_MAJOR=17
+FROM postgres:${PG_MAJOR}
+
+ENV PG_MAJOR=${PG_MAJOR}

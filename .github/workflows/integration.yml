@@ -1,4 +1,3 @@
----
 name: Integration Tests
 
 on:
@@ -40,20 +39,37 @@ env:
   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
   COMPOSE_FILE: "test/integration/environ/docker-compose.yml"
-  #IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
 
 jobs:
   build_images:
-    name: Build images
+    name: Build images (pg${{ matrix.pg_major }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_major: [17, 18]
+
+    env:
+      PG_MAJOR: ${{ matrix.pg_major }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Compute image cache key
         id: cache-key
-        ## TODO: dockerfiles, shell changes
-        run: echo "value=cache-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
+        run: |
+          # IMPORTANT: only hash *inputs* to image build, NOT docker-cache or binaries
+          KEY="docker-images-pg${{ matrix.pg_major }}-${{ hashFiles(
+            'go.mod',
+            'test/integration/environ/docker-compose.yml',
+            'test/integration/environ/dockerfiles/**',
+            'test/integration/environ/files/**',
+            'test/integration/environ/scripts/**',
+            '.github/workflows/integration.yml'
+          ) }}"
+          echo "value=${KEY}" >> "$GITHUB_OUTPUT"
 
       - name: Restore Docker image cache
         id: cache-images
@@ -65,8 +81,24 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
             ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
-          #key: ${{ env.IMAGES_CACHE_KEY }}
           key: ${{ steps.cache-key.outputs.value }}
+
+      - name: Load images from cache (if present)
+        if: steps.cache-images.outputs.cache-hit == 'true'
+        run: |
+          set -euo pipefail
+
+          echo "Restored cached image archives, loading into Docker..."
+          ls -lah "${{ env.CACHE_FOLDER }}" || true
+
+          [ -f "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load || true
+          [ -f "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load || true
+          [ -f "${{ env.CACHE_FILE_DOCKER_SSHD }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load || true
+          [ -f "${{ env.CACHE_FILE_DOCKER_MINIO }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load || true
+          [ -f "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load || true
+
+          echo "Images after load (if any):"
+          docker images || true
 
       - name: Set up Go
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -76,37 +108,63 @@ jobs:
 
       - name: Prepare Binary
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: (make build && mv bin test/integration/environ)
+        run: |
+          set -euo pipefail
+          make build
+          mv bin test/integration/environ
 
       - name: Build Docker images and cache them
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
-          docker compose -f ${{ env.COMPOSE_FILE }} build pg-primary pg-standby sshd minio createbuckets
-          mkdir -p ${{ env.CACHE_FOLDER }}
-          docker save pgrwl/pg-primary | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
-          docker save pgrwl/pg-standby | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
-          docker save pgrwl/sshd | gzip -c > ${{ env.CACHE_FILE_DOCKER_SSHD }}
-          docker save pgrwl/minio | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO }}
-          docker save pgrwl/minio-mc | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
-          ls -lah ${{ env.CACHE_FOLDER }}
+          set -euo pipefail
+
+          echo "Building images for PG_MAJOR=${PG_MAJOR} from scratch (no cache hit)..."
+          docker compose -f "${{ env.COMPOSE_FILE }}" build pg-primary pg-standby sshd minio createbuckets
+
+          echo "=== Images after build ==="
+          docker images || true
+
+          mkdir -p "${{ env.CACHE_FOLDER }}"
+
+          # image names must match docker-compose.yml
+          docker save "pgrwl/pg-primary-${PG_MAJOR}" | gzip -c > "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}"
+          docker save "pgrwl/pg-standby-${PG_MAJOR}" | gzip -c > "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}"
+          docker save "pgrwl/sshd" | gzip -c > "${{ env.CACHE_FILE_DOCKER_SSHD }}"
+          docker save "pgrwl/minio" | gzip -c > "${{ env.CACHE_FILE_DOCKER_MINIO }}"
+          docker save "pgrwl/minio-mc" | gzip -c > "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}"
+
+          echo "=== Cached archives ==="
+          ls -lah "${{ env.CACHE_FOLDER }}"
 
   test:
-    name: Run integration tests
+    name: Run integration tests (pg${{ matrix.pg_major }})
     runs-on: ubuntu-latest
     needs: [build_images]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_major: [17, 18]
+
+    env:
+      PG_MAJOR: ${{ matrix.pg_major }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Compute image cache key
         id: cache-key
-        ## TODO: dockerfiles, shell changes
-        run: echo "value=cache-${{ hashFiles('test/integration/environ/**', '.github/workflows/integration.yml') }}" >> $GITHUB_OUTPUT
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+        run: |
+          KEY="docker-images-pg${{ matrix.pg_major }}-${{ hashFiles(
+            'go.mod',
+            'test/integration/environ/docker-compose.yml',
+            'test/integration/environ/dockerfiles/**',
+            'test/integration/environ/files/**',
+            'test/integration/environ/scripts/**',
+            '.github/workflows/integration.yml'
+          ) }}"
+          echo "value=${KEY}" >> "$GITHUB_OUTPUT"
 
       - name: Restore Docker image cache
         id: cache-images
@@ -118,28 +176,45 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
             ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
-          #key: ${{ env.IMAGES_CACHE_KEY }}
           key: ${{ steps.cache-key.outputs.value }}
 
       - name: Fail if cache is missing
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
-          echo "Docker image cache not found!"
+          echo "Docker image cache not found for PG_MAJOR=${PG_MAJOR}!"
           exit 1
 
       - name: Load Docker images from cache
         run: |
-          gunzip -c ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }} | docker load
-          gunzip -c ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }} | docker load
-          gunzip -c ${{ env.CACHE_FILE_DOCKER_SSHD }} | docker load
-          gunzip -c ${{ env.CACHE_FILE_DOCKER_MINIO }} | docker load
-          gunzip -c ${{ env.CACHE_FILE_DOCKER_MINIO_MC }} | docker load
+          set -euo pipefail
+
+          ls -lah "${{ env.CACHE_FOLDER }}" || true
+
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load
+
+          echo "=== Images after load ==="
+          docker images || true
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
 
       - name: Run tests
         run: |
-          docker images
-          docker compose -f ${{ env.COMPOSE_FILE }} up -d
-          docker ps
-          docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
-          docker compose -f ${{ env.COMPOSE_FILE }} exec -T pg-primary su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
+          set -euo pipefail
 
+          echo "Running integration tests against PostgreSQL ${PG_MAJOR}"
+          docker images || true
+
+          docker compose -f "${{ env.COMPOSE_FILE }}" up -d
+          docker ps
+
+          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
+          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary \
+            env PG_MAJOR="${PG_MAJOR}" \
+            su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh

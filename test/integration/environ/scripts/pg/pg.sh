@@ -3,7 +3,7 @@
 . /var/lib/postgresql/scripts/pg/utils.sh
 
 # custom
-export PG_MAJOR=17
+export PG_MAJOR="${PG_MAJOR:-17}"
 export PG_BINDIR="/usr/lib/postgresql/${PG_MAJOR}/bin"
 export PG_CFG="/etc/postgresql/${PG_MAJOR}/main/postgresql.conf"
 export PG_HBA="/etc/postgresql/${PG_MAJOR}/main/pg_hba.conf"
