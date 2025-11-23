@@ -93,8 +93,8 @@ jobs:
           docker compose -f ${{ env.COMPOSE_FILE }} build pg-primary pg-standby sshd minio createbuckets
 
           mkdir -p ${{ env.CACHE_FOLDER }}
-          docker save pgrwl/pg-primary | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
-          docker save pgrwl/pg-standby | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
+          docker save "pgrwl/pg-primary-${PG_MAJOR}" | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+          docker save "pgrwl/pg-standby-${PG_MAJOR}" | gzip -c > ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
           docker save pgrwl/sshd | gzip -c > ${{ env.CACHE_FILE_DOCKER_SSHD }}
           docker save pgrwl/minio | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO }}
           docker save pgrwl/minio-mc | gzip -c > ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
