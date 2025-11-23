@@ -66,6 +66,45 @@ xpg_wait_is_in_recovery() {
   done
 }
 
+xpg_recreate_slots() {
+"${PG_BINDIR}/psql" -v ON_ERROR_STOP=1 <<'EOSQL'
+  -- pgrwl
+  SELECT pg_drop_replication_slot('pgrwl_v5') WHERE EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = 'pgrwl_v5');
+  SELECT pg_switch_wal();
+  SELECT * FROM pg_create_physical_replication_slot('pgrwl_v5', true, false);
+  -- pg_receivewal
+  SELECT pg_drop_replication_slot('pg_receivewal') WHERE EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = 'pg_receivewal');
+  SELECT pg_switch_wal();
+  SELECT * FROM pg_create_physical_replication_slot('pg_receivewal', true, false);
+  -- starting point
+  CHECKPOINT;
+  SELECT pg_switch_wal();
+EOSQL
+
+}
+
+xpg_create_slots() {
+"${PG_BINDIR}/psql" -v ON_ERROR_STOP=1 <<'EOSQL'
+  -- pgrwl
+  SELECT * FROM pg_create_physical_replication_slot('pgrwl_v5', true, false);
+  -- pg_receivewal
+  SELECT * FROM pg_create_physical_replication_slot('pg_receivewal', true, false);
+  -- starting point
+  CHECKPOINT;
+  SELECT pg_switch_wal();
+EOSQL
+
+}
+
+xpg_checkpoint_switch_wal() {
+"${PG_BINDIR}/psql" -v ON_ERROR_STOP=1 <<'EOSQL'
+  -- starting point
+  CHECKPOINT;
+  SELECT pg_switch_wal();
+EOSQL
+
+}
+
 xpg_config() {
   cat <<'EOF' >"${PG_HBA}"
 local all         all     trust
