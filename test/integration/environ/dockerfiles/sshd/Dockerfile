@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.22.2
 
 # Install OpenSSH
 RUN apk update && apk add --no-cache openssh sudo bash mc vim inetutils-telnet

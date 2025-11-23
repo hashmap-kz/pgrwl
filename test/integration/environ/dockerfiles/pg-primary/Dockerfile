@@ -1,11 +1,11 @@
 # Separate stage to cache mc binary download
-FROM alpine AS mc-downloader
+FROM alpine:3.22.2 AS mc-downloader
 
 ARG MC_VERSION=mc.RELEASE.2025-08-13T08-35-41Z
 RUN wget -q https://dl.min.io/client/mc/release/linux-amd64/${MC_VERSION} \
     -O /minio-mc && chmod +x /minio-mc
 
-FROM debian:bookworm
+FROM debian:bookworm-20251117-slim
 
 # Version argument
 ARG PG_MAJOR=17
@@ -25,23 +25,27 @@ COPY --from=mc-downloader /minio-mc /usr/local/bin/minio-mc
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    set -eux; \
     # packages
     apt-get update; \
-    apt-get install -y wget curl gnupg lsb-release ca-certificates; \
-    apt-get install -y openssh-server sudo vim net-tools telnet mc; \
-    apt-get install -y postgresql-common; \
+    apt-get install -y --no-install-recommends \
+      curl gnupg lsb-release ca-certificates \
+      openssh-server sudo vim net-tools telnet mc \
+      postgresql-common tzdata; \
     # pg
-    YES=true /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh && \
-    apt-get install -y postgresql-${PG_MAJOR} postgresql-client-${PG_MAJOR}; \
+    YES=true /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      postgresql-${PG_MAJOR} postgresql-client-${PG_MAJOR}; \
     # tz
     echo $TZ > /etc/timezone; \
     ln -sf /usr/share/zoneinfo/$TZ /etc/localtime; \
-    apt-get install -y tzdata && dpkg-reconfigure -f noninteractive tzdata; \
+    dpkg-reconfigure -f noninteractive tzdata; \
     # ssh
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config; \
     sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config; \
-    # cleanup
-    apt-get clean && mkdir /var/run/sshd; \
+    # afterall
+    mkdir /var/run/sshd; \
     rm -rf "/var/lib/postgresql/${PG_MAJOR}" && mkdir -p "/var/lib/postgresql/${PG_MAJOR}/main/pgdata";
 
 ######################################################################
