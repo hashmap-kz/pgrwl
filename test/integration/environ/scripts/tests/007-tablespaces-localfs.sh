@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+set -euo pipefail
+. /var/lib/postgresql/scripts/tests/utils.sh
+
+x_remake_config() {
+  cat <<EOF > "${TMPDIR}/config.json"
+{
+  "main": {
+    "listen_port": 7070,
+    "directory": "${TMPDIR}/wal-archive"
+  },
+  "receiver": {
+    "slot": "pgrwl_v5",
+    "no_loop": true
+  },
+  "log": {
+    "level": "trace",
+    "format": "text",
+    "add_source": true
+  }
+}
+EOF
+}
+
+x_backup_restore() {
+  echo_delim "cleanup state"
+  x_remake_dirs
+  x_remake_config
+
+  # rerun the cluster
+  echo_delim "init and run a cluster"
+  xpg_rebuild
+  xpg_start
+  xpg_recreate_slots
+
+  # run wal-receivers
+  echo_delim "running wal-receivers"
+  # run wal-receiver
+  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  # run pg_receivewal
+  nohup pg_receivewal \
+    -D "${PG_RECEIVEWAL_WAL_PATH}" \
+    -S pg_receivewal \
+    --no-loop \
+    --verbose \
+    --no-password \
+    --synchronous \
+    --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
+    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &
+
+  # create tablespaces
+  mkdir -p "${TMPDIR}/spaces/alpha"
+  mkdir -p "${TMPDIR}/spaces/beta"
+  chown -R postgres:postgres "${TMPDIR}/spaces"
+
+"${PG_BINDIR}/psql" -v ON_ERROR_STOP=1 <<EOSQL
+-- tablespaces
+CREATE TABLESPACE ts_alpha LOCATION '${TMPDIR}/spaces/alpha';
+CREATE TABLESPACE ts_beta  LOCATION '${TMPDIR}/spaces/beta';
+EOSQL
+
+"${PG_BINDIR}/psql" -v ON_ERROR_STOP=1 <<'EOSQL'
+-- products
+CREATE TABLE products (
+    product_id   integer,
+    product_name text,
+    country      text
+) TABLESPACE ts_alpha;
+
+INSERT INTO products (product_id, product_name, country) VALUES
+    (1, 'Orion Lamp',    'Germany'),
+    (2, 'Silver Pen',    'United Kingdom'),
+    (3, 'Blue Notebook', 'Sweden');
+
+-- orders
+CREATE TABLE orders (
+    order_id    integer,
+    description text
+) TABLESPACE ts_beta;
+
+INSERT INTO orders (order_id, description) VALUES
+    (1, 'First customer order'),
+    (2, 'Bulk shipment'),
+    (3, 'Online marketplace order');
+
+-- customers
+CREATE TABLE customers (
+    customer_id integer,
+    full_name   text,
+    secret_hash text
+);
+
+INSERT INTO customers (customer_id, full_name, secret_hash) VALUES
+    (1, 'alice01',      'hash_a1b2c3'),
+    (2, 'bob_dev',      'hash_x9y8z7'),
+    (3, 'charlie_k',    'hash_q2w3e4'),
+    (4, 'dora_admin',   'hash_l0p9m8');
+EOSQL
+
+  # make a backup before doing anything
+  echo_delim "creating backup"
+  /usr/local/bin/pgrwl backup -c "${TMPDIR}/config.json"
+
+  # run inserts in a background
+  chmod +x "${BACKGROUND_INSERTS_SCRIPT_PATH}"
+  nohup "${BACKGROUND_INSERTS_SCRIPT_PATH}" >>"${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}" 2>&1 &
+
+  # fill with 1M rows
+  echo_delim "running pgbench"
+  pgbench -i -s 10 postgres
+
+  # wait a little
+  sleep 5
+
+  # stop inserts
+  pkill -f inserts.sh
+
+  # remember the state
+  pg_dumpall -f "${TMPDIR}/pgdumpall-before" --restrict-key=0
+
+  # stop cluster, cleanup data
+  echo_delim "teardown"
+  xpg_teardown
+
+  # save and cleanup tablespaces
+  cp -r "${TMPDIR}/spaces" "${TMPDIR}/spaces_backup"
+  rm -rf "${TMPDIR:?}/spaces/*"
+
+  # restore from backup
+  echo_delim "restoring backup"
+  #BACKUP_ID=$(find ${TMPDIR}/wal-archive/backups -mindepth 1 -maxdepth 1 -type d -printf "%T@ %f\n" | sort -n | tail -1 | cut -d' ' -f2)
+  /usr/local/bin/pgrwl restore --dest="${PGDATA}" -c "${TMPDIR}/config.json"
+  chmod 0750 "${PGDATA}"
+  chown -R postgres:postgres "${PGDATA}"
+  touch "${PGDATA}/recovery.signal"
+
+  # prepare archive (all partial files contain valid wal-segments)
+  find "${WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
+  find "${PG_RECEIVEWAL_WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
+
+  # fix configs
+  xpg_config
+  cat <<EOF >>"${PG_CFG}"
+restore_command = 'pgrwl restore-command --serve-addr=127.0.0.1:7070 %f %p'
+EOF
+
+  # run serve-mode
+  echo_delim "running wal fetcher"
+  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+
+  # cleanup logs
+  >/var/log/postgresql/pg.log
+
+  # run restored cluster
+  echo_delim "running cluster"
+  xpg_start
+
+  # wait until is in recovery, check logs, etc...
+  xpg_wait_is_in_recovery
+  cat /var/log/postgresql/pg.log
+
+  # check diffs
+  echo_delim "running diff on pg_dumpall dumps (before vs after)"
+  pg_dumpall -f "${TMPDIR}/pgdumpall-after" --restrict-key=0
+  diff "${TMPDIR}/pgdumpall-before" "${TMPDIR}/pgdumpall-after"
+  echo_delim "running diff on tablespaces (before vs after)"
+  diff -r "${TMPDIR}/spaces_backup" "${TMPDIR}/spaces"
+
+  # read the latest rec
+  echo_delim "read latest applied records"
+  echo "table content:"
+  psql --pset pager=off -c "select * from public.tslog;"
+  echo "insert log content:"
+  tail -10 "${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}"
+
+  # compare with pg_receivewal
+  echo_delim "compare wal-archive with pg_receivewal"
+  find "${WAL_PATH}" -type f -name "*.json" -delete
+  rm -rf "${WAL_PATH}/backups"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
+}
+
+x_backup_restore "${@}"
