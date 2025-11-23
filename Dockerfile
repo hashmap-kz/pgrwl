@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS build-stage
+FROM golang:1.24.1-alpine3.21 AS build-stage
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 
 RUN go test -v ./... && go build -ldflags="-s -w" -o ./pgrwl
 
-FROM alpine:latest AS build-release-stage
+FROM alpine:3.21.5 AS build-release-stage
 
 RUN apk update && apk add --no-cache \
     bash \
