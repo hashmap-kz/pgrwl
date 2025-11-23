@@ -29,25 +29,27 @@ set -euo pipefail
 # * Clean up WAL directories and rerun the WAL archivers on a new timeline (cleanup is necessary since we run receivers with --no-loop option)
 # * Compare the WAL directories again
 
-# Per-test temporary directory
 TEST_NAME=$(basename "$0" .sh)
-TMPDIR=$(mktemp -d -t "pgrwl-${TEST_NAME}.XXXXXX")
-echo_delim "Using TMPDIR: ${TMPDIR} for test: ${TEST_NAME}"
+TEST_STATE_PATH="/var/lib/postgresql/test-state/${TEST_NAME}"
 
 # Cleanup on exit (even on error)
 cleanup() {
-  # comment this out if you want to inspect TMPDIR after run
-  rm -rf "${TMPDIR}"
+  set +e
+  # save content for debug
+  mkdir -p "${TEST_STATE_PATH}"
+  cp -a /tmp/* "${TEST_STATE_PATH}/"
+  # cleanup state
+  rm -rf /tmp/*
 }
-# trap cleanup EXIT
+trap cleanup EXIT
 
-export BASEBACKUP_PATH="${TMPDIR}/basebackup"
-export WAL_PATH="${TMPDIR}/wal-archive"
-export LOG_FILE="${TMPDIR}/pgrwl.log"
-export PG_RECEIVEWAL_WAL_PATH="${TMPDIR}/wal-archive-pg_receivewal"
-export PG_RECEIVEWAL_LOG_FILE="${TMPDIR}/pg_receivewal.log"
+export BASEBACKUP_PATH="/tmp/basebackup"
+export WAL_PATH="/tmp/wal-archive"
+export LOG_FILE="/tmp/pgrwl.log"
+export PG_RECEIVEWAL_WAL_PATH="/tmp/wal-archive-pg_receivewal"
+export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
 export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
-export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="${TMPDIR}/ts-inserts.log"
+export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="/tmp/ts-inserts.log"
 
 # Default environment
 export PGHOST="localhost"
@@ -61,11 +63,11 @@ x_remake_dirs() {
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
   rm -rf "${PG_RECEIVEWAL_WAL_PATH}" && mkdir -p "${PG_RECEIVEWAL_WAL_PATH}"
 
-  cat <<EOF > "${TMPDIR}/config.json"
+  cat <<EOF > "/tmp/config.json"
 {
   "main": {
     "listen_port": 7070,
-    "directory": "${TMPDIR}/wal-archive"
+    "directory": "/tmp/wal-archive"
   },
   "receiver": {
     "slot": "pgrwl_v5",
@@ -92,7 +94,7 @@ x_backup_restore() {
   # run wal-receivers
   echo_delim "running wal-receivers"
   # run wal-receiver
-  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   nohup pg_receivewal -D "${PG_RECEIVEWAL_WAL_PATH}" -S pg_receivewal --no-loop --verbose --no-password --synchronous \
     --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
@@ -135,7 +137,7 @@ EOSQL
   pkill -f inserts.sh
 
   # remember the state
-  pg_dumpall -f "${TMPDIR}/pgdumpall-before" --restrict-key=0
+  pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
 
   # stop cluster, cleanup data
   echo_delim "teardown"
@@ -161,7 +163,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -176,8 +178,8 @@ EOF
 
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
-  pg_dumpall -f "${TMPDIR}/pgdumpall-after" --restrict-key=0
-  diff "${TMPDIR}/pgdumpall-before" "${TMPDIR}/pgdumpall-after"
+  pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
+  diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
 
   # read the latest rec
   echo_delim "read latest applied records"
@@ -197,7 +199,7 @@ EOF
   # run wal-receiver
   pkill -f pgrwl || true
   xpg_create_slots
-  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   nohup pg_receivewal -D "${PG_RECEIVEWAL_WAL_PATH}" -S pg_receivewal --no-loop --verbose --no-password --synchronous \
     --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \

@@ -53,7 +53,7 @@ x_remake_buckets() {
 x_remake_dirs() {
   pkill -9 postgres || true
   pkill -9 pgrwl || true
-  rm -rf "${TMPDIR:?}/*"
+  rm -rf /tmp/*
 
   # recreate localFS
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
