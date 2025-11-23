@@ -30,7 +30,7 @@ while IFS= read -r -d '' filename; do
   echo "----------------------------------------------------------------------"
   echo ""
 
-done < <(find "/var/lib/postgresql/scripts/tests" -type f -name '*.sh' -print0 | sort -z)
+done < <(find "/var/lib/postgresql/scripts/tests" -type f -name '[0-9][0-9][0-9]-*.sh' -print0 | sort -z)
 
 total_elapsed=$(( SECONDS - script_start ))
 
