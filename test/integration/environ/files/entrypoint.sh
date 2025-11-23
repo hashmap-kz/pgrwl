@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export PG_MAJOR=17
+export PG_MAJOR="${PG_MAJOR:-17}"
 export PG_BIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
 
 export PGDATA="/var/lib/postgresql/${PG_MAJOR}/main/pgdata"

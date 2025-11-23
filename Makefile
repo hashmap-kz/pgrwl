@@ -41,9 +41,13 @@ test-cov: ## Run tests with coverage report
 	go test -coverprofile=$(COV_REPORT) ./...
 	go tool cover -html=$(COV_REPORT)
 
-.PHONY: test-integ-scripts
-test-integ-scripts: ## Slow tests (that runs inside containers)
-	@currdir=$$(pwd) && cd test/integration/environ && bash run-tests.sh | tee $$currdir/test-integ-scripts.log
+.PHONY: test-integ-scripts-17
+test-integ-scripts-17: ## Slow tests (that runs inside containers)
+	@currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=17 bash run-tests.sh | tee $$currdir/test-integ-scripts.log
+
+.PHONY: test-integ-scripts-18
+test-integ-scripts-18: ## Slow tests (that runs inside containers)
+	@currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=18 bash run-tests.sh | tee $$currdir/test-integ-scripts.log
 
 .PHONY: image
 image: ## Build and push Docker image to localhost:5000
