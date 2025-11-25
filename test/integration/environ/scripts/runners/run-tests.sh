@@ -7,6 +7,7 @@ results=()
 script_start=$SECONDS
 
 while IFS= read -r -d '' filename; do
+  echo "::group::TEST ${filename}"
   echo "----------------------------------------------------------------------"
   echo ">> RUNNING: ${filename}"
   echo "----------------------------------------------------------------------"
@@ -29,11 +30,13 @@ while IFS= read -r -d '' filename; do
   echo ">> DONE: ${filename} (time: ${elapsed}s)"
   echo "----------------------------------------------------------------------"
   echo ""
+  echo "::endgroup::"
 
 done < <(find "/var/lib/postgresql/scripts/tests" -type f -name '[0-9][0-9][0-9]-*.sh' -print0 | sort -z)
 
 total_elapsed=$(( SECONDS - script_start ))
 
+echo "::group::TOTAL ${filename}"
 echo ""
 echo ">> TOTAL:-------------------------------------------------------------"
 i=1
@@ -44,3 +47,4 @@ done
 
 echo ""
 echo "Total time: ${total_elapsed}s"
+echo "::endgroup::"
