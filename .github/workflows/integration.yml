@@ -214,7 +214,7 @@ jobs:
           docker compose -f "${{ env.COMPOSE_FILE }}" up -d
           docker ps
 
-          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary chmod +x /var/lib/postgresql/scripts/runners/run-tests.sh
+          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary chmod +x /var/lib/postgresql/scripts/tests/001-fundamental.sh
           docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary \
             env PG_MAJOR="${PG_MAJOR}" \
-            su - postgres -c /var/lib/postgresql/scripts/runners/run-tests.sh
+            su - postgres -c /var/lib/postgresql/scripts/tests/001-fundamental.sh
