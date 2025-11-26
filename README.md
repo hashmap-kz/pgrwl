@@ -25,7 +25,6 @@ integration with Kubernetes environments.
 - [Usage](#usage)
     - [Receive Mode](#receive-mode-quick-start)
     - [Serve Mode](#serve-mode)
-    - [Backup Mode](#backup-mode)
     - [Restore Command](#restore-command)
 - [Quick Start](examples)
     - [Docker Compose (Basic Setup)](examples/docker-compose-quick-start/)
@@ -67,10 +66,6 @@ integration with Kubernetes environments.
 **`pgrwl` running in `serve` mode**
 
 ![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/serve-mode.png)
-
-**`pgrwl` running in `backup` mode**
-
-![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/backup-mode.png)
 
 ---
 
@@ -170,36 +165,6 @@ export PGRWL_MODE=serve
 pgrwl start -c config.yml
 ```
 
-### Backup Mode
-
-`Backup` mode performs a full base backup of your PostgreSQL cluster on a configured schedule.
-
-```bash
-cat <<EOF >config.yml
-main:
-  listen_port: 7070
-  directory: wals
-backup:
-  cron: "0 0 */3 * *"
-  retention:
-    enable: true
-    type: time
-    value: "96h"
-log:
-  level: trace
-  format: text
-  add_source: true
-EOF
-
-export PGHOST=localhost
-export PGPORT=5432
-export PGUSER=postgres
-export PGPASSWORD=postgres
-export PGRWL_MODE=backup
-
-pgrwl start -c config.yml
-```
-
 ### Restore Command
 
 `restore_command` example for postgresql.conf:
@@ -237,17 +202,6 @@ receiver:                                # Required for 'receive' mode
     enable: true                         # Perform retention rules
     sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
     keep_period: "1m"                    # Remove WAL files older than given period
-
-backup:                                  # Required for 'backup' mode
-  cron: "0 0 */3 * *"                    # Basebackup cron schedule
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    type: time                           # One of: (time / count)
-    value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
-    keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
-  walretention:                          # Optional (WAL archive cleanup settings)
-    enable: true                         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-    receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)
@@ -298,13 +252,6 @@ PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY  # Maximum number of files to upload con
 PGRWL_RECEIVER_RETENTION_ENABLE          # Perform retention rules
 PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
 PGRWL_RECEIVER_RETENTION_KEEP_PERIOD     # Remove WAL files older than given period
-PGRWL_BACKUP_CRON                        # Basebackup cron schedule
-PGRWL_BACKUP_RETENTION_ENABLE            # Perform retention rules
-PGRWL_BACKUP_RETENTION_TYPE              # One of: (time / count)
-PGRWL_BACKUP_RETENTION_VALUE             # Remove backups older than given period (if time), keep last N backups (if count)
-PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable when 'retention.type = time')
-PGRWL_BACKUP_WALRETENTION_ENABLE         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
 PGRWL_LOG_FORMAT                         # One of: (text / json)
 PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)
@@ -405,18 +352,15 @@ helm install pgrwl pgrwl/pgrwl
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
-- A typical production setup runs **two `pgrwl` StatefulSets** in the cluster:
-  one in `receive` mode for **continuous WAL streaming**, and another in `backup` mode for scheduled **base backups**.
+- A typical production setup runs **`pgrwl` StatefulSet** in the cluster in `receive` 
+  mode for **continuous WAL streaming**.
 
 - In `receive` mode, `pgrwl` continuously **streams WAL files**, applies optional **compression** and **encryption**,
   uploads them to **remote storage** (such as S3 or SFTP), and enforces **retention policies** - for example, keeping
   WAL files for **four days**.
 
-- In `backup` mode, it performs a **full base backup** of your PostgreSQL cluster on a configured schedule -
-  for instance, **once every three days** - using **streaming basebackup**, with optional **compression**
-  and **encryption**. The resulting backup is also uploaded to the configured **remote storage**,
-  and subject to **retention policies** for cleanup. The built-in cron scheduler enables fully automated backups without
-  requiring external orchestration.
+- You configure a cronjob for a **full base backup** of your PostgreSQL cluster -
+  for instance, **once every three days**.
 
 - During recovery, the same `receive` StatefulSet can be reconfigured to run in `serve` mode,
   exposing previously archived WALs via HTTP to support **Point-in-Time Recovery (PITR)** through `restore_command`.

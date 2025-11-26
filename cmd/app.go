@@ -66,58 +66,11 @@ func App() *cli.Command {
 							ListenPort: cfg.Main.ListenPort,
 							Verbose:    verbose,
 						})
-					} else if mode == config.ModeBackup {
-						checkPgEnvsAreSet()
-						RunBackupMode(&BackupModeOpts{
-							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
-							Verbose:          verbose,
-						})
 					} else {
 						log.Fatalf("unknown mode: %s", mode)
 					}
 
 					return nil
-				},
-			},
-
-			// basebackup create
-			{
-				Name:  "backup",
-				Usage: "Create basebackup using streaming replication protocol",
-				Flags: []cli.Flag{
-					configFlag,
-				},
-				Action: func(_ context.Context, c *cli.Command) error {
-					checkPgEnvsAreSet()
-					cfg := loadConfig(c, config.ModeBackupCMD)
-					err := RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
-					return err
-				},
-			},
-
-			// basebackup restore
-			{
-				Name:  "restore",
-				Usage: "Retrieve basebackup",
-				Flags: []cli.Flag{
-					configFlag,
-					&cli.StringFlag{
-						Name:  "id",
-						Usage: "Backup id to restore (20060102150405), the 'latest' will be used if not set",
-					},
-					&cli.StringFlag{
-						Name:     "dest",
-						Usage:    "Restore to destination",
-						Required: true,
-					},
-				},
-				Action: func(_ context.Context, c *cli.Command) error {
-					cfg := loadConfig(c, config.ModeRestoreCMD)
-					err := RestoreBaseBackup(context.Background(), cfg,
-						c.String("id"),
-						c.String("dest"),
-					)
-					return err
 				},
 			},
 

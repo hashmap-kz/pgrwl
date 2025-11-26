@@ -76,5 +76,3 @@ kubectl -n pgrwl-test exec -it postgres-0 -- psql -U postgres -c "drop table if 
 ### Logging
 
 ![Receive Logs](https://github.com/hashmap-kz/assets/blob/main/pgrwl/logs/logs-receive.png)
-
-![Backup Logs](https://github.com/hashmap-kz/assets/blob/main/pgrwl/logs/logs-backup.png)
