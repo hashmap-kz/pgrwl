@@ -18,7 +18,7 @@ data:
           - targets: [ 'localhost:9090' ]
       - job_name: 'pgrwl'
         static_configs:
-          - targets: [ 'pgrwl-receive:7070' ]
+          - targets: [ 'pgrwl-receive.pgrwl-test:7070' ]
 
 ---
 apiVersion: v1
