@@ -3,7 +3,7 @@ set -euo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
 x_remake_config() {
-  cat <<EOF >/tmp/config.json
+  cat <<EOF > "${TMPDIR}/config.json"
 {
   "main": {
      "listen_port": 7070,
@@ -58,7 +58,7 @@ x_backup_restore() {
 
   # run wal-receivers
   echo_delim "running wal-receivers"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m receive >>"$LOG_FILE" 2>&1 &
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -76,7 +76,7 @@ x_backup_restore() {
   done
 
   # remember the state
-  pg_dumpall -f /tmp/pgdumpall-before --restrict-key=0
+  pg_dumpall -f "${TMPDIR}/pgdumpall-before" --restrict-key=0
 
   echo_delim "waiting upload"
   sleep 10
@@ -101,7 +101,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -116,8 +116,8 @@ EOF
 
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
-  pg_dumpall -f /tmp/pgdumpall-after --restrict-key=0
-  diff /tmp/pgdumpall-before /tmp/pgdumpall-after
+  pg_dumpall -f "${TMPDIR}/pgdumpall-after" --restrict-key=0
+  diff "${TMPDIR}/pgdumpall-before" "${TMPDIR}/pgdumpall-after"
 }
 
 x_backup_restore "${@}"

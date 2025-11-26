@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,12 +24,6 @@ const (
 
 	// ModeServe represents the HTTP API serving mode.
 	ModeServe = "serve"
-
-	// ModeBackup used in pgrwl streaming basebackup mode.
-	ModeBackup = "backup"
-
-	// ModeBackupCMD used in pgrwl backup CLI command.
-	ModeBackupCMD = "backup-cmd"
 
 	// ModeRestoreCMD used in pgrwl restore CLI command.
 	ModeRestoreCMD = "restore"
@@ -72,10 +65,8 @@ var (
 
 	modes = []string{
 		// CMD
-		ModeBackupCMD,
 		ModeRestoreCMD,
 		// serving
-		ModeBackup,
 		ModeReceive,
 		ModeServe,
 	}
@@ -90,7 +81,6 @@ type Config struct {
 	Log       LogConfig     `json:"log,omitempty"`       // Logging configuration.
 	Storage   StorageConfig `json:"storage,omitempty"`   // Storage backend configuration.
 	DevConfig DevConfig     `json:"devconfig,omitempty"` // Various dev options.
-	Backup    BackupConfig  `json:"backup,omitempty"`    // Streaming basebackup options.
 }
 
 // MainConfig holds top-level application settings.
@@ -110,33 +100,6 @@ type DevConfig struct {
 // DevConfigPprof configures pprof.
 type DevConfigPprof struct {
 	Enable bool `json:"enable,omitempty" env:"PGRWL_DEVCONFIG_PPROF_ENABLE"`
-}
-
-// BackupConfig configures streaming basebackup properties.
-type BackupConfig struct {
-	Cron         string                   `json:"cron" env:"PGRWL_BACKUP_CRON"`
-	Retention    BackupRetentionConfig    `json:"retention,omitempty"`
-	WalRetention BackupWalRetentionConfig `json:"walretention,omitempty"`
-}
-
-// BackupRetentionConfig configures retention for basebackups.
-type BackupRetentionConfig struct {
-	// Enable determines whether retention logic is active.
-	Enable bool `json:"enable,omitempty" env:"PGRWL_BACKUP_RETENTION_ENABLE"`
-
-	Type  string `json:"type,omitempty" env:"PGRWL_BACKUP_RETENTION_TYPE"`
-	Value string `json:"value,omitempty" env:"PGRWL_BACKUP_RETENTION_VALUE"`
-
-	KeepDurationParsed time.Duration `json:"-"`
-	KeepCountParsed    int64         `json:"-"`
-
-	KeepLast *int `json:"keep_last,omitempty" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
-}
-
-// BackupWalRetentionConfig configures related setting for WAL-archive.
-type BackupWalRetentionConfig struct {
-	Enable       bool   `json:"enable,omitempty" env:"PGRWL_BACKUP_WALRETENTION_ENABLE"`
-	ReceiverAddr string `json:"receiver_addr,omitempty" env:"PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.
@@ -384,7 +347,6 @@ func validate(c *Config, mode string) error {
 	errs = checkMode(mode, errs)
 	errs = checkMainConfig(c, errs)
 	errs = checkReceiverConfig(c, mode, errs)
-	errs = checkBackupConfig(c, mode, errs)
 	errs = checkLogConfig(c, errs)
 	errs = checkStorageConfig(c, errs)
 	errs = checkStorageModifiersConfig(c, errs)
@@ -523,47 +485,6 @@ func checkStorageConfig(c *Config, errs []string) []string {
 		}
 	default:
 		errs = append(errs, fmt.Sprintf("unknown storage.name: %q (must be %q or %q)", c.Storage.Name, StorageNameS3, StorageNameSFTP))
-	}
-	return errs
-}
-
-func checkBackupConfig(c *Config, mode string, errs []string) []string {
-	// Backup
-	if mode == ModeBackup {
-		if c.Backup.Cron == "" {
-			errs = append(errs, "backup.cron is required in backup mode")
-		}
-		if c.Backup.Retention.Enable {
-			if c.Backup.Retention.Type == BackupRetentionTypeTime || c.Backup.Retention.Type == BackupRetentionTypeCount {
-				// time-based retention
-				if c.Backup.Retention.Type == BackupRetentionTypeTime {
-					basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.Value)
-					if err != nil {
-						errs = append(errs, fmt.Sprintf(
-							"backup.retention.value cannot parse duration: %s, %v",
-							c.Backup.Retention.Value, err),
-						)
-					} else {
-						c.Backup.Retention.KeepDurationParsed = basebackupKeepPeriodParsed
-					}
-				}
-
-				// count-based retention
-				if c.Backup.Retention.Type == BackupRetentionTypeCount {
-					backupCountParsed, err := strconv.ParseInt(c.Backup.Retention.Value, 10, 32)
-					if err != nil || backupCountParsed <= 0 {
-						errs = append(errs, fmt.Sprintf(
-							"backup.retention.value cannot parse count: %s, %v",
-							c.Backup.Retention.Value, err),
-						)
-					} else {
-						c.Backup.Retention.KeepCountParsed = backupCountParsed
-					}
-				}
-			} else {
-				errs = append(errs, "backup.retention.type: must be one of: time/count (got: %q)", c.Backup.Retention.Type)
-			}
-		}
 	}
 	return errs
 }

@@ -29,10 +29,27 @@ set -euo pipefail
 # * Clean up WAL directories and rerun the WAL archivers on a new timeline (cleanup is necessary since we run receivers with --no-loop option)
 # * Compare the WAL directories again
 
+TEST_NAME=$(basename "$0" .sh)
+TEST_STATE_PATH="/var/lib/postgresql/test-state/${TEST_NAME}"
+
+# Cleanup on exit (even on error)
+cleanup() {
+  set +e
+  # save content for debug
+  mkdir -p "${TEST_STATE_PATH}"
+  cp -a /tmp/* "${TEST_STATE_PATH}/"
+  # cleanup state
+  rm -rf /tmp/*
+}
+trap cleanup EXIT
+
 export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
-export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
 export LOG_FILE="/tmp/pgrwl.log"
+export PG_RECEIVEWAL_WAL_PATH="/tmp/wal-archive-pg_receivewal"
+export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
+export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
+export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="/tmp/ts-inserts.log"
 
 # Default environment
 export PGHOST="localhost"
@@ -44,9 +61,9 @@ x_remake_dirs() {
   # cleanup possible state
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
-  rm -rf "${WAL_PATH_PG_RECEIVEWAL}" && mkdir -p "${WAL_PATH_PG_RECEIVEWAL}"
+  rm -rf "${PG_RECEIVEWAL_WAL_PATH}" && mkdir -p "${PG_RECEIVEWAL_WAL_PATH}"
 
-  cat <<EOF >/tmp/config.json
+  cat <<EOF > "/tmp/config.json"
 {
   "main": {
     "listen_port": 7070,
@@ -72,16 +89,16 @@ x_backup_restore() {
   echo_delim "init and run a cluster"
   xpg_rebuild
   xpg_start
-
-  # start receiving from the fresh WAL that is identical for both receivers
-  psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx (id serial);'
+  xpg_recreate_slots
 
   # run wal-receivers
   echo_delim "running wal-receivers"
   # run wal-receiver
   nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
-  bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
+  nohup pg_receivewal -D "${PG_RECEIVEWAL_WAL_PATH}" -S pg_receivewal --no-loop --verbose --no-password --synchronous \
+    --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
+    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -94,7 +111,8 @@ x_backup_restore() {
     --verbose
 
   # run inserts in a background
-  bash "/var/lib/postgresql/scripts/pg/run_inserts.sh" start
+  chmod +x "${BACKGROUND_INSERTS_SCRIPT_PATH}"
+  nohup "${BACKGROUND_INSERTS_SCRIPT_PATH}" >>"${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}" 2>&1 &
 
   # fill with 1M rows
   echo_delim "running pgbench"
@@ -119,7 +137,7 @@ EOSQL
   pkill -f inserts.sh
 
   # remember the state
-  pg_dumpall -f /tmp/pgdumpall-before --restrict-key=0
+  pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
 
   # stop cluster, cleanup data
   echo_delim "teardown"
@@ -134,7 +152,7 @@ EOSQL
 
   # prepare archive (all partial files contain valid wal-segments)
   find "${WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
-  find "${WAL_PATH_PG_RECEIVEWAL}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
+  find "${PG_RECEIVEWAL_WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
 
   # fix configs
   xpg_config
@@ -160,35 +178,37 @@ EOF
 
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
-  pg_dumpall -f /tmp/pgdumpall-after --restrict-key=0
-  diff /tmp/pgdumpall-before /tmp/pgdumpall-after
+  pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
+  diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
 
   # read the latest rec
   echo_delim "read latest applied records"
   echo "table content:"
   psql --pset pager=off -c "select * from public.tslog;"
   echo "insert log content:"
-  tail -10 /tmp/insert-ts.log
+  tail -10 "${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}"
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
   find "${WAL_PATH}" -type f -name "*.json" -delete
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
 
   # run receivers with a new timeline
   echo_delim "cleanup wal-archives, run wal-receivers with a new timeline"
   x_remake_dirs
   # run wal-receiver
   pkill -f pgrwl || true
+  xpg_create_slots
   nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
-  bash "/var/lib/postgresql/scripts/pg/run_pg_receivewal.sh" "start"
-  sleep 5 # wait a little (feedback timeout, etc...)
+  nohup pg_receivewal -D "${PG_RECEIVEWAL_WAL_PATH}" -S pg_receivewal --no-loop --verbose --no-password --synchronous \
+    --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
+    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal with a new timeline stream"
   find "${WAL_PATH}" -type f -name "*.json" -delete
-  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${WAL_PATH_PG_RECEIVEWAL}"
+  bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
 }
 
 x_backup_restore "${@}"

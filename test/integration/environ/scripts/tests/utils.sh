@@ -2,10 +2,25 @@
 set -euo pipefail
 . /var/lib/postgresql/scripts/pg/pg.sh
 
-export BASEBACKUP_PATH="/tmp/basebackup"
-export WAL_PATH="/tmp/wal-archive"
-export WAL_PATH_PG_RECEIVEWAL="/tmp/wal-archive-pg_receivewal"
-export LOG_FILE="/tmp/pgrwl.log"
+# Per-test temporary directory
+TEST_NAME=$(basename "$0" .sh)
+TMPDIR=$(mktemp -d -t "pgrwl-${TEST_NAME}.XXXXXX")
+echo_delim "Using TMPDIR: ${TMPDIR} for test: ${TEST_NAME}"
+
+# Cleanup on exit (even on error)
+cleanup() {
+  # comment this out if you want to inspect TMPDIR after run
+  rm -rf "${TMPDIR}"
+}
+# trap cleanup EXIT
+
+export BASEBACKUP_PATH="${TMPDIR}/basebackup"
+export WAL_PATH="${TMPDIR}/wal-archive"
+export LOG_FILE="${TMPDIR}/pgrwl.log"
+export PG_RECEIVEWAL_WAL_PATH="${TMPDIR}/wal-archive-pg_receivewal"
+export PG_RECEIVEWAL_LOG_FILE="${TMPDIR}/pg_receivewal.log"
+export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
+export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="${TMPDIR}/ts-inserts.log"
 
 # Default environment
 
@@ -43,7 +58,8 @@ x_remake_dirs() {
   # recreate localFS
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
   rm -rf "${WAL_PATH}" && mkdir -p "${WAL_PATH}"
-  rm -rf "${WAL_PATH_PG_RECEIVEWAL}" && mkdir -p "${WAL_PATH_PG_RECEIVEWAL}"
+  rm -rf "${PG_RECEIVEWAL_WAL_PATH}" && mkdir -p "${PG_RECEIVEWAL_WAL_PATH}"
+  chown -R postgres:postgres "${PG_RECEIVEWAL_WAL_PATH}"
 
   # recreate bucket
   x_remake_buckets
