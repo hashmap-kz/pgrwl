@@ -40,9 +40,6 @@ const (
 	// LocalFSStorageSubpath when storage name is 'local', uploader worker uses this as a storage.
 	LocalFSStorageSubpath = "wal-archive"
 
-	// BaseBackupSubpath when storage name is 'local', put basebackups to this directory.
-	BaseBackupSubpath = "backups"
-
 	// RepoEncryptorAes256Gcm is the AES-256-GCM encryption algorithm identifier.
 	RepoEncryptorAes256Gcm = "aes-256-gcm"
 
@@ -51,9 +48,6 @@ const (
 
 	// RepoCompressorZstd is the Zstandard compression algorithm identifier.
 	RepoCompressorZstd = "zstd"
-
-	BackupRetentionTypeTime  = "time"
-	BackupRetentionTypeCount = "count"
 )
 
 var (

@@ -11,15 +11,14 @@
       "args": [
         "start",
         "-c",
-        "${workspaceFolder}/hack/configs/s3/receive.yml"
+        "${workspaceFolder}/hack/configs/localfs/receive.yml"
       ],
       "env": {
         "PGHOST": "localhost",
-        "PGPORT": "30265",
+        "PGPORT": "5432",
         "PGUSER": "postgres",
         "PGPASSWORD": "postgres",
-        "PGRWL_MODE": "receive",
-        "PGRWL_MINIO_URL": "https://localhost:30268"
+        "PGRWL_MODE": "receive"
       },
       "console": "integratedTerminal"
     }
