@@ -18,17 +18,13 @@ while IFS= read -r -d '' filename; do
   # remember start time for this test
   start=$SECONDS
 
-  set -x
-
-  if bash "${filename}"; then
+  if bash -x "${filename}"; then
     status="OK"
   else
     status="FAILED"
      # record failure
     exitcode=1      
   fi
-
-  set +x
 
   # elapsed time in seconds for this test
   elapsed=$(( SECONDS - start ))
