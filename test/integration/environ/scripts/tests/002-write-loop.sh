@@ -63,6 +63,10 @@ x_backup_restore() {
     psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);'
   done
 
+  # (to prevent test-races just wait while slots are in sync)
+  xpg_wait_for_slot "pgrwl_v5"
+  xpg_wait_for_slot "pg_receivewal"
+
   # remember the state
   pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
 
