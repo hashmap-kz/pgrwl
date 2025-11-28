@@ -1,4 +1,4 @@
 ARG PG_MAJOR=17
-FROM postgres:${PG_MAJOR}
+FROM postgres:${PG_MAJOR}-alpine3.22
 
 ENV PG_MAJOR=${PG_MAJOR}
