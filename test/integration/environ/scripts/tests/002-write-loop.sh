@@ -3,11 +3,11 @@ set -euo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
 x_remake_config() {
-  cat <<EOF > "${TMPDIR}/config.json"
+  cat <<EOF > "/tmp/config.json"
 {
   "main": {
     "listen_port": 7070,
-    "directory": "${TMPDIR}/wal-archive"
+    "directory": "/tmp/wal-archive"
   },
   "receiver": {
     "slot": "pgrwl_v5",
@@ -36,7 +36,7 @@ x_backup_restore() {
   # run wal-receivers
   echo_delim "running wal-receivers"
   # run wal-receiver
-  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   nohup pg_receivewal \
     -D "${PG_RECEIVEWAL_WAL_PATH}" \
@@ -60,11 +60,21 @@ x_backup_restore() {
 
   # trying to write ~100 of WAL files as quick as possible
   for ((i = 0; i < 100; i++)); do
-    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);'
+    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
   done
 
+  # (to prevent test-races just wait while slots are in sync)
+  #
+  # those are races, when one receiver is ahead of another (may vary, it's impossible to fully keep in sync two receivers)
+  #
+  # renamed '/tmp/wal-archive/000000010000000000000067.partial' -> '/tmp/wal-archive/000000010000000000000067'
+  # renamed '/tmp/wal-archive-pg_receivewal/000000010000000000000066.partial' -> '/tmp/wal-archive-pg_receivewal/000000010000000000000066'
+  #
+  xpg_wait_for_slot "pgrwl_v5"
+  xpg_wait_for_slot "pg_receivewal"
+
   # remember the state
-  pg_dumpall -f "${TMPDIR}/pgdumpall-before" --restrict-key=0
+  pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
 
   # stop cluster, cleanup data
   echo_delim "teardown"
@@ -90,7 +100,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -105,8 +115,8 @@ EOF
 
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
-  pg_dumpall -f "${TMPDIR}/pgdumpall-after" --restrict-key=0
-  diff "${TMPDIR}/pgdumpall-before" "${TMPDIR}/pgdumpall-after"
+  pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
+  diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
 
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"

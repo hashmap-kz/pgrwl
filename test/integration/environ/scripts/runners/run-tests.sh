@@ -2,6 +2,9 @@
 
 results=()
 
+# track global exit code
+exitcode=0   
+
 # SECONDS starts from 0 when the shell starts;
 # save the starting point so we can compute total later
 script_start=$SECONDS
@@ -19,6 +22,8 @@ while IFS= read -r -d '' filename; do
     status="OK"
   else
     status="FAILED"
+     # record failure
+    exitcode=1      
   fi
 
   # elapsed time in seconds for this test
@@ -36,7 +41,7 @@ done < <(find "/var/lib/postgresql/scripts/tests" -type f -name '[0-9][0-9][0-9]
 
 total_elapsed=$(( SECONDS - script_start ))
 
-echo "::group::TOTAL ${filename}"
+echo "::group::TOTAL"
 echo ""
 echo ">> TOTAL:-------------------------------------------------------------"
 i=1
@@ -48,3 +53,5 @@ done
 echo ""
 echo "Total time: ${total_elapsed}s"
 echo "::endgroup::"
+
+exit $exitcode   # <--- exit with collected result

@@ -21,49 +21,49 @@ export PGPASSWORD=postgres
 # maintain
 
 xpg_dirs() {
-  mkdir -p "${PGDATA}"
-  chmod 0750 "${PGDATA}"
-  chown -R postgres:postgres "/var/lib/postgresql"
-  chown -R postgres:postgres "/etc/postgresql"
-
-  mkdir -p /var/log/postgresql
-  chown -R postgres:postgres /var/log/postgresql
+    mkdir -p "${PGDATA}"
+    chmod 0750 "${PGDATA}"
+    chown -R postgres:postgres "/var/lib/postgresql"
+    chown -R postgres:postgres "/etc/postgresql"
+    
+    mkdir -p /var/log/postgresql
+    chown -R postgres:postgres /var/log/postgresql
 }
 
 xpg_teardown() {
-  pkill -9 postgres || true
-  rm -rf "${PGDATA}"
+    pkill -9 postgres || true
+    rm -rf "${PGDATA}"
 }
 
 xpg_start() {
-  "${PG_BINDIR}/pg_ctl" \
+    "${PG_BINDIR}/pg_ctl" \
     -D ${PGDATA} \
     -o "-c config_file=${PG_CFG}" \
     -o "-c hba_file=${PG_HBA}" \
     start
-  xpg_wait_is_ready
+    xpg_wait_is_ready
 }
 
 xpg_rebuild() {
-  xpg_teardown
-  "${PG_BINDIR}/initdb" "${PGDATA}"
-  xpg_config
+    xpg_teardown
+    "${PG_BINDIR}/initdb" "${PGDATA}"
+    xpg_config
 }
 
 xpg_wait_is_ready() {
-  until "${PG_BINDIR}/pg_isready" -d "${PG_CONN_STR}" >/dev/null 2>&1; do
-    echo "Waiting for PostgreSQL to be ready..."
-    sleep 1
-  done
+    until "${PG_BINDIR}/pg_isready" -d "${PG_CONN_STR}" >/dev/null 2>&1; do
+        echo "Waiting for PostgreSQL to be ready..."
+        sleep 1
+    done
 }
 
 xpg_wait_is_in_recovery() {
-  is_in_recovery=$(psql -At -c "SELECT pg_catalog.pg_is_in_recovery()")
-  until [[ "${is_in_recovery}" == "f" ]]; do
-    log_info "Cluster is in recovery, waiting one second..."
-    sleep 1
     is_in_recovery=$(psql -At -c "SELECT pg_catalog.pg_is_in_recovery()")
-  done
+    until [[ "${is_in_recovery}" == "f" ]]; do
+        log_info "Cluster is in recovery, waiting one second..."
+        sleep 1
+        is_in_recovery=$(psql -At -c "SELECT pg_catalog.pg_is_in_recovery()")
+    done
 }
 
 xpg_recreate_slots() {
@@ -80,7 +80,7 @@ xpg_recreate_slots() {
   CHECKPOINT;
   SELECT pg_switch_wal();
 EOSQL
-
+    
 }
 
 xpg_create_slots() {
@@ -93,7 +93,7 @@ xpg_create_slots() {
   CHECKPOINT;
   SELECT pg_switch_wal();
 EOSQL
-
+    
 }
 
 xpg_checkpoint_switch_wal() {
@@ -102,7 +102,42 @@ xpg_checkpoint_switch_wal() {
   CHECKPOINT;
   SELECT pg_switch_wal();
 EOSQL
+    
+}
 
+xpg_wait_for_slot() {
+    local slot="$1"
+    
+    # target LSN = current WAL write position
+    local target_lsn
+    target_lsn=$(psql -At -U postgres -c "SELECT pg_current_wal_lsn()")
+    
+    echo_delim "waiting for slot ${slot} to reach ${target_lsn}"
+    
+    # tiny polling loop; tune timeout (if needed)
+    for i in {1..120}; do
+        local confirmed
+        confirmed=$(psql -At -U postgres -c "SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '${slot}'")
+        
+        # slot might not exist yet -> treat as 0/0
+        if [[ -z "$confirmed" ]]; then
+            confirmed="0/0"
+        fi
+        
+        local ok
+        ok=$(psql -At -U postgres -c \
+        "SELECT '${confirmed}' >= '${target_lsn}'")
+        
+        if [[ "$ok" = "t" ]]; then
+            echo "slot ${slot} caught up at ${confirmed}"
+            return 0
+        fi
+        
+        sleep 0.25
+    done
+    
+    echo "slot ${slot} failed to catch up in time"
+    return 1
 }
 
 xpg_config() {
@@ -112,7 +147,7 @@ local replication all     trust
 host  all         all all trust
 host  replication all all trust
 EOF
-
+    
   cat <<'EOF' >"${PG_CFG}"
 listen_addresses         = '*'
 logging_collector        = on

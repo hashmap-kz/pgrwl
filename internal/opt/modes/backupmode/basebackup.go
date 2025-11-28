@@ -80,6 +80,7 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// upload marker
 	markerFileName := bb.timestamp + ".json"
 	bb.log().Debug("uploading marker file", slog.String("name", markerFileName))
@@ -91,6 +92,7 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// metrics
 	bb.log().Debug("bytes received", slog.Int64("total", result.BytesTotal))
 	backupmetrics.M.AddBasebackupBytesReceived(float64(result.BytesTotal))
@@ -100,7 +102,7 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
 func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 	startResp, err := pglogrepl.StartBaseBackup(ctx, bb.conn, pglogrepl.BaseBackupOptions{
 		Label:         fmt.Sprintf("pgrwl_%s", bb.timestamp),
-		Progress:      false,
+		Progress:      false, // or true if you want to use 'p'
 		Fast:          true,
 		WAL:           false,
 		NoWait:        true,
@@ -111,54 +113,52 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 		return nil, fmt.Errorf("start base backup: %w", err)
 	}
 
-	streamBackupResult := &Result{
+	result := &Result{
 		StartLSN:   startResp.LSN,
 		TimelineID: startResp.TimelineID,
 	}
 
-	bb.log().Info("started backup",
-		slog.String("StopLSN", startResp.LSN.String()),
+	log := bb.log()
+	log.Info("started backup",
+		slog.String("StartLSN", startResp.LSN.String()),
 	)
 
-	var pipeWriter *io.PipeWriter
-	var putErr error
-	var putDone chan struct{}
+	var curFile *StreamingFile
+	var totalBytes int64
+	var remotePath string
 
-	cleanup := func() error {
-		if pipeWriter != nil {
-			_ = pipeWriter.Close()
-			<-putDone
-			if putErr != nil {
-				return fmt.Errorf("storage put failed: %w", putErr)
-			}
+	closeCurrent := func() error {
+		if curFile == nil {
+			return nil
 		}
+		if err := curFile.Close(); err != nil {
+			return err
+		}
+		curFile = nil
 		return nil
 	}
-
-	var remotePath string
-	var totalBytes int64
 
 	for {
 		msg, err := bb.conn.ReceiveMessage(ctx)
 		if err != nil {
 			//nolint:errcheck
-			_ = cleanup() // still try to cleanup
+			_ = closeCurrent()
 			return nil, fmt.Errorf("receive message: %w", err)
 		}
 
 		switch m := msg.(type) {
 		case *pgproto3.CopyOutResponse:
+			// nothing interesting here
 			continue
 
 		case *pgproto3.CopyData:
 			switch m.Data[0] {
 			case 'n':
-				if err := cleanup(); err != nil {
+				if err := closeCurrent(); err != nil {
 					return nil, err
 				}
 
-				buf := m.Data[1:]
-				filename, rest, err := readCString(buf)
+				filename, rest, err := readCString(m.Data[1:])
 				if err != nil {
 					return nil, err
 				}
@@ -169,68 +169,59 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 				}
 
 				remotePath = strings.TrimPrefix(filename, "./")
-				pr, pw := io.Pipe()
-				pipeWriter = pw
-				putDone = make(chan struct{})
+				curFile = NewStreamingFile(ctx, log, bb.storage, remotePath)
 
-				go func(path string, r io.Reader) {
-					defer func() {
-						bb.log().Info("closing", slog.String("file", path))
-						close(putDone)
-					}()
-					putErr = bb.storage.Put(ctx, path, r)
-				}(remotePath, pr)
-
-				bb.log().Info("streaming file",
+				log.Info("streaming file",
 					slog.String("path", remotePath),
 					slog.String("tablespace-path", tsPath),
 				)
 
 			case 'd':
-				if pipeWriter == nil {
+				if curFile == nil {
 					//nolint:errcheck
-					_ = cleanup()
+					_ = closeCurrent()
 					return nil, fmt.Errorf("received data but no active file")
 				}
-				if _, err := pipeWriter.Write(m.Data[1:]); err != nil {
+				n, err := curFile.Write(m.Data[1:])
+				if err != nil {
 					//nolint:errcheck
-					_ = cleanup()
-					return nil, fmt.Errorf("write to pipe: %w", err)
+					_ = closeCurrent()
+					return nil, fmt.Errorf("write to storage pipe: %w", err)
 				}
+				totalBytes += int64(n)
 
 			case 'm':
-				bb.log().Info("received manifest message type, ignored")
+				log.Info("received manifest message type, ignored")
 
 			case 'p':
+				// only if Progress: true
 				if len(m.Data) >= 9 {
 					//nolint:gosec
 					bytesDone := int64(binary.BigEndian.Uint64(m.Data[1:9]))
-					totalBytes += bytesDone
-					bb.log().Info("progress",
+					log.Info("progress",
 						slog.String("file", remotePath),
-						slog.Int64("bytes streamed", bytesDone),
-						slog.String("bytes streamed IEC", fsx.ByteCountIEC(bytesDone)),
+						slog.Int64("bytes_done", bytesDone),
+						slog.String("bytes_done_iec", fsx.ByteCountIEC(bytesDone)),
 					)
 				}
 
 			default:
-				bb.log().Warn("unknown CopyData type",
-					slog.String("rune", string(m.Data[0])),
-				)
+				log.Warn("unknown CopyData type", slog.String("rune", string(m.Data[0])))
 			}
 
 		case *pgproto3.CopyDone:
-			if err := cleanup(); err != nil {
+			if err := closeCurrent(); err != nil {
 				return nil, err
 			}
-			bb.log().Info("backup stream complete")
+			log.Info("backup stream complete")
 
 			stopRes, err := pglogrepl.FinishBaseBackup(ctx, bb.conn)
 			if err != nil {
 				return nil, fmt.Errorf("finish base backup: %w", err)
 			}
 
-			bb.log().Info("finished backup", slog.String("StopLSN", stopRes.LSN.String()))
+			log.Info("finished backup", slog.String("StopLSN", stopRes.LSN.String()))
+
 			var tablespaces []Tablespace
 			for _, ts := range stopRes.Tablespaces {
 				tablespaces = append(tablespaces, Tablespace{
@@ -239,10 +230,12 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 					Size:     ts.Size,
 				})
 			}
-			streamBackupResult.StopLSN = stopRes.LSN
-			streamBackupResult.Tablespaces = tablespaces
-			streamBackupResult.BytesTotal = totalBytes
-			return streamBackupResult, nil
+
+			result.StopLSN = stopRes.LSN
+			result.Tablespaces = tablespaces
+			result.BytesTotal = totalBytes
+
+			return result, nil
 
 		default:
 			return nil, fmt.Errorf("unexpected message type: %T", msg)
