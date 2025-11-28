@@ -64,6 +64,12 @@ x_backup_restore() {
   done
 
   # (to prevent test-races just wait while slots are in sync)
+  #
+  # those are races, when one receiver is ahead of another (may vary, it's impossible to fully keep in sync two receivers)
+  #
+  # renamed '/tmp/wal-archive/000000010000000000000067.partial' -> '/tmp/wal-archive/000000010000000000000067'
+  # renamed '/tmp/wal-archive-pg_receivewal/000000010000000000000066.partial' -> '/tmp/wal-archive-pg_receivewal/000000010000000000000066'
+  #
   xpg_wait_for_slot "pgrwl_v5"
   xpg_wait_for_slot "pg_receivewal"
 
