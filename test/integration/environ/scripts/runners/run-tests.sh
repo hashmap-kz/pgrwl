@@ -18,7 +18,7 @@ while IFS= read -r -d '' filename; do
   # remember start time for this test
   start=$SECONDS
 
-  if bash -x "${filename}"; then
+  if bash "${filename}"; then
     status="OK"
   else
     status="FAILED"
