@@ -11,8 +11,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Aqtau
 ENV PATH="/usr/lib/postgresql/${PG_MAJOR}/bin:${PATH}"
 
-COPY --from=quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local/bin/minio-mc
-
 ######################################################################
 # Install PostgreSQL and other utilities
 
@@ -47,7 +45,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY files/postgres/ /etc/postgresql/${PG_MAJOR}/main
 COPY files/dotfiles/ /var/lib/postgresql
 COPY files/dotfiles/ /root
-COPY bin/ /usr/local/bin
 COPY files/entrypoint.sh /entrypoint.sh
 
 ######################################################################
@@ -70,11 +67,19 @@ RUN echo "postgres:postgres" | chpasswd; \
     chmod +x /entrypoint.sh
 
 ######################################################################
+# Copy binaries (1)
+COPY --from=quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local/bin/minio-mc
+
+######################################################################
 # Copy test scripts (these files are frequently changed, so it's better to make this layer as late as possible)
 
-COPY scripts /var/lib/postgresql/scripts
 COPY files/configs /var/lib/postgresql/configs
+COPY scripts /var/lib/postgresql/scripts
 RUN chown -R postgres:postgres /var/lib/postgresql
+
+######################################################################
+# Copy binaries (2)
+COPY bin/ /usr/local/bin
 
 ######################################################################
 # Run container
