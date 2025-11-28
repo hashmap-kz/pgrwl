@@ -84,6 +84,9 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 		if strings.Contains(f, backupID+".json") {
 			continue
 		}
+		if filepath.Base(f) == "backup_manifest" {
+			continue
+		}
 
 		rc, err := stor.Get(ctx, f)
 		if err != nil {

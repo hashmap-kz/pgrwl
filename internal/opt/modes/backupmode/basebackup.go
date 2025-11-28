@@ -98,7 +98,7 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
 }
 
 func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
-	startResp, err := pglogrepl.StartBaseBackup(ctx, bb.conn, pglogrepl.BaseBackupOptions{
+	startResp, err := StartBaseBackup(ctx, bb.conn, BaseBackupOptions{
 		Label:         fmt.Sprintf("pgrwl_%s", bb.timestamp),
 		Progress:      false,
 		Fast:          true,
@@ -106,6 +106,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 		NoWait:        true,
 		MaxRate:       0,
 		TablespaceMap: true,
+		Manifest:      "yes",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start base backup: %w", err)
@@ -199,7 +200,28 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 				}
 
 			case 'm':
-				bb.log().Info("received manifest message type, ignored")
+				// bb.log().Info("received manifest message type, ignored")
+				// start of backup_manifest
+				bb.log().Info("starting backup manifest")
+
+				if err := cleanup(); err != nil {
+					return nil, err
+				}
+
+				// choose a name; e.g. keep next to base.tar
+				remotePath = "backup_manifest"
+
+				pr, pw := io.Pipe()
+				pipeWriter = pw
+				putDone = make(chan struct{})
+
+				go func(path string, r io.Reader) {
+					defer func() {
+						bb.log().Info("closing", slog.String("file", path))
+						close(putDone)
+					}()
+					putErr = bb.storage.Put(ctx, path, r)
+				}(remotePath, pr)
 
 			case 'p':
 				if len(m.Data) >= 9 {
@@ -225,7 +247,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 			}
 			bb.log().Info("backup stream complete")
 
-			stopRes, err := pglogrepl.FinishBaseBackup(ctx, bb.conn)
+			stopRes, err := FinishBaseBackup(ctx, bb.conn)
 			if err != nil {
 				return nil, fmt.Errorf("finish base backup: %w", err)
 			}
