@@ -40,6 +40,7 @@ xpg_start() {
     -D ${PGDATA} \
     -o "-c config_file=${PG_CFG}" \
     -o "-c hba_file=${PG_HBA}" \
+    -l /var/log/postgresql/pg.log \
     start
     xpg_wait_is_ready
 }
