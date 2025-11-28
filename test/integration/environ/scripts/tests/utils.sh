@@ -2,25 +2,27 @@
 set -euo pipefail
 . /var/lib/postgresql/scripts/pg/pg.sh
 
-# Per-test temporary directory
 TEST_NAME=$(basename "$0" .sh)
-TMPDIR=$(mktemp -d -t "pgrwl-${TEST_NAME}.XXXXXX")
-echo_delim "Using TMPDIR: ${TMPDIR} for test: ${TEST_NAME}"
+TEST_STATE_PATH="/var/lib/postgresql/test-state/${TEST_NAME}"
 
 # Cleanup on exit (even on error)
 cleanup() {
-  # comment this out if you want to inspect TMPDIR after run
-  rm -rf "${TMPDIR}"
+  set +e
+  # save content for debug
+  mkdir -p "${TEST_STATE_PATH}"
+  cp -a /tmp/* "${TEST_STATE_PATH}/"
+  # cleanup state
+  rm -rf /tmp/*
 }
-# trap cleanup EXIT
+trap cleanup EXIT
 
-export BASEBACKUP_PATH="${TMPDIR}/basebackup"
-export WAL_PATH="${TMPDIR}/wal-archive"
-export LOG_FILE="${TMPDIR}/pgrwl.log"
-export PG_RECEIVEWAL_WAL_PATH="${TMPDIR}/wal-archive-pg_receivewal"
-export PG_RECEIVEWAL_LOG_FILE="${TMPDIR}/pg_receivewal.log"
+export BASEBACKUP_PATH="/tmp/basebackup"
+export WAL_PATH="/tmp/wal-archive"
+export LOG_FILE="/tmp/pgrwl.log"
+export PG_RECEIVEWAL_WAL_PATH="/tmp/wal-archive-pg_receivewal"
+export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
 export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
-export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="${TMPDIR}/ts-inserts.log"
+export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="/tmp/ts-inserts.log"
 
 # Default environment
 
@@ -51,6 +53,7 @@ x_remake_buckets() {
 }
 
 x_remake_dirs() {
+  # stop all processes, clean ALL state
   pkill -9 postgres || true
   pkill -9 pgrwl || true
   rm -rf /tmp/*

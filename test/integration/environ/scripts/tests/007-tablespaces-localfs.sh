@@ -3,11 +3,11 @@ set -euo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
 x_remake_config() {
-  cat <<EOF > "${TMPDIR}/config.json"
+  cat <<EOF > "/tmp/config.json"
 {
   "main": {
     "listen_port": 7070,
-    "directory": "${TMPDIR}/wal-archive"
+    "directory": "/tmp/wal-archive"
   },
   "receiver": {
     "slot": "pgrwl_v5",
@@ -36,7 +36,7 @@ x_backup_restore() {
   # run wal-receivers
   echo_delim "running wal-receivers"
   # run wal-receiver
-  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   nohup pg_receivewal \
     -D "${PG_RECEIVEWAL_WAL_PATH}" \
@@ -49,14 +49,14 @@ x_backup_restore() {
     >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &
 
   # create tablespaces
-  mkdir -p "${TMPDIR}/spaces/alpha"
-  mkdir -p "${TMPDIR}/spaces/beta"
-  chown -R postgres:postgres "${TMPDIR}/spaces"
+  mkdir -p "/tmp/spaces/alpha"
+  mkdir -p "/tmp/spaces/beta"
+  chown -R postgres:postgres "/tmp/spaces"
 
 "${PG_BINDIR}/psql" -v ON_ERROR_STOP=1 <<EOSQL
 -- tablespaces
-CREATE TABLESPACE ts_alpha LOCATION '${TMPDIR}/spaces/alpha';
-CREATE TABLESPACE ts_beta  LOCATION '${TMPDIR}/spaces/beta';
+CREATE TABLESPACE ts_alpha LOCATION '/tmp/spaces/alpha';
+CREATE TABLESPACE ts_beta  LOCATION '/tmp/spaces/beta';
 EOSQL
 
 "${PG_BINDIR}/psql" -v ON_ERROR_STOP=1 <<'EOSQL'
@@ -99,7 +99,7 @@ EOSQL
 
   # make a backup before doing anything
   echo_delim "creating backup"
-  /usr/local/bin/pgrwl backup -c "${TMPDIR}/config.json"
+  /usr/local/bin/pgrwl backup -c "/tmp/config.json"
 
   # run inserts in a background
   chmod +x "${BACKGROUND_INSERTS_SCRIPT_PATH}"
@@ -116,20 +116,20 @@ EOSQL
   pkill -f inserts.sh
 
   # remember the state
-  pg_dumpall -f "${TMPDIR}/pgdumpall-before" --restrict-key=0
+  pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
 
   # stop cluster, cleanup data
   echo_delim "teardown"
   xpg_teardown
 
   # save and cleanup tablespaces
-  cp -r "${TMPDIR}/spaces" "${TMPDIR}/spaces_backup"
-  rm -rf "${TMPDIR:?}/spaces/*"
+  cp -r "/tmp/spaces" "/tmp/spaces_backup"
+  rm -rf "/tmp/spaces/*"
 
   # restore from backup
   echo_delim "restoring backup"
-  #BACKUP_ID=$(find ${TMPDIR}/wal-archive/backups -mindepth 1 -maxdepth 1 -type d -printf "%T@ %f\n" | sort -n | tail -1 | cut -d' ' -f2)
-  /usr/local/bin/pgrwl restore --dest="${PGDATA}" -c "${TMPDIR}/config.json"
+  #BACKUP_ID=$(find /tmp/wal-archive/backups -mindepth 1 -maxdepth 1 -type d -printf "%T@ %f\n" | sort -n | tail -1 | cut -d' ' -f2)
+  /usr/local/bin/pgrwl restore --dest="${PGDATA}" -c "/tmp/config.json"
   chmod 0750 "${PGDATA}"
   chown -R postgres:postgres "${PGDATA}"
   touch "${PGDATA}/recovery.signal"
@@ -146,7 +146,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "${TMPDIR}/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -161,10 +161,10 @@ EOF
 
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
-  pg_dumpall -f "${TMPDIR}/pgdumpall-after" --restrict-key=0
-  diff "${TMPDIR}/pgdumpall-before" "${TMPDIR}/pgdumpall-after"
+  pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
+  diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
   echo_delim "running diff on tablespaces (before vs after)"
-  diff -r "${TMPDIR}/spaces_backup" "${TMPDIR}/spaces"
+  diff -r "/tmp/spaces_backup" "/tmp/spaces"
 
   # read the latest rec
   echo_delim "read latest applied records"
