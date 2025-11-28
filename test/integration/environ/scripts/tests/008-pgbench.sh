@@ -42,11 +42,7 @@ x_backup_restore() {
 
   # fill with ~= 5Gi of data
   echo_delim "running pgbench"
-  psql -c "create schema if not exists pgbench1" postgres
-  PGOPTIONS='-c search_path=pgbench1' \
-    pgbench -iq -s 15 --unlogged -I dtg --fillfactor 10  postgres &
   pgbench -iq -s 15 --unlogged -I dtg --fillfactor 10  postgres
-  wait
 
   # wait a little
   sleep 5
