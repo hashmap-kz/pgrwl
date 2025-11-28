@@ -1,6 +1,7 @@
 package receivemode
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -11,11 +12,13 @@ import (
 
 type ReceiveController struct {
 	Service Service
+	StopFn  context.CancelFunc
 }
 
-func NewReceiveController(s Service) *ReceiveController {
+func NewReceiveController(s Service, stopFn context.CancelFunc) *ReceiveController {
 	return &ReceiveController{
 		Service: s,
+		StopFn:  stopFn,
 	}
 }
 
@@ -27,6 +30,11 @@ func (c *ReceiveController) StatusHandler(w http.ResponseWriter, _ *http.Request
 func (c *ReceiveController) BriefConfig(w http.ResponseWriter, r *http.Request) {
 	briefConfig := c.Service.BriefConfig(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, briefConfig)
+}
+
+func (c *ReceiveController) StopReceiver(w http.ResponseWriter, r *http.Request) {
+	c.StopFn()
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
 }
 
 func (c *ReceiveController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *http.Request) {

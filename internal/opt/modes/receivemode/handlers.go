@@ -1,6 +1,7 @@
 package receivemode
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -20,7 +21,8 @@ type Opts struct {
 	BaseDir  string
 	Verbose  bool
 	Storage  *storage.TransformingStorage
-	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	JobQueue *jobq.JobQueue     // optional, nil in 'serve' mode
+	StopFn   context.CancelFunc // stop main-receive loop outside on purpose
 }
 
 func Init(opts *Opts) http.Handler {
@@ -34,7 +36,7 @@ func Init(opts *Opts) http.Handler {
 		JobQueue: opts.JobQueue,
 		Verbose:  opts.Verbose,
 	})
-	controller := NewReceiveController(service)
+	controller := NewReceiveController(service, opts.StopFn)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -59,6 +61,7 @@ func Init(opts *Opts) http.Handler {
 	// Streaming mode (requires that wal-streaming process is running)
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
+	mux.Handle("DELETE /receiver", secureChain(http.HandlerFunc(controller.StopReceiver)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
 
 	shared.InitOptionalHandlers(cfg, mux, l)

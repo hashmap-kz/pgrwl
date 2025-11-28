@@ -37,19 +37,22 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	cfg := config.Cfg()
 	loggr := slog.With("component", "receive-mode-runner")
 
-	// setup context
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
-	defer signalCancel()
+	// rootCtx: killed only by SIGINT/SIGTERM
+	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// receiverCtx: you can cancel/restart independently
+	receiverCtx, receiverCancel := context.WithCancel(rootCtx)
+	defer receiverCancel()
 
 	// print options
-	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
+	loggr.LogAttrs(rootCtx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
 	//////////////////////////////////////////////////////////////////////
 	// Init WAL-receiver loop first
 
 	// setup wal-receiver
-	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
+	pgrw, err := xlog.NewPgReceiver(receiverCtx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
@@ -82,9 +85,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		// Signal that we are starting Run()
 		close(started)
 
-		if err := pgrw.Run(ctx); err != nil {
+		if err := pgrw.Run(receiverCtx); err != nil {
 			loggr.Error("streaming failed", slog.Any("err", err))
-			cancel() // cancel everything on error
+			receiverCancel() // cancel everything on error
 		}
 	}()
 
@@ -98,12 +101,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// setup job queue
 	loggr.Info("running job queue")
 	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
+	jobQueue.Start(receiverCtx)
 
 	// metrics
 	if cfg.Metrics.Enable {
 		loggr.Debug("init prom metrics")
-		receivemetrics.InitPromMetrics(ctx)
+		receivemetrics.InitPromMetrics(receiverCtx)
 	}
 
 	var stor *st.TransformingStorage
@@ -141,9 +144,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			Verbose:  opts.Verbose,
 			Storage:  stor,
 			JobQueue: jobQueue,
+			StopFn:   receiverCancel,
 		})
 		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
-		if err := srv.Run(ctx); err != nil {
+		if err := srv.Run(rootCtx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}
 	}()
@@ -167,15 +171,15 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				Verbose:          opts.Verbose,
 			})
 			if cfg.Receiver.Retention.Enable {
-				u.RunWithRetention(ctx, jobQueue)
+				u.RunWithRetention(receiverCtx, jobQueue)
 			} else {
-				u.RunUploader(ctx, jobQueue)
+				u.RunUploader(receiverCtx, jobQueue)
 			}
 		}()
 	}
 
 	// Wait for signal (context cancellation)
-	<-ctx.Done()
+	<-rootCtx.Done()
 	loggr.Info("shutting down, waiting for goroutines...")
 
 	// Wait for all goroutines to finish

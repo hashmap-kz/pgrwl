@@ -5,9 +5,9 @@ main:
 
 receiver:
   slot: pgrwl_v5
-  #uploader:
-  #  sync_interval: 10s
-  #  max_concurrency: 4
+  uploader:
+   sync_interval: 10s
+   max_concurrency: 4
   #retention:
   #  enable: true
   #  sync_interval: 10s
@@ -22,10 +22,10 @@ log:
   format: text
   add_source: true
 
-#storage:
-#  name: "local"
-#  compression:
-#    algo: gzip
+storage:
+ name: "local"
+ compression:
+   algo: gzip
 #  encryption:
 #    algo: aes-256-gcm
 #    pass: qwerty123
