@@ -72,7 +72,7 @@ x_backup_restore() {
 
   # trying to write ~100 of WAL files as quick as possible
   for ((i = 0; i < 100; i++)); do
-    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);'
+    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
   done
 
   # remember the state
