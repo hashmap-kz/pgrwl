@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
+
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
 
 	"github.com/hashmap-kz/pgrwl/internal/version"
@@ -53,7 +55,7 @@ func App() *cli.Command {
 					//nolint:staticcheck
 					if mode == config.ModeReceive {
 						checkPgEnvsAreSet()
-						RunReceiveMode(&ReceiveModeOpts{
+						RunReceiveMode(&receiveAPI.ReceiveModeOpts{
 							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
 							ListenPort:       cfg.Main.ListenPort,
 							Slot:             cfg.Receiver.Slot,

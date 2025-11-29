@@ -32,6 +32,7 @@ xpg_dirs() {
 
 xpg_teardown() {
     pkill -9 postgres || true
+    pkill -9 pgrwl || true
     rm -rf "${PGDATA}"
 }
 
