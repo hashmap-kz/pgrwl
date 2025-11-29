@@ -28,13 +28,13 @@ type serveModeSvc struct {
 
 var _ Service = &serveModeSvc{}
 
-type SvcOpts struct {
+type ServeServiceOpts struct {
 	BaseDir string
 	Storage *storage.TransformingStorage
 	Verbose bool
 }
 
-func NewServeModeService(opts *SvcOpts) Service {
+func NewServeModeService(opts *ServeServiceOpts) Service {
 	return &serveModeSvc{
 		l:       slog.With("component", "serve-service"),
 		baseDir: opts.BaseDir,
