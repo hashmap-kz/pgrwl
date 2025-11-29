@@ -83,7 +83,7 @@ func NewPgReceiver(ctx context.Context, opts *PgReceiveWalOpts) (PgReceiveWal, e
 	}, nil
 }
 
-func (pgrw *pgReceiveWal) Run(ctx context.Context) error {
+func (pgrw *pgReceiveWal) RunV0(ctx context.Context) error {
 	// enter main streaming loop
 	for {
 		err := pgrw.streamLog(ctx)
@@ -106,6 +106,50 @@ func (pgrw *pgReceiveWal) Run(ctx context.Context) error {
 
 		pgrw.log().Info("disconnected; waiting 5 seconds to try again")
 		time.Sleep(5 * time.Second)
+	}
+}
+
+func (pgrw *pgReceiveWal) Run(ctx context.Context) error {
+	for {
+		// Do one stream cycle
+		err := pgrw.streamLog(ctx)
+		if err != nil {
+			// If context is canceled, stop gracefully
+			if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+				pgrw.log().Info("wal-receiver stopping due to context cancellation")
+				return nil
+			}
+
+			// Fatal error in streaming
+			pgrw.log().Error("an error occurred in StreamLog()", slog.Any("err", err))
+
+			if pgrw.noLoop {
+				// one-shot mode: bubble error to caller
+				return err
+			}
+
+			// In loop mode: log and retry after backoff
+			pgrw.log().Info("disconnected; will retry after backoff")
+		}
+
+		// Check for context cancellation after one cycle
+		if ctx.Err() != nil {
+			pgrw.log().Info("wal-receiver stopping: context is done")
+			return nil
+		}
+
+		if pgrw.noLoop {
+			pgrw.log().Info("wal-receiver stopping: noLoop enabled")
+			return nil
+		}
+
+		pgrw.log().Info("disconnected; waiting 5 seconds to try again")
+		select {
+		case <-ctx.Done():
+			pgrw.log().Info("wal-receiver stopping during backoff: context is done")
+			return nil
+		case <-time.After(5 * time.Second):
+		}
 	}
 }
 

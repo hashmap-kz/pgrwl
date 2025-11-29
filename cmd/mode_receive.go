@@ -37,19 +37,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	cfg := config.Cfg()
 	loggr := slog.With("component", "receive-mode-runner")
 
-	// setup context
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	// Root context for the whole program (http, job queue, etc.)
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+	rootCtx, signalCancel := signal.NotifyContext(rootCtx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
+	defer rootCancel()
 
-	// print options
-	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
+	loggr.LogAttrs(rootCtx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	//////////////////////////////////////////////////////////////////////
-	// Init WAL-receiver loop first
-
-	// setup wal-receiver
-	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
+	// Init WAL receiver instance (no streaming yet)
+	pgrw, err := xlog.NewPgReceiver(rootCtx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
@@ -60,37 +57,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		log.Fatal(err)
 	}
 
-	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 
-	// Signal channel to indicate that pgrw.Run() has started
-	started := make(chan struct{})
-
-	// main streaming loop
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				loggr.Error("wal-receiver panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "wal-receiver"),
-				)
-			}
-		}()
-
-		// Signal that we are starting Run()
-		close(started)
-
-		if err := pgrw.Run(ctx); err != nil {
-			loggr.Error("streaming failed", slog.Any("err", err))
-			cancel() // cancel everything on error
-		}
-	}()
-
-	// Wait until pgrw.Run() has started
-	<-started
-	loggr.Info("wal-receiver started")
+	// Create controller and start streaming
+	streamCtl := receiveAPI.NewStreamController(rootCtx, loggr, pgrw)
+	streamCtl.Start(&wg)
 
 	//////////////////////////////////////////////////////////////////////
 	// Init OPT components
@@ -98,12 +69,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// setup job queue
 	loggr.Info("running job queue")
 	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
+	jobQueue.Start(rootCtx)
 
 	// metrics
 	if cfg.Metrics.Enable {
 		loggr.Debug("init prom metrics")
-		receivemetrics.InitPromMetrics(ctx)
+		receivemetrics.InitPromMetrics(rootCtx)
 	}
 
 	var stor *st.TransformingStorage
@@ -136,14 +107,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}()
 
 		handlers := receiveAPI.Init(&receiveAPI.Opts{
-			PGRW:     pgrw,
-			BaseDir:  opts.ReceiveDirectory,
-			Verbose:  opts.Verbose,
-			Storage:  stor,
-			JobQueue: jobQueue,
+			PGRW:             pgrw,
+			StreamController: streamCtl,
+			WG:               &wg,
+			BaseDir:          opts.ReceiveDirectory,
+			Verbose:          opts.Verbose,
+			Storage:          stor,
+			JobQueue:         jobQueue,
 		})
 		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
-		if err := srv.Run(ctx); err != nil {
+		if err := srv.Run(rootCtx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}
 	}()
@@ -167,15 +140,15 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				Verbose:          opts.Verbose,
 			})
 			if cfg.Receiver.Retention.Enable {
-				u.RunWithRetention(ctx, jobQueue)
+				u.RunWithRetention(rootCtx, jobQueue)
 			} else {
-				u.RunUploader(ctx, jobQueue)
+				u.RunUploader(rootCtx, jobQueue)
 			}
 		}()
 	}
 
 	// Wait for signal (context cancellation)
-	<-ctx.Done()
+	<-rootCtx.Done()
 	loggr.Info("shutting down, waiting for goroutines...")
 
 	// Wait for all goroutines to finish

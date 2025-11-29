@@ -3,6 +3,7 @@ package receivemode
 import (
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
@@ -16,11 +17,13 @@ import (
 )
 
 type Opts struct {
-	PGRW     xlog.PgReceiveWal
-	BaseDir  string
-	Verbose  bool
-	Storage  *storage.TransformingStorage
-	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	PGRW             xlog.PgReceiveWal
+	BaseDir          string
+	Verbose          bool
+	Storage          *storage.TransformingStorage
+	StreamController *StreamController
+	JobQueue         *jobq.JobQueue // optional, nil in 'serve' mode
+	WG               *sync.WaitGroup
 }
 
 func Init(opts *Opts) http.Handler {
@@ -34,7 +37,7 @@ func Init(opts *Opts) http.Handler {
 		JobQueue: opts.JobQueue,
 		Verbose:  opts.Verbose,
 	})
-	controller := NewReceiveController(service)
+	controller := NewReceiveController(service, opts.StreamController, opts.WG)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -60,6 +63,8 @@ func Init(opts *Opts) http.Handler {
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
+	mux.Handle("POST /pause", secureChain(http.HandlerFunc(controller.PauseStreaming)))
+	mux.Handle("POST /resume", secureChain(http.HandlerFunc(controller.ResumeStreaming)))
 
 	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
