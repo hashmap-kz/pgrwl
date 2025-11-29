@@ -95,7 +95,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	initMetrics(ctx, cfg, loggr)
 
 	// setup storage: it may be nil
-	stor, needSupervisorLoop := mustInitStorage(cfg, loggr, opts)
+	stor := mustInitStorageIfRequired(cfg, loggr, opts)
 
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
@@ -123,8 +123,8 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}
 	}()
 
-	// ArchiveSupervisor
-	if needSupervisorLoop {
+	// ArchiveSupervisor (run this goroutine ONLY when storage is required)
+	if stor != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -196,11 +196,10 @@ func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal 
 	return pgrw
 }
 
-func mustInitStorage(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts) (*st.TransformingStorage, bool) {
+func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts) *st.TransformingStorage {
 	var stor *st.TransformingStorage
 	var err error
-	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
-	if needSupervisorLoop {
+	if needSupervisorLoop(cfg, loggr) {
 		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
 			BaseDir: opts.ReceiveDirectory,
 			SubPath: config.LocalFSStorageSubpath,
@@ -212,5 +211,5 @@ func mustInitStorage(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOp
 			log.Fatal(err)
 		}
 	}
-	return stor, needSupervisorLoop
+	return stor
 }
