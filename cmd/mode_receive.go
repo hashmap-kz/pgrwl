@@ -110,7 +110,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				)
 			}
 		}()
-		handlers := receiveAPI.Init(&receiveAPI.Opts{
+		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
 			PGRW:     pgrw,
 			BaseDir:  opts.ReceiveDirectory,
 			Verbose:  opts.Verbose,

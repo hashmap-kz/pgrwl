@@ -15,7 +15,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type Opts struct {
+type ReceiveHandlerOpts struct {
 	PGRW     xlog.PgReceiveWal
 	BaseDir  string
 	Verbose  bool
@@ -23,7 +23,7 @@ type Opts struct {
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 }
 
-func Init(opts *Opts) http.Handler {
+func Init(opts *ReceiveHandlerOpts) http.Handler {
 	cfg := config.Cfg()
 	l := slog.With("component", "receive-api")
 
