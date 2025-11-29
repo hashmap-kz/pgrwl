@@ -54,9 +54,9 @@ x_remake_buckets() {
 
 x_remake_dirs() {
   # stop all processes, clean ALL state
-  pkill -9 postgres || true
-  pkill -9 pgrwl || true
-  rm -rf /tmp/*
+  sudo pkill -9 postgres || true
+  sudo pkill -9 pgrwl || true
+  sudo rm -rf /tmp/*
 
   # recreate localFS
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
