@@ -91,10 +91,9 @@ func (pgrw *pgReceiveWal) Run(ctx context.Context) error {
 			if errors.Is(err, context.Canceled) {
 				pgrw.log().Warn("context canceled in pgrw.Run(), exiting", slog.Any("err", err))
 				return nil
-			} else {
-				pgrw.log().Error("an error occurred in StreamLog(), exiting", slog.Any("err", err))
-				return err
 			}
+			pgrw.log().Error("an error occurred in StreamLog(), exiting", slog.Any("err", err))
+			return err
 		}
 
 		select {
