@@ -56,6 +56,7 @@ x_remake_dirs() {
   # stop all processes, clean ALL state
   pkill -9 postgres || true
   pkill -9 pgrwl || true
+  lsof -t -i :7070 | xargs -r kill -9
   rm -rf /tmp/*
 
   # recreate localFS
