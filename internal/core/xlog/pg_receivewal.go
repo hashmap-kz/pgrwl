@@ -88,20 +88,25 @@ func (pgrw *pgReceiveWal) Run(ctx context.Context) error {
 	for {
 		err := pgrw.streamLog(ctx)
 		if err != nil {
-			pgrw.log().Error("an error occurred in StreamLog(), exiting", slog.Any("err", err))
-			os.Exit(1)
+			if errors.Is(err, context.Canceled) {
+				pgrw.log().Warn("context canceled in pgrw.Run(), exiting", slog.Any("err", err))
+				return nil
+			} else {
+				pgrw.log().Error("an error occurred in StreamLog(), exiting", slog.Any("err", err))
+				return err
+			}
 		}
 
 		select {
 		case <-ctx.Done():
 			pgrw.log().Info("context is done, exiting...")
-			os.Exit(0)
+			return nil
 		default:
 		}
 
 		if pgrw.noLoop {
 			pgrw.log().Error("disconnected")
-			os.Exit(1)
+			return fmt.Errorf("disconnected")
 		}
 
 		pgrw.log().Info("disconnected; waiting 5 seconds to try again")
