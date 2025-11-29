@@ -88,7 +88,7 @@ func RunReceiveMode(opts *receiveAPI.ReceiveModeOpts) {
 			}
 		}()
 
-		handlers := receiveAPI.Init(&receiveAPI.Opts{
+		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
 			PGRW:     pgrw,
 			Pipeline: pipelineSvc, // NEW: pass pipeline controller
 			BaseDir:  opts.ReceiveDirectory,
