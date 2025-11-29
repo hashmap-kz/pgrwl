@@ -17,16 +17,10 @@ type BackupRetriever struct {
 
 type restoreRequest struct {
 	// Backup ID; if empty, RestoreBaseBackup will pick the latest
-	ID string `json:"id,omitempty"`
+	ID string `json:"id"`
 
 	// Restore destination
-	Dest string `json:"dest,omitempty"`
-}
-
-type restoreResponse struct {
-	ID   string `json:"id"`
 	Dest string `json:"dest"`
-	Msg  string `json:"msg"`
 }
 
 func (s *BackupRetriever) handleRestore(w http.ResponseWriter, r *http.Request) {
@@ -34,38 +28,45 @@ func (s *BackupRetriever) handleRestore(w http.ResponseWriter, r *http.Request) 
 
 	var req restoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+	if req.ID == "" || req.Dest == "" {
+		httpx.WriteJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "id and dest cannot be empty",
+		})
 		return
 	}
 
-	// TODO: fix (should be an empty dir)
-	// Decide destination (I’d strongly recommend not letting client pick arbitrary path)
-	dest := req.Dest
-
 	slog.Info("restore requested",
 		slog.String("id", req.ID),
-		slog.String("dest", dest),
+		slog.String("dest", req.Dest),
 	)
 
 	// Do the restore synchronously for now
-	if err := backupmode.RestoreBaseBackup(ctx, s.cfg, req.ID, dest); err != nil {
+	if err := backupmode.RestoreBaseBackup(ctx, s.cfg, req.ID, req.Dest); err != nil {
 		slog.Error("restore failed",
 			slog.String("id", req.ID),
-			slog.String("dest", dest),
+			slog.String("dest", req.Dest),
 			slog.Any("err", err),
 		)
-		http.Error(w, "restore failed: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{
+			"status": "failed",
+			"reason": err.Error(),
+		})
 		return
 	}
 
 	slog.Info("restore completed",
 		slog.String("id", req.ID),
-		slog.String("dest", dest),
+		slog.String("dest", req.Dest),
 	)
 
-	httpx.WriteJSON(w, http.StatusOK, restoreResponse{
-		ID:   req.ID,
-		Dest: dest,
-		Msg:  "restore completed",
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"id":     req.ID,
+		"dest":   req.Dest,
 	})
 }
