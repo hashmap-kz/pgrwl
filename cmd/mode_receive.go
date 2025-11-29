@@ -49,16 +49,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Init WAL-receiver loop first
 
 	// setup wal-receiver
-	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
-		ReceiveDirectory: opts.ReceiveDirectory,
-		Slot:             opts.Slot,
-		NoLoop:           opts.NoLoop,
-		Verbose:          opts.Verbose,
-	})
-	if err != nil {
-		//nolint:gocritic
-		log.Fatal(err)
-	}
+	pgrw := mustInitPgrw(ctx, opts)
 
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
@@ -100,26 +91,11 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	jobQueue := jobq.NewJobQueue(5)
 	jobQueue.Start(ctx)
 
-	// metrics
-	if cfg.Metrics.Enable {
-		loggr.Debug("init prom metrics")
-		receivemetrics.InitPromMetrics(ctx)
-	}
+	// setup metrics
+	initMetrics(ctx, cfg, loggr)
 
-	var stor *st.TransformingStorage
-	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
-	if needSupervisorLoop {
-		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
-			BaseDir: opts.ReceiveDirectory,
-			SubPath: config.LocalFSStorageSubpath,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := shared.CheckManifest(cfg); err != nil {
-			log.Fatal(err)
-		}
-	}
+	// setup storage: it may be nil
+	stor, needSupervisorLoop := mustInitStorage(cfg, loggr, opts)
 
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
@@ -134,7 +110,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				)
 			}
 		}()
-
 		handlers := receiveAPI.Init(&receiveAPI.Opts{
 			PGRW:     pgrw,
 			BaseDir:  opts.ReceiveDirectory,
@@ -183,6 +158,13 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	loggr.Info("all components shut down cleanly")
 }
 
+func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
+	if cfg.Metrics.Enable {
+		loggr.Debug("init prom metrics")
+		receivemetrics.InitPromMetrics(ctx)
+	}
+}
+
 // needSupervisorLoop decides whether we actually need to boot the storage
 // we don't need if:
 // * it's a localfs storage configured with no compression/encryption/retain
@@ -199,4 +181,36 @@ func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 		return hasCfg
 	}
 	return true
+}
+
+func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal {
+	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
+		ReceiveDirectory: opts.ReceiveDirectory,
+		Slot:             opts.Slot,
+		NoLoop:           opts.NoLoop,
+		Verbose:          opts.Verbose,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return pgrw
+}
+
+func mustInitStorage(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts) (*st.TransformingStorage, bool) {
+	var stor *st.TransformingStorage
+	var err error
+	needSupervisorLoop := needSupervisorLoop(cfg, loggr)
+	if needSupervisorLoop {
+		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
+			BaseDir: opts.ReceiveDirectory,
+			SubPath: config.LocalFSStorageSubpath,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := shared.CheckManifest(cfg); err != nil {
+			log.Fatal(err)
+		}
+	}
+	return stor, needSupervisorLoop
 }
