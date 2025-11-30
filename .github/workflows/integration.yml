@@ -91,11 +91,19 @@ jobs:
           echo "Restored cached image archives, loading into Docker..."
           ls -lah "${{ env.CACHE_FOLDER }}" || true
 
-          [ -f "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_SSHD }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_MINIO }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load || true
+          printf '%s\n' \
+            "${CACHE_FILE_DOCKER_PG_PRIMARY}" \
+            "${CACHE_FILE_DOCKER_PG_STANDBY}" \
+            "${CACHE_FILE_DOCKER_SSHD}" \
+            "${CACHE_FILE_DOCKER_MINIO}" \
+            "${CACHE_FILE_DOCKER_MINIO_MC}" \
+          | xargs -n1 -P4 bash -c '
+            set -euo pipefail
+            f="$0"
+            [ -f "$f" ] || { echo "Skip missing $f"; exit 0; }
+            echo "Loading image from $f ..."
+            gunzip -c "$f" | docker load
+          '
 
           echo "Images after load (if any):"
           docker images || true
@@ -206,11 +214,19 @@ jobs:
 
           ls -lah "${{ env.CACHE_FOLDER }}" || true
 
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load
+          printf '%s\n' \
+            "${CACHE_FILE_DOCKER_PG_PRIMARY}" \
+            "${CACHE_FILE_DOCKER_PG_STANDBY}" \
+            "${CACHE_FILE_DOCKER_SSHD}" \
+            "${CACHE_FILE_DOCKER_MINIO}" \
+            "${CACHE_FILE_DOCKER_MINIO_MC}" \
+          | xargs -n1 -P4 bash -c '
+            set -euo pipefail
+            f="$0"
+            [ -f "$f" ] || { echo "Skip missing $f"; exit 0; }
+            echo "Loading image from $f ..."
+            gunzip -c "$f" | docker load
+          '
 
           echo "=== Images after load ==="
           docker images || true
