@@ -75,6 +75,7 @@ COPY --from=quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local
 
 COPY files/configs /var/lib/postgresql/configs
 COPY scripts /var/lib/postgresql/scripts
+RUN find /var/lib/postgresql/scripts/tests -type f -name '*.sh' -exec chmod +x {} \;
 RUN chown -R postgres:postgres /var/lib/postgresql
 
 ######################################################################
