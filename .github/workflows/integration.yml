@@ -134,12 +134,21 @@ jobs:
 
           mkdir -p "${{ env.CACHE_FOLDER }}"
 
-          # image names must match docker-compose.yml
-          docker save "pgrwl/pg-primary-${PG_MAJOR}" | gzip -c > "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}"
-          docker save "pgrwl/pg-standby-${PG_MAJOR}" | gzip -c > "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}"
-          docker save "pgrwl/sshd" | gzip -c > "${{ env.CACHE_FILE_DOCKER_SSHD }}"
-          docker save "pgrwl/minio" | gzip -c > "${{ env.CACHE_FILE_DOCKER_MINIO }}"
-          docker save "pgrwl/minio-mc" | gzip -c > "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}"
+          # Save all images concurrently (image -> cache file)
+          printf '%s %s\n' \
+            "pgrwl/pg-primary-${PG_MAJOR}" "${CACHE_FILE_DOCKER_PG_PRIMARY}" \
+            "pgrwl/pg-standby-${PG_MAJOR}" "${CACHE_FILE_DOCKER_PG_STANDBY}" \
+            "pgrwl/sshd"                    "${CACHE_FILE_DOCKER_SSHD}" \
+            "pgrwl/minio"                   "${CACHE_FILE_DOCKER_MINIO}" \
+            "pgrwl/minio-mc"                "${CACHE_FILE_DOCKER_MINIO_MC}" \
+          | xargs -n2 -P4 bash -c '
+              set -euo pipefail
+              img="$1"
+              out="$2"
+              echo "Saving ${img} -> ${out} ..."
+              docker save "${img}" | gzip -c > "${out}"
+              echo "Saved ${img}"
+            ' _
 
           echo "=== Cached archives ==="
           ls -lah "${{ env.CACHE_FOLDER }}"
