@@ -9,7 +9,7 @@ services:
     user: postgres
     depends_on:
       minio:
-          condition: service_healthy
+        condition: service_healthy
       sshd:
         condition: service_started
 
