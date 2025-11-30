@@ -10,12 +10,14 @@ import (
 )
 
 type ReceiveController struct {
-	Service Service
+	Service  Service
+	Pipeline *ReceivePipelineService
 }
 
-func NewReceiveController(s Service) *ReceiveController {
+func NewReceiveController(s Service, p *ReceivePipelineService) *ReceiveController {
 	return &ReceiveController{
-		Service: s,
+		Service:  s,
+		Pipeline: p,
 	}
 }
 
@@ -46,4 +48,14 @@ func (c *ReceiveController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *ht
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "scheduled"})
+}
+
+func (c *ReceiveController) PauseStreaming(w http.ResponseWriter, _ *http.Request) {
+	c.Pipeline.Pause()
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "paused"})
+}
+
+func (c *ReceiveController) ResumeStreaming(w http.ResponseWriter, _ *http.Request) {
+	c.Pipeline.Resume()
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
