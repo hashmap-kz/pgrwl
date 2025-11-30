@@ -83,6 +83,7 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  pkill -9 pgrwl || true
   xpg_teardown
 
   # restore from backup
