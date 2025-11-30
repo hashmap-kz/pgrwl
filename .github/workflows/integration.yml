@@ -155,6 +155,7 @@ jobs:
           - pg_005_restore_localfs
           - pg_006_restore_s3
           - pg_007_tablespaces_localfs
+          - pg_008_dynstor
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}
