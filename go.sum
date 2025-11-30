@@ -47,8 +47,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/hashmap-kz/storecrypt v1.0.8 h1:MpyIwbRX8eI0slltF6nX+I1Qw9R+0Z2zKGJKaAj/fyQ=
-github.com/hashmap-kz/storecrypt v1.0.8/go.mod h1:2Pgy26oBvLdLA+Tx9tnzqH9444Fik7ay94Pi9sgWAOc=
+github.com/hashmap-kz/storecrypt v1.0.9 h1:RgDZ/zbe3Qu6rfs2DrPSw3LCKCTomMW2Gs4RmSj02gY=
+github.com/hashmap-kz/storecrypt v1.0.9/go.mod h1:PRR6XPAMKCgUSef/8Lh1O4fLk2m4Gd/IW60pOHoQWeE=
 github.com/hashmap-kz/streamcrypt v1.1.1 h1:bYEcZzwzeYBtIJEykIUOl0Gi4p5VssQXuxFy9T39ibQ=
 github.com/hashmap-kz/streamcrypt v1.1.1/go.mod h1:vgEoWh2wfV/y73c5HA5i4rGCh+3NDBXlE29Ro6uqwiY=
 github.com/jackc/pgio v1.0.0 h1:g12B9UwVnzGhueNavwioyEEpAmqMe1E/BN9ES+8ovkE=

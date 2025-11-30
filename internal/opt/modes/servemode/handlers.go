@@ -10,17 +10,17 @@ import (
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
-type HandlerOpts struct {
+type ServeHandlerOpts struct {
 	BaseDir string
 	Verbose bool
 	Storage *storage.TransformingStorage
 }
 
-func Init(opts *HandlerOpts) http.Handler {
+func Init(opts *ServeHandlerOpts) http.Handler {
 	cfg := config.Cfg()
 	l := slog.With("component", "serve-api")
 
-	service := NewServeModeService(&SvcOpts{
+	service := NewServeModeService(&ServeServiceOpts{
 		BaseDir: opts.BaseDir,
 		Storage: opts.Storage,
 		Verbose: opts.Verbose,

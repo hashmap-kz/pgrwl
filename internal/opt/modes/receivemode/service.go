@@ -26,35 +26,32 @@ type Service interface {
 }
 
 type receiveModeSvc struct {
-	l           *slog.Logger
-	pgrw        xlog.PgReceiveWal // direct access to running state
-	baseDir     string
-	runningMode string
-	storage     *storage.TransformingStorage
-	jobQueue    *jobq.JobQueue // optional, nil in 'serve' mode
-	verbose     bool
+	l        *slog.Logger
+	pgrw     xlog.PgReceiveWal // direct access to running state
+	baseDir  string
+	storage  *storage.TransformingStorage
+	jobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	verbose  bool
 }
 
 var _ Service = &receiveModeSvc{}
 
 type ReceiveServiceOpts struct {
-	PGRW        xlog.PgReceiveWal
-	BaseDir     string
-	RunningMode string
-	Storage     *storage.TransformingStorage
-	JobQueue    *jobq.JobQueue // optional, nil in 'serve' mode
-	Verbose     bool
+	PGRW     xlog.PgReceiveWal
+	BaseDir  string
+	Storage  *storage.TransformingStorage
+	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	Verbose  bool
 }
 
 func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
 	return &receiveModeSvc{
-		l:           slog.With("component", "receive-service"),
-		pgrw:        opts.PGRW,
-		baseDir:     opts.BaseDir,
-		runningMode: opts.RunningMode,
-		storage:     opts.Storage,
-		jobQueue:    opts.JobQueue,
-		verbose:     opts.Verbose,
+		l:        slog.With("component", "receive-service"),
+		pgrw:     opts.PGRW,
+		baseDir:  opts.BaseDir,
+		storage:  opts.Storage,
+		jobQueue: opts.JobQueue,
+		verbose:  opts.Verbose,
 	}
 }
 
@@ -80,7 +77,6 @@ func (s *receiveModeSvc) Status() *PgRwlStatus {
 		}
 	}
 	return &PgRwlStatus{
-		RunningMode:  s.runningMode,
 		StreamStatus: streamStatusResp,
 	}
 }
