@@ -2,19 +2,19 @@
 set -euo pipefail
 . /var/lib/postgresql/scripts/pg/pg.sh
 
-TEST_NAME=$(basename "$0" .sh)
-TEST_STATE_PATH="/var/lib/postgresql/test-state/${TEST_NAME}"
-
-# Cleanup on exit (even on error)
-cleanup() {
-  set +e
-  # save content for debug
-  mkdir -p "${TEST_STATE_PATH}"
-  cp -a /tmp/* "${TEST_STATE_PATH}/"
-  # cleanup state
-  rm -rf /tmp/*
-}
-trap cleanup EXIT
+#TEST_NAME=$(basename "$0" .sh)
+#TEST_STATE_PATH="/var/lib/postgresql/test-state/${TEST_NAME}"
+#
+## Cleanup on exit (even on error)
+#cleanup() {
+#  set +e
+#  # save content for debug
+#  mkdir -p "${TEST_STATE_PATH}"
+#  cp -a /tmp/* "${TEST_STATE_PATH}/"
+#  # cleanup state
+#  rm -rf /tmp/*
+#}
+#trap cleanup EXIT
 
 export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
@@ -56,7 +56,7 @@ x_remake_dirs() {
   # stop all processes, clean ALL state
   sudo pkill -9 postgres || true
   sudo pkill -9 pgrwl || true
-  sudo rm -rf /tmp/*
+  sudo rm -rfv /tmp/*
 
   # recreate localFS
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"

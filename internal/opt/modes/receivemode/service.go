@@ -29,7 +29,7 @@ type receiveModeSvc struct {
 	l        *slog.Logger
 	pgrw     xlog.PgReceiveWal // direct access to running state
 	baseDir  string
-	storage  *storage.TransformingStorage
+	storage  *storage.VariadicStorage
 	jobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 	verbose  bool
 }
@@ -39,7 +39,7 @@ var _ Service = &receiveModeSvc{}
 type ReceiveServiceOpts struct {
 	PGRW     xlog.PgReceiveWal
 	BaseDir  string
-	Storage  *storage.TransformingStorage
+	Storage  *storage.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 	Verbose  bool
 }

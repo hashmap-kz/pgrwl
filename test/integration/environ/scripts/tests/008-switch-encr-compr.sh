@@ -3,51 +3,50 @@ set -euo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
 x_remake_config() {
-  cat <<EOF > "/tmp/config.json"
-{
-  "main": {
-     "listen_port": 7070,
-     "directory": "${WAL_PATH}"
-  },
-  "receiver": {
-     "slot": "pgrwl_v5",
-     "no_loop": true,
-     "uploader": {
-       "sync_interval": "5s",
-       "max_concurrency": 4
-     }
-  },
-  "log": {
-    "level": "trace",
-    "format": "text",
-    "add_source": true
-  },
-  "storage": {
-    "name": "sftp",
-    "compression": {
-      "algo": "gzip"
-    },
-    "encryption": {
-      "algo": "aes-256-gcm",
-      "pass": "qwerty123"
-    },
-    "sftp": {
-      "host": "sshd",
-      "port": 22,
-      "base_dir": "/home/testuser",
-      "user": "testuser",
-      "pkey_path": "/var/lib/postgresql/.ssh/id_ed25519"
-    }
-  }
-}
+  cat <<EOF > "/tmp/config-zstd.yaml"
+main:
+  listen_port: 7070
+  directory: /tmp/wal-archive
+receiver:
+  slot: pgrwl_v5
+  uploader:
+    sync_interval: 3s
+    max_concurrency: 4
+log:
+  level: debug
+  format: text
+  add_source: true
+storage:
+  name: "local"
+  compression:
+    algo: zstd
 EOF
 
+  cat <<EOF > "/tmp/config-gzip-aes.yaml"
+main:
+  listen_port: 7070
+  directory: /tmp/wal-archive
+receiver:
+  slot: pgrwl_v5
+  uploader:
+    sync_interval: 3s
+    max_concurrency: 4
+log:
+  level: debug
+  format: text
+  add_source: true
+storage:
+  name: "local"
+  compression:
+    algo: gzip
+  encryption:
+    algo: aes-256-gcm
+    pass: qwerty123
+EOF
 }
 
 x_backup_restore() {
   echo_delim "cleanup state"
-  ssh testuser@sshd "rm -rf tmp"
-  chmod 0600 /var/lib/postgresql/.ssh/id_ed25519
   x_remake_dirs
   x_remake_config
 
@@ -55,10 +54,11 @@ x_backup_restore() {
   echo_delim "init and run a cluster"
   xpg_rebuild
   xpg_start
+  xpg_recreate_slots
 
-  # run wal-receivers
+  # run wal-receivers (zstd compression, no encryption)
   echo_delim "running wal-receivers"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config-zstd.yaml" -m receive >>"$LOG_FILE" 2>&1 &
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -70,20 +70,31 @@ x_backup_restore() {
     --no-password \
     --verbose
 
-  # trying to write ~100 of WAL files as quick as possible
-  for ((i = 0; i < 100; i++)); do
+  # 1) trying to write ~25 of WAL files as quick as possible
+  for ((i = 0; i < 25; i++)); do
     psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
   done
+
+  # wait compressor/encryptor
+  sleep 10
+
+  echo_delim "running wal-receiver with gzip/aes"
+  sudo pkill -9 pgrwl || true
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config-gzip-aes.yaml" -m receive >>"$LOG_FILE" 2>&1 &
+
+  # 2) trying to write ~25 of WAL files as quick as possible
+  for ((i = 0; i < 25; i++)); do
+    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
+  done
+
+  # wait compressor/encryptor
+  sleep 10
 
   # remember the state
   pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
 
-  echo_delim "waiting upload"
-  sleep 10
-
   # stop cluster, cleanup data
   echo_delim "teardown"
-  pkill -9 pgrwl || true
   xpg_teardown
 
   # restore from backup
@@ -101,7 +112,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl start -c "/tmp/config-gzip-aes.yaml" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log
