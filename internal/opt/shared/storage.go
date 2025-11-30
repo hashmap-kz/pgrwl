@@ -2,7 +2,6 @@ package shared
 
 import (
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/hashmap-kz/storecrypt/pkg/clients"
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 	"github.com/hashmap-kz/streamcrypt/pkg/codec"
-	"github.com/hashmap-kz/streamcrypt/pkg/crypt"
 	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
 )
 
@@ -19,17 +17,26 @@ type SetupStorageOpts struct {
 	SubPath string // for localfs storage, or basebackups
 }
 
-func SetupStorage(opts *SetupStorageOpts) (*st.TransformingStorage, error) {
+func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 	cfg := config.Cfg()
+
+	// storage configs
+	alg := st.Algorithms{
+		Gzip: &st.CodecPair{
+			Compressor:   codec.GzipCompressor{},
+			Decompressor: codec.GzipDecompressor{},
+		},
+		Zstd: &st.CodecPair{
+			Compressor:   codec.ZstdCompressor{},
+			Decompressor: codec.ZstdDecompressor{},
+		},
+		AES: aesgcm.NewChunkedGCMCrypter(cfg.Storage.Encryption.Pass),
+	}
+	writeExt := getWriteExt(cfg)
 
 	baseDir := filepath.ToSlash(opts.BaseDir)
 	if strings.TrimSpace(opts.SubPath) != "" {
 		baseDir = filepath.ToSlash(filepath.Join(opts.BaseDir, opts.SubPath))
-	}
-
-	compressor, decompressor, crypter, err := decideCompressorEncryptor(cfg)
-	if err != nil {
-		return nil, err
 	}
 
 	// localFS by default
@@ -37,19 +44,14 @@ func SetupStorage(opts *SetupStorageOpts) (*st.TransformingStorage, error) {
 		if opts.SubPath == "" {
 			return nil, fmt.Errorf("for localfs storage subpath is required")
 		}
-		local, err := st.NewLocal(&st.LocalStorageOpts{
+		backend, err := st.NewLocal(&st.LocalStorageOpts{
 			BaseDir:      baseDir,
 			FsyncOnWrite: true,
 		})
 		if err != nil {
 			return nil, err
 		}
-		return &st.TransformingStorage{
-			Backend:      local,
-			Crypter:      crypter,
-			Compressor:   compressor,
-			Decompressor: decompressor,
-		}, nil
+		return st.NewVariadicStorage(backend, alg, writeExt)
 	}
 
 	// sftp
@@ -65,12 +67,8 @@ func SetupStorage(opts *SetupStorageOpts) (*st.TransformingStorage, error) {
 			return nil, err
 		}
 		remotePath := filepath.ToSlash(filepath.Join(cfg.Storage.SFTP.BaseDir, baseDir))
-		return &st.TransformingStorage{
-			Backend:      st.NewSFTPStorage(client.SFTPClient(), remotePath),
-			Crypter:      crypter,
-			Compressor:   compressor,
-			Decompressor: decompressor,
-		}, nil
+		backend := st.NewSFTPStorage(client.SFTPClient(), remotePath)
+		return st.NewVariadicStorage(backend, alg, writeExt)
 	}
 
 	// s3
@@ -87,53 +85,29 @@ func SetupStorage(opts *SetupStorageOpts) (*st.TransformingStorage, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &st.TransformingStorage{
-			Backend:      st.NewS3Storage(client.Client(), cfg.Storage.S3.Bucket, baseDir),
-			Crypter:      crypter,
-			Compressor:   compressor,
-			Decompressor: decompressor,
-		}, nil
+		backend := st.NewS3Storage(client.Client(), cfg.Storage.S3.Bucket, baseDir)
+		return st.NewVariadicStorage(backend, alg, writeExt)
 	}
 
 	return nil, fmt.Errorf("unknown storage name: %s", cfg.Storage.Name)
 }
 
-func decideCompressorEncryptor(cfg *config.Config) (codec.Compressor, codec.Decompressor, crypt.Crypter, error) {
-	var compressor codec.Compressor
-	var decompressor codec.Decompressor
-	var crypter crypt.Crypter
-
-	if cfg.Storage.Compression.Algo != "" {
-		slog.Info("init compressor",
-			slog.String("module", "boot"),
-			slog.String("compressor", cfg.Storage.Compression.Algo),
-		)
-
-		switch cfg.Storage.Compression.Algo {
-		case config.RepoCompressorGzip:
-			compressor = &codec.GzipCompressor{}
-			decompressor = &codec.GzipDecompressor{}
-		case config.RepoCompressorZstd:
-			compressor = &codec.ZstdCompressor{}
-			decompressor = codec.ZstdDecompressor{}
-		default:
-			return nil, nil, nil,
-				fmt.Errorf("unknown compression algo: %s", cfg.Storage.Compression.Algo)
-		}
-	}
+func getWriteExt(cfg *config.Config) string {
+	enc := ""
 	if cfg.Storage.Encryption.Algo != "" {
-		slog.Info("init crypter",
-			slog.String("module", "boot"),
-			slog.String("crypter", cfg.Storage.Encryption.Algo),
-		)
-
 		if cfg.Storage.Encryption.Algo == config.RepoEncryptorAes256Gcm {
-			crypter = aesgcm.NewChunkedGCMCrypter(cfg.Storage.Encryption.Pass)
-		} else {
-			return nil, nil, nil,
-				fmt.Errorf("unknown encryption algo: %s", cfg.Storage.Encryption.Algo)
+			enc = ".aes"
 		}
 	}
-
-	return compressor, decompressor, crypter, nil
+	com := ""
+	if cfg.Storage.Compression.Algo != "" {
+		if cfg.Storage.Compression.Algo == config.RepoCompressorZstd {
+			com = ".zst"
+		}
+		if cfg.Storage.Compression.Algo == config.RepoCompressorGzip {
+			com = ".gz"
+		}
+	}
+	writeExt := fmt.Sprintf("%s%s", com, enc)
+	return writeExt
 }

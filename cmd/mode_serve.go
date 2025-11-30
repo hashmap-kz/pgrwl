@@ -22,7 +22,6 @@ type ServeModeOpts struct {
 
 func RunServeMode(opts *ServeModeOpts) {
 	var err error
-	cfg := config.Cfg()
 	loggr := slog.With("component", "serve-mode-runner")
 
 	// setup context
@@ -36,9 +35,6 @@ func RunServeMode(opts *ServeModeOpts) {
 	})
 	if err != nil {
 		//nolint:gocritic
-		log.Fatal(err)
-	}
-	if err := shared.CheckManifest(cfg); err != nil {
 		log.Fatal(err)
 	}
 

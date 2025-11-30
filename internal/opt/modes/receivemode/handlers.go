@@ -19,7 +19,7 @@ type ReceiveHandlerOpts struct {
 	PGRW     xlog.PgReceiveWal
 	BaseDir  string
 	Verbose  bool
-	Storage  *storage.TransformingStorage
+	Storage  *storage.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 }
 

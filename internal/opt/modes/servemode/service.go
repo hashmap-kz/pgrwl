@@ -22,7 +22,7 @@ type Service interface {
 type serveModeSvc struct {
 	l       *slog.Logger
 	baseDir string
-	storage *storage.TransformingStorage
+	storage *storage.VariadicStorage
 	verbose bool
 }
 
@@ -30,7 +30,7 @@ var _ Service = &serveModeSvc{}
 
 type ServeServiceOpts struct {
 	BaseDir string
-	Storage *storage.TransformingStorage
+	Storage *storage.VariadicStorage
 	Verbose bool
 }
 
