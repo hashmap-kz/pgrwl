@@ -1,0 +1,108 @@
+services:
+  pg_test_common: &pg_test_common
+    build:
+      context: .
+      dockerfile: dockerfiles/pg-primary/Dockerfile
+      args:
+        PG_MAJOR: ${PG_MAJOR:-17}
+    image: pgrwl/pg-primary-${PG_MAJOR:-17}
+    user: postgres
+    depends_on:
+      minio:
+        condition: service_healthy
+      sshd:
+        condition: service_started
+
+  #  docker run --rm --user postgres test1
+
+  pg_001_fundamental:
+    <<: *pg_test_common
+    container_name: pg_001_fundamental
+    entrypoint: /var/lib/postgresql/scripts/tests/001-fundamental.sh
+
+  pg_002_write_loop:
+    <<: *pg_test_common
+    container_name: pg_002_write_loop
+    entrypoint: /var/lib/postgresql/scripts/tests/002-write-loop.sh
+
+  pg_003_s3:
+    <<: *pg_test_common
+    container_name: pg_003_s3
+    entrypoint: /var/lib/postgresql/scripts/tests/003-s3.sh
+
+  pg_004_sftp:
+    <<: *pg_test_common
+    container_name: pg_004_sftp
+    entrypoint: /var/lib/postgresql/scripts/tests/004-sftp.sh
+
+  pg_005_restore_localfs:
+    <<: *pg_test_common
+    container_name: pg_005_restore_localfs
+    entrypoint: /var/lib/postgresql/scripts/tests/005-restore-localfs.sh
+
+  pg_006_restore_s3:
+    <<: *pg_test_common
+    container_name: pg_006_restore_s3
+    entrypoint: /var/lib/postgresql/scripts/tests/006-restore-s3.sh
+
+  pg_007_tablespaces_localfs:
+    <<: *pg_test_common
+    container_name: pg_007_tablespaces_localfs
+    entrypoint: /var/lib/postgresql/scripts/tests/007-tablespaces-localfs.sh
+
+#  pg_008_dynstor:
+#    <<: *pg_test_common
+#    container_name: pg_008_dynstor
+#    entrypoint: /var/lib/postgresql/scripts/tests/008-dynstor.sh
+
+  sshd:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/sshd/Dockerfile
+    image: pgrwl/sshd
+    container_name: pgrwl_sshd
+    restart: unless-stopped
+    ports:
+      - "2525:22"
+
+  minio:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/minio/Dockerfile
+    image: pgrwl/minio
+    container_name: pgrwl_minio
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+      - ./files/minio/certs:/root/.minio/certs:ro
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-k", "https://localhost:9000/minio/health/ready" ]
+      interval: 2s
+      timeout: 20s
+      retries: 30
+    restart: unless-stopped
+
+  createbuckets:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/minio_mc/Dockerfile
+    image: pgrwl/minio-mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      mc alias set local https://minio:9000 minioadmin minioadmin123 --insecure && \
+      mc mb local/backups --insecure || true && \
+      mc version enable local/backups --insecure && \
+      exit 0;
+      "
+
+volumes:
+  minio_data:
