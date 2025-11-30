@@ -8,8 +8,10 @@ services:
     image: pgrwl/pg-primary-${PG_MAJOR:-17}
     user: postgres
     depends_on:
-      - minio
-      - sshd
+      minio:
+          condition: service_healthy
+      sshd:
+        condition: service_started
 
   #  docker run --rm --user postgres test1
 
