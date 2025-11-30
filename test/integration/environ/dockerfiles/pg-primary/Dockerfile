@@ -86,4 +86,4 @@ COPY bin/ /usr/local/bin
 # Run container
 
 EXPOSE 5432 22
-#ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]

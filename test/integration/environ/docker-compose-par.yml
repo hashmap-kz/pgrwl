@@ -18,42 +18,42 @@ services:
   pg_001_fundamental:
     <<: *pg_test_common
     container_name: pg_001_fundamental
-    command: /var/lib/postgresql/scripts/tests/001-fundamental.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/001-fundamental.sh
 
   pg_002_write_loop:
     <<: *pg_test_common
     container_name: pg_002_write_loop
-    command: /var/lib/postgresql/scripts/tests/002-write-loop.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/002-write-loop.sh
 
   pg_003_s3:
     <<: *pg_test_common
     container_name: pg_003_s3
-    command: /var/lib/postgresql/scripts/tests/003-s3.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/003-s3.sh
 
   pg_004_sftp:
     <<: *pg_test_common
     container_name: pg_004_sftp
-    command: /var/lib/postgresql/scripts/tests/004-sftp.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/004-sftp.sh
 
   pg_005_restore_localfs:
     <<: *pg_test_common
     container_name: pg_005_restore_localfs
-    command: /var/lib/postgresql/scripts/tests/005-restore-localfs.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/005-restore-localfs.sh
 
   pg_006_restore_s3:
     <<: *pg_test_common
     container_name: pg_006_restore_s3
-    command: /var/lib/postgresql/scripts/tests/006-restore-s3.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/006-restore-s3.sh
 
   pg_007_tablespaces_localfs:
     <<: *pg_test_common
     container_name: pg_007_tablespaces_localfs
-    command: /var/lib/postgresql/scripts/tests/007-tablespaces-localfs.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/007-tablespaces-localfs.sh
 
 #  pg_008_dynstor:
 #    <<: *pg_test_common
 #    container_name: pg_008_dynstor
-#    command: /var/lib/postgresql/scripts/tests/008-dynstor.sh
+#    entrypoint: /var/lib/postgresql/scripts/tests/008-dynstor.sh
 
   sshd:
     build:
