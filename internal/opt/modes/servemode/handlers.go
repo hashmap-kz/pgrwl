@@ -47,9 +47,6 @@ func Init(opts *ServeHandlerOpts) http.Handler {
 	// Standalone mode (i.e. just serving wal-archive during restore)
 	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
-	server := BackupRetriever{cfg: cfg}
-	mux.HandleFunc("POST /api/v1/basebackup/restore", server.handleRestore)
-
 	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
 }
