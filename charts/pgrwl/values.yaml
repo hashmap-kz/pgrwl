@@ -104,44 +104,6 @@ receive:
   resources: {}
 
 ######################################################################
-## BACKUP MODE
-######################################################################
-
-backup:
-  enabled: true
-  # required section
-  persistence:
-    storageClassName: standard
-    accessMode: ReadWriteOnce
-    volumeMode: Filesystem
-    size: 16Gi
-  service:
-    type: ClusterIP
-    port: 7070
-  args: ["start"]
-  env:
-    PGRWL_MODE: "backup"
-    PGRWL_CONFIG_PATH: "/etc/pgrwl/config.yml"
-  config: |
-    backup:
-      cron: "* * * * *"
-      retention:
-        enable: true
-        type: time
-        value: "5m"
-  # optional section
-  livenessProbe: {}
-  readinessProbe: {}
-  podAnnotations: {}
-  podLabels: {}
-  podSecurityContext: {}
-  securityContext: {}
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  resources: {}
-
-######################################################################
 ## ETC
 ######################################################################
 

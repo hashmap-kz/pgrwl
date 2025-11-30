@@ -14,17 +14,6 @@ receiver:                                # Required for 'receive' mode
     sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
     keep_period: "1m"                    # Remove WAL files older than given period
 
-backup:                                  # Required for 'backup' mode
-  cron: "0 0 */3 * *"                    # Basebackup cron schedule
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    type: time                           # One of: (time / count)
-    value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
-    keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
-  walretention:                          # Optional (WAL archive cleanup settings)
-    enable: true                         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-    receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
-
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)
   format: text                           # One of: (text / json)

@@ -34,7 +34,3 @@ nodes:
       - containerPort: 30270
         hostPort: 30270
         protocol: TCP
-      # pgrwl-basebackup
-      - containerPort: 30271
-        hostPort: 30271
-        protocol: TCP
