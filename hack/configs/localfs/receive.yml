@@ -8,10 +8,10 @@ receiver:
   uploader:
     sync_interval: 10s
     max_concurrency: 4
-  retention:
-    enable: true
-    sync_interval: 10s
-    keep_period: "30s"
+#  retention:
+#    enable: true
+#    sync_interval: 10s
+#    keep_period: "30s"
 
 devconfig:
   pprof:
@@ -25,7 +25,7 @@ log:
 storage:
   name: "local"
   compression:
-    algo: gzip
+    algo: zstd
 #  encryption:
 #    algo: aes-256-gcm
 #    pass: qwerty123

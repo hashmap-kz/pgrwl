@@ -155,8 +155,8 @@ func mustInitPgrw(ctx context.Context, opts *receiveAPI.ReceiveModeOpts) xlog.Pg
 	return pgrw
 }
 
-func mustInitStorage(cfg *config.Config, loggr *slog.Logger, opts *receiveAPI.ReceiveModeOpts) *st.TransformingStorage {
-	var stor *st.TransformingStorage
+func mustInitStorage(cfg *config.Config, loggr *slog.Logger, opts *receiveAPI.ReceiveModeOpts) *st.VariadicStorage {
+	var stor *st.VariadicStorage
 	var err error
 	if needSupervisorLoop(cfg, loggr) {
 		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
@@ -164,9 +164,6 @@ func mustInitStorage(cfg *config.Config, loggr *slog.Logger, opts *receiveAPI.Re
 			SubPath: config.LocalFSStorageSubpath,
 		})
 		if err != nil {
-			log.Fatal(err)
-		}
-		if err := shared.CheckManifest(cfg); err != nil {
 			log.Fatal(err)
 		}
 	}

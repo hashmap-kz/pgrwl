@@ -20,7 +20,7 @@ type ReceiveHandlerOpts struct {
 	Pipeline *ReceivePipelineService
 	BaseDir  string
 	Verbose  bool
-	Storage  *storage.TransformingStorage
+	Storage  *storage.VariadicStorage
 	JobQueue *jobq.JobQueue
 }
 

@@ -42,7 +42,7 @@ type ReceivePipelineService struct {
 	log      *slog.Logger
 	cfg      *config.Config
 	pgrw     xlog.PgReceiveWal
-	stor     *st.TransformingStorage
+	stor     *st.VariadicStorage
 	jobQueue *jobq.JobQueue
 	opts     *ReceiveModeOpts
 	ctrlCh   chan pipelineCmd
@@ -53,7 +53,7 @@ type ReceivePipelineService struct {
 func NewReceivePipelineService(
 	cfg *config.Config,
 	pgrw xlog.PgReceiveWal,
-	stor *st.TransformingStorage,
+	stor *st.VariadicStorage,
 	jobQueue *jobq.JobQueue,
 	opts *ReceiveModeOpts,
 	log *slog.Logger,
