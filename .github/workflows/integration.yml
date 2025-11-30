@@ -137,7 +137,7 @@ jobs:
           ls -lah "${{ env.CACHE_FOLDER }}"
 
   test:
-    name: Run integration tests (pg${{ matrix.pg_major }})
+    name: Run integration tests (pg${{ matrix.pg_major }} / ${{ matrix.test_name }})
     runs-on: ubuntu-latest
     needs: [build_images]
 
@@ -145,9 +145,20 @@ jobs:
       fail-fast: false
       matrix:
         pg_major: [17, 18]
+        # One entry per test service in docker-compose-par.yml
+        test_name:
+          - pg_001_fundamental
+          - pg_002_write_loop
+          - pg_003_s3
+          - pg_004_sftp
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}
+      TEST_NAME: ${{ matrix.test_name }}
+      # parallel compose file
+      COMPOSE_FILE_PAR: "test/integration/environ/docker-compose-par.yml"
+      # optional, just to make logs clearer (not required for isolation)
+      COMPOSE_PROJECT_NAME: pgrwl_pg${{ matrix.pg_major }}_${{ matrix.test_name }}
 
     steps:
       - name: Checkout code
@@ -204,17 +215,112 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Run tests
+      - name: Run single test
         run: |
           set -euo pipefail
 
-          echo "Running integration tests against PostgreSQL ${PG_MAJOR}"
+          echo "Running integration test '${TEST_NAME}' against PostgreSQL ${PG_MAJOR}"
           docker images || true
 
-          docker compose -f "${{ env.COMPOSE_FILE }}" up -d
-          docker ps
+          # Each matrix job runs on its own runner, so services won't clash.
+          # We pass only the single test service to 'up', and use its exit code.
+          docker compose -f "${COMPOSE_FILE_PAR}" \
+            up \
+              --exit-code-from "${TEST_NAME}" \
+              "${TEST_NAME}"
 
-          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary chmod +x /var/lib/postgresql/scripts/runners/run-tests.sh
-          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary \
-            env PG_MAJOR="${PG_MAJOR}" \
-            su - postgres -c /var/lib/postgresql/scripts/runners/run-tests.sh
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          docker compose -f "${COMPOSE_FILE_PAR}" ps || true
+          docker compose -f "${COMPOSE_FILE_PAR}" logs || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          set -euo pipefail
+          docker compose -f "${COMPOSE_FILE_PAR}" down -v || true
+
+#  test:
+#    name: Run integration tests (pg${{ matrix.pg_major }})
+#    runs-on: ubuntu-latest
+#    needs: [build_images]
+#
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        pg_major: [17, 18]
+#
+#    env:
+#      PG_MAJOR: ${{ matrix.pg_major }}
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v6
+#
+#      - name: Compute image cache key
+#        id: cache-key
+#        run: |
+#          KEY="docker-images-pg${{ matrix.pg_major }}-${{ hashFiles(
+#            'go.mod',
+#            'test/integration/environ/docker-compose.yml',
+#            'test/integration/environ/dockerfiles/**',
+#            'test/integration/environ/files/**',
+#            'test/integration/environ/scripts/**',
+#            '.github/workflows/integration.yml'
+#          ) }}"
+#          echo "value=${KEY}" >> "$GITHUB_OUTPUT"
+#
+#      - name: Restore Docker image cache
+#        id: cache-images
+#        uses: actions/cache@v4
+#        with:
+#          path: |
+#            ${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}
+#            ${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}
+#            ${{ env.CACHE_FILE_DOCKER_SSHD }}
+#            ${{ env.CACHE_FILE_DOCKER_MINIO }}
+#            ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
+#          key: ${{ steps.cache-key.outputs.value }}
+#
+#      - name: Fail if cache is missing
+#        if: steps.cache-images.outputs.cache-hit != 'true'
+#        run: |
+#          echo "Docker image cache not found for PG_MAJOR=${PG_MAJOR}!"
+#          exit 1
+#
+#      - name: Load Docker images from cache
+#        run: |
+#          set -euo pipefail
+#
+#          ls -lah "${{ env.CACHE_FOLDER }}" || true
+#
+#          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load
+#          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load
+#          gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load
+#          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load
+#          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load
+#
+#          echo "=== Images after load ==="
+#          docker images || true
+#
+#      - name: Set up Go
+#        uses: actions/setup-go@v6
+#        with:
+#          go-version-file: go.mod
+#
+#      - name: Run tests
+#        run: |
+#          set -euo pipefail
+#
+#          echo "Running integration tests against PostgreSQL ${PG_MAJOR}"
+#          docker images || true
+#
+#          docker compose -f "${{ env.COMPOSE_FILE }}" up -d
+#          docker ps
+#
+#          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary chmod +x /var/lib/postgresql/scripts/runners/run-tests.sh
+#          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary \
+#            env PG_MAJOR="${PG_MAJOR}" \
+#            su - postgres -c /var/lib/postgresql/scripts/runners/run-tests.sh
