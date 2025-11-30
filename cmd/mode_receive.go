@@ -14,8 +14,6 @@ import (
 	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/receivesuperv"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
@@ -25,81 +23,60 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 )
 
-type ReceiveModeOpts struct {
-	ReceiveDirectory string
-	Slot             string
-	NoLoop           bool
-	ListenPort       int
-	Verbose          bool
-}
-
-func RunReceiveMode(opts *ReceiveModeOpts) {
+func RunReceiveMode(opts *receiveAPI.ReceiveModeOpts) {
 	cfg := config.Cfg()
 	loggr := slog.With("component", "receive-mode-runner")
 
-	// setup context
+	// root context
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
+	defer cancel()
 
 	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
 	//////////////////////////////////////////////////////////////////////
-	// Init WAL-receiver loop first
+	// Init WAL-receiver instance
 
-	// setup wal-receiver
 	pgrw := mustInitPgrw(ctx, opts)
 
-	// Use WaitGroup to wait for all goroutines to finish
-	var wg sync.WaitGroup
-
-	// Signal channel to indicate that pgrw.Run() has started
-	started := make(chan struct{})
-
-	// main streaming loop
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				loggr.Error("wal-receiver panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "wal-receiver"),
-				)
-			}
-		}()
-
-		// Signal that we are starting Run()
-		close(started)
-
-		if err := pgrw.Run(ctx); err != nil {
-			loggr.Error("streaming failed", slog.Any("err", err))
-			cancel() // cancel everything on error
-		}
-	}()
-
-	// Wait until pgrw.Run() has started
-	<-started
-	loggr.Info("wal-receiver started")
-
-	//////////////////////////////////////////////////////////////////////
-	// Init OPT components
-
-	// setup job queue
+	// job queue
 	loggr.Info("running job queue")
 	jobQueue := jobq.NewJobQueue(5)
 	jobQueue.Start(ctx)
 
-	// setup metrics
+	// storage (may be nil)
+	stor := mustInitStorage(cfg, loggr, opts)
+
+	//////////////////////////////////////////////////////////////////////
+	// Receive pipeline service (WAL + archiver together)
+
+	pipelineSvc := receiveAPI.NewReceivePipelineService(cfg, pgrw, stor, jobQueue, opts, loggr)
+
+	if err := pipelineSvc.StartAsync(ctx); err != nil {
+		//nolint:gocritic
+		log.Fatal("failed to start pipeline service:", err)
+	}
+	if err := pipelineSvc.AwaitRunning(ctx); err != nil {
+		log.Fatal("pipeline service didn't reach Running:", err)
+	}
+
+	// Start receiver + archiver immediately
+	pipelineSvc.Resume()
+	loggr.Info("receive pipeline started (wal + archiver)")
+
+	//////////////////////////////////////////////////////////////////////
+	// Init OPT components
+
+	// metrics
 	initMetrics(ctx, cfg, loggr)
 
-	// setup storage: it may be nil
-	stor := mustInitStorageIfRequired(cfg, loggr, opts)
-
-	// HTTP server
-	// It shouldn't cancel() the main streaming loop even on error.
+	//////////////////////////////////////////////////////////////////////
+	// HTTP server (it should never cancel the pipeline on errors)
+	var wg sync.WaitGroup
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
 		defer func() {
@@ -110,8 +87,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				)
 			}
 		}()
+
 		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
 			PGRW:     pgrw,
+			Pipeline: pipelineSvc, // NEW: pass pipeline controller
 			BaseDir:  opts.ReceiveDirectory,
 			Verbose:  opts.Verbose,
 			Storage:  stor,
@@ -123,37 +102,17 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}
 	}()
 
-	// ArchiveSupervisor (run this goroutine ONLY when storage is required)
-	if stor != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					loggr.Error("upload loop panicked",
-						slog.Any("panic", r),
-						slog.String("goroutine", "wal-supervisor"),
-					)
-				}
-			}()
-			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
-				ReceiveDirectory: opts.ReceiveDirectory,
-				PGRW:             pgrw,
-				Verbose:          opts.Verbose,
-			})
-			if cfg.Receiver.Retention.Enable {
-				u.RunWithRetention(ctx, jobQueue)
-			} else {
-				u.RunUploader(ctx, jobQueue)
-			}
-		}()
-	}
-
+	//////////////////////////////////////////////////////////////////////
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
 	loggr.Info("shutting down, waiting for goroutines...")
 
-	// Wait for all goroutines to finish
+	// Stop pipeline (wal + archiver) first
+	pipelineSvc.StopAsync()
+	//nolint:errcheck
+	_ = pipelineSvc.AwaitTerminated(context.Background())
+
+	// Wait for HTTP
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
 }
@@ -183,7 +142,7 @@ func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 	return true
 }
 
-func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal {
+func mustInitPgrw(ctx context.Context, opts *receiveAPI.ReceiveModeOpts) xlog.PgReceiveWal {
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
@@ -196,8 +155,8 @@ func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal 
 	return pgrw
 }
 
-func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts) *st.TransformingStorage {
-	var stor *st.TransformingStorage
+func mustInitStorage(cfg *config.Config, loggr *slog.Logger, opts *receiveAPI.ReceiveModeOpts) *st.VariadicStorage {
+	var stor *st.VariadicStorage
 	var err error
 	if needSupervisorLoop(cfg, loggr) {
 		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
@@ -205,9 +164,6 @@ func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *Rec
 			SubPath: config.LocalFSStorageSubpath,
 		})
 		if err != nil {
-			log.Fatal(err)
-		}
-		if err := shared.CheckManifest(cfg); err != nil {
 			log.Fatal(err)
 		}
 	}

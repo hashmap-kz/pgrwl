@@ -17,10 +17,11 @@ import (
 
 type ReceiveHandlerOpts struct {
 	PGRW     xlog.PgReceiveWal
+	Pipeline *ReceivePipelineService
 	BaseDir  string
 	Verbose  bool
-	Storage  *storage.TransformingStorage
-	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	Storage  *storage.VariadicStorage
+	JobQueue *jobq.JobQueue
 }
 
 func Init(opts *ReceiveHandlerOpts) http.Handler {
@@ -34,7 +35,7 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 		JobQueue: opts.JobQueue,
 		Verbose:  opts.Verbose,
 	})
-	controller := NewReceiveController(service)
+	controller := NewReceiveController(service, opts.Pipeline)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -60,6 +61,8 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
+	mux.Handle("POST /pause", secureChain(http.HandlerFunc(controller.PauseStreaming)))
+	mux.Handle("POST /resume", secureChain(http.HandlerFunc(controller.ResumeStreaming)))
 
 	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
