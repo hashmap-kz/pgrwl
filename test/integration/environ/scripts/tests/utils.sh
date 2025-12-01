@@ -23,6 +23,7 @@ export PG_RECEIVEWAL_WAL_PATH="/tmp/wal-archive-pg_receivewal"
 export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
 export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
 export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="/tmp/ts-inserts.log"
+export RECEIVER_PID=''
 
 # Default environment
 
@@ -66,4 +67,41 @@ x_remake_dirs() {
 
   # recreate bucket
   x_remake_buckets
+}
+
+# start the receiver in background and store its PID
+x_start_receiver() {
+  local cfg=$1
+  log_info "starting receiver with $cfg"
+  /usr/local/bin/pgrwl start -c "${cfg}" -m receive >>"$LOG_FILE" 2>&1 &
+  RECEIVER_PID=$!
+
+  # wait until the receiver reports "started" (simple poll)
+  for i in {1..30}; do
+    if grep -q "wal-receiver started" "$LOG_FILE"; then
+      log_info "receiver started (PID $RECEIVER_PID)"
+      return
+    fi
+    sleep 1
+  done
+  log_error "receiver did not start within timeout"
+  kill -9 "$RECEIVER_PID" || true
+  exit 1
+}
+
+x_stop_receiver() {
+  if [[ -n "${RECEIVER_PID:-}" ]]; then
+    log_info "stopping receiver (PID $RECEIVER_PID)"
+    kill -TERM "$RECEIVER_PID" 2>/dev/null || true
+    wait "$RECEIVER_PID" 2>/dev/null || true
+  fi
+}
+
+x_generate_wal() {
+  local count=${1:-5}
+  log_info "generating $count WAL switches"
+  for ((i = 0; i < count; i++)); do
+    psql -U postgres -c 'DROP TABLE IF EXISTS xxx; SELECT pg_switch_wal(); CREATE TABLE IF NOT EXISTS xxx(id serial);' \
+      >/dev/null 2>&1
+  done
 }

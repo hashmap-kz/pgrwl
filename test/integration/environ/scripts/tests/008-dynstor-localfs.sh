@@ -2,6 +2,13 @@
 set -euo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
+# clean up on exit or interrupt
+cleanup() {
+  log_info "Cleaning up"
+  x_stop_receiver
+}
+trap cleanup EXIT INT TERM
+
 x_remake_config() {
   cat <<EOF > "/tmp/config-zstd.yaml"
 main:
@@ -74,11 +81,10 @@ x_backup_restore() {
   echo_delim "init and run a cluster"
   xpg_rebuild
   xpg_start
-  xpg_recreate_slots
 
   # run wal-receivers (zstd compression, no encryption)
   echo_delim "running wal-receiver with zstd compression, no encryption"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config-zstd.yaml" -m receive >>"$LOG_FILE" 2>&1 &
+  x_start_receiver "/tmp/config-zstd.yaml"
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -92,20 +98,18 @@ x_backup_restore() {
 
   # switch config files with different compression/encryption settings
   echo_delim "configs switching loop"
-  config_files=(
+  declare -a config_files=(
     "/tmp/config-gzip-aes.yaml" 
     "/tmp/config-aes.yaml"
   )
   for config_file in "${config_files[@]}"; do
     # rerun receiver with a new config
     echo_delim "running wal-receiver with config: ${config_file}"
-    sudo pkill -9 pgrwl || true
-    nohup /usr/local/bin/pgrwl start -c "${config_file}" -m receive >>"$LOG_FILE" 2>&1 &
+    x_stop_receiver
+    x_start_receiver "${config_file}"
 
     # generate some wals
-    for ((i = 0; i < 25; i++)); do
-      psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
-    done  
+    x_generate_wal 25
     
     # wait compressor/encryptor/uploader
     sleep 10
@@ -149,7 +153,7 @@ EOF
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
   pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
-  diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
+  diff -u "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"  
 }
 
 x_backup_restore "${@}"
