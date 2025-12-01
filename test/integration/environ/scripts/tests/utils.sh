@@ -74,7 +74,14 @@ x_remake_dirs() {
 x_start_receiver() {
   local cfg=$1
   log_info "starting receiver with $cfg"
-  /usr/local/bin/pgrwl start -c "${cfg}" -m receive >>"$LOG_FILE" 2>&1 &
+
+  # Run the receiver in background.
+  #   * stdout  -> tee -> log file (append) -> /dev/null (discard)
+  #   * stderr  -> tee -> log file (append) -> original stderr (so it appears on console)
+  /usr/local/bin/pgrwl start -c "${cfg}" -m receive \
+    > >(tee -a "$LOG_FILE") \
+    2> >(tee -a "$LOG_FILE" >&2) &
+
   RECEIVER_PID=$!
 
   # wait until the receiver reports "started" (simple poll)
@@ -109,7 +116,7 @@ x_start_pg_receivewal() {
     --no-password \
     --synchronous \
     --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
-    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &  
+    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &
   PGRECEIVEWAL_PID=$!
 }
 
