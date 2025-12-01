@@ -70,6 +70,22 @@ storage:
     algo: aes-256-gcm
     pass: qwerty123
 EOF
+
+  cat <<EOF > "/tmp/config-plain.yaml"
+main:
+  listen_port: 7070
+  directory: /tmp/wal-archive
+receiver:
+  slot: pgrwl_v5
+  uploader:
+    sync_interval: 3s
+    max_concurrency: 4
+log:
+  level: debug
+  format: text
+  add_source: true
+EOF
+
 }
 
 x_backup_restore() {
@@ -101,6 +117,7 @@ x_backup_restore() {
   declare -a config_files=(
     "/tmp/config-gzip-aes.yaml" 
     "/tmp/config-aes.yaml"
+    "/tmp/config-plain.yaml"
   )
   for config_file in "${config_files[@]}"; do
     # rerun receiver with a new config
