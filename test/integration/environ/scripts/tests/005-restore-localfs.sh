@@ -14,7 +14,7 @@ x_remake_config() {
     "no_loop": true
   },
   "log": {
-    "level": "trace",
+    "level": "${LOG_LEVEL_DEFAULT}",
     "format": "text",
     "add_source": true
   }

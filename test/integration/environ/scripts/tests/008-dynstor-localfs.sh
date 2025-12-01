@@ -39,7 +39,7 @@ receiver:
     sync_interval: 3s
     max_concurrency: 4
 log:
-  level: debug
+  level: ${LOG_LEVEL_DEFAULT}
   format: text
   add_source: true
 storage:
@@ -61,7 +61,7 @@ receiver:
     sync_interval: 3s
     max_concurrency: 4
 log:
-  level: debug
+  level: ${LOG_LEVEL_DEFAULT}
   format: text
   add_source: true
 storage:
@@ -81,7 +81,7 @@ receiver:
     sync_interval: 3s
     max_concurrency: 4
 log:
-  level: debug
+  level: ${LOG_LEVEL_DEFAULT}
   format: text
   add_source: true
 EOF
