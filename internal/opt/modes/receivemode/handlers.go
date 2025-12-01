@@ -1,10 +1,11 @@
 package receivemode
 
 import (
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
-	"github.com/hashmap-kz/pgrwl/internal/opt/wrk"
 	"log/slog"
 	"net/http"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
+	"github.com/hashmap-kz/pgrwl/internal/opt/wrk"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
@@ -68,14 +69,14 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 
 	// control endpoints
 
-	mux.HandleFunc("POST /receiver/start", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /receiver/start", func(w http.ResponseWriter, _ *http.Request) {
 		opts.ReceiverController.Start()
 		httpx.WriteJSON(w, http.StatusOK, map[string]string{
 			"status": opts.ReceiverController.Status(),
 		})
 	})
 
-	mux.HandleFunc("POST /receiver/stop", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /receiver/stop", func(w http.ResponseWriter, _ *http.Request) {
 		opts.ReceiverController.Stop()
 		httpx.WriteJSON(w, http.StatusOK, map[string]string{
 			"status": opts.ReceiverController.Status(),
@@ -83,14 +84,14 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 	})
 
 	if opts.ArchiveController != nil {
-		mux.HandleFunc("POST /archiver/start", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("POST /archiver/start", func(w http.ResponseWriter, _ *http.Request) {
 			opts.ArchiveController.Start()
 			httpx.WriteJSON(w, http.StatusOK, map[string]string{
 				"status": opts.ArchiveController.Status(),
 			})
 		})
 
-		mux.HandleFunc("POST /archiver/stop", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("POST /archiver/stop", func(w http.ResponseWriter, _ *http.Request) {
 			opts.ArchiveController.Stop()
 			httpx.WriteJSON(w, http.StatusOK, map[string]string{
 				"status": opts.ArchiveController.Status(),
@@ -98,7 +99,7 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 		})
 	}
 
-	mux.HandleFunc("GET /control/status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /control/status", func(w http.ResponseWriter, _ *http.Request) {
 		resp := map[string]string{
 			"receiver": opts.ReceiverController.Status(),
 		}
