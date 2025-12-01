@@ -29,6 +29,12 @@ set -euo pipefail
 # * Clean up WAL directories and rerun the WAL archivers on a new timeline (cleanup is necessary since we run receivers with --no-loop option)
 # * Compare the WAL directories again
 
+# curl -X POST http://localhost:7070/receiver/stop
+# curl -X POST http://localhost:7070/receiver/start
+# curl -X POST http://localhost:7070/archiver/stop
+# curl -X POST http://localhost:7070/archiver/start
+# curl         http://localhost:7070/control/status
+
 TEST_NAME=$(basename "$0" .sh)
 TEST_STATE_PATH="/var/lib/postgresql/test-state/${TEST_NAME}"
 
@@ -141,6 +147,7 @@ EOSQL
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  pkill -9 pgrwl || true
   xpg_teardown
 
   # restore from backup
