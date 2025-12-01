@@ -53,7 +53,7 @@ services:
   pg_008_dynstor:
     <<: *pg_test_common
     container_name: pg_008_dynstor
-    entrypoint: /var/lib/postgresql/scripts/tests/008-dynstor.sh
+    entrypoint: /var/lib/postgresql/scripts/tests/008-dynstor-localfs.sh
 
   sshd:
     build:
