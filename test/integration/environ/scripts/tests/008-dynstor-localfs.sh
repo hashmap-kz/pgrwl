@@ -137,6 +137,7 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  x_stop_receiver
   xpg_teardown
 
   # restore from backup
