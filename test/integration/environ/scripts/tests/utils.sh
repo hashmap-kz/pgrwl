@@ -24,6 +24,7 @@ export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
 export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
 export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="/tmp/ts-inserts.log"
 export RECEIVER_PID=''
+export PGRECEIVEWAL_PID=''
 
 # Default environment
 
@@ -94,6 +95,29 @@ x_stop_receiver() {
     log_info "stopping receiver (PID $RECEIVER_PID)"
     kill -TERM "$RECEIVER_PID" 2>/dev/null || true
     wait "$RECEIVER_PID" 2>/dev/null || true
+  fi
+}
+
+# start pg_receivewal in background and store its PID
+x_start_pg_receivewal() {
+  log_info "starting pg_receivewal"
+  pg_receivewal \
+    -D "${PG_RECEIVEWAL_WAL_PATH}" \
+    -S pg_receivewal \
+    --no-loop \
+    --verbose \
+    --no-password \
+    --synchronous \
+    --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
+    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &  
+  PGRECEIVEWAL_PID=$!
+}
+
+x_stop_pg_receivewal() {
+  if [[ -n "${PGRECEIVEWAL_PID:-}" ]]; then
+    log_info "stopping pg_receivewal (PID $PGRECEIVEWAL_PID)"
+    kill -TERM "$PGRECEIVEWAL_PID" 2>/dev/null || true
+    wait "$PGRECEIVEWAL_PID" 2>/dev/null || true
   fi
 }
 

@@ -57,8 +57,7 @@ x_backup_restore() {
 
   # run wal-receivers
   echo_delim "running wal-receivers"
-  # run wal-receiver
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  x_start_receiver "/tmp/config.json"
 
   # make a backup before doing anything
   echo_delim "creating backup"
@@ -83,6 +82,7 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  x_stop_receiver
   xpg_teardown
 
   # restore from backup

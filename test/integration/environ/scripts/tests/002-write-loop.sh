@@ -35,18 +35,8 @@ x_backup_restore() {
 
   # run wal-receivers
   echo_delim "running wal-receivers"
-  # run wal-receiver
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
-  # run pg_receivewal
-  nohup pg_receivewal \
-    -D "${PG_RECEIVEWAL_WAL_PATH}" \
-    -S pg_receivewal \
-    --no-loop \
-    --verbose \
-    --no-password \
-    --synchronous \
-    --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
-    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &
+  x_start_receiver "/tmp/config.json"
+  x_start_pg_receivewal
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -59,9 +49,7 @@ x_backup_restore() {
     --verbose
 
   # trying to write ~100 of WAL files as quick as possible
-  for ((i = 0; i < 100; i++)); do
-    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
-  done
+  x_generate_wal 100
 
   # (to prevent test-races just wait while slots are in sync)
   #
@@ -78,6 +66,8 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  x_stop_receiver
+  x_stop_pg_receivewal
   xpg_teardown
 
   # restore from backup

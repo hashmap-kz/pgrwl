@@ -32,12 +32,6 @@ xpg_dirs() {
 
 xpg_teardown() {
     pkill -9 postgres || true
-    for i in {1..10}; do
-      if ! sudo pkill -9 pgrwl; then
-        break
-      fi
-      sleep 0.2
-    done
     rm -rf "${PGDATA}"
 }
 
