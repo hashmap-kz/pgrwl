@@ -43,6 +43,26 @@ storage:
     algo: aes-256-gcm
     pass: qwerty123
 EOF
+
+  cat <<EOF > "/tmp/config-aes.yaml"
+main:
+  listen_port: 7070
+  directory: /tmp/wal-archive
+receiver:
+  slot: pgrwl_v5
+  uploader:
+    sync_interval: 3s
+    max_concurrency: 4
+log:
+  level: debug
+  format: text
+  add_source: true
+storage:
+  name: "local"
+  encryption:
+    algo: aes-256-gcm
+    pass: qwerty123
+EOF
 }
 
 x_backup_restore() {
@@ -57,7 +77,7 @@ x_backup_restore() {
   xpg_recreate_slots
 
   # run wal-receivers (zstd compression, no encryption)
-  echo_delim "running wal-receivers"
+  echo_delim "running wal-receiver with zstd compression, no encryption"
   nohup /usr/local/bin/pgrwl start -c "/tmp/config-zstd.yaml" -m receive >>"$LOG_FILE" 2>&1 &
 
   # make a basebackup before doing anything
@@ -70,25 +90,26 @@ x_backup_restore() {
     --no-password \
     --verbose
 
-  # 1) trying to write ~25 of WAL files as quick as possible
-  for ((i = 0; i < 25; i++)); do
-    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
+  # switch config files with different compression/encryption settings
+  echo_delim "configs switching loop"
+  config_files=(
+    "/tmp/config-gzip-aes.yaml" 
+    "/tmp/config-aes.yaml"
+  )
+  for config_file in "${config_files[@]}"; do
+    # rerun receiver with a new config
+    echo_delim "running wal-receiver with config: ${config_file}"
+    sudo pkill -9 pgrwl || true
+    nohup /usr/local/bin/pgrwl start -c "${config_file}" -m receive >>"$LOG_FILE" 2>&1 &
+
+    # generate some wals
+    for ((i = 0; i < 25; i++)); do
+      psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
+    done  
+    
+    # wait compressor/encryptor/uploader
+    sleep 10
   done
-
-  # wait compressor/encryptor
-  sleep 10
-
-  echo_delim "running wal-receiver with gzip/aes"
-  sudo pkill -9 pgrwl || true
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config-gzip-aes.yaml" -m receive >>"$LOG_FILE" 2>&1 &
-
-  # 2) trying to write ~25 of WAL files as quick as possible
-  for ((i = 0; i < 25; i++)); do
-    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
-  done
-
-  # wait compressor/encryptor
-  sleep 10
 
   # remember the state
   pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
