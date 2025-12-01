@@ -90,7 +90,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  x_start_serving
+  x_start_serving "/tmp/config.json"
 
   # cleanup logs
   >/var/log/postgresql/pg.log
