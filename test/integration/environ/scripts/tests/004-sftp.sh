@@ -18,7 +18,7 @@ x_remake_config() {
      }
   },
   "log": {
-    "level": "trace",
+    "level": "${LOG_LEVEL_DEFAULT}",
     "format": "text",
     "add_source": true
   },
@@ -70,9 +70,7 @@ x_backup_restore() {
     --verbose
 
   # trying to write ~100 of WAL files as quick as possible
-  for ((i = 0; i < 100; i++)); do
-    psql -U postgres -c 'drop table if exists xxx; select pg_switch_wal(); create table if not exists xxx(id serial);' > /dev/null 2>&1
-  done
+  x_generate_wal 100
 
   # remember the state
   pg_dumpall -f "/tmp/pgdumpall-before" --restrict-key=0
@@ -82,7 +80,7 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
-  pkill -9 pgrwl || true
+  x_stop_receiver
   xpg_teardown
 
   # restore from backup

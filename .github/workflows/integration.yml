@@ -91,11 +91,19 @@ jobs:
           echo "Restored cached image archives, loading into Docker..."
           ls -lah "${{ env.CACHE_FOLDER }}" || true
 
-          [ -f "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_SSHD }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_MINIO }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load || true
-          [ -f "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" ] && gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load || true
+          printf '%s\n' \
+            "${CACHE_FILE_DOCKER_PG_PRIMARY}" \
+            "${CACHE_FILE_DOCKER_PG_STANDBY}" \
+            "${CACHE_FILE_DOCKER_SSHD}" \
+            "${CACHE_FILE_DOCKER_MINIO}" \
+            "${CACHE_FILE_DOCKER_MINIO_MC}" \
+          | xargs -n1 -P4 bash -c '
+            set -euo pipefail
+            f="$0"
+            [ -f "$f" ] || { echo "Skip missing $f"; exit 0; }
+            echo "Loading image from $f ..."
+            gunzip -c "$f" | docker load
+          '
 
           echo "Images after load (if any):"
           docker images || true
@@ -126,18 +134,27 @@ jobs:
 
           mkdir -p "${{ env.CACHE_FOLDER }}"
 
-          # image names must match docker-compose.yml
-          docker save "pgrwl/pg-primary-${PG_MAJOR}" | gzip -c > "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}"
-          docker save "pgrwl/pg-standby-${PG_MAJOR}" | gzip -c > "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}"
-          docker save "pgrwl/sshd" | gzip -c > "${{ env.CACHE_FILE_DOCKER_SSHD }}"
-          docker save "pgrwl/minio" | gzip -c > "${{ env.CACHE_FILE_DOCKER_MINIO }}"
-          docker save "pgrwl/minio-mc" | gzip -c > "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}"
+          # Save all images concurrently (image -> cache file)
+          printf '%s %s\n' \
+            "pgrwl/pg-primary-${PG_MAJOR}" "${CACHE_FILE_DOCKER_PG_PRIMARY}" \
+            "pgrwl/pg-standby-${PG_MAJOR}" "${CACHE_FILE_DOCKER_PG_STANDBY}" \
+            "pgrwl/sshd"                    "${CACHE_FILE_DOCKER_SSHD}" \
+            "pgrwl/minio"                   "${CACHE_FILE_DOCKER_MINIO}" \
+            "pgrwl/minio-mc"                "${CACHE_FILE_DOCKER_MINIO_MC}" \
+          | xargs -n2 -P4 bash -c '
+              set -euo pipefail
+              img="$1"
+              out="$2"
+              echo "Saving ${img} -> ${out} ..."
+              docker save "${img}" | gzip -c > "${out}"
+              echo "Saved ${img}"
+            ' _
 
           echo "=== Cached archives ==="
           ls -lah "${{ env.CACHE_FOLDER }}"
 
   test:
-    name: pg${{ matrix.pg_major }}-${{ matrix.test_name }}
+    name: ${{ matrix.pg_major }}-${{ matrix.test_name }}
     runs-on: ubuntu-latest
     needs: [build_images]
 
@@ -155,6 +172,7 @@ jobs:
           - pg_005_restore_localfs
           - pg_006_restore_s3
           - pg_007_tablespaces_localfs
+          - pg_008_dynstor
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}
@@ -205,19 +223,27 @@ jobs:
 
           ls -lah "${{ env.CACHE_FOLDER }}" || true
 
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load
-          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load
+          printf '%s\n' \
+            "${CACHE_FILE_DOCKER_PG_PRIMARY}" \
+            "${CACHE_FILE_DOCKER_PG_STANDBY}" \
+            "${CACHE_FILE_DOCKER_SSHD}" \
+            "${CACHE_FILE_DOCKER_MINIO}" \
+            "${CACHE_FILE_DOCKER_MINIO_MC}" \
+          | xargs -n1 -P4 bash -c '
+            set -euo pipefail
+            f="$0"
+            [ -f "$f" ] || { echo "Skip missing $f"; exit 0; }
+            echo "Loading image from $f ..."
+            gunzip -c "$f" | docker load
+          '
 
           echo "=== Images after load ==="
           docker images || true
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+      # - name: Set up Go
+      #   uses: actions/setup-go@v6
+      #   with:
+      #     go-version-file: go.mod
 
       - name: Run single test
         run: |

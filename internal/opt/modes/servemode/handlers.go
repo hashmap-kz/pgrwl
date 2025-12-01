@@ -13,7 +13,7 @@ import (
 type ServeHandlerOpts struct {
 	BaseDir string
 	Verbose bool
-	Storage *storage.TransformingStorage
+	Storage *storage.VariadicStorage
 }
 
 func Init(opts *ServeHandlerOpts) http.Handler {

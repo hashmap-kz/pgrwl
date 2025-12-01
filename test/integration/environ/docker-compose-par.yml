@@ -50,10 +50,10 @@ services:
     container_name: pg_007_tablespaces_localfs
     entrypoint: /var/lib/postgresql/scripts/tests/007-tablespaces-localfs.sh
 
-#  pg_008_dynstor:
-#    <<: *pg_test_common
-#    container_name: pg_008_dynstor
-#    entrypoint: /var/lib/postgresql/scripts/tests/008-dynstor.sh
+  pg_008_dynstor:
+    <<: *pg_test_common
+    container_name: pg_008_dynstor
+    entrypoint: /var/lib/postgresql/scripts/tests/008-dynstor-localfs.sh
 
   sshd:
     build:

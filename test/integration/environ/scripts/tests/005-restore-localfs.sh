@@ -14,7 +14,7 @@ x_remake_config() {
     "no_loop": true
   },
   "log": {
-    "level": "trace",
+    "level": "${LOG_LEVEL_DEFAULT}",
     "format": "text",
     "add_source": true
   }
@@ -35,18 +35,8 @@ x_backup_restore() {
 
   # run wal-receivers
   echo_delim "running wal-receivers"
-  # run wal-receiver
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
-  # run pg_receivewal
-  nohup pg_receivewal \
-    -D "${PG_RECEIVEWAL_WAL_PATH}" \
-    -S pg_receivewal \
-    --no-loop \
-    --verbose \
-    --no-password \
-    --synchronous \
-    --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \
-    >>"${PG_RECEIVEWAL_LOG_FILE}" 2>&1 &
+  x_start_receiver "/tmp/config.json"
+  x_start_pg_receivewal
 
   # make a backup before doing anything
   echo_delim "creating backup"
@@ -71,6 +61,8 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  x_stop_receiver
+  x_stop_pg_receivewal  
   xpg_teardown
 
   # restore from backup
