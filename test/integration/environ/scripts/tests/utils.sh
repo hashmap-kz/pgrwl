@@ -79,7 +79,7 @@ x_start_receiver() {
   # Run the receiver in background.
   #   * stdout  -> tee -> log file (append) -> /dev/null (discard)
   #   * stderr  -> tee -> log file (append) -> original stderr (so it appears on console)
-  /usr/local/bin/pgrwl start -c "${cfg}" -m receive \
+  /usr/local/bin/pgrwl daemon -c "${cfg}" -m receive \
     > >(tee -a "$LOG_FILE") \
     2> >(tee -a "$LOG_FILE" >&2) &
 

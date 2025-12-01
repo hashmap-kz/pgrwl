@@ -76,9 +76,9 @@ receive:
   service:
     type: ClusterIP
     port: 7070
-  args: ["start"]
+  args: ["daemon"]
   env:
-    PGRWL_MODE: "receive"
+    PGRWL_DAEMON_MODE: "receive"
     PGRWL_CONFIG_PATH: "/etc/pgrwl/config.yml"
   config: |
     receiver:
@@ -118,9 +118,9 @@ backup:
   service:
     type: ClusterIP
     port: 7070
-  args: ["start"]
+  args: ["daemon"]
   env:
-    PGRWL_MODE: "backup"
+    PGRWL_DAEMON_MODE: "backup"
     PGRWL_CONFIG_PATH: "/etc/pgrwl/config.yml"
   config: |
     backup:

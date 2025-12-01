@@ -84,74 +84,74 @@ var (
 // Config is the root configuration for the WAL receiver application.
 // Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
-	Main      MainConfig    `json:"main,omitempty"`      // Main application settings.
-	Receiver  ReceiveConfig `json:"receiver,omitempty"`  // WAL receiver configuration.
-	Metrics   MetricsConfig `json:"metrics,omitempty"`   // Prometheus metrics configuration.
-	Log       LogConfig     `json:"log,omitempty"`       // Logging configuration.
-	Storage   StorageConfig `json:"storage,omitempty"`   // Storage backend configuration.
-	DevConfig DevConfig     `json:"devconfig,omitempty"` // Various dev options.
-	Backup    BackupConfig  `json:"backup,omitempty"`    // Streaming basebackup options.
+	Main      MainConfig    `json:"main,omitzero"`      // Main application settings.
+	Receiver  ReceiveConfig `json:"receiver,omitzero"`  // WAL receiver configuration.
+	Metrics   MetricsConfig `json:"metrics,omitzero"`   // Prometheus metrics configuration.
+	Log       LogConfig     `json:"log,omitzero"`       // Logging configuration.
+	Storage   StorageConfig `json:"storage,omitzero"`   // Storage backend configuration.
+	DevConfig DevConfig     `json:"devconfig,omitzero"` // Various dev options.
+	Backup    BackupConfig  `json:"backup,omitzero"`    // Streaming basebackup options.
 }
 
 // MainConfig holds top-level application settings.
 type MainConfig struct {
 	// ListenPort is the TCP port for the management HTTP server.
-	ListenPort int `json:"listen_port,omitempty" env:"PGRWL_MAIN_LISTEN_PORT"`
+	ListenPort int `json:"listen_port,omitzero" env:"PGRWL_MAIN_LISTEN_PORT"`
 
 	// Directory is the base directory where WAL files and metadata are stored.
-	Directory string `json:"directory,omitempty" env:"PGRWL_MAIN_DIRECTORY"`
+	Directory string `json:"directory,omitzero" env:"PGRWL_MAIN_DIRECTORY"`
 }
 
 // DevConfig configures development-only features like profiling and debug endpoints.
 type DevConfig struct {
-	Pprof DevConfigPprof `json:"pprof,omitempty"`
+	Pprof DevConfigPprof `json:"pprof,omitzero"`
 }
 
 // DevConfigPprof configures pprof.
 type DevConfigPprof struct {
-	Enable bool `json:"enable,omitempty" env:"PGRWL_DEVCONFIG_PPROF_ENABLE"`
+	Enable bool `json:"enable,omitzero" env:"PGRWL_DEVCONFIG_PPROF_ENABLE"`
 }
 
 // BackupConfig configures streaming basebackup properties.
 type BackupConfig struct {
 	Cron         string                   `json:"cron" env:"PGRWL_BACKUP_CRON"`
-	Retention    BackupRetentionConfig    `json:"retention,omitempty"`
-	WalRetention BackupWalRetentionConfig `json:"walretention,omitempty"`
+	Retention    BackupRetentionConfig    `json:"retention,omitzero"`
+	WalRetention BackupWalRetentionConfig `json:"walretention,omitzero"`
 }
 
 // BackupRetentionConfig configures retention for basebackups.
 type BackupRetentionConfig struct {
 	// Enable determines whether retention logic is active.
-	Enable bool `json:"enable,omitempty" env:"PGRWL_BACKUP_RETENTION_ENABLE"`
+	Enable bool `json:"enable,omitzero" env:"PGRWL_BACKUP_RETENTION_ENABLE"`
 
-	Type  string `json:"type,omitempty" env:"PGRWL_BACKUP_RETENTION_TYPE"`
-	Value string `json:"value,omitempty" env:"PGRWL_BACKUP_RETENTION_VALUE"`
+	Type  string `json:"type,omitzero" env:"PGRWL_BACKUP_RETENTION_TYPE"`
+	Value string `json:"value,omitzero" env:"PGRWL_BACKUP_RETENTION_VALUE"`
 
 	KeepDurationParsed time.Duration `json:"-"`
 	KeepCountParsed    int64         `json:"-"`
 
-	KeepLast *int `json:"keep_last,omitempty" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
+	KeepLast *int `json:"keep_last,omitzero" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
 }
 
 // BackupWalRetentionConfig configures related setting for WAL-archive.
 type BackupWalRetentionConfig struct {
-	Enable       bool   `json:"enable,omitempty" env:"PGRWL_BACKUP_WALRETENTION_ENABLE"`
-	ReceiverAddr string `json:"receiver_addr,omitempty" env:"PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR"`
+	Enable       bool   `json:"enable,omitzero" env:"PGRWL_BACKUP_WALRETENTION_ENABLE"`
+	ReceiverAddr string `json:"receiver_addr,omitzero" env:"PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR"`
 }
 
 // ReceiveConfig configures the WAL receiving logic.
 type ReceiveConfig struct {
 	// Slot is the replication slot name used to stream WAL from PostgreSQL.
-	Slot string `json:"slot,omitempty" env:"PGRWL_RECEIVER_SLOT"`
+	Slot string `json:"slot,omitzero" env:"PGRWL_RECEIVER_SLOT"`
 
 	// NoLoop disables automatic reconnection loops on connection loss.
-	NoLoop bool `json:"no_loop,omitempty" env:"PGRWL_RECEIVER_NO_LOOP"`
+	NoLoop bool `json:"no_loop,omitzero" env:"PGRWL_RECEIVER_NO_LOOP"`
 
 	// Uploader worker configuration.
-	Uploader UploadConfig `json:"uploader,omitempty"`
+	Uploader UploadConfig `json:"uploader,omitzero"`
 
 	// Retention policy configuration.
-	Retention RetentionConfig `json:"retention,omitempty"`
+	Retention RetentionConfig `json:"retention,omitzero"`
 }
 
 // UploadConfig configures the uploader worker.
@@ -168,7 +168,7 @@ type UploadConfig struct {
 // RetentionConfig configures the WAL file retention worker.
 type RetentionConfig struct {
 	// Enable determines whether retention logic is active.
-	Enable bool `json:"enable,omitempty" env:"PGRWL_RECEIVER_RETENTION_ENABLE"`
+	Enable bool `json:"enable,omitzero" env:"PGRWL_RECEIVER_RETENTION_ENABLE"`
 
 	// SyncInterval is the interval between retention scans (e.g., "12h").
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
@@ -176,107 +176,107 @@ type RetentionConfig struct {
 	SyncIntervalParsed time.Duration `json:"-"`
 
 	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
-	KeepPeriod       string        `json:"keep_period,omitempty" env:"PGRWL_RECEIVER_RETENTION_KEEP_PERIOD"`
+	KeepPeriod       string        `json:"keep_period,omitzero" env:"PGRWL_RECEIVER_RETENTION_KEEP_PERIOD"`
 	KeepPeriodParsed time.Duration `json:"-"`
 }
 
 // MetricsConfig enables or disables Prometheus metrics exposure.
 type MetricsConfig struct {
 	// Enable turns on Prometheus metrics HTTP endpoint.
-	Enable bool `json:"enable,omitempty" env:"PGRWL_METRICS_ENABLE"`
+	Enable bool `json:"enable,omitzero" env:"PGRWL_METRICS_ENABLE"`
 }
 
 // LogConfig defines application logging options.
 type LogConfig struct {
 	// Level sets the log level (e.g., "trace", "debug", "info", "warn", "error").
-	Level string `json:"level,omitempty" env:"PGRWL_LOG_LEVEL"`
+	Level string `json:"level,omitzero" env:"PGRWL_LOG_LEVEL"`
 
 	// Format sets the log format ("text" or "json").
-	Format string `json:"format,omitempty" env:"PGRWL_LOG_FORMAT"`
+	Format string `json:"format,omitzero" env:"PGRWL_LOG_FORMAT"`
 
 	// AddSource includes source file and line in log entries.
-	AddSource bool `json:"add_source,omitempty" env:"PGRWL_LOG_ADD_SOURCE"`
+	AddSource bool `json:"add_source,omitzero" env:"PGRWL_LOG_ADD_SOURCE"`
 }
 
 // StorageConfig defines which storage backend to use and its options.
 type StorageConfig struct {
 	// Name specifies the storage backend to use ("s3", "sftp", etc.).
-	Name string `json:"name,omitempty" env:"PGRWL_STORAGE_NAME"`
+	Name string `json:"name,omitzero" env:"PGRWL_STORAGE_NAME"`
 
 	// Compression defines compression settings for stored WAL files.
-	Compression CompressionConfig `json:"compression,omitempty"`
+	Compression CompressionConfig `json:"compression,omitzero"`
 
 	// Encryption defines encryption settings for stored WAL files.
-	Encryption EncryptionConfig `json:"encryption,omitempty"`
+	Encryption EncryptionConfig `json:"encryption,omitzero"`
 
 	// SFTP holds configuration specific to the SFTP backend.
-	SFTP SFTPConfig `json:"sftp,omitempty"`
+	SFTP SFTPConfig `json:"sftp,omitzero"`
 
 	// S3 holds configuration specific to the S3 backend.
-	S3 S3Config `json:"s3,omitempty"`
+	S3 S3Config `json:"s3,omitzero"`
 }
 
 // CompressionConfig defines the compression algorithm to use.
 type CompressionConfig struct {
 	// Algo is the compression algorithm ("gzip", "zstd", etc.).
-	Algo string `json:"algo,omitempty" env:"PGRWL_STORAGE_COMPRESSION_ALGO"`
+	Algo string `json:"algo,omitzero" env:"PGRWL_STORAGE_COMPRESSION_ALGO"`
 }
 
 // EncryptionConfig defines the encryption algorithm and credentials.
 type EncryptionConfig struct {
 	// Algo is the encryption algorithm identifier ("aes-256-gcm", etc.).
-	Algo string `json:"algo,omitempty" env:"PGRWL_STORAGE_ENCRYPTION_ALGO"`
+	Algo string `json:"algo,omitzero" env:"PGRWL_STORAGE_ENCRYPTION_ALGO"`
 
 	// Pass is the encryption passphrase.
-	Pass string `json:"pass,omitempty" env:"PGRWL_STORAGE_ENCRYPTION_PASS"`
+	Pass string `json:"pass,omitzero" env:"PGRWL_STORAGE_ENCRYPTION_PASS"`
 }
 
 // SFTPConfig defines parameters for connecting to an SFTP server.
 type SFTPConfig struct {
 	// Host is the SFTP server hostname or IP.
-	Host string `json:"host,omitempty" env:"PGRWL_STORAGE_SFTP_HOST"`
+	Host string `json:"host,omitzero" env:"PGRWL_STORAGE_SFTP_HOST"`
 
 	// Port is the TCP port for the SFTP server.
-	Port int `json:"port,omitempty" env:"PGRWL_STORAGE_SFTP_PORT"`
+	Port int `json:"port,omitzero" env:"PGRWL_STORAGE_SFTP_PORT"`
 
 	// User is the username for SFTP authentication.
-	User string `json:"user,omitempty" env:"PGRWL_STORAGE_SFTP_USER"`
+	User string `json:"user,omitzero" env:"PGRWL_STORAGE_SFTP_USER"`
 
 	// Pass is the password for SFTP authentication (if not using a key).
-	Pass string `json:"pass,omitempty" env:"PGRWL_STORAGE_SFTP_PASS"`
+	Pass string `json:"pass,omitzero" env:"PGRWL_STORAGE_SFTP_PASS"`
 
 	// PKeyPath is the file path to the private key for key-based authentication.
-	PKeyPath string `json:"pkey_path,omitempty" env:"PGRWL_STORAGE_SFTP_PKEY_PATH"`
+	PKeyPath string `json:"pkey_path,omitzero" env:"PGRWL_STORAGE_SFTP_PKEY_PATH"`
 
 	// PKeyPass is the passphrase for the private key, if encrypted.
-	PKeyPass string `json:"pkey_pass,omitempty" env:"PGRWL_STORAGE_SFTP_PKEY_PASS"`
+	PKeyPass string `json:"pkey_pass,omitzero" env:"PGRWL_STORAGE_SFTP_PKEY_PASS"`
 
 	// Base directory with sufficient user permissions
-	BaseDir string `json:"base_dir,omitempty" env:"PGRWL_STORAGE_SFTP_BASE_DIR"`
+	BaseDir string `json:"base_dir,omitzero" env:"PGRWL_STORAGE_SFTP_BASE_DIR"`
 }
 
 // S3Config defines configuration for S3-compatible object storage.
 type S3Config struct {
 	// URL is the S3-compatible endpoint URL (e.g., "https://s3.amazonaws.com").
-	URL string `json:"url,omitempty" env:"PGRWL_STORAGE_S3_URL"`
+	URL string `json:"url,omitzero" env:"PGRWL_STORAGE_S3_URL"`
 
 	// AccessKeyID is the S3 access key ID.
-	AccessKeyID string `json:"access_key_id,omitempty" env:"PGRWL_STORAGE_S3_ACCESS_KEY_ID"`
+	AccessKeyID string `json:"access_key_id,omitzero" env:"PGRWL_STORAGE_S3_ACCESS_KEY_ID"`
 
 	// SecretAccessKey is the S3 secret access key.
-	SecretAccessKey string `json:"secret_access_key,omitempty" env:"PGRWL_STORAGE_S3_SECRET_ACCESS_KEY"`
+	SecretAccessKey string `json:"secret_access_key,omitzero" env:"PGRWL_STORAGE_S3_SECRET_ACCESS_KEY"`
 
 	// Bucket is the name of the S3 bucket to store WAL files.
-	Bucket string `json:"bucket,omitempty" env:"PGRWL_STORAGE_S3_BUCKET"`
+	Bucket string `json:"bucket,omitzero" env:"PGRWL_STORAGE_S3_BUCKET"`
 
 	// Region is the AWS region (for Amazon S3).
-	Region string `json:"region,omitempty" env:"PGRWL_STORAGE_S3_REGION"`
+	Region string `json:"region,omitzero" env:"PGRWL_STORAGE_S3_REGION"`
 
 	// UsePathStyle forces path-style requests instead of virtual-hosted style.
-	UsePathStyle bool `json:"use_path_style,omitempty" env:"PGRWL_STORAGE_S3_USE_PATH_STYLE"`
+	UsePathStyle bool `json:"use_path_style,omitzero" env:"PGRWL_STORAGE_S3_USE_PATH_STYLE"`
 
 	// DisableSSL disables HTTPS for connections to the S3 endpoint.
-	DisableSSL bool `json:"disable_ssl,omitempty" env:"PGRWL_STORAGE_S3_DISABLE_SSL"`
+	DisableSSL bool `json:"disable_ssl,omitzero" env:"PGRWL_STORAGE_S3_DISABLE_SSL"`
 }
 
 // String returns a pretty-printed structure where sensitive fields are hidden.

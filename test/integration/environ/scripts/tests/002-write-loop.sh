@@ -90,7 +90,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  nohup /usr/local/bin/pgrwl daemon -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs
   >/var/log/postgresql/pg.log

@@ -5,6 +5,6 @@ export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
-export PGRWL_MODE=receive
+export PGRWL_DAEMON_MODE=receive
 
-go run ../main.go start -c configs/s3/receive.yml
+go run ../main.go daemon -c configs/s3/receive.yml

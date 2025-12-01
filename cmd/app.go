@@ -26,10 +26,10 @@ func App() *cli.Command {
 	}
 	modeFlag := &cli.StringFlag{
 		Name:     "mode",
-		Usage:    "Run mode: receive/serve",
+		Usage:    "Daemon mode: receive/serve/backup",
 		Aliases:  []string{"m"},
 		Required: true,
-		Sources:  cli.EnvVars("PGRWL_MODE"),
+		Sources:  cli.EnvVars("PGRWL_DAEMON_MODE"),
 	}
 
 	app := &cli.Command{
@@ -39,8 +39,8 @@ func App() *cli.Command {
 		Commands: []*cli.Command{
 			// server modes
 			{
-				Name:  "start",
-				Usage: "Running in a server mode: receive/serve",
+				Name:  "daemon",
+				Usage: "Running in a daemon mode: receive/serve/backup",
 				Flags: []cli.Flag{
 					configFlag,
 					modeFlag,
