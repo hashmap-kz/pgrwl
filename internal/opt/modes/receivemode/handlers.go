@@ -1,6 +1,8 @@
 package receivemode
 
 import (
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
+	"github.com/hashmap-kz/pgrwl/internal/opt/wrk"
 	"log/slog"
 	"net/http"
 
@@ -21,6 +23,9 @@ type ReceiveHandlerOpts struct {
 	Verbose  bool
 	Storage  *storage.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+
+	ReceiverController *wrk.WorkerController
+	ArchiveController  *wrk.WorkerController
 }
 
 func Init(opts *ReceiveHandlerOpts) http.Handler {
@@ -60,6 +65,48 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
+
+	// control endpoints
+
+	mux.HandleFunc("POST /receiver/start", func(w http.ResponseWriter, r *http.Request) {
+		opts.ReceiverController.Start()
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{
+			"status": opts.ReceiverController.Status(),
+		})
+	})
+
+	mux.HandleFunc("POST /receiver/stop", func(w http.ResponseWriter, r *http.Request) {
+		opts.ReceiverController.Stop()
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{
+			"status": opts.ReceiverController.Status(),
+		})
+	})
+
+	if opts.ArchiveController != nil {
+		mux.HandleFunc("POST /archiver/start", func(w http.ResponseWriter, r *http.Request) {
+			opts.ArchiveController.Start()
+			httpx.WriteJSON(w, http.StatusOK, map[string]string{
+				"status": opts.ArchiveController.Status(),
+			})
+		})
+
+		mux.HandleFunc("POST /archiver/stop", func(w http.ResponseWriter, r *http.Request) {
+			opts.ArchiveController.Stop()
+			httpx.WriteJSON(w, http.StatusOK, map[string]string{
+				"status": opts.ArchiveController.Status(),
+			})
+		})
+	}
+
+	mux.HandleFunc("GET /control/status", func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]string{
+			"receiver": opts.ReceiverController.Status(),
+		}
+		if opts.ArchiveController != nil {
+			resp["archiver"] = opts.ArchiveController.Status()
+		}
+		httpx.WriteJSON(w, http.StatusOK, resp)
+	})
 
 	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
