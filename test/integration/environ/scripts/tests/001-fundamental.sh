@@ -197,6 +197,8 @@ EOF
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
   find "${WAL_PATH}" -type f -name "*.json" -delete
+  find "${WAL_PATH}" -type f -name "*.history" -delete
+  find "${PG_RECEIVEWAL_WAL_PATH}" -type f -name "*.history" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
 
   # run receivers with a new timeline

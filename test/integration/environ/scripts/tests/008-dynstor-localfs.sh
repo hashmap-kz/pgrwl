@@ -2,12 +2,12 @@
 set -euo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
-# clean up on exit or interrupt
-cleanup() {
-  log_info "Cleaning up"
-  x_stop_receiver
-}
-trap cleanup EXIT INT TERM
+# # clean up on exit or interrupt
+# cleanup() {
+#   log_info "Cleaning up"
+#   x_stop_receiver
+# }
+# trap cleanup EXIT INT TERM
 
 x_remake_config() {
   cat <<EOF > "/tmp/config-zstd.yaml"
