@@ -4,47 +4,24 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
-	"github.com/hashmap-kz/pgrwl/internal/opt/wrk"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"golang.org/x/time/rate"
 )
-
-type ReceiveHandlerOpts struct {
-	PGRW     xlog.PgReceiveWal
-	BaseDir  string
-	Verbose  bool
-	Storage  *storage.VariadicStorage
-	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
-
-	ReceiverController *wrk.WorkerController
-	ArchiveController  *wrk.WorkerController
-}
 
 var statusOk = map[string]string{
 	"status": "ok",
 }
 
-func Init(opts *ReceiveHandlerOpts) http.Handler {
+func Init(opts *ReceiveDaemonRunOpts) http.Handler {
 	cfg := config.Cfg()
 	l := slog.With("component", "receive-api")
 
-	service := NewReceiveModeService(&ReceiveServiceOpts{
-		PGRW:     opts.PGRW,
-		BaseDir:  opts.BaseDir,
-		Storage:  opts.Storage,
-		JobQueue: opts.JobQueue,
-		Verbose:  opts.Verbose,
-	})
-	controller := NewReceiveController(service)
+	service := NewReceiveModeService(opts)
+	controller := NewReceiveController(service, opts)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -60,6 +37,11 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 		rateLimitMiddleware.Middleware,
 	)
 
+	plainChain := middleware.Chain(
+		middleware.SafeHandlerMiddleware,
+		loggingMiddleware.Middleware,
+	)
+
 	// Init handlers
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -71,57 +53,20 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
 
+	// Standalone mode (i.e. just serving wal-archive during restore)
+	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
+
 	// control endpoints
 
-	mux.HandleFunc("POST /api/v1/daemons/receiver/start", func(w http.ResponseWriter, _ *http.Request) {
-		opts.ReceiverController.Start()
-		httpx.WriteJSON(w, http.StatusOK, map[string]string{
-			"status": opts.ReceiverController.Status(),
-		})
-	})
-
-	mux.HandleFunc("POST /api/v1/daemons/receiver/stop", func(w http.ResponseWriter, _ *http.Request) {
-		opts.ReceiverController.Stop()
-		httpx.WriteJSON(w, http.StatusOK, statusOk)
-	})
-
-	if opts.ArchiveController != nil {
-		mux.HandleFunc("POST /api/v1/daemons/archiver/start", func(w http.ResponseWriter, _ *http.Request) {
-			opts.ArchiveController.Start()
-			httpx.WriteJSON(w, http.StatusOK, statusOk)
-		})
-
-		mux.HandleFunc("POST /api/v1/daemons/archiver/stop", func(w http.ResponseWriter, _ *http.Request) {
-			opts.ArchiveController.Stop()
-			httpx.WriteJSON(w, http.StatusOK, statusOk)
-		})
-	}
-
-	mux.HandleFunc("POST /api/v1/daemons/stop", func(w http.ResponseWriter, _ *http.Request) {
-		opts.ReceiverController.Stop()
-		if opts.ArchiveController != nil {
-			opts.ArchiveController.Stop()
-		}
-		httpx.WriteJSON(w, http.StatusOK, statusOk)
-	})
-
-	mux.HandleFunc("POST /api/v1/daemons/start", func(w http.ResponseWriter, _ *http.Request) {
-		opts.ReceiverController.Start()
-		if opts.ArchiveController != nil {
-			opts.ArchiveController.Start()
-		}
-		httpx.WriteJSON(w, http.StatusOK, statusOk)
-	})
-
-	mux.HandleFunc("GET /api/v1/daemons/status", func(w http.ResponseWriter, _ *http.Request) {
-		resp := map[string]string{
-			"receiver": opts.ReceiverController.Status(),
-		}
-		if opts.ArchiveController != nil {
-			resp["archiver"] = opts.ArchiveController.Status()
-		}
-		httpx.WriteJSON(w, http.StatusOK, resp)
-	})
+	mux.Handle("POST /api/v1/daemons/receiver/start", secureChain(http.HandlerFunc(controller.receiverStart)))
+	mux.Handle("POST /api/v1/daemons/receiver/stop", secureChain(http.HandlerFunc(controller.receiverStop)))
+	mux.Handle("POST /api/v1/daemons/archiver/start", secureChain(http.HandlerFunc(controller.archiverStart)))
+	mux.Handle("POST /api/v1/daemons/archiver/stop", secureChain(http.HandlerFunc(controller.archiverStop)))
+	mux.Handle("POST /api/v1/daemons/start", secureChain(http.HandlerFunc(controller.daemonsStart)))
+	mux.Handle("POST /api/v1/daemons/stop", secureChain(http.HandlerFunc(controller.daemonsStop)))
+	mux.Handle("POST /api/v1/switch-to-wal-receive", secureChain(http.HandlerFunc(controller.daemonsStart)))
+	mux.Handle("POST /api/v1/switch-to-wal-serve", secureChain(http.HandlerFunc(controller.daemonsStop)))
+	mux.Handle("GET /api/v1/daemons/status", secureChain(http.HandlerFunc(controller.daemonsStatus)))
 
 	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux

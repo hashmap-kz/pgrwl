@@ -108,7 +108,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 
-		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
+		handlers := receiveAPI.Init(&receiveAPI.ReceiveDaemonRunOpts{
 			PGRW:               pgrw,
 			BaseDir:            opts.ReceiveDirectory,
 			Verbose:            opts.Verbose,

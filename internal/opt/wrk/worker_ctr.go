@@ -101,3 +101,12 @@ func (c *WorkerController) Status() string {
 	}
 	return "stopped"
 }
+
+func (c *WorkerController) IsRunning() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.parentCtx.Err() != nil {
+		return false
+	}
+	return c.running
+}
