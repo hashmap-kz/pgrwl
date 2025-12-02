@@ -29,6 +29,10 @@ type ReceiveHandlerOpts struct {
 	ArchiveController  *wrk.WorkerController
 }
 
+var statusOk = map[string]string{
+	"status": "ok",
+}
+
 func Init(opts *ReceiveHandlerOpts) http.Handler {
 	cfg := config.Cfg()
 	l := slog.With("component", "receive-api")
@@ -69,37 +73,47 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 
 	// control endpoints
 
-	mux.HandleFunc("POST /receiver/start", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("POST /api/v1/daemons/receiver/start", func(w http.ResponseWriter, _ *http.Request) {
 		opts.ReceiverController.Start()
 		httpx.WriteJSON(w, http.StatusOK, map[string]string{
 			"status": opts.ReceiverController.Status(),
 		})
 	})
 
-	mux.HandleFunc("POST /receiver/stop", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("POST /api/v1/daemons/receiver/stop", func(w http.ResponseWriter, _ *http.Request) {
 		opts.ReceiverController.Stop()
-		httpx.WriteJSON(w, http.StatusOK, map[string]string{
-			"status": opts.ReceiverController.Status(),
-		})
+		httpx.WriteJSON(w, http.StatusOK, statusOk)
 	})
 
 	if opts.ArchiveController != nil {
-		mux.HandleFunc("POST /archiver/start", func(w http.ResponseWriter, _ *http.Request) {
+		mux.HandleFunc("POST /api/v1/daemons/archiver/start", func(w http.ResponseWriter, _ *http.Request) {
 			opts.ArchiveController.Start()
-			httpx.WriteJSON(w, http.StatusOK, map[string]string{
-				"status": opts.ArchiveController.Status(),
-			})
+			httpx.WriteJSON(w, http.StatusOK, statusOk)
 		})
 
-		mux.HandleFunc("POST /archiver/stop", func(w http.ResponseWriter, _ *http.Request) {
+		mux.HandleFunc("POST /api/v1/daemons/archiver/stop", func(w http.ResponseWriter, _ *http.Request) {
 			opts.ArchiveController.Stop()
-			httpx.WriteJSON(w, http.StatusOK, map[string]string{
-				"status": opts.ArchiveController.Status(),
-			})
+			httpx.WriteJSON(w, http.StatusOK, statusOk)
 		})
 	}
 
-	mux.HandleFunc("GET /control/status", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("POST /api/v1/daemons/stop", func(w http.ResponseWriter, _ *http.Request) {
+		opts.ReceiverController.Stop()
+		if opts.ArchiveController != nil {
+			opts.ArchiveController.Stop()
+		}
+		httpx.WriteJSON(w, http.StatusOK, statusOk)
+	})
+
+	mux.HandleFunc("POST /api/v1/daemons/start", func(w http.ResponseWriter, _ *http.Request) {
+		opts.ReceiverController.Start()
+		if opts.ArchiveController != nil {
+			opts.ArchiveController.Start()
+		}
+		httpx.WriteJSON(w, http.StatusOK, statusOk)
+	})
+
+	mux.HandleFunc("GET /api/v1/daemons/status", func(w http.ResponseWriter, _ *http.Request) {
 		resp := map[string]string{
 			"receiver": opts.ReceiverController.Status(),
 		}
