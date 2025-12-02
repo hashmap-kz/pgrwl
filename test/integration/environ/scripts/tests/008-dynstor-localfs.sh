@@ -153,16 +153,17 @@ x_backup_restore() {
 restore_command = 'pgrwl restore-command --serve-addr=127.0.0.1:7070 %f %p'
 EOF
 
-  # run serve-mode
-  echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl daemon -c "/tmp/config-gzip-aes.yaml" -m serve >>"$LOG_FILE" 2>&1 &
-
   # cleanup logs
   >/var/log/postgresql/pg.log
 
   # run restored cluster
   echo_delim "running cluster"
   xpg_start
+
+  # run serve-mode
+  echo_delim "running wal fetcher"
+  x_start_receiver "/tmp/config-plain.yaml"
+  curl --location --request POST 'http://localhost:7070/api/v1/switch-to-wal-serve'
 
   # wait until is in recovery, check logs, etc...
   xpg_wait_is_in_recovery
