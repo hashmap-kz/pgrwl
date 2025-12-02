@@ -91,6 +91,7 @@ func (c *ReceiveController) receiverStart(w http.ResponseWriter, _ *http.Request
 
 func (c *ReceiveController) receiverStop(w http.ResponseWriter, _ *http.Request) {
 	c.opts.ReceiverController.Stop()
+	c.opts.ReceiverController.Wait()
 	httpx.WriteJSON(w, http.StatusOK, statusOk)
 }
 
@@ -104,6 +105,7 @@ func (c *ReceiveController) archiverStart(w http.ResponseWriter, _ *http.Request
 func (c *ReceiveController) archiverStop(w http.ResponseWriter, _ *http.Request) {
 	if c.opts.ArchiveController != nil {
 		c.opts.ArchiveController.Stop()
+		c.opts.ArchiveController.Wait()
 	}
 	httpx.WriteJSON(w, http.StatusOK, statusOk)
 }
@@ -118,8 +120,10 @@ func (c *ReceiveController) daemonsStart(w http.ResponseWriter, _ *http.Request)
 
 func (c *ReceiveController) daemonsStop(w http.ResponseWriter, _ *http.Request) {
 	c.opts.ReceiverController.Stop()
+	c.opts.ReceiverController.Wait()
 	if c.opts.ArchiveController != nil {
 		c.opts.ArchiveController.Stop()
+		c.opts.ArchiveController.Wait()
 	}
 	httpx.WriteJSON(w, http.StatusOK, statusOk)
 }
