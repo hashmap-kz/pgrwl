@@ -198,6 +198,7 @@ EOF
   echo_delim "compare wal-archive with pg_receivewal"
   find "${WAL_PATH}" -type f -name "*.json" -delete
   find "${WAL_PATH}" -type f -name "*.history" -delete
+  find "${WAL_PATH}" -type f -name "*.tmp" -delete
   find "${PG_RECEIVEWAL_WAL_PATH}" -type f -name "*.history" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
 
@@ -206,7 +207,9 @@ EOF
   x_remake_dirs
   # run wal-receiver
   xpg_create_slots
-  curl --location --request POST 'http://localhost:7070/api/v1/switch-to-wal-receive'
+  # re-run pgrwl
+  pkill -9 pgrwl || true
+  nohup /usr/local/bin/pgrwl daemon -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   nohup pg_receivewal -D "${PG_RECEIVEWAL_WAL_PATH}" -S pg_receivewal --no-loop --verbose --no-password --synchronous \
     --dbname "dbname=replication options=-cdatestyle=iso replication=true application_name=pg_receivewal" \

@@ -2,12 +2,12 @@
 set -euo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
-# # clean up on exit or interrupt
-# cleanup() {
-#   log_info "Cleaning up"
-#   x_stop_receiver
-# }
-# trap cleanup EXIT INT TERM
+# clean up on exit or interrupt
+cleanup() {
+  log_info "Cleaning up"
+  x_stop_receiver
+}
+trap cleanup EXIT INT TERM
 
 x_remake_config() {
   cat <<EOF > "/tmp/config-zstd.yaml"
@@ -137,6 +137,7 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  x_stop_receiver
   xpg_teardown
 
   # restore from backup
@@ -154,6 +155,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
+  x_start_receiver "/tmp/config-plain.yaml"
   curl --location --request POST 'http://localhost:7070/api/v1/switch-to-wal-serve'
 
   # cleanup logs
