@@ -12,7 +12,7 @@ export PGPASSWORD=postgres
 ######################################################################
 ## pgrwl envs
 ######################################################################
-export PGRWL_MODE=receive
+export PGRWL_DAEMON_MODE=receive
 export PGRWL_MAIN_LISTEN_PORT=7070
 export PGRWL_MAIN_DIRECTORY=wals
 export PGRWL_RECEIVER_SLOT=pgrwl_v5
@@ -20,4 +20,4 @@ export PGRWL_LOG_LEVEL="trace"
 export PGRWL_LOG_FORMAT="text"
 export PGRWL_LOG_ADD_SOURCE="true"
 
-go run ../main.go start
+go run ../main.go daemon

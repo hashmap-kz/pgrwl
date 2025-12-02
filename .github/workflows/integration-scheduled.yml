@@ -1,24 +1,9 @@
-name: Integration Tests
+name: Integration Tests (weekly)
 
 on:
-  push:
-    branches: &branches
-      - "master"
-      - "release/**"
-    paths-ignore: &paths-ignore
-      - "docs/**"
-      - "examples/**"
-      - "charts/**"
-      - "hack/**"
-      - "**/*.md"
-      - "**/*.gitignore"
-      - "**/*.gitattributes"
-      - "Makefile"
-      - ".golangci.yml"
-  pull_request:
-    branches: *branches
-    paths-ignore: *paths-ignore
   workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 0"
 
 env:
   CACHE_FOLDER: docker-cache
@@ -143,7 +128,7 @@ jobs:
           ls -lah "${{ env.CACHE_FOLDER }}"
 
   test:
-    name: ${{ matrix.pg_major }}-${{ matrix.test_name }}
+    name: Run integration tests (pg${{ matrix.pg_major }})
     runs-on: ubuntu-latest
     needs: [build_images]
 
@@ -151,25 +136,9 @@ jobs:
       fail-fast: false
       matrix:
         pg_major: [17, 18]
-        # One entry per test service in docker-compose-par.yml
-        test_name:
-          - pg_001_fundamental
-          - pg_002_write_loop
-          - pg_003_s3
-          # TODO: fix (works locally, but not in github-action runner)
-          # - pg_004_sftp
-          - pg_005_restore_localfs
-          - pg_006_restore_s3
-          - pg_007_tablespaces_localfs
-          - pg_008_dynstor
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}
-      TEST_NAME: ${{ matrix.test_name }}
-      # parallel compose file
-      COMPOSE_FILE_PAR: "test/integration/environ/docker-compose-par.yml"
-      # optional, just to make logs clearer (not required for isolation)
-      COMPOSE_PROJECT_NAME: pgrwl_pg${{ matrix.pg_major }}_${{ matrix.test_name }}
 
     steps:
       - name: Checkout code
@@ -212,46 +181,26 @@ jobs:
 
           ls -lah "${{ env.CACHE_FOLDER }}" || true
 
-          printf '%s\n' \
-            "${CACHE_FILE_DOCKER_PG_PRIMARY}" \
-            "${CACHE_FILE_DOCKER_PG_STANDBY}" \
-            "${CACHE_FILE_DOCKER_SSHD}" \
-            "${CACHE_FILE_DOCKER_MINIO}" \
-            "${CACHE_FILE_DOCKER_MINIO_MC}" \
-          | xargs -n1 -P4 bash -c '
-            set -euo pipefail
-            f="$0"
-            [ -f "$f" ] || { echo "Skip missing $f"; exit 0; }
-            echo "Loading image from $f ..."
-            gunzip -c "$f" | docker load
-          '
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_PRIMARY }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_PG_STANDBY }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_SSHD }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO }}" | docker load
+          gunzip -c "${{ env.CACHE_FILE_DOCKER_MINIO_MC }}" | docker load
 
           echo "=== Images after load ==="
           docker images || true
 
-      - name: Run single test
+      - name: Run tests
         run: |
           set -euo pipefail
 
-          echo "Running integration test '${TEST_NAME}' against PostgreSQL ${PG_MAJOR}"
+          echo "Running integration tests against PostgreSQL ${PG_MAJOR}"
           docker images || true
 
-          # Each matrix job runs on its own runner, so services won't clash.
-          # We pass only the single test service to 'up', and use its exit code.
-          docker compose -f "${COMPOSE_FILE_PAR}" \
-            up \
-              --exit-code-from "${TEST_NAME}" \
-              "${TEST_NAME}"
+          docker compose -f "${{ env.COMPOSE_FILE }}" up -d
+          docker ps
 
-      - name: Dump logs on failure
-        if: failure()
-        run: |
-          set -euo pipefail
-          docker compose -f "${COMPOSE_FILE_PAR}" ps || true
-          docker compose -f "${COMPOSE_FILE_PAR}" logs || true
-
-      - name: Cleanup
-        if: always()
-        run: |
-          set -euo pipefail
-          docker compose -f "${COMPOSE_FILE_PAR}" down -v || true
+          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary chmod +x /var/lib/postgresql/scripts/runners/run-tests.sh
+          docker compose -f "${{ env.COMPOSE_FILE }}" exec -T pg-primary \
+            env PG_MAJOR="${PG_MAJOR}" \
+            su - postgres -c /var/lib/postgresql/scripts/runners/run-tests.sh

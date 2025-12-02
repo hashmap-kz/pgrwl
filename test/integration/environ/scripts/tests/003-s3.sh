@@ -58,7 +58,7 @@ x_backup_restore() {
 
   # run wal-receivers
   echo_delim "running wal-receivers"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
+  x_start_receiver "/tmp/config.json"
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"
@@ -99,7 +99,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl start -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  x_start_serving "/tmp/config.json"
 
   # cleanup logs
   >/var/log/postgresql/pg.log

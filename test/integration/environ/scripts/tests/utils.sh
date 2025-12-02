@@ -26,6 +26,7 @@ export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inser
 export BACKGROUND_INSERTS_SCRIPT_LOG_FILE="/tmp/ts-inserts.log"
 export RECEIVER_PID=''
 export PGRECEIVEWAL_PID=''
+export SERVE_PID=''
 
 # Default environment
 
@@ -79,23 +80,11 @@ x_start_receiver() {
   # Run the receiver in background.
   #   * stdout  -> tee -> log file (append) -> /dev/null (discard)
   #   * stderr  -> tee -> log file (append) -> original stderr (so it appears on console)
-  /usr/local/bin/pgrwl start -c "${cfg}" -m receive \
+  /usr/local/bin/pgrwl daemon -c "${cfg}" -m receive \
     > >(tee -a "$LOG_FILE") \
     2> >(tee -a "$LOG_FILE" >&2) &
 
   RECEIVER_PID=$!
-
-  # wait until the receiver reports "started" (simple poll)
-  for i in {1..30}; do
-    if grep -q "wal-receiver started" "$LOG_FILE"; then
-      log_info "receiver started (PID $RECEIVER_PID)"
-      return
-    fi
-    sleep 1
-  done
-  log_error "receiver did not start within timeout"
-  kill -9 "$RECEIVER_PID" || true
-  exit 1
 }
 
 x_stop_receiver() {
@@ -136,4 +125,18 @@ x_generate_wal() {
     psql -U postgres -c 'DROP TABLE IF EXISTS xxx; SELECT pg_switch_wal(); CREATE TABLE IF NOT EXISTS xxx(id serial);' \
       >/dev/null 2>&1
   done
+}
+
+x_start_serving() {
+  local cfg=$1
+  log_info "starting wal-serving with $cfg"
+
+  # Run the 'serve' mode in background.
+  #   * stdout  -> tee -> log file (append) -> /dev/null (discard)
+  #   * stderr  -> tee -> log file (append) -> original stderr (so it appears on console)
+  /usr/local/bin/pgrwl daemon -c "${cfg}" -m serve \
+    > >(tee -a "$LOG_FILE") \
+    2> >(tee -a "$LOG_FILE" >&2) &
+
+  SERVE_PID=$!
 }

@@ -9,7 +9,7 @@
       "program": "${workspaceFolder}/main.go",
       "buildFlags": "-tags=debug",
       "args": [
-        "start",
+        "daemon",
         "-c",
         "${workspaceFolder}/hack/configs/localfs/receive.yml"
       ],
@@ -18,7 +18,7 @@
         "PGPORT": "5432",
         "PGUSER": "postgres",
         "PGPASSWORD": "postgres",
-        "PGRWL_MODE": "receive"
+        "PGRWL_DAEMON_MODE": "receive"
       },
       "console": "integratedTerminal"
     }

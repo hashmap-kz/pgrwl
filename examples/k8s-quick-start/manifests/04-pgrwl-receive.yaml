@@ -163,9 +163,9 @@ spec:
         - name: *app
           image: "quay.io/hashmap_kz/pgrwl:latest"
           imagePullPolicy: Always
-          args: ["start"]
+          args: ["daemon"]
           env:
-            - name: PGRWL_MODE
+            - name: PGRWL_DAEMON_MODE
               value: "receive"
             # "/tmp/configs/config-s3.yml"
             # "/tmp/configs/config-localfs.yml"

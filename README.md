@@ -21,29 +21,31 @@ integration with Kubernetes environments.
 
 ## Table of Contents
 
-- [About](#about)
-- [Usage](#usage)
-    - [Receive Mode](#receive-mode-quick-start)
+- [pgrwl](#pgrwl)
+  - [Table of Contents](#table-of-contents)
+  - [About](#about)
+  - [Usage](#usage)
+    - [Receive Mode Quick Start](#receive-mode-quick-start)
     - [Serve Mode](#serve-mode)
     - [Backup Mode](#backup-mode)
     - [Restore Command](#restore-command)
-- [Quick Start](examples)
-    - [Docker Compose (Basic Setup)](examples/docker-compose-quick-start/)
-    - [Docker Compose (Archive And Recovery)](examples/docker-compose-recovery-example/)
-    - [Kubernetes (all features: s3-storage, compression, encryption, retention, monitoring, etc...)](examples/k8s-quick-start/)
-- [Configuration Reference](#configuration-reference)
-- [Installation](#installation)
-    - [Docker Images](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
-    - [Binaries](#manual-installation)
-    - [Packages](#package-based-installation-suitable-in-cicd)
+  - [Configuration Reference](#configuration-reference)
+  - [Installation](#installation)
+    - [Docker images are available at quay.io/hashmap\_kz/pgrwl](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
+    - [Manual Installation](#manual-installation)
+    - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_:](#installation-script-for-unix-based-os-requires-tar-curl-jq)
+    - [Package-Based installation (suitable in CI/CD)](#package-based-installation-suitable-in-cicd)
+      - [Debian](#debian)
+      - [Apline Linux](#apline-linux)
     - [Helm Chart](#helm-chart)
-- [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
-- [Architecture](#architecture)
+  - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
+  - [Architecture](#architecture)
     - [Design Notes](#design-notes)
-    - [Durability & `fsync`](#durability--fsync)
-    - [Why Not archive_command `archive_command`?](#why-not-archive_command)
-- [Contributing](#contributing)
-- [License](#license)
+    - [Durability \& `fsync`](#durability--fsync)
+    - [Why Not `archive_command`?](#why-not-archive_command)
+  - [Contributing](#contributing)
+    - [Links](#links)
+  - [License](#license)
 
 ---
 
@@ -146,8 +148,8 @@ export PGHOST=localhost
 export PGPORT=15432
 export PGUSER=postgres
 export PGPASSWORD=postgres
-export PGRWL_MODE=receive
-go run main.go start -c config.yml
+export PGRWL_DAEMON_MODE=receive
+go run main.go daemon -c config.yml
 ```
 
 ### Serve Mode
@@ -165,9 +167,9 @@ log:
   add_source: true
 EOF
 
-export PGRWL_MODE=serve
+export PGRWL_DAEMON_MODE=serve
 
-pgrwl start -c config.yml
+pgrwl daemon -c config.yml
 ```
 
 ### Backup Mode
@@ -195,9 +197,9 @@ export PGHOST=localhost
 export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
-export PGRWL_MODE=backup
+export PGRWL_DAEMON_MODE=backup
 
-pgrwl start -c config.yml
+pgrwl daemon -c config.yml
 ```
 
 ### Restore Command
@@ -219,8 +221,8 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 The configuration file is in JSON or YML format (\*.json is preferred).
 It supports environment variable placeholders like `${PGRWL_SECRET_ACCESS_KEY}`.
 
-You may either use `pgrwl start -c config.yml -m receive` or provide the corresponding environment variables and run
-`pgrwl start`.
+You may either use `pgrwl daemon -c config.yml -m receive` or provide the corresponding environment variables and run
+`pgrwl daemon`.
 
 ```
 main:                                    # Required for both modes: receive/serve
@@ -289,6 +291,7 @@ storage:                                 # Optional
 Corresponding env-vars.
 
 ```
+PGRWL_DAEMON_MODE                        # receive/serve/backup
 PGRWL_MAIN_LISTEN_PORT                   # HTTP server port (used for management)
 PGRWL_MAIN_DIRECTORY                     # Base directory for storing WAL files
 PGRWL_RECEIVER_SLOT                      # Replication slot to use

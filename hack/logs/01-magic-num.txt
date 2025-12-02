@@ -1,0 +1,1054 @@
+2025-12-01T11:09:58.2566612Z Current runner version: '2.329.0'
+2025-12-01T11:09:58.2593073Z ##[group]Runner Image Provisioner
+2025-12-01T11:09:58.2593810Z Hosted Compute Agent
+2025-12-01T11:09:58.2594340Z Version: 20251016.436
+2025-12-01T11:09:58.2595034Z Commit: 8ab8ac8bfd662a3739dab9fe09456aba92132568
+2025-12-01T11:09:58.2595729Z Build Date: 2025-10-15T20:44:12Z
+2025-12-01T11:09:58.2596300Z ##[endgroup]
+2025-12-01T11:09:58.2596857Z ##[group]Operating System
+2025-12-01T11:09:58.2597424Z Ubuntu
+2025-12-01T11:09:58.2597870Z 24.04.3
+2025-12-01T11:09:58.2598378Z LTS
+2025-12-01T11:09:58.2598838Z ##[endgroup]
+2025-12-01T11:09:58.2599334Z ##[group]Runner Image
+2025-12-01T11:09:58.2599942Z Image: ubuntu-24.04
+2025-12-01T11:09:58.2600422Z Version: 20251112.124.1
+2025-12-01T11:09:58.2601762Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20251112.124/images/ubuntu/Ubuntu2404-Readme.md
+2025-12-01T11:09:58.2603395Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20251112.124
+2025-12-01T11:09:58.2604357Z ##[endgroup]
+2025-12-01T11:09:58.2607703Z ##[group]GITHUB_TOKEN Permissions
+2025-12-01T11:09:58.2610388Z Actions: write
+2025-12-01T11:09:58.2611550Z ArtifactMetadata: write
+2025-12-01T11:09:58.2612485Z Attestations: write
+2025-12-01T11:09:58.2613227Z Checks: write
+2025-12-01T11:09:58.2614047Z Contents: write
+2025-12-01T11:09:58.2614787Z Deployments: write
+2025-12-01T11:09:58.2615602Z Discussions: write
+2025-12-01T11:09:58.2616309Z Issues: write
+2025-12-01T11:09:58.2617193Z Metadata: read
+2025-12-01T11:09:58.2617938Z Models: read
+2025-12-01T11:09:58.2618789Z Packages: write
+2025-12-01T11:09:58.2619721Z Pages: write
+2025-12-01T11:09:58.2620498Z PullRequests: write
+2025-12-01T11:09:58.2621585Z RepositoryProjects: write
+2025-12-01T11:09:58.2622793Z SecurityEvents: write
+2025-12-01T11:09:58.2623712Z Statuses: write
+2025-12-01T11:09:58.2624578Z ##[endgroup]
+2025-12-01T11:09:58.2628112Z Secret source: Actions
+2025-12-01T11:09:58.2629796Z Prepare workflow directory
+2025-12-01T11:09:58.3405320Z Prepare all required actions
+2025-12-01T11:09:58.3461614Z Getting action download info
+2025-12-01T11:09:58.6437840Z Download action repository 'actions/checkout@v6' (SHA:1af3b93b6815bc44a9784bd300feb67ff0d1eeb3)
+2025-12-01T11:09:58.9606818Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2025-12-01T11:09:59.1263694Z Complete job name: 18-pg_001_fundamental
+2025-12-01T11:09:59.1907492Z ##[group]Run actions/checkout@v6
+2025-12-01T11:09:59.1908400Z with:
+2025-12-01T11:09:59.1908838Z   repository: hashmap-kz/pgrwl
+2025-12-01T11:09:59.1909567Z   token: ***
+2025-12-01T11:09:59.1909976Z   ssh-strict: true
+2025-12-01T11:09:59.1910404Z   ssh-user: git
+2025-12-01T11:09:59.1910935Z   persist-credentials: true
+2025-12-01T11:09:59.1911637Z   clean: true
+2025-12-01T11:09:59.1912079Z   sparse-checkout-cone-mode: true
+2025-12-01T11:09:59.1912609Z   fetch-depth: 1
+2025-12-01T11:09:59.1913041Z   fetch-tags: false
+2025-12-01T11:09:59.1913505Z   show-progress: true
+2025-12-01T11:09:59.1913978Z   lfs: false
+2025-12-01T11:09:59.1914389Z   submodules: false
+2025-12-01T11:09:59.1914834Z   set-safe-directory: true
+2025-12-01T11:09:59.1915579Z env:
+2025-12-01T11:09:59.1916003Z   CACHE_FOLDER: docker-cache
+2025-12-01T11:09:59.1916591Z   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+2025-12-01T11:09:59.1917375Z   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+2025-12-01T11:09:59.1918243Z   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+2025-12-01T11:09:59.1919020Z   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+2025-12-01T11:09:59.1919759Z   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+2025-12-01T11:09:59.1920534Z   COMPOSE_FILE: test/integration/environ/docker-compose.yml
+2025-12-01T11:09:59.1921324Z   PG_MAJOR: 18
+2025-12-01T11:09:59.1921756Z   TEST_NAME: pg_001_fundamental
+2025-12-01T11:09:59.1922414Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
+2025-12-01T11:09:59.1923202Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
+2025-12-01T11:09:59.1924101Z ##[endgroup]
+2025-12-01T11:09:59.2955495Z Syncing repository: hashmap-kz/pgrwl
+2025-12-01T11:09:59.2957673Z ##[group]Getting Git version info
+2025-12-01T11:09:59.2958556Z Working directory is '/home/runner/work/pgrwl/pgrwl'
+2025-12-01T11:09:59.2959861Z [command]/usr/bin/git version
+2025-12-01T11:09:59.3010750Z git version 2.51.2
+2025-12-01T11:09:59.3034215Z ##[endgroup]
+2025-12-01T11:09:59.3050807Z Temporarily overriding HOME='/home/runner/work/_temp/e0cb5e8a-0d03-45a6-b310-5e5b0a22a150' before making global git config changes
+2025-12-01T11:09:59.3053700Z Adding repository directory to the temporary git global config as a safe directory
+2025-12-01T11:09:59.3057572Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/pgrwl/pgrwl
+2025-12-01T11:09:59.3098559Z Deleting the contents of '/home/runner/work/pgrwl/pgrwl'
+2025-12-01T11:09:59.3100837Z ##[group]Initializing the repository
+2025-12-01T11:09:59.3109368Z [command]/usr/bin/git init /home/runner/work/pgrwl/pgrwl
+2025-12-01T11:09:59.3220608Z hint: Using 'master' as the name for the initial branch. This default branch name
+2025-12-01T11:09:59.3222973Z hint: is subject to change. To configure the initial branch name to use in all
+2025-12-01T11:09:59.3224672Z hint: of your new repositories, which will suppress this warning, call:
+2025-12-01T11:09:59.3225886Z hint:
+2025-12-01T11:09:59.3226847Z hint: 	git config --global init.defaultBranch <name>
+2025-12-01T11:09:59.3228185Z hint:
+2025-12-01T11:09:59.3229347Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2025-12-01T11:09:59.3231770Z hint: 'development'. The just-created branch can be renamed via this command:
+2025-12-01T11:09:59.3233727Z hint:
+2025-12-01T11:09:59.3234478Z hint: 	git branch -m <name>
+2025-12-01T11:09:59.3235346Z hint:
+2025-12-01T11:09:59.3236484Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2025-12-01T11:09:59.3238431Z Initialized empty Git repository in /home/runner/work/pgrwl/pgrwl/.git/
+2025-12-01T11:09:59.3242022Z [command]/usr/bin/git remote add origin https://github.com/hashmap-kz/pgrwl
+2025-12-01T11:09:59.3283258Z ##[endgroup]
+2025-12-01T11:09:59.3284685Z ##[group]Disabling automatic garbage collection
+2025-12-01T11:09:59.3287719Z [command]/usr/bin/git config --local gc.auto 0
+2025-12-01T11:09:59.3318247Z ##[endgroup]
+2025-12-01T11:09:59.3320240Z ##[group]Setting up auth
+2025-12-01T11:09:59.3321546Z Removing SSH command configuration
+2025-12-01T11:09:59.3327025Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-12-01T11:09:59.3362875Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-12-01T11:09:59.3714520Z Removing HTTP extra header
+2025-12-01T11:09:59.3720002Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-12-01T11:09:59.3752817Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-12-01T11:09:59.3972429Z Removing includeIf entries pointing to credentials config files
+2025-12-01T11:09:59.3978933Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2025-12-01T11:09:59.4011996Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2025-12-01T11:09:59.4238514Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2025-12-01T11:09:59.4276903Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/pgrwl/pgrwl/.git.path /home/runner/work/_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config
+2025-12-01T11:09:59.4306897Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config
+2025-12-01T11:09:59.4332551Z ##[endgroup]
+2025-12-01T11:09:59.4333491Z ##[group]Fetching the repository
+2025-12-01T11:09:59.4342139Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c308e8a95d45218b5102884a8812f62a0f98270c:refs/remotes/pull/169/merge
+2025-12-01T11:09:59.6445506Z From https://github.com/hashmap-kz/pgrwl
+2025-12-01T11:09:59.6446960Z  * [new ref]         c308e8a95d45218b5102884a8812f62a0f98270c -> pull/169/merge
+2025-12-01T11:09:59.6478209Z ##[endgroup]
+2025-12-01T11:09:59.6480160Z ##[group]Determining the checkout info
+2025-12-01T11:09:59.6482764Z ##[endgroup]
+2025-12-01T11:09:59.6487312Z [command]/usr/bin/git sparse-checkout disable
+2025-12-01T11:09:59.6537478Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2025-12-01T11:09:59.6567988Z ##[group]Checking out the ref
+2025-12-01T11:09:59.6572179Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/169/merge
+2025-12-01T11:09:59.6740501Z Note: switching to 'refs/remotes/pull/169/merge'.
+2025-12-01T11:09:59.6741481Z 
+2025-12-01T11:09:59.6742117Z You are in 'detached HEAD' state. You can look around, make experimental
+2025-12-01T11:09:59.6743690Z changes and commit them, and you can discard any commits you make in this
+2025-12-01T11:09:59.6745904Z state without impacting any branches by switching back to a branch.
+2025-12-01T11:09:59.6747514Z 
+2025-12-01T11:09:59.6748549Z If you want to create a new branch to retain commits you create, you may
+2025-12-01T11:09:59.6751323Z do so (now or later) by using -c with the switch command. Example:
+2025-12-01T11:09:59.6752760Z 
+2025-12-01T11:09:59.6753347Z   git switch -c <new-branch-name>
+2025-12-01T11:09:59.6754385Z 
+2025-12-01T11:09:59.6754980Z Or undo this operation with:
+2025-12-01T11:09:59.6756019Z 
+2025-12-01T11:09:59.6756503Z   git switch -
+2025-12-01T11:09:59.6757218Z 
+2025-12-01T11:09:59.6758309Z Turn off this advice by setting config variable advice.detachedHead to false
+2025-12-01T11:09:59.6760108Z 
+2025-12-01T11:09:59.6762347Z HEAD is now at c308e8a Merge ac9a0f735b9657438916c646f80f531369ba69e2 into 61da19b7bc66e6bdd5fb82f9a59a9def929f3dce
+2025-12-01T11:09:59.6766789Z ##[endgroup]
+2025-12-01T11:09:59.6790071Z [command]/usr/bin/git log -1 --format=%H
+2025-12-01T11:09:59.6812863Z c308e8a95d45218b5102884a8812f62a0f98270c
+2025-12-01T11:09:59.7950938Z ##[group]Run KEY="docker-images-pg18-d4fa8a0d9d88fec8b649bb738ffdfa1bd2705a659120939f1cbe41f78701fa4d"
+2025-12-01T11:09:59.7954847Z [36;1mKEY="docker-images-pg18-d4fa8a0d9d88fec8b649bb738ffdfa1bd2705a659120939f1cbe41f78701fa4d"[0m
+2025-12-01T11:09:59.7957273Z [36;1mecho "value=${KEY}" >> "$GITHUB_OUTPUT"[0m
+2025-12-01T11:09:59.7995661Z shell: /usr/bin/bash -e {0}
+2025-12-01T11:09:59.7996725Z env:
+2025-12-01T11:09:59.7997552Z   CACHE_FOLDER: docker-cache
+2025-12-01T11:09:59.7998839Z   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+2025-12-01T11:09:59.8000614Z   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+2025-12-01T11:09:59.8002797Z   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+2025-12-01T11:09:59.8004560Z   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+2025-12-01T11:09:59.8006251Z   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+2025-12-01T11:09:59.8008052Z   COMPOSE_FILE: test/integration/environ/docker-compose.yml
+2025-12-01T11:09:59.8009464Z   PG_MAJOR: 18
+2025-12-01T11:09:59.8010340Z   TEST_NAME: pg_001_fundamental
+2025-12-01T11:09:59.8011964Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
+2025-12-01T11:09:59.8013685Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
+2025-12-01T11:09:59.8014995Z ##[endgroup]
+2025-12-01T11:09:59.8263712Z ##[group]Run actions/cache@v4
+2025-12-01T11:09:59.8264764Z with:
+2025-12-01T11:09:59.8267369Z   path: docker-cache/docker_pg_primary.tgz
+docker-cache/docker_pg_standby.tgz
+docker-cache/docker_sshd.tgz
+docker-cache/docker_minio.tgz
+docker-cache/docker_minio_mc.tgz
+
+2025-12-01T11:09:59.8271533Z   key: docker-images-pg18-d4fa8a0d9d88fec8b649bb738ffdfa1bd2705a659120939f1cbe41f78701fa4d
+2025-12-01T11:09:59.8273491Z   enableCrossOsArchive: false
+2025-12-01T11:09:59.8274504Z   fail-on-cache-miss: false
+2025-12-01T11:09:59.8275472Z   lookup-only: false
+2025-12-01T11:09:59.8276319Z   save-always: false
+2025-12-01T11:09:59.8277143Z env:
+2025-12-01T11:09:59.8277887Z   CACHE_FOLDER: docker-cache
+2025-12-01T11:09:59.8279045Z   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+2025-12-01T11:09:59.8280651Z   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+2025-12-01T11:09:59.8282718Z   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+2025-12-01T11:09:59.8284390Z   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+2025-12-01T11:09:59.8285944Z   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+2025-12-01T11:09:59.8287556Z   COMPOSE_FILE: test/integration/environ/docker-compose.yml
+2025-12-01T11:09:59.8288866Z   PG_MAJOR: 18
+2025-12-01T11:09:59.8289692Z   TEST_NAME: pg_001_fundamental
+2025-12-01T11:09:59.8291206Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
+2025-12-01T11:09:59.8292860Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
+2025-12-01T11:09:59.8294081Z ##[endgroup]
+2025-12-01T11:10:00.0517985Z Cache hit for: docker-images-pg18-d4fa8a0d9d88fec8b649bb738ffdfa1bd2705a659120939f1cbe41f78701fa4d
+2025-12-01T11:10:01.1100360Z Received 230686720 of 342263343 (67.4%), 218.9 MBs/sec
+2025-12-01T11:10:01.6712087Z Received 342263343 of 342263343 (100.0%), 208.4 MBs/sec
+2025-12-01T11:10:01.6715781Z Cache Size: ~326 MB (342263343 B)
+2025-12-01T11:10:01.6837955Z [command]/usr/bin/tar -xf /home/runner/work/_temp/372f5ba8-bd63-425e-a4f9-b434b9de65d3/cache.tzst -P -C /home/runner/work/pgrwl/pgrwl --use-compress-program unzstd
+2025-12-01T11:10:02.1798581Z Cache restored successfully
+2025-12-01T11:10:02.2547705Z Cache restored from key: docker-images-pg18-d4fa8a0d9d88fec8b649bb738ffdfa1bd2705a659120939f1cbe41f78701fa4d
+2025-12-01T11:10:02.2702778Z ##[group]Run set -euo pipefail
+2025-12-01T11:10:02.2703161Z [36;1mset -euo pipefail[0m
+2025-12-01T11:10:02.2703432Z [36;1m[0m
+2025-12-01T11:10:02.2703676Z [36;1mls -lah "docker-cache" || true[0m
+2025-12-01T11:10:02.2703965Z [36;1m[0m
+2025-12-01T11:10:02.2704186Z [36;1mprintf '%s\n' \[0m
+2025-12-01T11:10:02.2704479Z [36;1m  "${CACHE_FILE_DOCKER_PG_PRIMARY}" \[0m
+2025-12-01T11:10:02.2704810Z [36;1m  "${CACHE_FILE_DOCKER_PG_STANDBY}" \[0m
+2025-12-01T11:10:02.2705156Z [36;1m  "${CACHE_FILE_DOCKER_SSHD}" \[0m
+2025-12-01T11:10:02.2705486Z [36;1m  "${CACHE_FILE_DOCKER_MINIO}" \[0m
+2025-12-01T11:10:02.2705807Z [36;1m  "${CACHE_FILE_DOCKER_MINIO_MC}" \[0m
+2025-12-01T11:10:02.2706125Z [36;1m| xargs -n1 -P4 bash -c '[0m
+2025-12-01T11:10:02.2706425Z [36;1m  set -euo pipefail[0m
+2025-12-01T11:10:02.2706691Z [36;1m  f="$0"[0m
+2025-12-01T11:10:02.2706962Z [36;1m  [ -f "$f" ] || { echo "Skip missing $f"; exit 0; }[0m
+2025-12-01T11:10:02.2707363Z [36;1m  echo "Loading image from $f ..."[0m
+2025-12-01T11:10:02.2707680Z [36;1m  gunzip -c "$f" | docker load[0m
+2025-12-01T11:10:02.2707963Z [36;1m'[0m
+2025-12-01T11:10:02.2708179Z [36;1m[0m
+2025-12-01T11:10:02.2708410Z [36;1mecho "=== Images after load ==="[0m
+2025-12-01T11:10:02.2708712Z [36;1mdocker images || true[0m
+2025-12-01T11:10:02.2742696Z shell: /usr/bin/bash -e {0}
+2025-12-01T11:10:02.2743021Z env:
+2025-12-01T11:10:02.2743278Z   CACHE_FOLDER: docker-cache
+2025-12-01T11:10:02.2743636Z   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+2025-12-01T11:10:02.2744057Z   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+2025-12-01T11:10:02.2744495Z   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+2025-12-01T11:10:02.2744902Z   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+2025-12-01T11:10:02.2745306Z   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+2025-12-01T11:10:02.2745931Z   COMPOSE_FILE: test/integration/environ/docker-compose.yml
+2025-12-01T11:10:02.2746273Z   PG_MAJOR: 18
+2025-12-01T11:10:02.2746515Z   TEST_NAME: pg_001_fundamental
+2025-12-01T11:10:02.2746881Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
+2025-12-01T11:10:02.2747298Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
+2025-12-01T11:10:02.2747618Z ##[endgroup]
+2025-12-01T11:10:02.2813162Z total 328M
+2025-12-01T11:10:02.2813647Z drwxr-xr-x  2 runner runner 4.0K Dec  1 11:10 .
+2025-12-01T11:10:02.2814270Z drwxr-xr-x 14 runner runner 4.0K Dec  1 11:10 ..
+2025-12-01T11:10:02.2814961Z -rw-r--r--  1 runner runner  59M Dec  1 10:46 docker_minio.tgz
+2025-12-01T11:10:02.2815708Z -rw-r--r--  1 runner runner  28M Dec  1 10:46 docker_minio_mc.tgz
+2025-12-01T11:10:02.2816512Z -rw-r--r--  1 runner runner 116M Dec  1 10:46 docker_pg_primary.tgz
+2025-12-01T11:10:02.2817279Z -rw-r--r--  1 runner runner 104M Dec  1 10:46 docker_pg_standby.tgz
+2025-12-01T11:10:02.2817919Z -rw-r--r--  1 runner runner  24M Dec  1 10:45 docker_sshd.tgz
+2025-12-01T11:10:02.2853305Z Loading image from docker-cache/docker_pg_primary.tgz ...
+2025-12-01T11:10:02.2854091Z Loading image from docker-cache/docker_pg_standby.tgz ...
+2025-12-01T11:10:02.2854799Z Loading image from docker-cache/docker_sshd.tgz ...
+2025-12-01T11:10:02.2862082Z Loading image from docker-cache/docker_minio.tgz ...
+2025-12-01T11:10:08.3135671Z Loaded image: pgrwl/sshd:latest
+2025-12-01T11:10:08.3344493Z Loading image from docker-cache/docker_minio_mc.tgz ...
+2025-12-01T11:10:09.7934353Z Loaded image: pgrwl/minio:latest
+2025-12-01T11:10:10.0236490Z Loaded image: pgrwl/minio-mc:latest
+2025-12-01T11:10:10.8403867Z Loaded image: pgrwl/pg-standby-18:latest
+2025-12-01T11:10:11.7855994Z Loaded image: pgrwl/pg-primary-18:latest
+2025-12-01T11:10:11.8477662Z === Images after load ===
+2025-12-01T11:10:11.8648689Z REPOSITORY            TAG       IMAGE ID       CREATED          SIZE
+2025-12-01T11:10:11.8649406Z pgrwl/pg-primary-18   latest    21413bfe8e4e   24 minutes ago   345MB
+2025-12-01T11:10:11.8650747Z pgrwl/sshd            latest    eed47af0b88c   24 minutes ago   63.7MB
+2025-12-01T11:10:11.8651708Z pgrwl/pg-standby-18   latest    4e42f37cbc78   2 weeks ago      280MB
+2025-12-01T11:10:11.8652406Z pgrwl/minio           latest    69b2ec208575   2 months ago     175MB
+2025-12-01T11:10:11.8653088Z pgrwl/minio-mc        latest    c2ad77420d33   2 months ago     84.9MB
+2025-12-01T11:10:11.8700858Z ##[group]Run set -euo pipefail
+2025-12-01T11:10:11.8701557Z [36;1mset -euo pipefail[0m
+2025-12-01T11:10:11.8701799Z [36;1m[0m
+2025-12-01T11:10:11.8702115Z [36;1mecho "Running integration test '${TEST_NAME}' against PostgreSQL ${PG_MAJOR}"[0m
+2025-12-01T11:10:11.8702508Z [36;1mdocker images || true[0m
+2025-12-01T11:10:11.8702732Z [36;1m[0m
+2025-12-01T11:10:11.8703017Z [36;1m# Each matrix job runs on its own runner, so services won't clash.[0m
+2025-12-01T11:10:11.8703447Z [36;1m# We pass only the single test service to 'up', and use its exit code.[0m
+2025-12-01T11:10:11.8703849Z [36;1mdocker compose -f "${COMPOSE_FILE_PAR}" \[0m
+2025-12-01T11:10:11.8704142Z [36;1m  up \[0m
+2025-12-01T11:10:11.8704368Z [36;1m    --exit-code-from "${TEST_NAME}" \[0m
+2025-12-01T11:10:11.8704639Z [36;1m    "${TEST_NAME}"[0m
+2025-12-01T11:10:11.8736753Z shell: /usr/bin/bash -e {0}
+2025-12-01T11:10:11.8736992Z env:
+2025-12-01T11:10:11.8737208Z   CACHE_FOLDER: docker-cache
+2025-12-01T11:10:11.8737531Z   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+2025-12-01T11:10:11.8737919Z   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+2025-12-01T11:10:11.8738342Z   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+2025-12-01T11:10:11.8738720Z   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+2025-12-01T11:10:11.8739083Z   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+2025-12-01T11:10:11.8739454Z   COMPOSE_FILE: test/integration/environ/docker-compose.yml
+2025-12-01T11:10:11.8739766Z   PG_MAJOR: 18
+2025-12-01T11:10:11.8739978Z   TEST_NAME: pg_001_fundamental
+2025-12-01T11:10:11.8740483Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
+2025-12-01T11:10:11.8740871Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
+2025-12-01T11:10:11.8741306Z ##[endgroup]
+2025-12-01T11:10:11.8790913Z Running integration test 'pg_001_fundamental' against PostgreSQL 18
+2025-12-01T11:10:11.8913435Z REPOSITORY            TAG       IMAGE ID       CREATED          SIZE
+2025-12-01T11:10:11.8914004Z pgrwl/pg-primary-18   latest    21413bfe8e4e   24 minutes ago   345MB
+2025-12-01T11:10:11.8915582Z pgrwl/sshd            latest    eed47af0b88c   24 minutes ago   63.7MB
+2025-12-01T11:10:11.8916283Z pgrwl/pg-standby-18   latest    4e42f37cbc78   2 weeks ago      280MB
+2025-12-01T11:10:11.8916694Z pgrwl/minio           latest    69b2ec208575   2 months ago     175MB
+2025-12-01T11:10:11.8917072Z pgrwl/minio-mc        latest    c2ad77420d33   2 months ago     84.9MB
+2025-12-01T11:10:12.1280801Z  Network pgrwl_pg18_pg_001_fundamental_default  Creating
+2025-12-01T11:10:12.1701350Z  Network pgrwl_pg18_pg_001_fundamental_default  Created
+2025-12-01T11:10:12.1744518Z  Volume "pgrwl_pg18_pg_001_fundamental_minio_data"  Creating
+2025-12-01T11:10:12.1759280Z  Volume "pgrwl_pg18_pg_001_fundamental_minio_data"  Created
+2025-12-01T11:10:12.1765126Z  Container pgrwl_minio  Creating
+2025-12-01T11:10:12.1765801Z  Container pgrwl_sshd  Creating
+2025-12-01T11:10:12.2041194Z  Container pgrwl_minio  Created
+2025-12-01T11:10:12.2041707Z  Container pgrwl_sshd  Created
+2025-12-01T11:10:12.2043451Z  Container pg_001_fundamental  Creating
+2025-12-01T11:10:12.2148712Z  Container pg_001_fundamental  Created
+2025-12-01T11:10:12.2156843Z Attaching to pg_001_fundamental
+2025-12-01T11:10:15.0373880Z pg_001_fundamental  | 
+2025-12-01T11:10:15.0374734Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:15.0375351Z pg_001_fundamental  | ### init and run a cluster
+2025-12-01T11:10:15.0375929Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:15.0376384Z pg_001_fundamental  | 
+2025-12-01T11:10:15.0577855Z pg_001_fundamental  | The files belonging to this database system will be owned by user "postgres".
+2025-12-01T11:10:15.0580940Z pg_001_fundamental  | This user must also own the server process.
+2025-12-01T11:10:15.0581834Z pg_001_fundamental  | 
+2025-12-01T11:10:15.0582769Z pg_001_fundamental  | The database cluster will be initialized with locale "C".
+2025-12-01T11:10:15.0584428Z pg_001_fundamental  | The default database encoding has accordingly been set to "SQL_ASCII".
+2025-12-01T11:10:15.0585513Z pg_001_fundamental  | The default text search configuration will be set to "english".
+2025-12-01T11:10:15.0586188Z pg_001_fundamental  | 
+2025-12-01T11:10:15.0586653Z pg_001_fundamental  | Data page checksums are enabled.
+2025-12-01T11:10:15.0587172Z pg_001_fundamental  | 
+2025-12-01T11:10:15.0587745Z pg_001_fundamental  | creating directory /var/lib/postgresql/18/main/pgdata ... ok
+2025-12-01T11:10:15.0592537Z pg_001_fundamental  | creating subdirectories ... ok
+2025-12-01T11:10:15.0595665Z pg_001_fundamental  | selecting dynamic shared memory implementation ... posix
+2025-12-01T11:10:15.0760326Z pg_001_fundamental  | selecting default "max_connections" ... 100
+2025-12-01T11:10:15.0990014Z pg_001_fundamental  | selecting default "shared_buffers" ... 128MB
+2025-12-01T11:10:15.0990830Z pg_001_fundamental  | selecting default time zone ... Asia/Aqtau
+2025-12-01T11:10:15.1000915Z pg_001_fundamental  | creating configuration files ... ok
+2025-12-01T11:10:15.2448697Z pg_001_fundamental  | running bootstrap script ... ok
+2025-12-01T11:10:15.6014280Z pg_001_fundamental  | performing post-bootstrap initialization ... ok
+2025-12-01T11:10:15.9262213Z pg_001_fundamental  | initdb: warning: enabling "trust" authentication for local connections
+2025-12-01T11:10:15.9263003Z pg_001_fundamental  | syncing data to disk ... ok
+2025-12-01T11:10:15.9264075Z pg_001_fundamental  | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2025-12-01T11:10:15.9265366Z pg_001_fundamental  | 
+2025-12-01T11:10:15.9265703Z pg_001_fundamental  | 
+2025-12-01T11:10:15.9266239Z pg_001_fundamental  | Success. You can now start the database server using:
+2025-12-01T11:10:15.9266842Z pg_001_fundamental  | 
+2025-12-01T11:10:15.9267548Z pg_001_fundamental  |     /usr/lib/postgresql/18/bin/pg_ctl -D /var/lib/postgresql/18/main/pgdata -l logfile start
+2025-12-01T11:10:15.9268292Z pg_001_fundamental  | 
+2025-12-01T11:10:16.0417516Z pg_001_fundamental  | waiting for server to start.... done
+2025-12-01T11:10:16.0418223Z pg_001_fundamental  | server started
+2025-12-01T11:10:16.0640897Z pg_001_fundamental  |  pg_drop_replication_slot 
+2025-12-01T11:10:16.0641611Z pg_001_fundamental  | --------------------------
+2025-12-01T11:10:16.0642052Z pg_001_fundamental  | (0 rows)
+2025-12-01T11:10:16.0642400Z pg_001_fundamental  | 
+2025-12-01T11:10:16.0721999Z pg_001_fundamental  |  pg_switch_wal 
+2025-12-01T11:10:16.0722544Z pg_001_fundamental  | ---------------
+2025-12-01T11:10:16.0722829Z pg_001_fundamental  |  0/1756C10
+2025-12-01T11:10:16.0723082Z pg_001_fundamental  | (1 row)
+2025-12-01T11:10:16.0723326Z pg_001_fundamental  | 
+2025-12-01T11:10:16.0744140Z pg_001_fundamental  |  slot_name |    lsn    
+2025-12-01T11:10:16.0744707Z pg_001_fundamental  | -----------+-----------
+2025-12-01T11:10:16.0745230Z pg_001_fundamental  |  pgrwl_v5  | 0/1756B80
+2025-12-01T11:10:16.0745728Z pg_001_fundamental  | (1 row)
+2025-12-01T11:10:16.0746154Z pg_001_fundamental  | 
+2025-12-01T11:10:16.0748610Z pg_001_fundamental  |  pg_drop_replication_slot 
+2025-12-01T11:10:16.0749213Z pg_001_fundamental  | --------------------------
+2025-12-01T11:10:16.0749718Z pg_001_fundamental  | (0 rows)
+2025-12-01T11:10:16.0750123Z pg_001_fundamental  | 
+2025-12-01T11:10:16.0750505Z pg_001_fundamental  |  pg_switch_wal 
+2025-12-01T11:10:16.0750917Z pg_001_fundamental  | ---------------
+2025-12-01T11:10:16.0751541Z pg_001_fundamental  |  0/2000000
+2025-12-01T11:10:16.0751944Z pg_001_fundamental  | (1 row)
+2025-12-01T11:10:16.0752235Z pg_001_fundamental  | 
+2025-12-01T11:10:16.0771463Z pg_001_fundamental  |    slot_name   |    lsn    
+2025-12-01T11:10:16.0772009Z pg_001_fundamental  | ---------------+-----------
+2025-12-01T11:10:16.0772553Z pg_001_fundamental  |  pg_receivewal | 0/1756B80
+2025-12-01T11:10:16.0773234Z pg_001_fundamental  | (1 row)
+2025-12-01T11:10:16.0773586Z pg_001_fundamental  | 
+2025-12-01T11:10:16.0960068Z pg_001_fundamental  | CHECKPOINT
+2025-12-01T11:10:16.1069499Z pg_001_fundamental  |  pg_switch_wal 
+2025-12-01T11:10:16.1070121Z pg_001_fundamental  | ---------------
+2025-12-01T11:10:16.1070557Z pg_001_fundamental  |  0/2000110
+2025-12-01T11:10:16.1070939Z pg_001_fundamental  | (1 row)
+2025-12-01T11:10:16.1071524Z pg_001_fundamental  | 
+2025-12-01T11:10:16.1081513Z pg_001_fundamental  | 
+2025-12-01T11:10:16.1082586Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:16.1083264Z pg_001_fundamental  | ### running wal-receivers
+2025-12-01T11:10:16.1083864Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:16.1084411Z pg_001_fundamental  | 
+2025-12-01T11:10:16.1086589Z pg_001_fundamental  | 
+2025-12-01T11:10:16.1100690Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:16.1103974Z pg_001_fundamental  | ### creating basebackup
+2025-12-01T11:10:16.1104562Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:16.1105114Z pg_001_fundamental  | 
+2025-12-01T11:10:16.1209984Z pg_001_fundamental  | pg_basebackup: initiating base backup, waiting for checkpoint to complete
+2025-12-01T11:10:16.1756086Z pg_001_fundamental  | pg_basebackup: checkpoint completed
+2025-12-01T11:10:16.2914580Z pg_001_fundamental  | 23579/23579 kB (100%), 0/1 tablespace (...asebackup/data/global/pg_control)
+2025-12-01T11:10:16.2918035Z pg_001_fundamental  | NOTICE:  WAL archiving is not enabled; you must ensure that all required WAL segments are copied through other means to complete the backup
+2025-12-01T11:10:16.2922584Z pg_001_fundamental  | 23579/23579 kB (100%), 1/1 tablespace                                         
+2025-12-01T11:10:16.2923865Z pg_001_fundamental  | pg_basebackup: syncing data to disk ...
+2025-12-01T11:10:16.6600521Z pg_001_fundamental  | pg_basebackup: renaming backup_manifest.tmp to backup_manifest
+2025-12-01T11:10:16.6604762Z pg_001_fundamental  | pg_basebackup: base backup completed
+2025-12-01T11:10:16.6635525Z pg_001_fundamental  | 
+2025-12-01T11:10:16.6636276Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:16.6636863Z pg_001_fundamental  | ### running pgbench
+2025-12-01T11:10:16.6637365Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:16.6637729Z pg_001_fundamental  | 
+2025-12-01T11:10:16.6710817Z pg_001_fundamental  | dropping old tables...
+2025-12-01T11:10:16.6716874Z pg_001_fundamental  | NOTICE:  table "pgbench_accounts" does not exist, skipping
+2025-12-01T11:10:16.6718019Z pg_001_fundamental  | NOTICE:  table "pgbench_branches" does not exist, skipping
+2025-12-01T11:10:16.6719950Z pg_001_fundamental  | NOTICE:  table "pgbench_history" does not exist, skipping
+2025-12-01T11:10:16.6720779Z pg_001_fundamental  | NOTICE:  table "pgbench_tellers" does not exist, skipping
+2025-12-01T11:10:16.6722631Z pg_001_fundamental  | creating tables...
+2025-12-01T11:10:16.6938965Z pg_001_fundamental  | generating data (client-side)...
+2025-12-01T11:10:16.7142286Z pg_001_fundamental  | 100000 of 1000000 tuples (10%) of pgbench_accounts done (elapsed 0.02 s, remaining 0.15 s)
+2025-12-01T11:10:16.7238783Z pg_001_fundamental  | 200000 of 1000000 tuples (20%) of pgbench_accounts done (elapsed 0.03 s, remaining 0.11 s)
+2025-12-01T11:10:16.7749498Z pg_001_fundamental  | 300000 of 1000000 tuples (30%) of pgbench_accounts done (elapsed 0.08 s, remaining 0.18 s)
+2025-12-01T11:10:16.8614798Z pg_001_fundamental  | 400000 of 1000000 tuples (40%) of pgbench_accounts done (elapsed 0.16 s, remaining 0.25 s)
+2025-12-01T11:10:16.9353665Z pg_001_fundamental  | 500000 of 1000000 tuples (50%) of pgbench_accounts done (elapsed 0.24 s, remaining 0.24 s)
+2025-12-01T11:10:17.0247029Z pg_001_fundamental  | 600000 of 1000000 tuples (60%) of pgbench_accounts done (elapsed 0.33 s, remaining 0.22 s)
+2025-12-01T11:10:17.1253631Z pg_001_fundamental  | 700000 of 1000000 tuples (70%) of pgbench_accounts done (elapsed 0.43 s, remaining 0.18 s)
+2025-12-01T11:10:17.2063259Z pg_001_fundamental  | 800000 of 1000000 tuples (80%) of pgbench_accounts done (elapsed 0.51 s, remaining 0.13 s)
+2025-12-01T11:10:17.2897193Z pg_001_fundamental  | 900000 of 1000000 tuples (90%) of pgbench_accounts done (elapsed 0.59 s, remaining 0.07 s)
+2025-12-01T11:10:17.4596385Z pg_001_fundamental  | 1000000 of 1000000 tuples (100%) of pgbench_accounts done (elapsed 0.76 s, remaining 0.00 s)
+2025-12-01T11:10:17.7500866Z pg_001_fundamental  | vacuuming...
+2025-12-01T11:10:17.8147304Z pg_001_fundamental  | creating primary keys...
+2025-12-01T11:10:18.0567410Z pg_001_fundamental  | done in 1.38 s (drop tables 0.00 s, create tables 0.02 s, client-side generate 1.06 s, vacuum 0.07 s, primary keys 0.24 s).
+2025-12-01T11:10:23.0567904Z pg_001_fundamental  | 
+2025-12-01T11:10:23.0569487Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:23.0570067Z pg_001_fundamental  | ### generate 512Mi of data
+2025-12-01T11:10:23.0570403Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:23.0570739Z pg_001_fundamental  | 
+2025-12-01T11:10:29.6571814Z pg_001_fundamental  | SELECT 524288
+2025-12-01T11:10:29.6603015Z pg_001_fundamental  | 
+2025-12-01T11:10:29.6604479Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:29.6606420Z pg_001_fundamental  | ### concurrently populate with 100 tables, 10K rows each
+2025-12-01T11:10:29.6607181Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:29.6607751Z pg_001_fundamental  | 
+2025-12-01T11:10:44.3589074Z pg_001_fundamental  | 
+2025-12-01T11:10:44.3589668Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.3590230Z pg_001_fundamental  | ### teardown
+2025-12-01T11:10:44.3590769Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.3591613Z pg_001_fundamental  | 
+2025-12-01T11:10:44.8179677Z pg_001_fundamental  | 
+2025-12-01T11:10:44.8180268Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.8180837Z pg_001_fundamental  | ### restoring backup
+2025-12-01T11:10:44.8181380Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.8181722Z pg_001_fundamental  | 
+2025-12-01T11:10:44.8324276Z pg_001_fundamental  | renamed '/tmp/wal-archive/000000010000000000000060.partial' -> '/tmp/wal-archive/000000010000000000000060'
+2025-12-01T11:10:44.8359588Z pg_001_fundamental  | renamed '/tmp/wal-archive-pg_receivewal/000000010000000000000060.partial' -> '/tmp/wal-archive-pg_receivewal/000000010000000000000060'
+2025-12-01T11:10:44.8390322Z pg_001_fundamental  | 
+2025-12-01T11:10:44.8390813Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.8391589Z pg_001_fundamental  | ### running wal fetcher
+2025-12-01T11:10:44.8392164Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.8392729Z pg_001_fundamental  | 
+2025-12-01T11:10:44.8395538Z pg_001_fundamental  | 
+2025-12-01T11:10:44.8396058Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.8396669Z pg_001_fundamental  | ### running cluster
+2025-12-01T11:10:44.8397219Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:44.8397749Z pg_001_fundamental  | 
+2025-12-01T11:10:45.0520291Z pg_001_fundamental  | waiting for server to start.... done
+2025-12-01T11:10:45.0521419Z pg_001_fundamental  | server started
+2025-12-01T11:10:45.0757693Z pg_001_fundamental  | 2025-12-01 16:10:45 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:46.0902635Z pg_001_fundamental  | 2025-12-01 16:10:46 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:47.1028209Z pg_001_fundamental  | 2025-12-01 16:10:47 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:48.1183737Z pg_001_fundamental  | 2025-12-01 16:10:48 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:49.1330109Z pg_001_fundamental  | 2025-12-01 16:10:49 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:50.1482355Z pg_001_fundamental  | 2025-12-01 16:10:50 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:51.1598188Z pg_001_fundamental  | 2025-12-01 16:10:51 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:52.1707807Z pg_001_fundamental  | 2025-12-01 16:10:52 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:53.1816981Z pg_001_fundamental  | 2025-12-01 16:10:53 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:10:54.1931835Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-1]  LOG:  redirecting log output to logging collector process
+2025-12-01T11:10:54.1932935Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-2]  HINT:  Future log output will appear in directory "/var/log/postgresql".
+2025-12-01T11:10:54.1934402Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-3]  LOG:  starting PostgreSQL 18.1 (Debian 18.1-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2025-12-01T11:10:54.1936078Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-4]  LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2025-12-01T11:10:54.1941886Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-5]  LOG:  listening on IPv6 address "::", port 5432
+2025-12-01T11:10:54.1942540Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-6]  LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2025-12-01T11:10:54.1943183Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-1]  LOG:  database system was interrupted; last known up at 2025-12-01 16:10:16 +05
+2025-12-01T11:10:54.1943713Z pg_001_fundamental  | 2025/12/01 16:10:44 server error: 404 Not Found
+2025-12-01T11:10:54.1944291Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-2]  LOG:  starting backup recovery with redo LSN 0/3000028, checkpoint LSN 0/3000080, on timeline ID 1
+2025-12-01T11:10:54.1944950Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-3]  LOG:  restored log file "000000010000000000000003" from archive
+2025-12-01T11:10:54.1945446Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-4]  LOG:  starting archive recovery
+2025-12-01T11:10:54.1945887Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-5]  LOG:  redo starts at 0/3000028
+2025-12-01T11:10:54.1946369Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-6]  LOG:  restored log file "000000010000000000000004" from archive
+2025-12-01T11:10:54.1946963Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-7]  LOG:  completed backup recovery with redo LSN 0/3000028 and end LSN 0/3000120
+2025-12-01T11:10:54.1947533Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-8]  LOG:  consistent recovery state reached at 0/3000120
+2025-12-01T11:10:54.1948072Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-7]  LOG:  database system is ready to accept read-only connections
+2025-12-01T11:10:54.1948620Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-9]  LOG:  restored log file "000000010000000000000005" from archive
+2025-12-01T11:10:54.1949173Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-10]  LOG:  restored log file "000000010000000000000006" from archive
+2025-12-01T11:10:54.1949715Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-11]  LOG:  restored log file "000000010000000000000007" from archive
+2025-12-01T11:10:54.1950470Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-12]  LOG:  restored log file "000000010000000000000008" from archive
+2025-12-01T11:10:54.1951201Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-13]  LOG:  restored log file "000000010000000000000009" from archive
+2025-12-01T11:10:54.1951776Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-14]  LOG:  restored log file "00000001000000000000000A" from archive
+2025-12-01T11:10:54.1952299Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-15]  LOG:  restored log file "00000001000000000000000B" from archive
+2025-12-01T11:10:54.1952828Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-16]  LOG:  restored log file "00000001000000000000000C" from archive
+2025-12-01T11:10:54.1953359Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-17]  LOG:  restored log file "00000001000000000000000D" from archive
+2025-12-01T11:10:54.1953888Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-18]  LOG:  restored log file "00000001000000000000000E" from archive
+2025-12-01T11:10:54.1954418Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-19]  LOG:  restored log file "00000001000000000000000F" from archive
+2025-12-01T11:10:54.1954946Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-20]  LOG:  restored log file "000000010000000000000010" from archive
+2025-12-01T11:10:54.1955477Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-21]  LOG:  restored log file "000000010000000000000011" from archive
+2025-12-01T11:10:54.1956011Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-22]  LOG:  restored log file "000000010000000000000012" from archive
+2025-12-01T11:10:54.1956532Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-23]  LOG:  restored log file "000000010000000000000013" from archive
+2025-12-01T11:10:54.1957193Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-24]  LOG:  restored log file "000000010000000000000014" from archive
+2025-12-01T11:10:54.1957719Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-25]  LOG:  restored log file "000000010000000000000015" from archive
+2025-12-01T11:10:54.1958250Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-26]  LOG:  restored log file "000000010000000000000016" from archive
+2025-12-01T11:10:54.1958769Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-27]  LOG:  restored log file "000000010000000000000017" from archive
+2025-12-01T11:10:54.1959294Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-28]  LOG:  restored log file "000000010000000000000018" from archive
+2025-12-01T11:10:54.1959822Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-29]  LOG:  restored log file "000000010000000000000019" from archive
+2025-12-01T11:10:54.1960369Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-30]  LOG:  restored log file "00000001000000000000001A" from archive
+2025-12-01T11:10:54.1960915Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-31]  LOG:  restored log file "00000001000000000000001B" from archive
+2025-12-01T11:10:54.1961735Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-32]  LOG:  restored log file "00000001000000000000001C" from archive
+2025-12-01T11:10:54.1962269Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-33]  LOG:  restored log file "00000001000000000000001D" from archive
+2025-12-01T11:10:54.1962794Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-34]  LOG:  restored log file "00000001000000000000001E" from archive
+2025-12-01T11:10:54.1963315Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-35]  LOG:  restored log file "00000001000000000000001F" from archive
+2025-12-01T11:10:54.1963843Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-36]  LOG:  restored log file "000000010000000000000020" from archive
+2025-12-01T11:10:54.1964366Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-37]  LOG:  restored log file "000000010000000000000021" from archive
+2025-12-01T11:10:54.1964898Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-38]  LOG:  restored log file "000000010000000000000022" from archive
+2025-12-01T11:10:54.1965422Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-39]  LOG:  restored log file "000000010000000000000023" from archive
+2025-12-01T11:10:54.1966074Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-40]  LOG:  restored log file "000000010000000000000024" from archive
+2025-12-01T11:10:54.1966622Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-41]  LOG:  restored log file "000000010000000000000025" from archive
+2025-12-01T11:10:54.1967151Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-42]  LOG:  restored log file "000000010000000000000026" from archive
+2025-12-01T11:10:54.1967678Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-43]  LOG:  restored log file "000000010000000000000027" from archive
+2025-12-01T11:10:54.1968212Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-44]  LOG:  restored log file "000000010000000000000028" from archive
+2025-12-01T11:10:54.1968732Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-45]  LOG:  restored log file "000000010000000000000029" from archive
+2025-12-01T11:10:54.1969258Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-46]  LOG:  restored log file "00000001000000000000002A" from archive
+2025-12-01T11:10:54.1969790Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-47]  LOG:  restored log file "00000001000000000000002B" from archive
+2025-12-01T11:10:54.1970320Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-48]  LOG:  restored log file "00000001000000000000002C" from archive
+2025-12-01T11:10:54.1970844Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-49]  LOG:  restored log file "00000001000000000000002D" from archive
+2025-12-01T11:10:54.1971612Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-50]  LOG:  restored log file "00000001000000000000002E" from archive
+2025-12-01T11:10:54.1972271Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-51]  LOG:  restored log file "00000001000000000000002F" from archive
+2025-12-01T11:10:54.1972799Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-52]  LOG:  restored log file "000000010000000000000030" from archive
+2025-12-01T11:10:54.1973323Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-53]  LOG:  restored log file "000000010000000000000031" from archive
+2025-12-01T11:10:54.1973853Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-54]  LOG:  restored log file "000000010000000000000032" from archive
+2025-12-01T11:10:54.1974376Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-55]  LOG:  restored log file "000000010000000000000033" from archive
+2025-12-01T11:10:54.1974928Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-56]  LOG:  restored log file "000000010000000000000034" from archive
+2025-12-01T11:10:54.1975474Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-57]  LOG:  restored log file "000000010000000000000035" from archive
+2025-12-01T11:10:54.1976104Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-58]  LOG:  restored log file "000000010000000000000036" from archive
+2025-12-01T11:10:54.1976714Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-59]  LOG:  restored log file "000000010000000000000037" from archive
+2025-12-01T11:10:54.1977265Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-60]  LOG:  restored log file "000000010000000000000038" from archive
+2025-12-01T11:10:54.1977803Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-61]  LOG:  restored log file "000000010000000000000039" from archive
+2025-12-01T11:10:54.1978328Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-62]  LOG:  restored log file "00000001000000000000003A" from archive
+2025-12-01T11:10:54.1978870Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-63]  LOG:  restored log file "00000001000000000000003B" from archive
+2025-12-01T11:10:54.1979402Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-64]  LOG:  restored log file "00000001000000000000003C" from archive
+2025-12-01T11:10:54.1979937Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-65]  LOG:  restored log file "00000001000000000000003D" from archive
+2025-12-01T11:10:54.1980462Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-66]  LOG:  restored log file "00000001000000000000003E" from archive
+2025-12-01T11:10:54.1981302Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-67]  LOG:  restored log file "00000001000000000000003F" from archive
+2025-12-01T11:10:54.1981858Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-68]  LOG:  restored log file "000000010000000000000040" from archive
+2025-12-01T11:10:54.1982386Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-69]  LOG:  restored log file "000000010000000000000041" from archive
+2025-12-01T11:10:54.1982909Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-70]  LOG:  restored log file "000000010000000000000042" from archive
+2025-12-01T11:10:54.1983442Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-71]  LOG:  restored log file "000000010000000000000043" from archive
+2025-12-01T11:10:54.1983980Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-72]  LOG:  restored log file "000000010000000000000044" from archive
+2025-12-01T11:10:54.1984523Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-73]  LOG:  restored log file "000000010000000000000045" from archive
+2025-12-01T11:10:54.1985053Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-74]  LOG:  restored log file "000000010000000000000046" from archive
+2025-12-01T11:10:54.1985582Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-75]  LOG:  restored log file "000000010000000000000047" from archive
+2025-12-01T11:10:54.1986112Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-76]  LOG:  restored log file "000000010000000000000048" from archive
+2025-12-01T11:10:54.1986640Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-77]  LOG:  restored log file "000000010000000000000049" from archive
+2025-12-01T11:10:54.1987124Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [588-1]  LOG:  restartpoint starting: wal
+2025-12-01T11:10:54.1987724Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-78]  LOG:  restored log file "00000001000000000000004A" from archive
+2025-12-01T11:10:54.1988257Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-79]  LOG:  restored log file "00000001000000000000004B" from archive
+2025-12-01T11:10:54.1988794Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-80]  LOG:  restored log file "00000001000000000000004C" from archive
+2025-12-01T11:10:54.1989321Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-81]  LOG:  restored log file "00000001000000000000004D" from archive
+2025-12-01T11:10:54.1989847Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-82]  LOG:  restored log file "00000001000000000000004E" from archive
+2025-12-01T11:10:54.1990372Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-83]  LOG:  restored log file "00000001000000000000004F" from archive
+2025-12-01T11:10:54.1990902Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-84]  LOG:  restored log file "000000010000000000000050" from archive
+2025-12-01T11:10:54.1991680Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-85]  LOG:  restored log file "000000010000000000000051" from archive
+2025-12-01T11:10:54.1992237Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-86]  LOG:  restored log file "000000010000000000000052" from archive
+2025-12-01T11:10:54.1992783Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-87]  LOG:  restored log file "000000010000000000000053" from archive
+2025-12-01T11:10:54.1993321Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-88]  LOG:  restored log file "000000010000000000000054" from archive
+2025-12-01T11:10:54.1993854Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-89]  LOG:  restored log file "000000010000000000000055" from archive
+2025-12-01T11:10:54.1994389Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-90]  LOG:  restored log file "000000010000000000000056" from archive
+2025-12-01T11:10:54.1994925Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-91]  LOG:  restored log file "000000010000000000000057" from archive
+2025-12-01T11:10:54.1995459Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-92]  LOG:  restored log file "000000010000000000000058" from archive
+2025-12-01T11:10:54.1995982Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-93]  LOG:  restored log file "000000010000000000000059" from archive
+2025-12-01T11:10:54.1996635Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-94]  LOG:  restored log file "00000001000000000000005A" from archive
+2025-12-01T11:10:54.1997170Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-95]  LOG:  restored log file "00000001000000000000005B" from archive
+2025-12-01T11:10:54.1997703Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-96]  LOG:  restored log file "00000001000000000000005C" from archive
+2025-12-01T11:10:54.1998232Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-97]  LOG:  restored log file "00000001000000000000005D" from archive
+2025-12-01T11:10:54.1998763Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-98]  LOG:  restored log file "00000001000000000000005E" from archive
+2025-12-01T11:10:54.1999298Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-99]  LOG:  restored log file "00000001000000000000005F" from archive
+2025-12-01T11:10:54.1999839Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-100]  LOG:  restored log file "000000010000000000000060" from archive
+2025-12-01T11:10:54.2000503Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-101]  LOG:  invalid magic number 0000 in WAL segment 000000010000000000000060, LSN 0/60FB0000, offset 16449536
+2025-12-01T11:10:54.2001467Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-102]  LOG:  redo done at 0/60FAC3D8 system usage: CPU: user: 1.63 s, system: 1.87 s, elapsed: 5.79 s
+2025-12-01T11:10:54.2002189Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-103]  LOG:  last completed transaction was at log time 2025-12-01 11:10:32.410006+00
+2025-12-01T11:10:54.2002791Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-104]  LOG:  restored log file "000000010000000000000060" from archive
+2025-12-01T11:10:54.2003384Z pg_001_fundamental  | 2025/12/01 16:10:50 server error: 404 Not Found
+2025-12-01T11:10:54.2003799Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-105]  LOG:  selected new timeline ID: 2
+2025-12-01T11:10:54.2004213Z pg_001_fundamental  | 2025/12/01 16:10:50 server error: 404 Not Found
+2025-12-01T11:10:54.2004621Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-106]  LOG:  archive recovery complete
+2025-12-01T11:10:54.2005687Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-2]  LOG:  restartpoint complete: wrote 41 buffers (0.3%), wrote 2 SLRU buffers; 0 WAL file(s) added, 30 removed, 3 recycled; write=1.160 s, sync=2.039 s, total=3.295 s; sync files=460, longest=1.451 s, average=0.005 s; distance=544910 kB, estimate=544910 kB; lsn=0/4981B890, redo lsn=0/24423C08
+2025-12-01T11:10:54.2006786Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-3]  LOG:  recovery restart point at 0/24423C08
+2025-12-01T11:10:54.2007389Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-4]  DETAIL:  Last completed transaction was at log time 2025-12-01 11:10:32.410006+00.
+2025-12-01T11:10:54.2008028Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-5]  LOG:  checkpoints are occurring too frequently (3 seconds apart)
+2025-12-01T11:10:54.2008640Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-6]  HINT:  Consider increasing the configuration parameter "max_wal_size".
+2025-12-01T11:10:54.2009241Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-7]  LOG:  checkpoint starting: end-of-recovery immediate wait wal
+2025-12-01T11:10:54.2010359Z pg_001_fundamental  | 2025-12-01 16:10:53 +05 [588-8]  LOG:  checkpoint complete: wrote 15279 buffers (93.3%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 56 recycled; write=0.077 s, sync=0.130 s, total=0.254 s; sync files=102, longest=0.039 s, average=0.002 s; distance=994857 kB, estimate=994857 kB; lsn=0/60FAE3B0, redo lsn=0/60FAE3B0
+2025-12-01T11:10:54.2011651Z pg_001_fundamental  | 2025-12-01 16:10:53 +05 [583-8]  LOG:  database system is ready to accept connections
+2025-12-01T11:10:54.2012061Z pg_001_fundamental  | 
+2025-12-01T11:10:54.2012337Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:54.2012744Z pg_001_fundamental  | ### running diff on pg_dumpall dumps (before vs after)
+2025-12-01T11:10:54.2013262Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:10:54.2013564Z pg_001_fundamental  | 
+2025-12-01T11:11:00.2954486Z pg_001_fundamental  | 
+2025-12-01T11:11:00.2955090Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:00.2955662Z pg_001_fundamental  | ### read latest applied records
+2025-12-01T11:11:00.2956207Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:00.2956732Z pg_001_fundamental  | 
+2025-12-01T11:11:00.2957048Z pg_001_fundamental  | table content:
+2025-12-01T11:11:00.3064980Z pg_001_fundamental  |              ts             
+2025-12-01T11:11:00.3066132Z pg_001_fundamental  | ----------------------------
+2025-12-01T11:11:00.3066770Z pg_001_fundamental  |  2025-12-01 16:10:16.692632
+2025-12-01T11:11:00.3067274Z pg_001_fundamental  |  2025-12-01 16:10:17.707655
+2025-12-01T11:11:00.3067757Z pg_001_fundamental  |  2025-12-01 16:10:18.725317
+2025-12-01T11:11:00.3068247Z pg_001_fundamental  |  2025-12-01 16:10:19.736427
+2025-12-01T11:11:00.3068701Z pg_001_fundamental  |  2025-12-01 16:10:20.748034
+2025-12-01T11:11:00.3069153Z pg_001_fundamental  |  2025-12-01 16:10:21.758777
+2025-12-01T11:11:00.3069596Z pg_001_fundamental  |  2025-12-01 16:10:22.769558
+2025-12-01T11:11:00.3070050Z pg_001_fundamental  |  2025-12-01 16:10:23.78067
+2025-12-01T11:11:00.3074020Z pg_001_fundamental  |  2025-12-01 16:10:24.851332
+2025-12-01T11:11:00.3074535Z pg_001_fundamental  |  2025-12-01 16:10:25.875529
+2025-12-01T11:11:00.3075007Z pg_001_fundamental  |  2025-12-01 16:10:26.955417
+2025-12-01T11:11:00.3076013Z pg_001_fundamental  |  2025-12-01 16:10:28.068704
+2025-12-01T11:11:00.3076487Z pg_001_fundamental  |  2025-12-01 16:10:29.200597
+2025-12-01T11:11:00.3076951Z pg_001_fundamental  |  2025-12-01 16:10:30.312544
+2025-12-01T11:11:00.3077416Z pg_001_fundamental  |  2025-12-01 16:10:31.360435
+2025-12-01T11:11:00.3077864Z pg_001_fundamental  |  2025-12-01 16:10:32.385035
+2025-12-01T11:11:00.3078299Z pg_001_fundamental  | (16 rows)
+2025-12-01T11:11:00.3078675Z pg_001_fundamental  | 
+2025-12-01T11:11:00.3079040Z pg_001_fundamental  | insert log content:
+2025-12-01T11:11:00.3082681Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:00.3084801Z pg_001_fundamental  | 2025-12-01 16:10:28.068704
+2025-12-01T11:11:00.3085267Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:00.3085703Z pg_001_fundamental  | 2025-12-01 16:10:29.200597
+2025-12-01T11:11:00.3086159Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:00.3086546Z pg_001_fundamental  | 2025-12-01 16:10:30.312544
+2025-12-01T11:11:00.3086959Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:00.3087349Z pg_001_fundamental  | 2025-12-01 16:10:31.360435
+2025-12-01T11:11:00.3087789Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:00.3088069Z pg_001_fundamental  | 2025-12-01 16:10:32.385035
+2025-12-01T11:11:00.3088331Z pg_001_fundamental  | 
+2025-12-01T11:11:00.3088614Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:00.3088990Z pg_001_fundamental  | ### compare wal-archive with pg_receivewal
+2025-12-01T11:11:00.3089367Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:00.3089675Z pg_001_fundamental  | 
+2025-12-01T11:11:12.9013018Z pg_001_fundamental  | 000000010000000000000060 differs
+2025-12-01T11:11:29.9089067Z Aborting on container exit...
+2025-12-01T11:11:29.9089392Z 
+2025-12-01T11:11:29.9089841Z [Kpg_001_fundamental exited with code 3
+2025-12-01T11:11:29.9100684Z  Container pg_001_fundamental  Stopping
+2025-12-01T11:11:29.9104287Z  Container pg_001_fundamental  Stopped
+2025-12-01T11:11:29.9105728Z 
+2025-12-01T11:11:29.9158376Z ##[error]Process completed with exit code 3.
+2025-12-01T11:11:29.9227379Z ##[group]Run set -euo pipefail
+2025-12-01T11:11:29.9227729Z [36;1mset -euo pipefail[0m
+2025-12-01T11:11:29.9228031Z [36;1mdocker compose -f "${COMPOSE_FILE_PAR}" ps || true[0m
+2025-12-01T11:11:29.9228417Z [36;1mdocker compose -f "${COMPOSE_FILE_PAR}" logs || true[0m
+2025-12-01T11:11:29.9268716Z shell: /usr/bin/bash -e {0}
+2025-12-01T11:11:29.9268950Z env:
+2025-12-01T11:11:29.9269136Z   CACHE_FOLDER: docker-cache
+2025-12-01T11:11:29.9269418Z   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+2025-12-01T11:11:29.9269808Z   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+2025-12-01T11:11:29.9270220Z   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+2025-12-01T11:11:29.9270593Z   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+2025-12-01T11:11:29.9270950Z   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+2025-12-01T11:11:29.9271463Z   COMPOSE_FILE: test/integration/environ/docker-compose.yml
+2025-12-01T11:11:29.9271788Z   PG_MAJOR: 18
+2025-12-01T11:11:29.9271991Z   TEST_NAME: pg_001_fundamental
+2025-12-01T11:11:29.9272309Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
+2025-12-01T11:11:29.9272688Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
+2025-12-01T11:11:29.9272958Z ##[endgroup]
+2025-12-01T11:11:30.0038090Z NAME          IMAGE         COMMAND                  SERVICE   CREATED              STATUS                        PORTS
+2025-12-01T11:11:30.0040453Z pgrwl_minio   pgrwl/minio   "/usr/bin/docker-ent…"   minio     About a minute ago   Up About a minute (healthy)   0.0.0.0:9000-9001->9000-9001/tcp, [::]:9000-9001->9000-9001/tcp
+2025-12-01T11:11:30.0042181Z pgrwl_sshd    pgrwl/sshd    "/usr/sbin/sshd -D"      sshd      About a minute ago   Up About a minute             0.0.0.0:2525->22/tcp, [::]:2525->22/tcp
+2025-12-01T11:11:30.0852865Z pgrwl_minio  | INFO: Formatting 1st pool, 1 set(s), 1 drives per set.
+2025-12-01T11:11:30.0854417Z pgrwl_minio  | INFO: WARNING: Host local has more than 0 drives of set. A host failure will result in data becoming unavailable.
+2025-12-01T11:11:30.0856300Z pgrwl_minio  | MinIO Object Storage Server
+2025-12-01T11:11:30.0856948Z pgrwl_minio  | Copyright: 2015-2025 MinIO, Inc.
+2025-12-01T11:11:30.0862617Z pgrwl_minio  | License: GNU AGPLv3 - https://www.gnu.org/licenses/agpl-3.0.html
+2025-12-01T11:11:30.0863442Z pgrwl_minio  | Version: RELEASE.2025-09-07T16-13-09Z (go1.24.6 linux/amd64)
+2025-12-01T11:11:30.0864049Z pgrwl_minio  | 
+2025-12-01T11:11:30.0864550Z pgrwl_minio  | API: https://172.18.0.3:9000  https://127.0.0.1:9000 
+2025-12-01T11:11:30.0865312Z pgrwl_minio  | WebUI: https://172.18.0.3:9001 https://127.0.0.1:9001  
+2025-12-01T11:11:30.0865865Z pgrwl_minio  | 
+2025-12-01T11:11:30.0866231Z pgrwl_minio  | Docs: https://docs.min.io
+2025-12-01T11:11:30.0866693Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0867193Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0867794Z pg_001_fundamental  | ### init and run a cluster
+2025-12-01T11:11:30.0868345Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0868863Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0869494Z pg_001_fundamental  | The files belonging to this database system will be owned by user "postgres".
+2025-12-01T11:11:30.0870317Z pg_001_fundamental  | This user must also own the server process.
+2025-12-01T11:11:30.0870855Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0871602Z pg_001_fundamental  | The database cluster will be initialized with locale "C".
+2025-12-01T11:11:30.0872473Z pg_001_fundamental  | The default database encoding has accordingly been set to "SQL_ASCII".
+2025-12-01T11:11:30.0873355Z pg_001_fundamental  | The default text search configuration will be set to "english".
+2025-12-01T11:11:30.0873985Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0874392Z pg_001_fundamental  | Data page checksums are enabled.
+2025-12-01T11:11:30.0874855Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0875831Z pg_001_fundamental  | creating directory /var/lib/postgresql/18/main/pgdata ... ok
+2025-12-01T11:11:30.0876542Z pg_001_fundamental  | creating subdirectories ... ok
+2025-12-01T11:11:30.0877205Z pg_001_fundamental  | selecting dynamic shared memory implementation ... posix
+2025-12-01T11:11:30.0877945Z pg_001_fundamental  | selecting default "max_connections" ... 100
+2025-12-01T11:11:30.0878604Z pg_001_fundamental  | selecting default "shared_buffers" ... 128MB
+2025-12-01T11:11:30.0879274Z pg_001_fundamental  | selecting default time zone ... Asia/Aqtau
+2025-12-01T11:11:30.0879919Z pg_001_fundamental  | creating configuration files ... ok
+2025-12-01T11:11:30.0880517Z pg_001_fundamental  | running bootstrap script ... ok
+2025-12-01T11:11:30.0883488Z pg_001_fundamental  | performing post-bootstrap initialization ... ok
+2025-12-01T11:11:30.0884116Z pg_001_fundamental  | syncing data to disk ... ok
+2025-12-01T11:11:30.0884552Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0884866Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0885350Z pg_001_fundamental  | Success. You can now start the database server using:
+2025-12-01T11:11:30.0885893Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0886547Z pg_001_fundamental  |     /usr/lib/postgresql/18/bin/pg_ctl -D /var/lib/postgresql/18/main/pgdata -l logfile start
+2025-12-01T11:11:30.0887270Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0887822Z pg_001_fundamental  | initdb: warning: enabling "trust" authentication for local connections
+2025-12-01T11:11:30.0889063Z pg_001_fundamental  | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2025-12-01T11:11:30.0890090Z pg_001_fundamental  | waiting for server to start.... done
+2025-12-01T11:11:30.0890576Z pg_001_fundamental  | server started
+2025-12-01T11:11:30.0890997Z pg_001_fundamental  |  pg_drop_replication_slot 
+2025-12-01T11:11:30.0891895Z pg_001_fundamental  | --------------------------
+2025-12-01T11:11:30.0892331Z pg_001_fundamental  | (0 rows)
+2025-12-01T11:11:30.0892685Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0893018Z pg_001_fundamental  |  pg_switch_wal 
+2025-12-01T11:11:30.0893421Z pg_001_fundamental  | ---------------
+2025-12-01T11:11:30.0893798Z pg_001_fundamental  |  0/1756C10
+2025-12-01T11:11:30.0894167Z pg_001_fundamental  | (1 row)
+2025-12-01T11:11:30.0894507Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0894843Z pg_001_fundamental  |  slot_name |    lsn    
+2025-12-01T11:11:30.0895275Z pg_001_fundamental  | -----------+-----------
+2025-12-01T11:11:30.0895699Z pg_001_fundamental  |  pgrwl_v5  | 0/1756B80
+2025-12-01T11:11:30.0896110Z pg_001_fundamental  | (1 row)
+2025-12-01T11:11:30.0896450Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0896810Z pg_001_fundamental  |  pg_drop_replication_slot 
+2025-12-01T11:11:30.0897268Z pg_001_fundamental  | --------------------------
+2025-12-01T11:11:30.0897690Z pg_001_fundamental  | (0 rows)
+2025-12-01T11:11:30.0898053Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0898394Z pg_001_fundamental  |  pg_switch_wal 
+2025-12-01T11:11:30.0898776Z pg_001_fundamental  | ---------------
+2025-12-01T11:11:30.0899156Z pg_001_fundamental  |  0/2000000
+2025-12-01T11:11:30.0899523Z pg_001_fundamental  | (1 row)
+2025-12-01T11:11:30.0899855Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0900207Z pg_001_fundamental  |    slot_name   |    lsn    
+2025-12-01T11:11:30.0900670Z pg_001_fundamental  | ---------------+-----------
+2025-12-01T11:11:30.0901233Z pg_001_fundamental  |  pg_receivewal | 0/1756B80
+2025-12-01T11:11:30.0901632Z pg_001_fundamental  | (1 row)
+2025-12-01T11:11:30.0901962Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0902271Z pg_001_fundamental  | CHECKPOINT
+2025-12-01T11:11:30.0902625Z pg_001_fundamental  |  pg_switch_wal 
+2025-12-01T11:11:30.0902996Z pg_001_fundamental  | ---------------
+2025-12-01T11:11:30.0903372Z pg_001_fundamental  |  0/2000110
+2025-12-01T11:11:30.0903756Z pg_001_fundamental  | (1 row)
+2025-12-01T11:11:30.0904112Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0904435Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0905073Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0905624Z pg_001_fundamental  | ### running wal-receivers
+2025-12-01T11:11:30.0906147Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0906666Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0906988Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0907425Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0907979Z pg_001_fundamental  | ### creating basebackup
+2025-12-01T11:11:30.0908511Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0909028Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0909637Z pg_001_fundamental  | pg_basebackup: initiating base backup, waiting for checkpoint to complete
+2025-12-01T11:11:30.0910405Z pg_001_fundamental  | pg_basebackup: checkpoint completed
+2025-12-01T11:11:30.0911701Z pg_001_fundamental  | 23579/23579 kB (100%), 0/1 tablespace (...asebackup/data/global/pg_control)
+2025-12-01T11:11:30.0912909Z pg_001_fundamental  | NOTICE:  WAL archiving is not enabled; you must ensure that all required WAL segments are copied through other means to complete the backup
+2025-12-01T11:11:30.0914102Z pg_001_fundamental  | 23579/23579 kB (100%), 1/1 tablespace                                         
+2025-12-01T11:11:30.0914819Z pg_001_fundamental  | pg_basebackup: syncing data to disk ...
+2025-12-01T11:11:30.0915536Z pg_001_fundamental  | pg_basebackup: renaming backup_manifest.tmp to backup_manifest
+2025-12-01T11:11:30.0916242Z pg_001_fundamental  | pg_basebackup: base backup completed
+2025-12-01T11:11:30.0916722Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0917154Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0917898Z pg_001_fundamental  | ### running pgbench
+2025-12-01T11:11:30.0918414Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0918903Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0919245Z pg_001_fundamental  | dropping old tables...
+2025-12-01T11:11:30.0919844Z pg_001_fundamental  | NOTICE:  table "pgbench_accounts" does not exist, skipping
+2025-12-01T11:11:30.0920569Z pg_001_fundamental  | NOTICE:  table "pgbench_branches" does not exist, skipping
+2025-12-01T11:11:30.0921484Z pg_001_fundamental  | NOTICE:  table "pgbench_history" does not exist, skipping
+2025-12-01T11:11:30.0922210Z pg_001_fundamental  | NOTICE:  table "pgbench_tellers" does not exist, skipping
+2025-12-01T11:11:30.0922781Z pg_001_fundamental  | creating tables...
+2025-12-01T11:11:30.0923247Z pg_001_fundamental  | generating data (client-side)...
+2025-12-01T11:11:30.0924023Z pg_001_fundamental  | 100000 of 1000000 tuples (10%) of pgbench_accounts done (elapsed 0.02 s, remaining 0.15 s)
+2025-12-01T11:11:30.0925052Z pg_001_fundamental  | 200000 of 1000000 tuples (20%) of pgbench_accounts done (elapsed 0.03 s, remaining 0.11 s)
+2025-12-01T11:11:30.0926060Z pg_001_fundamental  | 300000 of 1000000 tuples (30%) of pgbench_accounts done (elapsed 0.08 s, remaining 0.18 s)
+2025-12-01T11:11:30.0927084Z pg_001_fundamental  | 400000 of 1000000 tuples (40%) of pgbench_accounts done (elapsed 0.16 s, remaining 0.25 s)
+2025-12-01T11:11:30.0928113Z pg_001_fundamental  | 500000 of 1000000 tuples (50%) of pgbench_accounts done (elapsed 0.24 s, remaining 0.24 s)
+2025-12-01T11:11:30.0929061Z pg_001_fundamental  | 600000 of 1000000 tuples (60%) of pgbench_accounts done (elapsed 0.33 s, remaining 0.22 s)
+2025-12-01T11:11:30.0929671Z pg_001_fundamental  | 700000 of 1000000 tuples (70%) of pgbench_accounts done (elapsed 0.43 s, remaining 0.18 s)
+2025-12-01T11:11:30.0930266Z pg_001_fundamental  | 800000 of 1000000 tuples (80%) of pgbench_accounts done (elapsed 0.51 s, remaining 0.13 s)
+2025-12-01T11:11:30.0931171Z pg_001_fundamental  | 900000 of 1000000 tuples (90%) of pgbench_accounts done (elapsed 0.59 s, remaining 0.07 s)
+2025-12-01T11:11:30.0931957Z pg_001_fundamental  | 1000000 of 1000000 tuples (100%) of pgbench_accounts done (elapsed 0.76 s, remaining 0.00 s)
+2025-12-01T11:11:30.0932744Z pg_001_fundamental  | vacuuming...
+2025-12-01T11:11:30.0933174Z pg_001_fundamental  | creating primary keys...
+2025-12-01T11:11:30.0933997Z pg_001_fundamental  | done in 1.38 s (drop tables 0.00 s, create tables 0.02 s, client-side generate 1.06 s, vacuum 0.07 s, primary keys 0.24 s).
+2025-12-01T11:11:30.0934492Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0934765Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0935102Z pg_001_fundamental  | ### generate 512Mi of data
+2025-12-01T11:11:30.0935429Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0935740Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0935949Z pg_001_fundamental  | SELECT 524288
+2025-12-01T11:11:30.0936183Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0936450Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0936853Z pg_001_fundamental  | ### concurrently populate with 100 tables, 10K rows each
+2025-12-01T11:11:30.0937249Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0937545Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0937738Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0937985Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0938288Z pg_001_fundamental  | ### teardown
+2025-12-01T11:11:30.0938586Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0938883Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0939070Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0939478Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0939800Z pg_001_fundamental  | ### restoring backup
+2025-12-01T11:11:30.0940103Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0940397Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0940896Z pg_001_fundamental  | renamed '/tmp/wal-archive/000000010000000000000060.partial' -> '/tmp/wal-archive/000000010000000000000060'
+2025-12-01T11:11:30.0941937Z pg_001_fundamental  | renamed '/tmp/wal-archive-pg_receivewal/000000010000000000000060.partial' -> '/tmp/wal-archive-pg_receivewal/000000010000000000000060'
+2025-12-01T11:11:30.0942517Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0942777Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0943115Z pg_001_fundamental  | ### running wal fetcher
+2025-12-01T11:11:30.0943440Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0943746Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0943934Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0944191Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0944506Z pg_001_fundamental  | ### running cluster
+2025-12-01T11:11:30.0944808Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.0945101Z pg_001_fundamental  | 
+2025-12-01T11:11:30.0945351Z pg_001_fundamental  | waiting for server to start.... done
+2025-12-01T11:11:30.0945646Z pg_001_fundamental  | server started
+2025-12-01T11:11:30.0946023Z pg_001_fundamental  | 2025-12-01 16:10:45 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0946528Z pg_001_fundamental  | 2025-12-01 16:10:46 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0947025Z pg_001_fundamental  | 2025-12-01 16:10:47 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0947640Z pg_001_fundamental  | 2025-12-01 16:10:48 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0948130Z pg_001_fundamental  | 2025-12-01 16:10:49 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0948616Z pg_001_fundamental  | 2025-12-01 16:10:50 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0949102Z pg_001_fundamental  | 2025-12-01 16:10:51 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0949587Z pg_001_fundamental  | 2025-12-01 16:10:52 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0950072Z pg_001_fundamental  | 2025-12-01 16:10:53 -- [INFO] -- Cluster is in recovery, waiting one second...
+2025-12-01T11:11:30.0950597Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-1]  LOG:  redirecting log output to logging collector process
+2025-12-01T11:11:30.0951423Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-2]  HINT:  Future log output will appear in directory "/var/log/postgresql".
+2025-12-01T11:11:30.0952246Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-3]  LOG:  starting PostgreSQL 18.1 (Debian 18.1-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2025-12-01T11:11:30.0952975Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-4]  LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2025-12-01T11:11:30.0953517Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-5]  LOG:  listening on IPv6 address "::", port 5432
+2025-12-01T11:11:30.0954062Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-6]  LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2025-12-01T11:11:30.0954676Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-1]  LOG:  database system was interrupted; last known up at 2025-12-01 16:10:16 +05
+2025-12-01T11:11:30.0955194Z pg_001_fundamental  | 2025/12/01 16:10:44 server error: 404 Not Found
+2025-12-01T11:11:30.0955894Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-2]  LOG:  starting backup recovery with redo LSN 0/3000028, checkpoint LSN 0/3000080, on timeline ID 1
+2025-12-01T11:11:30.0956547Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-3]  LOG:  restored log file "000000010000000000000003" from archive
+2025-12-01T11:11:30.0957047Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-4]  LOG:  starting archive recovery
+2025-12-01T11:11:30.0957479Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-5]  LOG:  redo starts at 0/3000028
+2025-12-01T11:11:30.0957968Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-6]  LOG:  restored log file "000000010000000000000004" from archive
+2025-12-01T11:11:30.0958567Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-7]  LOG:  completed backup recovery with redo LSN 0/3000028 and end LSN 0/3000120
+2025-12-01T11:11:30.0959146Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [590-8]  LOG:  consistent recovery state reached at 0/3000120
+2025-12-01T11:11:30.0959696Z pg_001_fundamental  | 2025-12-01 16:10:44 +05 [583-7]  LOG:  database system is ready to accept read-only connections
+2025-12-01T11:11:30.0960260Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-9]  LOG:  restored log file "000000010000000000000005" from archive
+2025-12-01T11:11:30.0960807Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-10]  LOG:  restored log file "000000010000000000000006" from archive
+2025-12-01T11:11:30.0961532Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-11]  LOG:  restored log file "000000010000000000000007" from archive
+2025-12-01T11:11:30.0962076Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-12]  LOG:  restored log file "000000010000000000000008" from archive
+2025-12-01T11:11:30.0962610Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-13]  LOG:  restored log file "000000010000000000000009" from archive
+2025-12-01T11:11:30.0963148Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-14]  LOG:  restored log file "00000001000000000000000A" from archive
+2025-12-01T11:11:30.0963683Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-15]  LOG:  restored log file "00000001000000000000000B" from archive
+2025-12-01T11:11:30.0964337Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-16]  LOG:  restored log file "00000001000000000000000C" from archive
+2025-12-01T11:11:30.0964879Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-17]  LOG:  restored log file "00000001000000000000000D" from archive
+2025-12-01T11:11:30.0965416Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-18]  LOG:  restored log file "00000001000000000000000E" from archive
+2025-12-01T11:11:30.0965947Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-19]  LOG:  restored log file "00000001000000000000000F" from archive
+2025-12-01T11:11:30.0966484Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-20]  LOG:  restored log file "000000010000000000000010" from archive
+2025-12-01T11:11:30.0967020Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-21]  LOG:  restored log file "000000010000000000000011" from archive
+2025-12-01T11:11:30.0967574Z pg_001_fundamental  | 2025-12-01 16:10:45 +05 [590-22]  LOG:  restored log file "000000010000000000000012" from archive
+2025-12-01T11:11:30.0968116Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-23]  LOG:  restored log file "000000010000000000000013" from archive
+2025-12-01T11:11:30.0968651Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-24]  LOG:  restored log file "000000010000000000000014" from archive
+2025-12-01T11:11:30.0969188Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-25]  LOG:  restored log file "000000010000000000000015" from archive
+2025-12-01T11:11:30.0969725Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-26]  LOG:  restored log file "000000010000000000000016" from archive
+2025-12-01T11:11:30.0970260Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-27]  LOG:  restored log file "000000010000000000000017" from archive
+2025-12-01T11:11:30.0970795Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-28]  LOG:  restored log file "000000010000000000000018" from archive
+2025-12-01T11:11:30.0971911Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-29]  LOG:  restored log file "000000010000000000000019" from archive
+2025-12-01T11:11:30.0972459Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-30]  LOG:  restored log file "00000001000000000000001A" from archive
+2025-12-01T11:11:30.0972998Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-31]  LOG:  restored log file "00000001000000000000001B" from archive
+2025-12-01T11:11:30.0973547Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-32]  LOG:  restored log file "00000001000000000000001C" from archive
+2025-12-01T11:11:30.0974090Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-33]  LOG:  restored log file "00000001000000000000001D" from archive
+2025-12-01T11:11:30.0974631Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-34]  LOG:  restored log file "00000001000000000000001E" from archive
+2025-12-01T11:11:30.0975165Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-35]  LOG:  restored log file "00000001000000000000001F" from archive
+2025-12-01T11:11:30.0975714Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-36]  LOG:  restored log file "000000010000000000000020" from archive
+2025-12-01T11:11:30.0976251Z pg_001_fundamental  | 2025-12-01 16:10:46 +05 [590-37]  LOG:  restored log file "000000010000000000000021" from archive
+2025-12-01T11:11:30.0976785Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-38]  LOG:  restored log file "000000010000000000000022" from archive
+2025-12-01T11:11:30.0977321Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-39]  LOG:  restored log file "000000010000000000000023" from archive
+2025-12-01T11:11:30.0977855Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-40]  LOG:  restored log file "000000010000000000000024" from archive
+2025-12-01T11:11:30.0978397Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-41]  LOG:  restored log file "000000010000000000000025" from archive
+2025-12-01T11:11:30.0978934Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-42]  LOG:  restored log file "000000010000000000000026" from archive
+2025-12-01T11:11:30.0979596Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-43]  LOG:  restored log file "000000010000000000000027" from archive
+2025-12-01T11:11:30.0980168Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-44]  LOG:  restored log file "000000010000000000000028" from archive
+2025-12-01T11:11:30.0980702Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-45]  LOG:  restored log file "000000010000000000000029" from archive
+2025-12-01T11:11:30.0981476Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-46]  LOG:  restored log file "00000001000000000000002A" from archive
+2025-12-01T11:11:30.0982012Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-47]  LOG:  restored log file "00000001000000000000002B" from archive
+2025-12-01T11:11:30.0982545Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-48]  LOG:  restored log file "00000001000000000000002C" from archive
+2025-12-01T11:11:30.0983082Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-49]  LOG:  restored log file "00000001000000000000002D" from archive
+2025-12-01T11:11:30.0983630Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-50]  LOG:  restored log file "00000001000000000000002E" from archive
+2025-12-01T11:11:30.0984160Z pg_001_fundamental  | 2025-12-01 16:10:47 +05 [590-51]  LOG:  restored log file "00000001000000000000002F" from archive
+2025-12-01T11:11:30.0984696Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-52]  LOG:  restored log file "000000010000000000000030" from archive
+2025-12-01T11:11:30.0985230Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-53]  LOG:  restored log file "000000010000000000000031" from archive
+2025-12-01T11:11:30.0985762Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-54]  LOG:  restored log file "000000010000000000000032" from archive
+2025-12-01T11:11:30.0986290Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-55]  LOG:  restored log file "000000010000000000000033" from archive
+2025-12-01T11:11:30.0986822Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-56]  LOG:  restored log file "000000010000000000000034" from archive
+2025-12-01T11:11:30.0987487Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-57]  LOG:  restored log file "000000010000000000000035" from archive
+2025-12-01T11:11:30.0988021Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-58]  LOG:  restored log file "000000010000000000000036" from archive
+2025-12-01T11:11:30.0988586Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-59]  LOG:  restored log file "000000010000000000000037" from archive
+2025-12-01T11:11:30.0989124Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-60]  LOG:  restored log file "000000010000000000000038" from archive
+2025-12-01T11:11:30.0989659Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-61]  LOG:  restored log file "000000010000000000000039" from archive
+2025-12-01T11:11:30.0990191Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-62]  LOG:  restored log file "00000001000000000000003A" from archive
+2025-12-01T11:11:30.0990721Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-63]  LOG:  restored log file "00000001000000000000003B" from archive
+2025-12-01T11:11:30.0991436Z pg_001_fundamental  | 2025-12-01 16:10:48 +05 [590-64]  LOG:  restored log file "00000001000000000000003C" from archive
+2025-12-01T11:11:30.0991974Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-65]  LOG:  restored log file "00000001000000000000003D" from archive
+2025-12-01T11:11:30.0992511Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-66]  LOG:  restored log file "00000001000000000000003E" from archive
+2025-12-01T11:11:30.0993035Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-67]  LOG:  restored log file "00000001000000000000003F" from archive
+2025-12-01T11:11:30.0993565Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-68]  LOG:  restored log file "000000010000000000000040" from archive
+2025-12-01T11:11:30.0994100Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-69]  LOG:  restored log file "000000010000000000000041" from archive
+2025-12-01T11:11:30.0994642Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-70]  LOG:  restored log file "000000010000000000000042" from archive
+2025-12-01T11:11:30.0995317Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-71]  LOG:  restored log file "000000010000000000000043" from archive
+2025-12-01T11:11:30.0995855Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-72]  LOG:  restored log file "000000010000000000000044" from archive
+2025-12-01T11:11:30.0996388Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-73]  LOG:  restored log file "000000010000000000000045" from archive
+2025-12-01T11:11:30.0996920Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-74]  LOG:  restored log file "000000010000000000000046" from archive
+2025-12-01T11:11:30.0997447Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-75]  LOG:  restored log file "000000010000000000000047" from archive
+2025-12-01T11:11:30.0997976Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-76]  LOG:  restored log file "000000010000000000000048" from archive
+2025-12-01T11:11:30.0998515Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-77]  LOG:  restored log file "000000010000000000000049" from archive
+2025-12-01T11:11:30.0999012Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [588-1]  LOG:  restartpoint starting: wal
+2025-12-01T11:11:30.0999497Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-78]  LOG:  restored log file "00000001000000000000004A" from archive
+2025-12-01T11:11:30.1000032Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-79]  LOG:  restored log file "00000001000000000000004B" from archive
+2025-12-01T11:11:30.1000569Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-80]  LOG:  restored log file "00000001000000000000004C" from archive
+2025-12-01T11:11:30.1001305Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-81]  LOG:  restored log file "00000001000000000000004D" from archive
+2025-12-01T11:11:30.1001974Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-82]  LOG:  restored log file "00000001000000000000004E" from archive
+2025-12-01T11:11:30.1002668Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-83]  LOG:  restored log file "00000001000000000000004F" from archive
+2025-12-01T11:11:30.1003211Z pg_001_fundamental  | 2025-12-01 16:10:49 +05 [590-84]  LOG:  restored log file "000000010000000000000050" from archive
+2025-12-01T11:11:30.1003749Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-85]  LOG:  restored log file "000000010000000000000051" from archive
+2025-12-01T11:11:30.1004277Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-86]  LOG:  restored log file "000000010000000000000052" from archive
+2025-12-01T11:11:30.1004806Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-87]  LOG:  restored log file "000000010000000000000053" from archive
+2025-12-01T11:11:30.1005336Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-88]  LOG:  restored log file "000000010000000000000054" from archive
+2025-12-01T11:11:30.1005870Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-89]  LOG:  restored log file "000000010000000000000055" from archive
+2025-12-01T11:11:30.1006410Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-90]  LOG:  restored log file "000000010000000000000056" from archive
+2025-12-01T11:11:30.1006945Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-91]  LOG:  restored log file "000000010000000000000057" from archive
+2025-12-01T11:11:30.1007475Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-92]  LOG:  restored log file "000000010000000000000058" from archive
+2025-12-01T11:11:30.1008011Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-93]  LOG:  restored log file "000000010000000000000059" from archive
+2025-12-01T11:11:30.1008539Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-94]  LOG:  restored log file "00000001000000000000005A" from archive
+2025-12-01T11:11:30.1009072Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-95]  LOG:  restored log file "00000001000000000000005B" from archive
+2025-12-01T11:11:30.1009606Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-96]  LOG:  restored log file "00000001000000000000005C" from archive
+2025-12-01T11:11:30.1010296Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-97]  LOG:  restored log file "00000001000000000000005D" from archive
+2025-12-01T11:11:30.1010848Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-98]  LOG:  restored log file "00000001000000000000005E" from archive
+2025-12-01T11:11:30.1011613Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-99]  LOG:  restored log file "00000001000000000000005F" from archive
+2025-12-01T11:11:30.1012165Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-100]  LOG:  restored log file "000000010000000000000060" from archive
+2025-12-01T11:11:30.1012838Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-101]  LOG:  invalid magic number 0000 in WAL segment 000000010000000000000060, LSN 0/60FB0000, offset 16449536
+2025-12-01T11:11:30.1013598Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-102]  LOG:  redo done at 0/60FAC3D8 system usage: CPU: user: 1.63 s, system: 1.87 s, elapsed: 5.79 s
+2025-12-01T11:11:30.1014302Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-103]  LOG:  last completed transaction was at log time 2025-12-01 11:10:32.410006+00
+2025-12-01T11:11:30.1014918Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-104]  LOG:  restored log file "000000010000000000000060" from archive
+2025-12-01T11:11:30.1015395Z pg_001_fundamental  | 2025/12/01 16:10:50 server error: 404 Not Found
+2025-12-01T11:11:30.1015811Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-105]  LOG:  selected new timeline ID: 2
+2025-12-01T11:11:30.1016229Z pg_001_fundamental  | 2025/12/01 16:10:50 server error: 404 Not Found
+2025-12-01T11:11:30.1016639Z pg_001_fundamental  | 2025-12-01 16:10:50 +05 [590-106]  LOG:  archive recovery complete
+2025-12-01T11:11:30.1017705Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-2]  LOG:  restartpoint complete: wrote 41 buffers (0.3%), wrote 2 SLRU buffers; 0 WAL file(s) added, 30 removed, 3 recycled; write=1.160 s, sync=2.039 s, total=3.295 s; sync files=460, longest=1.451 s, average=0.005 s; distance=544910 kB, estimate=544910 kB; lsn=0/4981B890, redo lsn=0/24423C08
+2025-12-01T11:11:30.1018958Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-3]  LOG:  recovery restart point at 0/24423C08
+2025-12-01T11:11:30.1019538Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-4]  DETAIL:  Last completed transaction was at log time 2025-12-01 11:10:32.410006+00.
+2025-12-01T11:11:30.1020163Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-5]  LOG:  checkpoints are occurring too frequently (3 seconds apart)
+2025-12-01T11:11:30.1020772Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-6]  HINT:  Consider increasing the configuration parameter "max_wal_size".
+2025-12-01T11:11:30.1021557Z pg_001_fundamental  | 2025-12-01 16:10:52 +05 [588-7]  LOG:  checkpoint starting: end-of-recovery immediate wait wal
+2025-12-01T11:11:30.1022684Z pg_001_fundamental  | 2025-12-01 16:10:53 +05 [588-8]  LOG:  checkpoint complete: wrote 15279 buffers (93.3%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 56 recycled; write=0.077 s, sync=0.130 s, total=0.254 s; sync files=102, longest=0.039 s, average=0.002 s; distance=994857 kB, estimate=994857 kB; lsn=0/60FAE3B0, redo lsn=0/60FAE3B0
+2025-12-01T11:11:30.1023789Z pg_001_fundamental  | 2025-12-01 16:10:53 +05 [583-8]  LOG:  database system is ready to accept connections
+2025-12-01T11:11:30.1024178Z pg_001_fundamental  | 
+2025-12-01T11:11:30.1024454Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.1024856Z pg_001_fundamental  | ### running diff on pg_dumpall dumps (before vs after)
+2025-12-01T11:11:30.1025252Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.1025558Z pg_001_fundamental  | 
+2025-12-01T11:11:30.1025752Z pg_001_fundamental  | 
+2025-12-01T11:11:30.1026008Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.1026351Z pg_001_fundamental  | ### read latest applied records
+2025-12-01T11:11:30.1026691Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.1027101Z pg_001_fundamental  | 
+2025-12-01T11:11:30.1027314Z pg_001_fundamental  | table content:
+2025-12-01T11:11:30.1027577Z pg_001_fundamental  |              ts             
+2025-12-01T11:11:30.1027872Z pg_001_fundamental  | ----------------------------
+2025-12-01T11:11:30.1028156Z pg_001_fundamental  |  2025-12-01 16:10:16.692632
+2025-12-01T11:11:30.1028431Z pg_001_fundamental  |  2025-12-01 16:10:17.707655
+2025-12-01T11:11:30.1028697Z pg_001_fundamental  |  2025-12-01 16:10:18.725317
+2025-12-01T11:11:30.1028953Z pg_001_fundamental  |  2025-12-01 16:10:19.736427
+2025-12-01T11:11:30.1029216Z pg_001_fundamental  |  2025-12-01 16:10:20.748034
+2025-12-01T11:11:30.1029482Z pg_001_fundamental  |  2025-12-01 16:10:21.758777
+2025-12-01T11:11:30.1029738Z pg_001_fundamental  |  2025-12-01 16:10:22.769558
+2025-12-01T11:11:30.1030003Z pg_001_fundamental  |  2025-12-01 16:10:23.78067
+2025-12-01T11:11:30.1030274Z pg_001_fundamental  |  2025-12-01 16:10:24.851332
+2025-12-01T11:11:30.1030542Z pg_001_fundamental  |  2025-12-01 16:10:25.875529
+2025-12-01T11:11:30.1030801Z pg_001_fundamental  |  2025-12-01 16:10:26.955417
+2025-12-01T11:11:30.1031229Z pg_001_fundamental  |  2025-12-01 16:10:28.068704
+2025-12-01T11:11:30.1031500Z pg_001_fundamental  |  2025-12-01 16:10:29.200597
+2025-12-01T11:11:30.1031754Z pg_001_fundamental  |  2025-12-01 16:10:30.312544
+2025-12-01T11:11:30.1032015Z pg_001_fundamental  |  2025-12-01 16:10:31.360435
+2025-12-01T11:11:30.1032276Z pg_001_fundamental  |  2025-12-01 16:10:32.385035
+2025-12-01T11:11:30.1032526Z pg_001_fundamental  | (16 rows)
+2025-12-01T11:11:30.1032746Z pg_001_fundamental  | 
+2025-12-01T11:11:30.1032960Z pg_001_fundamental  | insert log content:
+2025-12-01T11:11:30.1033211Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:30.1033454Z pg_001_fundamental  | 2025-12-01 16:10:28.068704
+2025-12-01T11:11:30.1033712Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:30.1034075Z pg_001_fundamental  | 2025-12-01 16:10:29.200597
+2025-12-01T11:11:30.1034329Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:30.1034572Z pg_001_fundamental  | 2025-12-01 16:10:30.312544
+2025-12-01T11:11:30.1034828Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:30.1035060Z pg_001_fundamental  | 2025-12-01 16:10:31.360435
+2025-12-01T11:11:30.1035311Z pg_001_fundamental  | INSERT 0 1
+2025-12-01T11:11:30.1035547Z pg_001_fundamental  | 2025-12-01 16:10:32.385035
+2025-12-01T11:11:30.1035790Z pg_001_fundamental  | 
+2025-12-01T11:11:30.1036056Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.1036432Z pg_001_fundamental  | ### compare wal-archive with pg_receivewal
+2025-12-01T11:11:30.1036793Z pg_001_fundamental  | ######################################################################
+2025-12-01T11:11:30.1037098Z pg_001_fundamental  | 
+2025-12-01T11:11:30.1037325Z pg_001_fundamental  | 000000010000000000000060 differs
+2025-12-01T11:11:30.1064573Z ##[group]Run set -euo pipefail
+2025-12-01T11:11:30.1064889Z [36;1mset -euo pipefail[0m
+2025-12-01T11:11:30.1065196Z [36;1mdocker compose -f "${COMPOSE_FILE_PAR}" down -v || true[0m
+2025-12-01T11:11:30.1097148Z shell: /usr/bin/bash -e {0}
+2025-12-01T11:11:30.1097372Z env:
+2025-12-01T11:11:30.1097562Z   CACHE_FOLDER: docker-cache
+2025-12-01T11:11:30.1097843Z   CACHE_FILE_DOCKER_SSHD: docker-cache/docker_sshd.tgz
+2025-12-01T11:11:30.1098214Z   CACHE_FILE_DOCKER_PG_PRIMARY: docker-cache/docker_pg_primary.tgz
+2025-12-01T11:11:30.1098626Z   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
+2025-12-01T11:11:30.1098991Z   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
+2025-12-01T11:11:30.1099335Z   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+2025-12-01T11:11:30.1099701Z   COMPOSE_FILE: test/integration/environ/docker-compose.yml
+2025-12-01T11:11:30.1100002Z   PG_MAJOR: 18
+2025-12-01T11:11:30.1100205Z   TEST_NAME: pg_001_fundamental
+2025-12-01T11:11:30.1100564Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
+2025-12-01T11:11:30.1100940Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
+2025-12-01T11:11:30.1101479Z ##[endgroup]
+2025-12-01T11:11:30.1847084Z  Container pg_001_fundamental  Stopping
+2025-12-01T11:11:30.1849715Z  Container pg_001_fundamental  Stopped
+2025-12-01T11:11:30.1850152Z  Container pg_001_fundamental  Removing
+2025-12-01T11:11:31.3316660Z  Container pg_001_fundamental  Removed
+2025-12-01T11:11:31.3317184Z  Container pgrwl_sshd  Stopping
+2025-12-01T11:11:31.3319410Z  Container pgrwl_minio  Stopping
+2025-12-01T11:11:31.4810931Z  Container pgrwl_sshd  Stopped
+2025-12-01T11:11:31.4811671Z  Container pgrwl_sshd  Removing
+2025-12-01T11:11:31.4850645Z  Container pgrwl_sshd  Removed
+2025-12-01T11:11:31.5032056Z  Container pgrwl_minio  Stopped
+2025-12-01T11:11:31.5033659Z  Container pgrwl_minio  Removing
+2025-12-01T11:11:31.5080373Z  Container pgrwl_minio  Removed
+2025-12-01T11:11:31.5087285Z  Volume pgrwl_pg18_pg_001_fundamental_minio_data  Removing
+2025-12-01T11:11:31.5089150Z  Network pgrwl_pg18_pg_001_fundamental_default  Removing
+2025-12-01T11:11:31.5106092Z  Volume pgrwl_pg18_pg_001_fundamental_minio_data  Removed
+2025-12-01T11:11:31.6276287Z  Network pgrwl_pg18_pg_001_fundamental_default  Removed
+2025-12-01T11:11:31.6399882Z Post job cleanup.
+2025-12-01T11:11:31.8287666Z [command]/usr/bin/git version
+2025-12-01T11:11:31.8334763Z git version 2.51.2
+2025-12-01T11:11:31.8379349Z Temporarily overriding HOME='/home/runner/work/_temp/1002d554-d006-4c37-b048-51810764b432' before making global git config changes
+2025-12-01T11:11:31.8380612Z Adding repository directory to the temporary git global config as a safe directory
+2025-12-01T11:11:31.8384973Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/pgrwl/pgrwl
+2025-12-01T11:11:31.8418352Z Removing SSH command configuration
+2025-12-01T11:11:31.8424646Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-12-01T11:11:31.8462746Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-12-01T11:11:31.8711592Z Removing HTTP extra header
+2025-12-01T11:11:31.8716685Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-12-01T11:11:31.8750580Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-12-01T11:11:31.8971300Z Removing includeIf entries pointing to credentials config files
+2025-12-01T11:11:31.8978038Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2025-12-01T11:11:31.9000636Z includeif.gitdir:/home/runner/work/pgrwl/pgrwl/.git.path
+2025-12-01T11:11:31.9001481Z includeif.gitdir:/github/workspace/.git.path
+2025-12-01T11:11:31.9011290Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/pgrwl/pgrwl/.git.path
+2025-12-01T11:11:31.9032420Z /home/runner/work/_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config
+2025-12-01T11:11:31.9045872Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/pgrwl/pgrwl/.git.path /home/runner/work/_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config
+2025-12-01T11:11:31.9079280Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2025-12-01T11:11:31.9100802Z /github/runner_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config
+2025-12-01T11:11:31.9110818Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config
+2025-12-01T11:11:31.9143588Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2025-12-01T11:11:31.9362776Z Removing credentials config '/home/runner/work/_temp/git-credentials-d4cdbbfa-59b8-4bcd-878f-6adbf8a95e4a.config'
+2025-12-01T11:11:31.9502041Z Cleaning up orphan processes

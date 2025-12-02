@@ -62,7 +62,7 @@ run: build ## Run the binary with local config
 	export PGPORT="5432" && \
 	export PGUSER="postgres" && \
 	export PGPASSWORD="postgres" && \
-	bin/$(OUTPUT) start -c hack/configs/localfs/receive.yml -m receive
+	bin/$(OUTPUT) daemon -c hack/configs/localfs/receive.yml -m receive
 
 .PHONY: profile-cpu
 profile-cpu: ## Capture CPU profile and open web UI
