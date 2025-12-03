@@ -114,8 +114,9 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 	}
 
 	result := &Result{
-		StartLSN:   startResp.LSN,
-		TimelineID: startResp.TimelineID,
+		StartLSN:    startResp.LSN,
+		TimelineID:  startResp.TimelineID,
+		Tablespaces: getTblspcInfo(startResp.Tablespaces),
 	}
 
 	log := bb.log()
@@ -222,17 +223,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 
 			log.Info("finished backup", slog.String("StopLSN", stopRes.LSN.String()))
 
-			var tablespaces []Tablespace
-			for _, ts := range stopRes.Tablespaces {
-				tablespaces = append(tablespaces, Tablespace{
-					OID:      ts.OID,
-					Location: ts.Location,
-					Size:     ts.Size,
-				})
-			}
-
 			result.StopLSN = stopRes.LSN
-			result.Tablespaces = tablespaces
 			result.BytesTotal = totalBytes
 
 			return result, nil
@@ -250,4 +241,16 @@ func readCString(buf []byte) (string, []byte, error) {
 		return "", nil, fmt.Errorf("invalid CString: %q", string(buf))
 	}
 	return string(buf[:idx]), buf[idx+1:], nil
+}
+
+func getTblspcInfo(t []pglogrepl.BaseBackupTablespace) []Tablespace {
+	r := []Tablespace{}
+	for _, elem := range t {
+		r = append(r, Tablespace{
+			OID:      elem.OID,
+			Location: elem.Location,
+			Size:     elem.Size,
+		})
+	}
+	return r
 }
