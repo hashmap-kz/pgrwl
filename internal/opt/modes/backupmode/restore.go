@@ -25,6 +25,7 @@ type RestoreInfo struct {
 }
 
 func makeRestoreInfo(backupID string, backupFiles []string) *RestoreInfo {
+	loggr := slog.With(slog.String("component", "restore"), slog.String("id", backupID))
 	r := RestoreInfo{}
 
 	// 0 = {string} "20251203150245/20251203150245.json"
@@ -32,9 +33,20 @@ func makeRestoreInfo(backupID string, backupFiles []string) *RestoreInfo {
 	// 2 = {string} "20251203150245/base.tar"
 
 	for _, fname := range backupFiles {
+		// slight cleanup of path for querying
 		tmp := filepath.ToSlash(fname)
 		tmp = strings.TrimPrefix(tmp, backupID+"/")
-		if strings.HasPrefix(tmp, backupID+".json") {
+
+		// check that files we have
+		isManifest := strings.HasPrefix(tmp, backupID+".json")
+		correctFile := isManifest || strings.HasSuffix(tmp, ".tar")
+		if !correctFile {
+			loggr.Warn("skipping unknown type of file", slog.String("name", fname))
+			continue
+		}
+
+		// build result
+		if isManifest {
 			r.ManifestFile = fname
 		} else if strings.HasPrefix(tmp, "base.") {
 			r.BaseTar = fname
