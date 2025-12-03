@@ -31,7 +31,6 @@ type BaseBackup interface {
 type Tablespace struct {
 	OID      int32  `json:"oid,omitempty"`
 	Location string `json:"location,omitempty"`
-	Size     int8   `json:"size,omitempty"`
 }
 
 // Result will hold the return values  of the BaseBackup command
@@ -249,7 +248,6 @@ func getTblspcInfo(t []pglogrepl.BaseBackupTablespace) []Tablespace {
 		r = append(r, Tablespace{
 			OID:      elem.OID,
 			Location: elem.Location,
-			Size:     elem.Size,
 		})
 	}
 	return r

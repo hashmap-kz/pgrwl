@@ -3,12 +3,15 @@ package backupmode
 import (
 	"archive/tar"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/hashmap-kz/storecrypt/pkg/storage"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
@@ -55,6 +58,30 @@ func makeRestoreInfo(backupID string, backupFiles []string) *RestoreInfo {
 		}
 	}
 	return &r
+}
+
+func readManifestFile(
+	ctx context.Context,
+	backupID string,
+	stor storage.Storage,
+	ri *RestoreInfo,
+) (*Result, error) {
+	if ri.ManifestFile == "" {
+		return nil, fmt.Errorf("no manifest file (*%s.json*) found for backup %s", backupID+".json", backupID)
+	}
+	mrc, err := stor.Get(ctx, ri.ManifestFile)
+	if err != nil {
+		return nil, fmt.Errorf("get manifest %s: %w", ri.ManifestFile, err)
+	}
+	var mf Result
+	if err := json.NewDecoder(mrc).Decode(&mf); err != nil {
+		mrc.Close()
+		return nil, fmt.Errorf("decode manifest %s: %w", ri.ManifestFile, err)
+	}
+	if err := mrc.Close(); err != nil {
+		return nil, err
+	}
+	return &mf, nil
 }
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
@@ -115,7 +142,9 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 		return err
 	}
 
-	_ = makeRestoreInfo(backupID, backupFiles)
+	ri := makeRestoreInfo(backupID, backupFiles)
+	//nolint:errcheck
+	_, _ = readManifestFile(ctx, backupID, stor, ri)
 
 	// TODO: tablespaces
 	// untar archives
