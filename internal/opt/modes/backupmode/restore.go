@@ -18,6 +18,33 @@ import (
 	"github.com/hashmap-kz/pgrwl/config"
 )
 
+type RestoreInfo struct {
+	BaseTar         string
+	TablespacesTars []string
+	ManifestFile    string
+}
+
+func makeRestoreInfo(backupID string, backupFiles []string) *RestoreInfo {
+	r := RestoreInfo{}
+
+	// 0 = {string} "20251203150245/20251203150245.json"
+	// 1 = {string} "20251203150245/25222.tar"
+	// 2 = {string} "20251203150245/base.tar"
+
+	for _, fname := range backupFiles {
+		tmp := filepath.ToSlash(fname)
+		tmp = strings.TrimPrefix(tmp, backupID+"/")
+		if strings.HasPrefix(tmp, backupID+".json") {
+			r.ManifestFile = fname
+		} else if strings.HasPrefix(tmp, "base.") {
+			r.BaseTar = fname
+		} else {
+			r.TablespacesTars = append(r.TablespacesTars, fname)
+		}
+	}
+	return &r
+}
+
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
 
@@ -75,6 +102,8 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	if err != nil {
 		return err
 	}
+
+	_ = makeRestoreInfo(backupID, backupFiles)
 
 	// TODO: tablespaces
 	// untar archives
