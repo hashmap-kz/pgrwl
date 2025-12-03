@@ -86,6 +86,8 @@ func readManifestFile(
 
 //nolint:unused
 func restoreTblspc() {
+	// filesystem:
+	//
 	// root@deb:/mnt/894.3G/postgresql/pg_tblspc# ls -lah
 	// total 8.0K
 	// drwx------  2 postgres postgres 4.0K Nov 27 22:13 .
@@ -97,6 +99,21 @@ func restoreTblspc() {
 	// drwx------ 3 postgres postgres 4.0K Nov 27 22:13 .
 	// drwxr-xr-x 3 root     root     4.0K Nov 27 22:13 ..
 	// drwx------ 3 postgres postgres 4.0K Dec  3 19:40 PG_17_202406281
+
+	// manifest:
+	//
+	// {
+	//   "start_lsn": 40047214632,
+	//   "stop_lsn": 40047214880,
+	//   "timeline_id": 1,
+	//   "tablespaces": [
+	//     {
+	//       "oid": 25222,
+	//       "location": "/mnt/pg_tablespaces/my_data_tablespace"
+	//     }
+	//   ],
+	//   "bytes_total": 46151680
+	// }
 }
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
