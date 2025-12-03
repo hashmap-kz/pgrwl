@@ -84,6 +84,21 @@ func readManifestFile(
 	return &mf, nil
 }
 
+//nolint:unused
+func restoreTblspc() {
+	// root@deb:/mnt/894.3G/postgresql/pg_tblspc# ls -lah
+	// total 8.0K
+	// drwx------  2 postgres postgres 4.0K Nov 27 22:13 .
+	// drwx------ 19 postgres postgres 4.0K Dec  3 18:52 ..
+	// lrwxrwxrwx  1 postgres postgres   38 Nov 27 22:13 25222 -> /mnt/pg_tablespaces/my_data_tablespace
+	//
+	// root@deb:/mnt/894.3G/postgresql/pg_tblspc# ls -lah /mnt/pg_tablespaces/my_data_tablespace
+	// total 12K
+	// drwx------ 3 postgres postgres 4.0K Nov 27 22:13 .
+	// drwxr-xr-x 3 root     root     4.0K Nov 27 22:13 ..
+	// drwx------ 3 postgres postgres 4.0K Dec  3 19:40 PG_17_202406281
+}
+
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
 
