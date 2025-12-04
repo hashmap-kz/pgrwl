@@ -133,7 +133,6 @@ func TestFindStreamingStart_MultipleFilesMixed(t *testing.T) {
 		assert.NoError(t, os.WriteFile(path, make([]byte, contentSize), 0o600))
 
 		if f.preferred {
-			//nolint:gosec
 			expectedTLI = uint32(f.tli)
 			if f.partial {
 				expectedLSN = XLogSegNoToRecPtr(f.seg, segSize)

@@ -196,7 +196,6 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 			case 'p':
 				// only if Progress: true
 				if len(m.Data) >= 9 {
-					//nolint:gosec
 					bytesDone := int64(binary.BigEndian.Uint64(m.Data[1:9]))
 					log.Info("progress",
 						slog.String("file", remotePath),

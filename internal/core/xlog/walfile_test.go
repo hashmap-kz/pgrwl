@@ -40,7 +40,7 @@ func TestOpenWalFile_CreateAndTruncate(t *testing.T) {
 
 	stat, err := os.Stat(stream.walfile.pathname)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(stream.walSegSz), stat.Size()) //nolint:gosec
+	assert.Equal(t, int64(stream.walSegSz), stat.Size())
 }
 
 func TestWriteAtWalFile(t *testing.T) {
@@ -84,7 +84,6 @@ func TestWriteAtWalFile_LoopAndVerify(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, len(chunk), n)
 
-		//nolint:gosec
 		offset += uint64(n)
 		expectedData = append(expectedData, chunk...)
 	}
