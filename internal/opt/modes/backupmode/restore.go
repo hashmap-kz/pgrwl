@@ -84,7 +84,7 @@ func readManifestFile(
 	return &mf, nil
 }
 
-func getTblspcLocation(tarName string, mf *Result) (string, error) {
+func getTblspcLocation(tarName string, mf *Result) (Tablespace, error) {
 	// storage:
 	//
 	// 0 = {string} "20251203150245/20251203150245.json"
@@ -121,16 +121,16 @@ func getTblspcLocation(tarName string, mf *Result) (string, error) {
 	// drwx------ 3 postgres postgres 4.0K Dec  3 19:40 PG_17_202406281
 
 	if len(mf.Tablespaces) == 0 {
-		return "", fmt.Errorf("tablespaces map is empty")
+		return Tablespace{}, fmt.Errorf("tablespaces map is empty")
 	}
 	for _, ts := range mf.Tablespaces {
 		// tarName -> "20251203150245/25222.tar"
 		// ts.OID  -> 25222
 		if strings.HasPrefix(filepath.Base(tarName), fmt.Sprintf("%d", ts.OID)) {
-			return ts.Location, nil
+			return ts, nil
 		}
 	}
-	return "", fmt.Errorf("cannot find tablespace target location: %s", tarName)
+	return Tablespace{}, fmt.Errorf("cannot find tablespace target location: %s", tarName)
 }
 
 func checkTblspcDirsEmpty(
@@ -147,12 +147,13 @@ func checkTblspcDirsEmpty(
 	// safe check
 	// refusing to restore, if a target dir exists and it's not empty
 	for _, f := range ri.TablespacesTars {
-		dest, err := getTblspcLocation(f, mf)
-		// TODO: for tests only
-		dest = filepath.Join(dest, "tmp-restore-testing-xxxxx")
+		tsInfo, err := getTblspcLocation(f, mf)
 		if err != nil {
 			return err
 		}
+
+		// TODO: for tests only
+		dest := filepath.Join(tsInfo.Location, "restore-tblspc-tmp-xxx")
 
 		loggr.Debug("check that target dir for restoring tblspc is empty", slog.String("path", dest))
 		dirExistsAndNotEmpty, err := fsx.DirExistsAndNotEmpty(dest)
@@ -168,7 +169,7 @@ func checkTblspcDirsEmpty(
 
 func restoreTblspc(
 	ctx context.Context,
-	id string,
+	id, pgdata string,
 	stor storage.Storage,
 	ri *RestoreInfo,
 	mf *Result,
@@ -184,17 +185,25 @@ func restoreTblspc(
 		if err != nil {
 			return fmt.Errorf("get %s: %w", id, err)
 		}
-		dest, err := getTblspcLocation(f, mf)
-		// TODO: for tests only
-		dest = filepath.Join(dest, "tmp-restore-testing-xxxxx")
+		tsInfo, err := getTblspcLocation(f, mf)
 		if err != nil {
 			return err
 		}
+
+		// TODO: for tests only
+		dest := filepath.Join(tsInfo.Location, "restore-tblspc-tmp-xxx")
+
 		loggr.Info("tblspc restore dest", slog.String("path", dest))
 		if err := untar(rc, dest); err != nil {
 			return fmt.Errorf("untar %s: %w", id, err)
 		}
 		if err := rc.Close(); err != nil {
+			return err
+		}
+
+		// create link
+		tsInPgdata := filepath.Join(pgdata, "pg_tblspc", fmt.Sprintf("%d", tsInfo.OID))
+		if err := os.Symlink(tsInPgdata, dest); err != nil {
 			return err
 		}
 	}
@@ -255,12 +264,14 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// get backup files for restore (*.tar)
+	loggr.Info("querying backup files in storage")
 	backupFiles, err := stor.List(ctx, backupID)
 	if err != nil {
 		return err
 	}
 
 	// construct restore info, prepare manifest
+	loggr.Info("construct restore info")
 	ri := makeRestoreInfo(backupID, backupFiles)
 	mf, err := readManifestFile(ctx, backupID, stor, ri)
 	if err != nil {
@@ -268,6 +279,7 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// preflight checks
+	loggr.Info("running preflight checks")
 	err = checkTblspcDirsEmpty(backupID, ri, mf)
 	if err != nil {
 		return err
@@ -276,6 +288,7 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	// TODO: restore in goroutines (worker-pool)
 
 	// 1) restore base
+	loggr.Info("restoring basebackup")
 	rc, err := stor.Get(ctx, ri.BaseTar)
 	if err != nil {
 		return fmt.Errorf("get %s: %w", id, err)
@@ -288,7 +301,8 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// 2) restore tablespaces
-	err = restoreTblspc(ctx, backupID, stor, ri, mf)
+	loggr.Info("restoring tablespaces")
+	err = restoreTblspc(ctx, backupID, dest, stor, ri, mf)
 	if err != nil {
 		return err
 	}
