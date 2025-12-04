@@ -199,15 +199,36 @@ func restoreTblspc(
 			return err
 		}
 
-		// TODO: ensure link
-		//
-		// tsInPgdata := filepath.Join(pgdata, "pg_tblspc", fmt.Sprintf("%d", tsInfo.OID))
-		// if err := os.Symlink(tsInPgdata, dest); err != nil {
-		// 	return err
-		// }
+		tsInPgdata := filepath.Join(pgdata, "pg_tblspc", fmt.Sprintf("%d", tsInfo.OID))
+		if err := ensureSymlink(dest, tsInPgdata); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func isSymlinkTo(oldName, newName string) bool {
+	file, err := os.Stat(newName)
+	if err != nil {
+		return false
+	}
+	if file.Mode()&os.ModeSymlink != os.ModeSymlink {
+		return false
+	}
+	target, err := os.Readlink(newName)
+	if err != nil {
+		return false
+	}
+	return target == oldName
+}
+
+func ensureSymlink(oldName, newName string) error {
+	if isSymlinkTo(oldName, newName) {
+		return nil
+	}
+	_ = os.Remove(newName)
+	return os.Symlink(oldName, newName)
 }
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
