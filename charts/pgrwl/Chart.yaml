@@ -2,5 +2,5 @@ apiVersion: v2
 name: pgrwl
 description: Cloud-native PostgreSQL WAL receiver
 type: application
-version: 0.0.2
-appVersion: "1.0.25"
+version: 0.0.3
+appVersion: "1.0.26"
