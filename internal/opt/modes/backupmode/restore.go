@@ -199,11 +199,12 @@ func restoreTblspc(
 			return err
 		}
 
-		// create link
-		tsInPgdata := filepath.Join(pgdata, "pg_tblspc", fmt.Sprintf("%d", tsInfo.OID))
-		if err := os.Symlink(tsInPgdata, dest); err != nil {
-			return err
-		}
+		// TODO: ensure link
+		//
+		// tsInPgdata := filepath.Join(pgdata, "pg_tblspc", fmt.Sprintf("%d", tsInfo.OID))
+		// if err := os.Symlink(tsInPgdata, dest); err != nil {
+		// 	return err
+		// }
 	}
 
 	return nil
