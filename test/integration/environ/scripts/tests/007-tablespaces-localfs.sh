@@ -116,7 +116,7 @@ EOSQL
 
   # save and cleanup tablespaces
   cp -r "/tmp/spaces" "/tmp/spaces_backup"
-  rm -rf "/tmp/spaces/*"
+  rm -rf /tmp/spaces/*
 
   # restore from backup
   echo_delim "restoring backup"

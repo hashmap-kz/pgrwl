@@ -9,17 +9,16 @@
       "program": "${workspaceFolder}/main.go",
       "buildFlags": "-tags=debug",
       "args": [
-        "restore",
+        "daemon",
         "-c",
-        "${workspaceFolder}/hack/configs/localfs/receive.yml",
-        "--dest",
-        "backups"
+        "${workspaceFolder}/hack/configs/localfs/receive.yml"
       ],
       "env": {
         "PGHOST": "localhost",
         "PGPORT": "5432",
         "PGUSER": "postgres",
-        "PGPASSWORD": "postgres"
+        "PGPASSWORD": "postgres",
+        "PGRWL_DAEMON_MODE": "receive"
       },
       "console": "integratedTerminal"
     }

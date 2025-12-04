@@ -1,17 +1,15 @@
-package backupmode
+package restorecmd
 
 import (
-	"archive/tar"
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/tarx"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
@@ -71,71 +69,46 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	}
 
 	// get backup files for restore (*.tar)
+	loggr.Info("querying backup files in storage")
 	backupFiles, err := stor.List(ctx, backupID)
 	if err != nil {
 		return err
 	}
 
-	// TODO: tablespaces
-	// untar archives
-	for _, f := range backupFiles {
-		loggr.Debug("restoring file", slog.String("path", filepath.ToSlash(f)))
-		// skip internals
-		if strings.Contains(f, backupID+".json") {
-			continue
-		}
-
-		rc, err := stor.Get(ctx, f)
-		if err != nil {
-			return fmt.Errorf("get %s: %w", id, err)
-		}
-		// TODO: log() func
-		if err := untar(rc, dest, loggr); err != nil {
-			return fmt.Errorf("untar %s: %w", id, err)
-		}
-		if err := rc.Close(); err != nil {
-			return err
-		}
+	// construct restore info, prepare manifest
+	loggr.Info("construct restore info")
+	ri := makeRestoreInfo(backupID, backupFiles)
+	mf, err := readManifestFile(ctx, backupID, stor, ri)
+	if err != nil {
+		return err
 	}
-	return nil
-}
 
-func untar(r io.Reader, dest string, loggr *slog.Logger) error {
-	tr := tar.NewReader(r)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-
-		//nolint:gosec
-		target := filepath.ToSlash(filepath.Join(dest, hdr.Name))
-		loggr.Debug("tar target", slog.String("path", target))
-
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o700); err != nil {
-				return err
-			}
-		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-				return err
-			}
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-			if err != nil {
-				return err
-			}
-			//nolint:gosec
-			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
-				return err
-			}
-			f.Close()
-		default:
-			// skip other types (e.g., symlinks in tar)
-		}
+	// preflight checks
+	loggr.Info("running preflight checks")
+	err = checkTblspcDirsEmpty(backupID, ri, mf)
+	if err != nil {
+		return err
 	}
+
+	// 1) restore base
+	loggr.Info("restoring basebackup")
+	rc, err := stor.Get(ctx, ri.BaseTar)
+	if err != nil {
+		return fmt.Errorf("get %s: %w", id, err)
+	}
+	if err := tarx.Untar(rc, dest); err != nil {
+		return fmt.Errorf("untar %s: %w", id, err)
+	}
+	if err := rc.Close(); err != nil {
+		return err
+	}
+
+	// 2) restore tablespaces
+	loggr.Info("restoring tablespaces")
+	err = restoreTblspc(ctx, backupID, dest, stor, ri, mf)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

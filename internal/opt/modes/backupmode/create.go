@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	"github.com/hashmap-kz/pgrwl/config"
@@ -18,7 +19,7 @@ type CreateBaseBackupOpts struct {
 	Directory string
 }
 
-func CreateBaseBackup(opts *CreateBaseBackupOpts) (*Result, error) {
+func CreateBaseBackup(opts *CreateBaseBackupOpts) (*backupdto.Result, error) {
 	var err error
 
 	// setup context

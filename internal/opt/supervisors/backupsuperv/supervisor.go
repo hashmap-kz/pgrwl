@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
@@ -205,7 +206,7 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 	return nil
 }
 
-func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.Storage, backupID string) (*backupmode.Result, error) {
+func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.Storage, backupID string) (*backupdto.Result, error) {
 	manifestFilename := filepath.Base(backupID) + ".json"
 	manifestRdr, err := stor.Get(ctx, filepath.ToSlash(filepath.Join(filepath.Base(backupID), manifestFilename)))
 	if err != nil {
@@ -214,7 +215,7 @@ func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.St
 	defer manifestRdr.Close()
 
 	// unmarshal
-	var info backupmode.Result
+	var info backupdto.Result
 	if err := json.NewDecoder(manifestRdr).Decode(&info); err != nil {
 		return nil, err
 	}

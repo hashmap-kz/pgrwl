@@ -48,3 +48,26 @@ func DirExistsAndNotEmpty(path string) (bool, error) {
 
 	return len(entries) > 0, nil
 }
+
+func isSymlinkTo(oldName, newName string) bool {
+	file, err := os.Stat(newName)
+	if err != nil {
+		return false
+	}
+	if file.Mode()&os.ModeSymlink != os.ModeSymlink {
+		return false
+	}
+	target, err := os.Readlink(newName)
+	if err != nil {
+		return false
+	}
+	return target == oldName
+}
+
+func EnsureSymlink(oldName, newName string) error {
+	if isSymlinkTo(oldName, newName) {
+		return nil
+	}
+	_ = os.Remove(newName)
+	return os.Symlink(oldName, newName)
+}

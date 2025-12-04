@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 
@@ -24,23 +25,7 @@ import (
 
 // BaseBackup is an API for streaming basebackup
 type BaseBackup interface {
-	StreamBackup(ctx context.Context) (*Result, error)
-}
-
-// Tablespace represents a tablespace in the backup
-type Tablespace struct {
-	OID      int32  `json:"oid,omitempty"`
-	Location string `json:"location,omitempty"`
-	Size     int8   `json:"size,omitempty"`
-}
-
-// Result will hold the return values  of the BaseBackup command
-type Result struct {
-	StartLSN    pglogrepl.LSN `json:"start_lsn,omitempty"`
-	StopLSN     pglogrepl.LSN `json:"stop_lsn,omitempty"`
-	TimelineID  int32         `json:"timeline_id,omitempty"`
-	Tablespaces []Tablespace  `json:"tablespaces,omitempty"`
-	BytesTotal  int64         `json:"bytes_total,omitempty"`
+	StreamBackup(ctx context.Context) (*backupdto.Result, error)
 }
 
 type baseBackup struct {
@@ -75,7 +60,7 @@ func (bb *baseBackup) log() *slog.Logger {
 	return slog.With(slog.String("component", "basebackup"), slog.String("id", bb.timestamp))
 }
 
-func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
+func (bb *baseBackup) StreamBackup(ctx context.Context) (*backupdto.Result, error) {
 	result, err := bb.streamBaseBackup(ctx)
 	if err != nil {
 		return nil, err
@@ -99,7 +84,7 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*Result, error) {
 	return result, nil
 }
 
-func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
+func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, error) {
 	startResp, err := pglogrepl.StartBaseBackup(ctx, bb.conn, pglogrepl.BaseBackupOptions{
 		Label:         fmt.Sprintf("pgrwl_%s", bb.timestamp),
 		Progress:      false, // or true if you want to use 'p'
@@ -113,9 +98,10 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 		return nil, fmt.Errorf("start base backup: %w", err)
 	}
 
-	result := &Result{
-		StartLSN:   startResp.LSN,
-		TimelineID: startResp.TimelineID,
+	result := &backupdto.Result{
+		StartLSN:    startResp.LSN,
+		TimelineID:  startResp.TimelineID,
+		Tablespaces: getTblspcInfo(startResp.Tablespaces),
 	}
 
 	log := bb.log()
@@ -196,7 +182,6 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 			case 'p':
 				// only if Progress: true
 				if len(m.Data) >= 9 {
-					//nolint:gosec
 					bytesDone := int64(binary.BigEndian.Uint64(m.Data[1:9]))
 					log.Info("progress",
 						slog.String("file", remotePath),
@@ -222,17 +207,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*Result, error) {
 
 			log.Info("finished backup", slog.String("StopLSN", stopRes.LSN.String()))
 
-			var tablespaces []Tablespace
-			for _, ts := range stopRes.Tablespaces {
-				tablespaces = append(tablespaces, Tablespace{
-					OID:      ts.OID,
-					Location: ts.Location,
-					Size:     ts.Size,
-				})
-			}
-
 			result.StopLSN = stopRes.LSN
-			result.Tablespaces = tablespaces
 			result.BytesTotal = totalBytes
 
 			return result, nil
@@ -250,4 +225,15 @@ func readCString(buf []byte) (string, []byte, error) {
 		return "", nil, fmt.Errorf("invalid CString: %q", string(buf))
 	}
 	return string(buf[:idx]), buf[idx+1:], nil
+}
+
+func getTblspcInfo(t []pglogrepl.BaseBackupTablespace) []backupdto.Tablespace {
+	r := []backupdto.Tablespace{}
+	for _, elem := range t {
+		r = append(r, backupdto.Tablespace{
+			OID:      elem.OID,
+			Location: elem.Location,
+		})
+	}
+	return r
 }
