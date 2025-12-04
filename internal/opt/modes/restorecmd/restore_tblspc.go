@@ -1,4 +1,4 @@
-package backupmode
+package restorecmd
 
 import (
 	"context"
@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/tarx"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
-func getTblspcLocation(tarName string, mf *Result) (Tablespace, error) {
+func getTblspcLocation(tarName string, mf *backupdto.Result) (backupdto.Tablespace, error) {
 	// storage:
 	//
 	// 0 = {string} "20251203150245/20251203150245.json"
@@ -48,7 +50,7 @@ func getTblspcLocation(tarName string, mf *Result) (Tablespace, error) {
 	// drwx------ 3 postgres postgres 4.0K Dec  3 19:40 PG_17_202406281
 
 	if len(mf.Tablespaces) == 0 {
-		return Tablespace{}, fmt.Errorf("tablespaces map is empty")
+		return backupdto.Tablespace{}, fmt.Errorf("tablespaces map is empty")
 	}
 	for _, ts := range mf.Tablespaces {
 		// tarName -> "20251203150245/25222.tar"
@@ -57,13 +59,13 @@ func getTblspcLocation(tarName string, mf *Result) (Tablespace, error) {
 			return ts, nil
 		}
 	}
-	return Tablespace{}, fmt.Errorf("cannot find tablespace target location: %s", tarName)
+	return backupdto.Tablespace{}, fmt.Errorf("cannot find tablespace target location: %s", tarName)
 }
 
 func checkTblspcDirsEmpty(
 	id string,
-	ri *RestoreInfo,
-	mf *Result,
+	ri *backupdto.RestoreInfo,
+	mf *backupdto.Result,
 ) error {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
 	if len(ri.TablespacesTars) == 0 {
@@ -97,8 +99,8 @@ func restoreTblspc(
 	ctx context.Context,
 	id, pgdata string,
 	stor storage.Storage,
-	ri *RestoreInfo,
-	mf *Result,
+	ri *backupdto.RestoreInfo,
+	mf *backupdto.Result,
 ) error {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
 
@@ -119,7 +121,7 @@ func restoreTblspc(
 		dest := tsInfo.Location
 
 		loggr.Info("tblspc restore dest", slog.String("path", dest))
-		if err := untar(rc, dest); err != nil {
+		if err := tarx.Untar(rc, dest); err != nil {
 			return fmt.Errorf("untar %s: %w", id, err)
 		}
 		if err := rc.Close(); err != nil {

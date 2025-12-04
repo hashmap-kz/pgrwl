@@ -1,4 +1,4 @@
-package backupmode
+package restorecmd
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/tarx"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
@@ -95,7 +96,7 @@ func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string)
 	if err != nil {
 		return fmt.Errorf("get %s: %w", id, err)
 	}
-	if err := untar(rc, dest); err != nil {
+	if err := tarx.Untar(rc, dest); err != nil {
 		return fmt.Errorf("untar %s: %w", id, err)
 	}
 	if err := rc.Close(); err != nil {

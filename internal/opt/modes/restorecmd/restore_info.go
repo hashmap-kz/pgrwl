@@ -1,4 +1,4 @@
-package backupmode
+package restorecmd
 
 import (
 	"context"
@@ -8,18 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
 	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
-type RestoreInfo struct {
-	BaseTar         string
-	TablespacesTars []string
-	ManifestFile    string
-}
-
-func makeRestoreInfo(backupID string, backupFiles []string) *RestoreInfo {
+func makeRestoreInfo(backupID string, backupFiles []string) *backupdto.RestoreInfo {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", backupID))
-	r := RestoreInfo{}
+	r := backupdto.RestoreInfo{}
 
 	// 0 = {string} "20251203150245/20251203150245.json"
 	// 1 = {string} "20251203150245/25222.tar"
@@ -54,8 +49,8 @@ func readManifestFile(
 	ctx context.Context,
 	backupID string,
 	stor storage.Storage,
-	ri *RestoreInfo,
-) (*Result, error) {
+	ri *backupdto.RestoreInfo,
+) (*backupdto.Result, error) {
 	if ri.ManifestFile == "" {
 		return nil, fmt.Errorf("no manifest file (*%s.json*) found for backup %s", backupID+".json", backupID)
 	}
@@ -63,7 +58,7 @@ func readManifestFile(
 	if err != nil {
 		return nil, fmt.Errorf("get manifest %s: %w", ri.ManifestFile, err)
 	}
-	var mf Result
+	var mf backupdto.Result
 	if err := json.NewDecoder(mrc).Decode(&mf); err != nil {
 		mrc.Close()
 		return nil, fmt.Errorf("decode manifest %s: %w", ri.ManifestFile, err)

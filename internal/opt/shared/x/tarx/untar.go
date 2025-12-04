@@ -1,4 +1,4 @@
-package backupmode
+package tarx
 
 import (
 	"archive/tar"
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-func untar(r io.Reader, dest string) error {
+func Untar(r io.Reader, dest string) error {
 	loggr := slog.With(slog.String("component", "restore-untar"), slog.String("dest", dest))
 
 	tr := tar.NewReader(r)
