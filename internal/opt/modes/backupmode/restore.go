@@ -152,8 +152,7 @@ func checkTblspcDirsEmpty(
 			return err
 		}
 
-		// TODO: for tests only
-		dest := filepath.Join(tsInfo.Location, "restore-tblspc-tmp-xxx")
+		dest := tsInfo.Location
 
 		loggr.Debug("check that target dir for restoring tblspc is empty", slog.String("path", dest))
 		dirExistsAndNotEmpty, err := fsx.DirExistsAndNotEmpty(dest)
@@ -190,8 +189,7 @@ func restoreTblspc(
 			return err
 		}
 
-		// TODO: for tests only
-		dest := filepath.Join(tsInfo.Location, "restore-tblspc-tmp-xxx")
+		dest := tsInfo.Location
 
 		loggr.Info("tblspc restore dest", slog.String("path", dest))
 		if err := untar(rc, dest); err != nil {
