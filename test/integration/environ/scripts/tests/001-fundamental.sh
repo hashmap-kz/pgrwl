@@ -29,6 +29,12 @@ set -euo pipefail
 # * Clean up WAL directories and rerun the WAL archivers on a new timeline (cleanup is necessary since we run receivers with --no-loop option)
 # * Compare the WAL directories again
 
+# curl -X POST http://localhost:7070/receiver/stop
+# curl -X POST http://localhost:7070/receiver/start
+# curl -X POST http://localhost:7070/archiver/stop
+# curl -X POST http://localhost:7070/archiver/start
+# curl         http://localhost:7070/control/status
+
 TEST_NAME=$(basename "$0" .sh)
 TEST_STATE_PATH="/var/lib/postgresql/test-state/${TEST_NAME}"
 
@@ -163,7 +169,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl daemon -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  curl --location --request POST 'http://localhost:7070/api/v1/switch-to-wal-serve'
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -191,14 +197,18 @@ EOF
   # compare with pg_receivewal
   echo_delim "compare wal-archive with pg_receivewal"
   find "${WAL_PATH}" -type f -name "*.json" -delete
+  find "${WAL_PATH}" -type f -name "*.history" -delete
+  find "${WAL_PATH}" -type f -name "*.tmp" -delete
+  find "${PG_RECEIVEWAL_WAL_PATH}" -type f -name "*.history" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
 
   # run receivers with a new timeline
   echo_delim "cleanup wal-archives, run wal-receivers with a new timeline"
   x_remake_dirs
   # run wal-receiver
-  pkill -f pgrwl || true
   xpg_create_slots
+  # re-run pgrwl
+  pkill -9 pgrwl || true
   nohup /usr/local/bin/pgrwl daemon -c "/tmp/config.json" -m receive >>"$LOG_FILE" 2>&1 &
   # run pg_receivewal
   nohup pg_receivewal -D "${PG_RECEIVEWAL_WAL_PATH}" -S pg_receivewal --no-loop --verbose --no-password --synchronous \
