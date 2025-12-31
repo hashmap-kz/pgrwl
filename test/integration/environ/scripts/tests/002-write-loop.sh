@@ -66,7 +66,6 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
-  x_stop_receiver
   x_stop_pg_receivewal
   xpg_teardown
 
@@ -90,7 +89,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  x_start_serving "/tmp/config.json"
+  curl --location --request POST 'http://localhost:7070/api/v1/switch-to-wal-serve'
 
   # cleanup logs
   >/var/log/postgresql/pg.log

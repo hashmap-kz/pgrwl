@@ -60,12 +60,6 @@ func App() *cli.Command {
 							NoLoop:           cfg.Receiver.NoLoop,
 							Verbose:          verbose,
 						})
-					} else if mode == config.ModeServe {
-						RunServeMode(&ServeModeOpts{
-							Directory:  filepath.ToSlash(cfg.Main.Directory),
-							ListenPort: cfg.Main.ListenPort,
-							Verbose:    verbose,
-						})
 					} else if mode == config.ModeBackup {
 						checkPgEnvsAreSet()
 						RunBackupMode(&BackupModeOpts{
