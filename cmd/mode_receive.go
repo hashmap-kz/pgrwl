@@ -9,14 +9,13 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
-
-	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
-
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/receivesuperv"
-
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
+	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+	receiveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
+	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/receivesuperv"
+	"github.com/hashmap-kz/pgrwl/internal/opt/wrk"
+
+	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 
 	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 
@@ -37,68 +36,66 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	cfg := config.Cfg()
 	loggr := slog.With("component", "receive-mode-runner")
 
-	// setup context
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	// global app context (SIGINT/SIGTERM)
+	appCtx, appCancel := context.WithCancel(context.Background())
+	appCtx, signalCancel := signal.NotifyContext(appCtx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
+	defer appCancel()
 
-	// print options
-	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
+	loggr.LogAttrs(appCtx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	//////////////////////////////////////////////////////////////////////
-	// Init WAL-receiver loop first
+	// init pgrw
+	pgrw := mustInitPgrw(appCtx, opts)
 
-	// setup wal-receiver
-	pgrw := mustInitPgrw(ctx, opts)
-
-	// Use WaitGroup to wait for all goroutines to finish
-	var wg sync.WaitGroup
-
-	// Signal channel to indicate that pgrw.Run() has started
-	started := make(chan struct{})
-
-	// main streaming loop
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				loggr.Error("wal-receiver panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "wal-receiver"),
-				)
-			}
-		}()
-
-		// Signal that we are starting Run()
-		close(started)
-
-		if err := pgrw.Run(ctx); err != nil {
-			loggr.Error("streaming failed", slog.Any("err", err))
-			cancel() // cancel everything on error
-		}
-	}()
-
-	// Wait until pgrw.Run() has started
-	<-started
-	loggr.Info("wal-receiver started")
-
-	//////////////////////////////////////////////////////////////////////
-	// Init OPT components
-
-	// setup job queue
-	loggr.Info("running job queue")
+	// job queue always running under appCtx
 	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
+	jobQueue.Start(appCtx)
 
-	// setup metrics
-	initMetrics(ctx, cfg, loggr)
+	initMetrics(appCtx, cfg, loggr)
 
-	// setup storage: it may be nil
 	stor := mustInitStorageIfRequired(cfg, loggr, opts)
 
-	// HTTP server
-	// It shouldn't cancel() the main streaming loop even on error.
+	var wg sync.WaitGroup
+
+	// Controllers
+
+	receiverCtl := wrk.NewWorkerController(
+		appCtx,
+		loggr.With("component", "wal-receiver"),
+		func(ctx context.Context) error {
+			return pgrw.Run(ctx)
+		},
+	)
+
+	var archiveCtl *wrk.WorkerController
+	if stor != nil {
+		archiveCtl = wrk.NewWorkerController(
+			appCtx,
+			loggr.With("component", "wal-archiver"),
+			func(ctx context.Context) error {
+				u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
+					ReceiveDirectory: opts.ReceiveDirectory,
+					PGRW:             pgrw,
+					Verbose:          opts.Verbose,
+				})
+				if cfg.Receiver.Retention.Enable {
+					u.RunWithRetention(ctx, jobQueue)
+				} else {
+					u.RunUploader(ctx, jobQueue)
+				}
+				return nil // loops only exit on ctx cancel
+			},
+		)
+	}
+
+	// start receiver + archiver
+	receiverCtl.Start()
+	if archiveCtl != nil {
+		archiveCtl.Start()
+	}
+
+	// HTTP server with control endpoints
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -110,50 +107,37 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				)
 			}
 		}()
-		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
-			PGRW:     pgrw,
-			BaseDir:  opts.ReceiveDirectory,
-			Verbose:  opts.Verbose,
-			Storage:  stor,
-			JobQueue: jobQueue,
+
+		handlers := receiveAPI.Init(&receiveAPI.ReceiveDaemonRunOpts{
+			PGRW:               pgrw,
+			BaseDir:            opts.ReceiveDirectory,
+			Verbose:            opts.Verbose,
+			Storage:            stor,
+			JobQueue:           jobQueue,
+			ReceiverController: receiverCtl,
+			ArchiveController:  archiveCtl,
 		})
 		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
-		if err := srv.Run(ctx); err != nil {
+		if err := srv.Run(appCtx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}
 	}()
 
-	// ArchiveSupervisor (run this goroutine ONLY when storage is required)
-	if stor != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					loggr.Error("upload loop panicked",
-						slog.Any("panic", r),
-						slog.String("goroutine", "wal-supervisor"),
-					)
-				}
-			}()
-			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
-				ReceiveDirectory: opts.ReceiveDirectory,
-				PGRW:             pgrw,
-				Verbose:          opts.Verbose,
-			})
-			if cfg.Receiver.Retention.Enable {
-				u.RunWithRetention(ctx, jobQueue)
-			} else {
-				u.RunUploader(ctx, jobQueue)
-			}
-		}()
+	// Wait for SIGINT/SIGTERM
+	<-appCtx.Done()
+	loggr.Info("shutting down, waiting for workers...")
+
+	// politely stop workers
+	receiverCtl.Stop()
+	if archiveCtl != nil {
+		archiveCtl.Stop()
 	}
 
-	// Wait for signal (context cancellation)
-	<-ctx.Done()
-	loggr.Info("shutting down, waiting for goroutines...")
+	receiverCtl.Wait()
+	if archiveCtl != nil {
+		archiveCtl.Wait()
+	}
 
-	// Wait for all goroutines to finish
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
 }

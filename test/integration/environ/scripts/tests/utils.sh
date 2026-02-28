@@ -126,17 +126,3 @@ x_generate_wal() {
       >/dev/null 2>&1
   done
 }
-
-x_start_serving() {
-  local cfg=$1
-  log_info "starting wal-serving with $cfg"
-
-  # Run the 'serve' mode in background.
-  #   * stdout  -> tee -> log file (append) -> /dev/null (discard)
-  #   * stderr  -> tee -> log file (append) -> original stderr (so it appears on console)
-  /usr/local/bin/pgrwl daemon -c "${cfg}" -m serve \
-    > >(tee -a "$LOG_FILE") \
-    2> >(tee -a "$LOG_FILE" >&2) &
-
-  SERVE_PID=$!
-}
