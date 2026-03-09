@@ -1,6 +1,6 @@
 module github.com/hashmap-kz/pgrwl
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/go-resty/resty/v2 v2.17.2
@@ -13,7 +13,7 @@ require (
 	github.com/sethvargo/go-envconfig v1.3.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.7.0
-	golang.org/x/time v0.14.0
+	golang.org/x/time v0.15.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
