@@ -182,6 +182,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 			case 'p':
 				// only if Progress: true
 				if len(m.Data) >= 9 {
+					//nolint:gosec
 					bytesDone := int64(binary.BigEndian.Uint64(m.Data[1:9]))
 					log.Info("progress",
 						slog.String("file", remotePath),
@@ -228,6 +229,7 @@ func readCString(buf []byte) (string, []byte, error) {
 }
 
 func getTblspcInfo(t []pglogrepl.BaseBackupTablespace) []backupdto.Tablespace {
+	//nolint:prealloc
 	r := []backupdto.Tablespace{}
 	for _, elem := range t {
 		r = append(r, backupdto.Tablespace{

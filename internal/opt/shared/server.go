@@ -39,6 +39,7 @@ func (s *HTTPSrv) Run(ctx context.Context) error {
 		WriteTimeout:      10 * time.Second,
 	}
 
+	//nolint:gosec
 	go func() {
 		<-ctx.Done()
 		// Context was cancelled, shut down the HTTP server gracefully
