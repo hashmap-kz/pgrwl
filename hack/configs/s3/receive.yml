@@ -26,13 +26,13 @@ log:
 
 storage:
   name: s3
-  compression:
-    algo: gzip
-  encryption:
-    algo: aes-256-gcm
-    pass: qwerty123
+  #compression:
+  #  algo: gzip
+  #encryption:
+  #  algo: aes-256-gcm
+  #  pass: qwerty123
   s3:
-    url: "${PGRWL_MINIO_URL}"
+    url: "https://localhost:9000"
     access_key_id: minioadmin
     secret_access_key: minioadmin123
     bucket: backups
