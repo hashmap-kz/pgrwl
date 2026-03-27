@@ -10,6 +10,7 @@ import (
 )
 
 func Fsync(f *os.File) error {
+	//nolint:gosec
 	return syscall.Fsync(int(f.Fd()))
 }
 
