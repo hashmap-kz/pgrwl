@@ -67,10 +67,12 @@ func (s *serveModeSvc) GetWalFile(ctx context.Context, filename string) (io.Read
 	s.log().Debug("wal-restore, fetching local file", slog.String("path", filePath))
 	if fsx.FileExists(filePath) {
 		s.log().Debug("wal-restore, found local file", slog.String("path", filePath))
+		//nolint:gosec
 		return os.Open(filePath)
 	}
 	if fsx.FileExists(partialFilePath) {
 		s.log().Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
+		//nolint:gosec
 		return os.Open(partialFilePath)
 	}
 

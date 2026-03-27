@@ -21,6 +21,7 @@ func HeredocTrim(text string) string {
 }
 
 func SortDesc(topLevel map[string]bool) []string {
+	//nolint:prealloc
 	r := []string{}
 	for k := range topLevel {
 		r = append(r, k)
