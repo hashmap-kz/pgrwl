@@ -13,7 +13,6 @@ import (
 type StreamingFile struct {
 	path string
 	pw   *io.PipeWriter
-
 	done chan struct{}
 	log  *slog.Logger
 
@@ -55,14 +54,28 @@ func NewStreamingFile(ctx context.Context, log *slog.Logger, storage st.Storage,
 
 func (sf *StreamingFile) Write(p []byte) (int, error) {
 	sf.mu.Lock()
+	err := sf.putErr
 	closed := sf.closed
 	sf.mu.Unlock()
 
+	if err != nil {
+		return 0, fmt.Errorf("storage put failed for %s: %w", sf.path, err)
+	}
 	if closed {
 		return 0, fmt.Errorf("write to closed streaming file: %s", sf.path)
 	}
 
-	return sf.pw.Write(p)
+	n, werr := sf.pw.Write(p)
+	if werr != nil {
+		sf.mu.Lock()
+		err = sf.putErr
+		sf.mu.Unlock()
+		if err != nil {
+			return n, fmt.Errorf("storage put failed for %s: %w", sf.path, err)
+		}
+		return n, werr
+	}
+	return n, nil
 }
 
 func (sf *StreamingFile) Close() error {
