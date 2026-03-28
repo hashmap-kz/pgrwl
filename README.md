@@ -33,7 +33,7 @@ integration with Kubernetes environments.
   - [Installation](#installation)
     - [Docker images are available at quay.io/pgrwl/pgrwl](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
     - [Manual Installation](#manual-installation)
-    - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_:](#installation-script-for-unix-based-os-requires-tar-curl-jq)
+    - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_](#installation-script-for-unix-based-os-requires-tar-curl-jq)
     - [Package-Based installation (suitable in CI/CD)](#package-based-installation-suitable-in-cicd)
       - [Debian](#debian)
       - [Apline Linux](#apline-linux)
@@ -64,15 +64,15 @@ integration with Kubernetes environments.
 
 **`pgrwl` running in `receive` mode**
 
-![Receive Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/loop-v1.png)
+![Receive Mode](docs/assets/svg/loop-v1.svg)
 
 **`pgrwl` running in `serve` mode**
 
-![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/serve-mode.png)
+![Serve Mode](docs/assets/svg/serve-mode.svg)
 
 **`pgrwl` running in `backup` mode**
 
-![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/backup-mode.png)
+![Backup Mode](docs/assets/svg/backup-mode.svg)
 
 ---
 
