@@ -31,7 +31,7 @@ integration with Kubernetes environments.
     - [Restore Command](#restore-command)
   - [Configuration Reference](#configuration-reference)
   - [Installation](#installation)
-    - [Docker images are available at quay.io/hashmap\_kz/pgrwl](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
+    - [Docker images are available at quay.io/pgrwl/pgrwl](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
     - [Manual Installation](#manual-installation)
     - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_:](#installation-script-for-unix-based-os-requires-tar-curl-jq)
     - [Package-Based installation (suitable in CI/CD)](#package-based-installation-suitable-in-cicd)
@@ -390,7 +390,7 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 See [pgrwl-helm-chart](charts/pgrwl)
 
 ```bash
-helm repo add pgrwl https://hashmap-kz.github.io/pgrwl
+helm repo add pgrwl https://pgrwl.github.io/pgrwl
 helm repo update
 ```
 
