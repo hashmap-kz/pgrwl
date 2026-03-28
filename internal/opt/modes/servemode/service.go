@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 )
@@ -22,7 +22,7 @@ type Service interface {
 type serveModeSvc struct {
 	l       *slog.Logger
 	baseDir string
-	storage *storage.VariadicStorage
+	storage *st.VariadicStorage
 	verbose bool
 }
 
@@ -30,7 +30,7 @@ var _ Service = &serveModeSvc{}
 
 type ServeServiceOpts struct {
 	BaseDir string
-	Storage *storage.VariadicStorage
+	Storage *st.VariadicStorage
 	Verbose bool
 }
 

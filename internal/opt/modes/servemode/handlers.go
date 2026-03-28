@@ -7,13 +7,13 @@ import (
 	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type ServeHandlerOpts struct {
 	BaseDir string
 	Verbose bool
-	Storage *storage.VariadicStorage
+	Storage *st.VariadicStorage
 }
 
 func Init(opts *ServeHandlerOpts) http.Handler {

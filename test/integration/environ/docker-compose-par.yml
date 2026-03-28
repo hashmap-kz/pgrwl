@@ -55,6 +55,11 @@ services:
     container_name: pg_008_dynstor
     entrypoint: /var/lib/postgresql/scripts/tests/008-dynstor-localfs.sh
 
+  pg_009_s3_remote_only_restore:
+    <<: *pg_test_common
+    container_name: pg_009_s3_remote_only_restore
+    entrypoint: /var/lib/postgresql/scripts/tests/009-s3-remote-only-restore.sh
+
   sshd:
     build:
       context: .

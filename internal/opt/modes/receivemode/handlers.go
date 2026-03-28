@@ -9,7 +9,7 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
 
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 	"golang.org/x/time/rate"
@@ -19,7 +19,7 @@ type ReceiveHandlerOpts struct {
 	PGRW     xlog.PgReceiveWal
 	BaseDir  string
 	Verbose  bool
-	Storage  *storage.VariadicStorage
+	Storage  *st.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 }
 

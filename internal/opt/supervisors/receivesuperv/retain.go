@@ -10,11 +10,11 @@ import (
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 )
 
 func (u *ArchiveSupervisor) filterOlderThan(
-	files []storage.FileInfo,
+	files []st.FileInfo,
 	cutoff time.Time,
 ) []string {
 	var result []string

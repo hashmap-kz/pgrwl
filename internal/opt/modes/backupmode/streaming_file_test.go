@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
-	stormock "github.com/hashmap-kz/storecrypt/pkg/storage"
+	stormock "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/stretchr/testify/assert"
 )
 

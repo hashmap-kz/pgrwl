@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+
 	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/storecrypt/pkg/clients"
-	st "github.com/hashmap-kz/storecrypt/pkg/storage"
 	"github.com/hashmap-kz/streamcrypt/pkg/codec"
 	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
 )
@@ -56,7 +56,7 @@ func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 
 	// sftp
 	if strings.EqualFold(cfg.Storage.Name, config.StorageNameSFTP) {
-		client, err := clients.NewSFTPClient(&clients.SFTPConfig{
+		client, err := st.NewSFTPClient(&st.SFTPConfig{
 			Host:       cfg.Storage.SFTP.Host,
 			Port:       fmt.Sprintf("%d", cfg.Storage.SFTP.Port),
 			User:       cfg.Storage.SFTP.User,
@@ -73,7 +73,7 @@ func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 
 	// s3
 	if strings.EqualFold(cfg.Storage.Name, config.StorageNameS3) {
-		client, err := clients.NewS3Client(&clients.S3Config{
+		client, err := st.NewS3Client(&st.S3Config{
 			EndpointURL:     cfg.Storage.S3.URL,
 			AccessKeyID:     cfg.Storage.S3.AccessKeyID,
 			SecretAccessKey: cfg.Storage.S3.SecretAccessKey,

@@ -88,3 +88,21 @@ help: ## Show this help
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+
+######################################################################
+# Storage integration tests
+######################################################################
+
+.PHONY: test-integ-storage
+test-integ-storage:
+	@cd test/integration/storage/environ && bash run.sh
+	go test -tags=integration_storage -v ./test/integration/storage/... | tee test-integ-fast.log
+
+.PHONY: test-integ-storage-highload
+test-integ-storage-highload:
+	@cd test/integration/storage/environ && bash run.sh
+	go test -tags=integration_storage_highload -v ./test/integration/storage/... | tee test-integ-highload.log
+
+.PHONY: test-integ-storage-teardown
+test-integ-storage-teardown:
+	@cd test/integration/storage/environ && bash teardown.sh

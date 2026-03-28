@@ -18,7 +18,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
 
-	st "github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/hashmap-kz/pgrwl/config"
 

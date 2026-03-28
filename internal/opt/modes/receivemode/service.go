@@ -14,7 +14,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
 )
@@ -29,7 +29,7 @@ type receiveModeSvc struct {
 	l        *slog.Logger
 	pgrw     xlog.PgReceiveWal // direct access to running state
 	baseDir  string
-	storage  *storage.VariadicStorage
+	storage  *st.VariadicStorage
 	jobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 	verbose  bool
 }
@@ -39,7 +39,7 @@ var _ Service = &receiveModeSvc{}
 type ReceiveServiceOpts struct {
 	PGRW     xlog.PgReceiveWal
 	BaseDir  string
-	Storage  *storage.VariadicStorage
+	Storage  *st.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 	Verbose  bool
 }
