@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/pgrwl/pgrwl/internal/core/logger"
 )
 
 const (
@@ -21,11 +23,15 @@ const (
 	DefaultS3PartSize int64 = 16 * 1024 * 1024
 	DefaultS3Conc           = 2
 	MaxS3UploadParts  int64 = 10000
+
+	MultipartDefaultPartSizeBytes = 256 * 1024 * 1024
 )
 
 type S3Options struct {
 	PartSizeBytes int64
 	Concurrency   int
+	Log           *slog.Logger
+	Verbose       bool
 }
 
 type s3Storage struct {
@@ -33,6 +39,8 @@ type s3Storage struct {
 	bucket   string
 	prefix   string
 	uploader *transfermanager.Client
+	log      *slog.Logger
+	verbose  bool
 }
 
 var _ Storage = &s3Storage{}
@@ -65,11 +73,26 @@ func NewS3StorageWithOptions(client *s3.Client, bucket, prefix string, opts S3Op
 		bucket:   bucket,
 		prefix:   filepath.ToSlash(strings.TrimPrefix(prefix, "/")),
 		uploader: tmClient,
+		log:      opts.Log,
+		verbose:  opts.Verbose,
 	}
 }
 
 func (s *s3Storage) fullPath(path string) string {
 	return filepath.ToSlash(filepath.Join(s.prefix, path))
+}
+
+func (s *s3Storage) logf() *slog.Logger {
+	if s.log != nil {
+		return s.log.With(
+			slog.String("component", "storage-s3"),
+			slog.String("bucket", s.bucket),
+		)
+	}
+	return slog.Default().With(
+		slog.String("component", "storage-s3"),
+		slog.String("bucket", s.bucket),
+	)
 }
 
 // CreateUploader creates a new S3 uploader with the given part size and concurrency.
@@ -112,7 +135,12 @@ func ChooseUploadPartSize(size int64) int64 {
 }
 
 func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) error {
-	remotePath = s.fullPath(remotePath)
+	fullPath := s.fullPath(remotePath)
+
+	log := s.logf().With(
+		slog.String("path", remotePath),
+		slog.String("s3_key", fullPath),
+	)
 
 	// If we know the size, use transfermanager with computed part size.
 	if f, ok := isSeekable(r); ok {
@@ -122,25 +150,35 @@ func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) err
 			partSize := ChooseUploadPartSize(size)
 			uploader := CreateUploader(s.client, partSize, DefaultS3Conc)
 
+			log.Debug("using seekable upload path",
+				slog.Int64("size_bytes", size),
+				slog.Int64("part_size_bytes", partSize),
+				slog.Int("concurrency", DefaultS3Conc),
+			)
+
 			if _, err := f.Seek(0, io.SeekStart); err != nil {
-				return fmt.Errorf("seek file for %q: %w", remotePath, err)
+				return fmt.Errorf("seek file for %q: %w", fullPath, err)
 			}
 
 			_, err = uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
 				Bucket: aws.String(s.bucket),
-				Key:    aws.String(remotePath),
+				Key:    aws.String(fullPath),
 				Body:   f,
 			})
 			if err != nil {
-				return fmt.Errorf("s3 upload %q: %w", remotePath, err)
+				return fmt.Errorf("s3 upload %q: %w", fullPath, err)
 			}
 			return nil
 		}
 	}
 
+	log.Debug("using streaming multipart upload path",
+		slog.Int64("part_size_bytes", MultipartDefaultPartSizeBytes),
+	)
+
 	// Unknown-size stream: use manual multipart with a conservative part size.
 	// 256 MiB gives ~2.44 TiB before hitting 10k parts.
-	return s.putMultipartStream(ctx, remotePath, r, 256*1024*1024)
+	return s.putMultipartStream(ctx, fullPath, r, MultipartDefaultPartSizeBytes)
 }
 
 func (s *s3Storage) Get(ctx context.Context, remotePath string) (io.ReadCloser, error) {
@@ -456,6 +494,11 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 		partSize = MinS3PartSize
 	}
 
+	log := s.logf().With(
+		slog.String("s3_key", remotePath),
+		slog.Int64("part_size_bytes", partSize),
+	)
+
 	createOut, err := s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(remotePath),
@@ -503,6 +546,13 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				))
 			}
 
+			if s.verbose {
+				log.LogAttrs(ctx, logger.LevelTrace, "uploading multipart chunk",
+					slog.Int64("part_number", int64(partNumber)),
+					slog.Int("chunk_size_bytes", n),
+				)
+			}
+
 			upOut, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
 				Bucket:        aws.String(s.bucket),
 				Key:           aws.String(remotePath),
@@ -519,6 +569,13 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				ETag:       upOut.ETag,
 				PartNumber: aws.Int32(partNumber),
 			})
+
+			if s.verbose {
+				log.LogAttrs(ctx, logger.LevelTrace, "multipart chunk uploaded",
+					slog.Int64("part_number", int64(partNumber)),
+					slog.Int("chunk_size_bytes", n),
+				)
+			}
 
 			partNumber++
 		}
@@ -551,6 +608,12 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 	})
 	if err != nil {
 		return abort(fmt.Errorf("complete multipart upload %q: %w", remotePath, err))
+	}
+
+	if s.verbose {
+		log.LogAttrs(ctx, logger.LevelTrace, "multipart upload completed",
+			slog.Int("parts", len(completedParts)),
+		)
 	}
 
 	return nil
