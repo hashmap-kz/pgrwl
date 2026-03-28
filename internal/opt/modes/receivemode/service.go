@@ -6,17 +6,17 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
-	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/pgrwl/pgrwl/config"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
+	"github.com/pgrwl/pgrwl/internal/opt/jobq"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
+	"github.com/pgrwl/pgrwl/internal/core/logger"
 
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
 )
 
 type Service interface {

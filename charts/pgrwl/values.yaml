@@ -5,7 +5,7 @@ imagePullSecrets: []
 
 image:
   registry: "quay.io"
-  repository: "hashmap_kz/pgrwl"
+  repository: "pgrwl/pgrwl"
   tag: ""
   pullPolicy: IfNotPresent
 

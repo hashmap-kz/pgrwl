@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/hashmap-kz/pgrwl/cmd"
+	"github.com/pgrwl/pgrwl/cmd"
 )
 
 func main() {

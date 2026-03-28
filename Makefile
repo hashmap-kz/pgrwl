@@ -30,7 +30,7 @@ install: build ## Install the binary to $(INSTALL_DIR)
 
 .PHONY: snapshot
 snapshot: ## Run snapshot build with goreleaser
-	goreleaser release --skip sign --skip publish --snapshot --clean
+	GORELEASER_FORCE_TOKEN=github goreleaser release --skip sign --skip publish --snapshot --clean
 
 .PHONY: test
 test: ## Run unit tests

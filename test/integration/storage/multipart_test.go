@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	storage "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	storage "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"

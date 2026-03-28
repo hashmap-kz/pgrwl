@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/tarx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/tarx"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
-	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/pgrwl/pgrwl/config"
 )
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {

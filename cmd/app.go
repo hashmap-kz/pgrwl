@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
 
-	"github.com/hashmap-kz/pgrwl/internal/version"
+	"github.com/pgrwl/pgrwl/internal/version"
 
-	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/core/logger"
 	"github.com/urfave/cli/v3"
 )
 

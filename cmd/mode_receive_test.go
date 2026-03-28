@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/pgrwl/pgrwl/config"
 	"github.com/stretchr/testify/assert"
 )
 

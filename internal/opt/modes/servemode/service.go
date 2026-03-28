@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
 
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
 )
 
 type Service interface {

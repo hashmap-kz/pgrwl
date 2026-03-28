@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
 )
 
 type BaseBackupCmdOpts struct {

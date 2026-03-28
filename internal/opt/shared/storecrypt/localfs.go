@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
+	"github.com/pgrwl/pgrwl/internal/core/fsync"
 )
 
 type LocalStorageOpts struct {

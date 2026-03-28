@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 
-	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/pgrwl/pgrwl/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

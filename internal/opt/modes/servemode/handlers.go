@@ -4,10 +4,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/middleware"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type ServeHandlerOpts struct {

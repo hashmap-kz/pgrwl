@@ -43,7 +43,7 @@
 2025-12-01T11:09:59.1263694Z Complete job name: 18-pg_001_fundamental
 2025-12-01T11:09:59.1907492Z ##[group]Run actions/checkout@v6
 2025-12-01T11:09:59.1908400Z with:
-2025-12-01T11:09:59.1908838Z   repository: hashmap-kz/pgrwl
+2025-12-01T11:09:59.1908838Z   repository: pgrwl/pgrwl
 2025-12-01T11:09:59.1909567Z   token: ***
 2025-12-01T11:09:59.1909976Z   ssh-strict: true
 2025-12-01T11:09:59.1910404Z   ssh-user: git
@@ -69,7 +69,7 @@
 2025-12-01T11:09:59.1922414Z   COMPOSE_FILE_PAR: test/integration/environ/docker-compose-par.yml
 2025-12-01T11:09:59.1923202Z   COMPOSE_PROJECT_NAME: pgrwl_pg18_pg_001_fundamental
 2025-12-01T11:09:59.1924101Z ##[endgroup]
-2025-12-01T11:09:59.2955495Z Syncing repository: hashmap-kz/pgrwl
+2025-12-01T11:09:59.2955495Z Syncing repository: pgrwl/pgrwl
 2025-12-01T11:09:59.2957673Z ##[group]Getting Git version info
 2025-12-01T11:09:59.2958556Z Working directory is '/home/runner/work/pgrwl/pgrwl'
 2025-12-01T11:09:59.2959861Z [command]/usr/bin/git version
@@ -94,7 +94,7 @@
 2025-12-01T11:09:59.3235346Z hint:
 2025-12-01T11:09:59.3236484Z hint: Disable this message with "git config set advice.defaultBranchName false"
 2025-12-01T11:09:59.3238431Z Initialized empty Git repository in /home/runner/work/pgrwl/pgrwl/.git/
-2025-12-01T11:09:59.3242022Z [command]/usr/bin/git remote add origin https://github.com/hashmap-kz/pgrwl
+2025-12-01T11:09:59.3242022Z [command]/usr/bin/git remote add origin https://github.com/pgrwl/pgrwl
 2025-12-01T11:09:59.3283258Z ##[endgroup]
 2025-12-01T11:09:59.3284685Z ##[group]Disabling automatic garbage collection
 2025-12-01T11:09:59.3287719Z [command]/usr/bin/git config --local gc.auto 0
@@ -115,7 +115,7 @@
 2025-12-01T11:09:59.4332551Z ##[endgroup]
 2025-12-01T11:09:59.4333491Z ##[group]Fetching the repository
 2025-12-01T11:09:59.4342139Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c308e8a95d45218b5102884a8812f62a0f98270c:refs/remotes/pull/169/merge
-2025-12-01T11:09:59.6445506Z From https://github.com/hashmap-kz/pgrwl
+2025-12-01T11:09:59.6445506Z From https://github.com/pgrwl/pgrwl
 2025-12-01T11:09:59.6446960Z  * [new ref]         c308e8a95d45218b5102884a8812f62a0f98270c -> pull/169/merge
 2025-12-01T11:09:59.6478209Z ##[endgroup]
 2025-12-01T11:09:59.6480160Z ##[group]Determining the checkout info

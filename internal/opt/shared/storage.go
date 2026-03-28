@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/hashmap-kz/streamcrypt/pkg/codec"
 	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
+	"github.com/pgrwl/pgrwl/config"
 )
 
 type SetupStorageOpts struct {

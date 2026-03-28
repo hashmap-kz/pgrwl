@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/httpx"
 )
 
 type Controller struct {

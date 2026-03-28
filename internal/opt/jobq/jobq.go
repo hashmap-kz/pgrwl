@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 )
 
 var ErrJobQueueFull = errors.New("job queue full")

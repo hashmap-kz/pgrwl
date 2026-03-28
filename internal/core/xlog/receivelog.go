@@ -10,14 +10,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/conv"
-	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/core/fsync"
+	"github.com/pgrwl/pgrwl/internal/core/logger"
 )
 
 // https://github.com/postgres/postgres/blob/master/src/bin/pg_basebackup/receivelog.c

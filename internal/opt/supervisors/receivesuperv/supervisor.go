@@ -5,12 +5,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
+	"github.com/pgrwl/pgrwl/internal/opt/jobq"
 
-	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/pgrwl/pgrwl/config"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type ArchiveSupervisorOpts struct {

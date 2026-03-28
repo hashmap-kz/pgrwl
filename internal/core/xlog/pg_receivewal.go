@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/conv"
-	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/core/fsync"
 
 	"github.com/jackc/pgx/v5/pgconn"
 

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/tarx"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/tarx"
 )
 
 func getTblspcLocation(tarName string, mf *backupdto.Result) (backupdto.Tablespace, error) {

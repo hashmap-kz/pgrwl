@@ -1,4 +1,4 @@
-module github.com/hashmap-kz/pgrwl
+module github.com/pgrwl/pgrwl
 
 go 1.25.0
 
