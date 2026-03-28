@@ -36,7 +36,7 @@ integration with Kubernetes environments.
     - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_](#installation-script-for-unix-based-os-requires-tar-curl-jq)
     - [Package-Based installation (suitable in CI/CD)](#package-based-installation-suitable-in-cicd)
       - [Debian](#debian)
-      - [Apline Linux](#apline-linux)
+      - [Alpine Linux](#apline-linux)
     - [Helm Chart](#helm-chart)
   - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
   - [Architecture](#architecture)
@@ -351,7 +351,7 @@ docker pull quay.io/pgrwl/pgrwl:latest
    the [Releases page](https://github.com/pgrwl/pgrwl/releases).
 2. Place the binary in your system's `PATH` (e.g., `/usr/local/bin`).
 
-### Installation script for Unix-Based OS _(requires: tar, curl, jq)_:
+### Installation script for Unix-Based OS _(requires: tar, curl, jq)_
 
 ```bash
 (
@@ -377,7 +377,7 @@ curl -LO https://github.com/pgrwl/pgrwl/releases/latest/download/pgrwl_linux_amd
 sudo dpkg -i pgrwl_linux_amd64.deb
 ```
 
-#### Apline Linux
+#### Alpine Linux
 
 ```bash
 apk update && apk add --no-cache bash curl
@@ -387,17 +387,20 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 ### Helm Chart
 
-See [pgrwl-helm-chart](charts/pgrwl)
+See [pgrwl-helm-chart](https://github.com/pgrwl/charts)
 
 ```bash
-helm repo add pgrwl https://pgrwl.github.io/pgrwl
-helm repo update
+helm repo add pgrwl https://pgrwl.github.io/charts
+helm repo update pgrwl
+helm search repo pgrwl
 ```
 
 To install the chart with the release name `pgrwl`:
 
 ```bash
-helm install pgrwl pgrwl/pgrwl
+helm upgrade pgrwl pgrwl/pgrwl \
+  --install --debug --atomic --wait --timeout=10m \
+  --namespace=pgrwl
 ```
 
 ---
