@@ -25,6 +25,7 @@ integration with Kubernetes environments.
   - [Table of Contents](#table-of-contents)
   - [About](#about)
   - [Usage](#usage)
+    - [Kubernetes Quick Start](#kubernetes-quick-start) 
     - [Receive Mode Quick Start](#receive-mode-quick-start)
     - [Serve Mode](#serve-mode)
     - [Backup Mode](#backup-mode)
@@ -32,12 +33,12 @@ integration with Kubernetes environments.
   - [Configuration Reference](#configuration-reference)
   - [Installation](#installation)
     - [Docker images are available at quay.io/pgrwl/pgrwl](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
+    - [Helm Chart](#helm-chart)
     - [Manual Installation](#manual-installation)
-    - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_:](#installation-script-for-unix-based-os-requires-tar-curl-jq)
+    - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_](#installation-script-for-unix-based-os-requires-tar-curl-jq)
     - [Package-Based installation (suitable in CI/CD)](#package-based-installation-suitable-in-cicd)
       - [Debian](#debian)
-      - [Apline Linux](#apline-linux)
-    - [Helm Chart](#helm-chart)
+      - [Alpine Linux](#apline-linux)
   - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
   - [Architecture](#architecture)
     - [Design Notes](#design-notes)
@@ -64,21 +65,25 @@ integration with Kubernetes environments.
 
 **`pgrwl` running in `receive` mode**
 
-![Receive Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/loop-v1.png)
+![Receive Mode](docs/assets/svg/loop-v1.svg)
 
 **`pgrwl` running in `serve` mode**
 
-![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/serve-mode.png)
+![Serve Mode](docs/assets/svg/serve-mode.svg)
 
 **`pgrwl` running in `backup` mode**
 
-![Serve Mode](https://github.com/hashmap-kz/assets/blob/main/pgrwl/backup-mode.png)
+![Backup Mode](docs/assets/svg/backup-mode.svg)
 
 ---
 
 ## Usage
 
 **[`^        back to top        ^`](#table-of-contents)**
+
+### Kubernetes Quick Start
+
+See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-start)
 
 ### Receive Mode Quick Start
 
@@ -345,13 +350,31 @@ PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
 docker pull quay.io/pgrwl/pgrwl:latest
 ```
 
+### Helm Chart
+
+See [pgrwl helm-chart](https://github.com/pgrwl/charts)
+
+```bash
+helm repo add pgrwl https://pgrwl.github.io/charts
+helm repo update pgrwl
+helm search repo pgrwl
+```
+
+To install the chart with the release name `pgrwl`:
+
+```bash
+helm upgrade pgrwl pgrwl/pgrwl \
+  --install --debug --atomic --wait --timeout=10m \
+  --namespace=pgrwl
+```
+
 ### Manual Installation
 
 1. Download the latest binary for your platform from
    the [Releases page](https://github.com/pgrwl/pgrwl/releases).
 2. Place the binary in your system's `PATH` (e.g., `/usr/local/bin`).
 
-### Installation script for Unix-Based OS _(requires: tar, curl, jq)_:
+### Installation script for Unix-Based OS _(requires: tar, curl, jq)_
 
 ```bash
 (
@@ -377,27 +400,12 @@ curl -LO https://github.com/pgrwl/pgrwl/releases/latest/download/pgrwl_linux_amd
 sudo dpkg -i pgrwl_linux_amd64.deb
 ```
 
-#### Apline Linux
+#### Alpine Linux
 
 ```bash
 apk update && apk add --no-cache bash curl
 curl -LO https://github.com/pgrwl/pgrwl/releases/latest/download/pgrwl_linux_amd64.apk
 apk add pgrwl_linux_amd64.apk --allow-untrusted
-```
-
-### Helm Chart
-
-See [pgrwl-helm-chart](charts/pgrwl)
-
-```bash
-helm repo add pgrwl https://pgrwl.github.io/pgrwl
-helm repo update
-```
-
-To install the chart with the release name `pgrwl`:
-
-```bash
-helm install pgrwl pgrwl/pgrwl
 ```
 
 ---
