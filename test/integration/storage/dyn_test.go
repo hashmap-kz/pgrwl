@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	storage "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/hashmap-kz/streamcrypt/pkg/codec"
 	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
 	"github.com/stretchr/testify/require"

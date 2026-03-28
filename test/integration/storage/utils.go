@@ -11,7 +11,7 @@ import (
 
 	"github.com/pkg/sftp"
 
-	"github.com/hashmap-kz/storecrypt/pkg/clients"
+	clients "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"

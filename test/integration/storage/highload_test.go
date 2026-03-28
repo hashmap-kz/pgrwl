@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	storage "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/hashmap-kz/streamcrypt/pkg/codec"
 	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
 	"github.com/stretchr/testify/assert"
@@ -68,26 +68,6 @@ func impls(dir, subpath string) map[string]storage.Storage {
 	}
 
 	return map[string]storage.Storage{
-		// transforming – each with its own backend namespace
-		"local": &storage.TransformingStorage{
-			Backend:      mkLocal("local"),
-			Crypter:      aesgcm.NewChunkedGCMCrypter("password"),
-			Compressor:   codec.GzipCompressor{},
-			Decompressor: codec.GzipDecompressor{},
-		},
-		"s3": &storage.TransformingStorage{
-			Backend:      mkS3("s3"),
-			Crypter:      aesgcm.NewChunkedGCMCrypter("password"),
-			Compressor:   codec.GzipCompressor{},
-			Decompressor: codec.GzipDecompressor{},
-		},
-		"sftp": &storage.TransformingStorage{
-			Backend:      mkSFTP("sftp"),
-			Crypter:      aesgcm.NewChunkedGCMCrypter("password"),
-			Compressor:   codec.GzipCompressor{},
-			Decompressor: codec.GzipDecompressor{},
-		},
-
 		// dynamic – **each has its own backend** too
 		"dyn-local-gz.aes": newVariadic(mkLocal("dyn-local-gz.aes"), ".gz.aes"),
 		"dyn-s3-gz.aes":    newVariadic(mkS3("dyn-s3-gz.aes"), ".gz.aes"),
