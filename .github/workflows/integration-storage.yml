@@ -1,8 +1,23 @@
-name: Storage Integration Tests
+name: Integration Tests (Storage)
 
 on:
   push:
+    branches: &branches
+      - "master"
+      - "release/**"
+    paths-ignore: &paths-ignore
+      - "docs/**"
+      - "examples/**"
+      - "charts/**"
+      - "hack/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
+      - "Makefile"
+      - ".golangci.yml"
   pull_request:
+    branches: *branches
+    paths-ignore: *paths-ignore
   workflow_dispatch:
 
 jobs:
