@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	stormock "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	stormock "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/stretchr/testify/assert"
 )
 

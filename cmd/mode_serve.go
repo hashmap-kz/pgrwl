@@ -8,10 +8,10 @@ import (
 	"sync"
 	"syscall"
 
-	serveAPI "github.com/hashmap-kz/pgrwl/internal/opt/modes/servemode"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+	serveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/servemode"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
-	"github.com/hashmap-kz/pgrwl/config"
+	"github.com/pgrwl/pgrwl/config"
 )
 
 type ServeModeOpts struct {

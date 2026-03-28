@@ -9,7 +9,7 @@ builds:
     binary: pgrwl
     ldflags:
       - -s -w
-      - -X 'github.com/hashmap-kz/pgrwl/internal/version.Version={{.Version}}'
+      - -X 'github.com/pgrwl/pgrwl/internal/version.Version={{.Version}}'
     env:
       - CGO_ENABLED=0
     goos:
@@ -78,7 +78,7 @@ changelog:
 nfpms:
   - file_name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     maintainer: alexey.zh
-    homepage: "https://github.com/hashmap-kz/pgrwl"
+    homepage: "https://github.com/pgrwl/pgrwl"
     description: "Durable PostgreSQL WAL streaming"
     license: "Apache-2.0"
     formats:
@@ -95,7 +95,7 @@ nfpms:
 
 dockers:
   - image_templates:
-      - "quay.io/hashmap_kz/pgrwl:{{ .Version }}-amd64"
+      - "quay.io/pgrwl/pgrwl:{{ .Version }}-amd64"
     dockerfile: Dockerfile
     extra_files:
       - go.mod
@@ -106,7 +106,7 @@ dockers:
       - internal/
       - test/
     build_flag_templates:
-      - "--label=io.artifacthub.package.readme-url=https://raw.githubusercontent.com/hashmap-kz/pgrwl/master/README.md"
+      - "--label=io.artifacthub.package.readme-url=https://raw.githubusercontent.com/pgrwl/pgrwl/master/README.md"
       - '--label=io.artifacthub.package.maintainers=[{"name":"alexey.zh","email":"mailbox.stdio@gmail.com"}]'
       - "--label=io.artifacthub.package.license=MIT"
       - "--label=org.opencontainers.image.description=Durable PostgreSQL WAL streaming"
@@ -118,9 +118,9 @@ dockers:
       - "--platform=linux/amd64"
 
 docker_manifests:
-  - name_template: "quay.io/hashmap_kz/pgrwl:{{ .Version }}"
+  - name_template: "quay.io/pgrwl/pgrwl:{{ .Version }}"
     image_templates:
-      - "quay.io/hashmap_kz/pgrwl:{{ .Version }}-amd64"
-  - name_template: "quay.io/hashmap_kz/pgrwl:latest"
+      - "quay.io/pgrwl/pgrwl:{{ .Version }}-amd64"
+  - name_template: "quay.io/pgrwl/pgrwl:latest"
     image_templates:
-      - "quay.io/hashmap_kz/pgrwl:{{ .Version }}-amd64"
+      - "quay.io/pgrwl/pgrwl:{{ .Version }}-amd64"

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/cmdx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/cmdx"
 )
 
 type RestoreCommandOpts struct {

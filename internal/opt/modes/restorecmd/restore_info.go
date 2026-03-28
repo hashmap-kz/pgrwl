@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 func makeRestoreInfo(backupID string, backupFiles []string) *backupdto.RestoreInfo {

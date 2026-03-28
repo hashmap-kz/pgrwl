@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/conv"
-	"github.com/hashmap-kz/pgrwl/internal/core/fsync"
 	"github.com/jackc/pglogrepl"
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/core/fsync"
 )
 
 type walfileT struct {

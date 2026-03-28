@@ -8,12 +8,12 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backupmode"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
-	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/opt/supervisors/backupsuperv"
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsuperv"
 )
 
 type BackupModeOpts struct {

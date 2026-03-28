@@ -153,7 +153,7 @@ spec:
 
       containers:
         - name: *app
-          image: "quay.io/hashmap_kz/pgrwl:latest"
+          image: "quay.io/pgrwl/pgrwl:latest"
           imagePullPolicy: Always
           args: ["daemon"]
           env:

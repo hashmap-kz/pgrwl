@@ -22,7 +22,7 @@ Link issues and relevant forum posts here.
 
 #### Checklist
 
-- [ ] I have read the [contribution guidelines](https://github.com/hashmap-kz/pgrwl/blob/master/CONTRIBUTING.md).
+- [ ] I have read the [contribution guidelines](https://github.com/pgrwl/pgrwl/blob/master/CONTRIBUTING.md).
 - [ ] I have added unit-tests for all changes in this PR if appropriate.
 - [ ] I have added integration-tests for all changes in this PR if appropriate.
 - [ ] I have added documentation for the changes if appropriate.

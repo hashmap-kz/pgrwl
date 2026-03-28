@@ -2,14 +2,14 @@
 
 > Stream PostgreSQL WALs with Zero Data Loss
 
-[![License](https://img.shields.io/github/license/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/hashmap-kz/pgrwl)](https://goreportcard.com/report/github.com/hashmap-kz/pgrwl)
-[![Go Reference](https://pkg.go.dev/badge/github.com/hashmap-kz/pgrwl.svg)](https://pkg.go.dev/github.com/hashmap-kz/pgrwl)
-[![Workflow Status](https://img.shields.io/github/actions/workflow/status/hashmap-kz/pgrwl/ci.yml?branch=master)](https://github.com/hashmap-kz/pgrwl/actions/workflows/ci.yml?query=branch:master)
-[![GitHub Issues](https://img.shields.io/github/issues/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/issues)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/blob/master/go.mod#L3)
-[![Latest Release](https://img.shields.io/github/v/release/hashmap-kz/pgrwl)](https://github.com/hashmap-kz/pgrwl/releases/latest)
-[![Start contributing](https://img.shields.io/github/issues/hashmap-kz/pgrwl/good%20first%20issue?color=7057ff&label=Contribute)](https://github.com/hashmap-kz/pgrwl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22)
+[![License](https://img.shields.io/github/license/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/blob/master/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/pgrwl/pgrwl)](https://goreportcard.com/report/github.com/pgrwl/pgrwl)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pgrwl/pgrwl.svg)](https://pkg.go.dev/github.com/pgrwl/pgrwl)
+[![Workflow Status](https://img.shields.io/github/actions/workflow/status/pgrwl/pgrwl/ci.yml?branch=master)](https://github.com/pgrwl/pgrwl/actions/workflows/ci.yml?query=branch:master)
+[![GitHub Issues](https://img.shields.io/github/issues/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/issues)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/blob/master/go.mod#L3)
+[![Latest Release](https://img.shields.io/github/v/release/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/releases/latest)
+[![Start contributing](https://img.shields.io/github/issues/pgrwl/pgrwl/good%20first%20issue?color=7057ff&label=Contribute)](https://github.com/pgrwl/pgrwl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22)
 
 **pgrwl** is a PostgreSQL write-ahead log (WAL) receiver written in Go. It’s a drop-in, container-friendly alternative
 to `pg_receivewal`, supporting streaming replication, encryption, compression, and remote storage (S3, SFTP).
@@ -89,7 +89,7 @@ integration with Kubernetes environments.
 set -euo pipefail
 
 # Clone repo
-git clone https://github.com/hashmap-kz/pgrwl.git
+git clone https://github.com/pgrwl/pgrwl.git
 cd pgrwl
 
 # Prepare docker-compose files
@@ -339,16 +339,16 @@ PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
 
 **[`^        back to top        ^`](#table-of-contents)**
 
-### Docker images are available at [quay.io/hashmap_kz/pgrwl](https://quay.io/repository/hashmap_kz/pgrwl)
+### Docker images are available at [quay.io/pgrwl/pgrwl](https://quay.io/repository/pgrwl/pgrwl)
 
 ```bash
-docker pull quay.io/hashmap_kz/pgrwl:latest
+docker pull quay.io/pgrwl/pgrwl:latest
 ```
 
 ### Manual Installation
 
 1. Download the latest binary for your platform from
-   the [Releases page](https://github.com/hashmap-kz/pgrwl/releases).
+   the [Releases page](https://github.com/pgrwl/pgrwl/releases).
 2. Place the binary in your system's `PATH` (e.g., `/usr/local/bin`).
 
 ### Installation script for Unix-Based OS _(requires: tar, curl, jq)_:
@@ -359,9 +359,9 @@ set -euo pipefail
 
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')"
-TAG="$(curl -s https://api.github.com/repos/hashmap-kz/pgrwl/releases/latest | jq -r .tag_name)"
+TAG="$(curl -s https://api.github.com/repos/pgrwl/pgrwl/releases/latest | jq -r .tag_name)"
 
-curl -L "https://github.com/hashmap-kz/pgrwl/releases/download/${TAG}/pgrwl_${TAG}_${OS}_${ARCH}.tar.gz" |
+curl -L "https://github.com/pgrwl/pgrwl/releases/download/${TAG}/pgrwl_${TAG}_${OS}_${ARCH}.tar.gz" |
 tar -xzf - -C /usr/local/bin && \
 chmod +x /usr/local/bin/pgrwl
 )
@@ -373,7 +373,7 @@ chmod +x /usr/local/bin/pgrwl
 
 ```bash
 sudo apt update -y && sudo apt install -y curl
-curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linux_amd64.deb
+curl -LO https://github.com/pgrwl/pgrwl/releases/latest/download/pgrwl_linux_amd64.deb
 sudo dpkg -i pgrwl_linux_amd64.deb
 ```
 
@@ -381,7 +381,7 @@ sudo dpkg -i pgrwl_linux_amd64.deb
 
 ```bash
 apk update && apk add --no-cache bash curl
-curl -LO https://github.com/hashmap-kz/pgrwl/releases/latest/download/pgrwl_linux_amd64.apk
+curl -LO https://github.com/pgrwl/pgrwl/releases/latest/download/pgrwl_linux_amd64.apk
 apk add pgrwl_linux_amd64.apk --allow-untrusted
 ```
 

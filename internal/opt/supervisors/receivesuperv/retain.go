@@ -7,10 +7,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/core/logger"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 func (u *ArchiveSupervisor) filterOlderThan(

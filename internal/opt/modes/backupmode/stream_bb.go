@@ -10,15 +10,15 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
 
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 // https://www.postgresql.org/docs/current/protocol-replication.html#PROTOCOL-REPLICATION-BASE-BACKUP

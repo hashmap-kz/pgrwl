@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Clone repo
-git clone https://github.com/hashmap-kz/pgrwl.git
+git clone https://github.com/pgrwl/pgrwl.git
 cd pgrwl
 
 # Prepare docker-compose files

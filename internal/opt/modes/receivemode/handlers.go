@@ -4,14 +4,14 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/middleware"
+	"github.com/pgrwl/pgrwl/internal/opt/jobq"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/middleware"
 
-	"github.com/hashmap-kz/pgrwl/config"
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/config"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"golang.org/x/time/rate"
 )
 

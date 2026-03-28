@@ -11,26 +11,26 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/receivemode"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 
-	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
 
-	"github.com/hashmap-kz/pgrwl/internal/core/conv"
-	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/cmdx"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/cmdx"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/hashmap-kz/pgrwl/config"
-	"github.com/hashmap-kz/pgrwl/internal/core/logger"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/core/logger"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 	"github.com/robfig/cron/v3"
 )
 

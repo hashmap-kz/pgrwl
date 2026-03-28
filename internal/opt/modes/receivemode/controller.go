@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/httpx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/httpx"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/jobq"
+	"github.com/pgrwl/pgrwl/internal/opt/jobq"
 )
 
 type ReceiveController struct {

@@ -8,11 +8,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared"
+	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
-	"github.com/hashmap-kz/pgrwl/config"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/pgrwl/pgrwl/config"
 )
 
 type CreateBaseBackupOpts struct {

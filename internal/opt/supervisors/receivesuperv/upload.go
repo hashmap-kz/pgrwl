@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/receivemetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
-	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
 )
 
 func (u *ArchiveSupervisor) performUploads(ctx context.Context) error {
