@@ -468,6 +468,7 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 	completedParts := make([]s3types.CompletedPart, 0, 128)
 
 	abort := func(abortErr error) error {
+		//nolint:errcheck
 		_, _ = s.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
 			Bucket:   aws.String(s.bucket),
 			Key:      aws.String(remotePath),
