@@ -32,12 +32,12 @@ integration with Kubernetes environments.
   - [Configuration Reference](#configuration-reference)
   - [Installation](#installation)
     - [Docker images are available at quay.io/pgrwl/pgrwl](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
+    - [Helm Chart](#helm-chart)
     - [Manual Installation](#manual-installation)
     - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_](#installation-script-for-unix-based-os-requires-tar-curl-jq)
     - [Package-Based installation (suitable in CI/CD)](#package-based-installation-suitable-in-cicd)
       - [Debian](#debian)
       - [Alpine Linux](#apline-linux)
-    - [Helm Chart](#helm-chart)
   - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
   - [Architecture](#architecture)
     - [Design Notes](#design-notes)
@@ -345,6 +345,24 @@ PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
 docker pull quay.io/pgrwl/pgrwl:latest
 ```
 
+### Helm Chart
+
+See [pgrwl helm-chart](https://github.com/pgrwl/charts)
+
+```bash
+helm repo add pgrwl https://pgrwl.github.io/charts
+helm repo update pgrwl
+helm search repo pgrwl
+```
+
+To install the chart with the release name `pgrwl`:
+
+```bash
+helm upgrade pgrwl pgrwl/pgrwl \
+  --install --debug --atomic --wait --timeout=10m \
+  --namespace=pgrwl
+```
+
 ### Manual Installation
 
 1. Download the latest binary for your platform from
@@ -383,24 +401,6 @@ sudo dpkg -i pgrwl_linux_amd64.deb
 apk update && apk add --no-cache bash curl
 curl -LO https://github.com/pgrwl/pgrwl/releases/latest/download/pgrwl_linux_amd64.apk
 apk add pgrwl_linux_amd64.apk --allow-untrusted
-```
-
-### Helm Chart
-
-See [pgrwl-helm-chart](https://github.com/pgrwl/charts)
-
-```bash
-helm repo add pgrwl https://pgrwl.github.io/charts
-helm repo update pgrwl
-helm search repo pgrwl
-```
-
-To install the chart with the release name `pgrwl`:
-
-```bash
-helm upgrade pgrwl pgrwl/pgrwl \
-  --install --debug --atomic --wait --timeout=10m \
-  --namespace=pgrwl
 ```
 
 ---
