@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 )
 
 func makeRestoreInfo(backupID string, backupFiles []string) *backupdto.RestoreInfo {
@@ -48,7 +48,7 @@ func makeRestoreInfo(backupID string, backupFiles []string) *backupdto.RestoreIn
 func readManifestFile(
 	ctx context.Context,
 	backupID string,
-	stor storage.Storage,
+	stor st.Storage,
 	ri *backupdto.RestoreInfo,
 ) (*backupdto.Result, error) {
 	if ri.ManifestFile == "" {

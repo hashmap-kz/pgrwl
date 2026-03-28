@@ -10,7 +10,7 @@ import (
 	"github.com/hashmap-kz/pgrwl/config"
 
 	"github.com/hashmap-kz/pgrwl/internal/core/xlog"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type ArchiveSupervisorOpts struct {
@@ -26,7 +26,7 @@ type uploadBundle struct {
 type ArchiveSupervisor struct {
 	l       *slog.Logger
 	cfg     *config.Config
-	stor    storage.Storage
+	stor    st.Storage
 	opts    *ArchiveSupervisorOpts
 	verbose bool
 
@@ -34,7 +34,7 @@ type ArchiveSupervisor struct {
 	storageName string
 }
 
-func NewArchiveSupervisor(cfg *config.Config, stor storage.Storage, opts *ArchiveSupervisorOpts) *ArchiveSupervisor {
+func NewArchiveSupervisor(cfg *config.Config, stor st.Storage, opts *ArchiveSupervisorOpts) *ArchiveSupervisor {
 	return &ArchiveSupervisor{
 		l:           slog.With(slog.String("component", "archive-supervisor")),
 		cfg:         cfg,

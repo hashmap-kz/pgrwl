@@ -16,7 +16,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/metrics/backupmetrics"
 
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/strx"
 
@@ -206,7 +206,7 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 	return nil
 }
 
-func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor storage.Storage, backupID string) (*backupdto.Result, error) {
+func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor st.Storage, backupID string) (*backupdto.Result, error) {
 	manifestFilename := filepath.Base(backupID) + ".json"
 	manifestRdr, err := stor.Get(ctx, filepath.ToSlash(filepath.Join(filepath.Base(backupID), manifestFilename)))
 	if err != nil {
@@ -294,7 +294,7 @@ func (u *BaseBackupSupervisor) purgeBackups(
 	ctx context.Context,
 	backupTs map[string]bool,
 	backupsToDelete []string,
-	stor storage.Storage,
+	stor st.Storage,
 ) error {
 	// list backups in storage
 	if u.verbose {
@@ -339,7 +339,7 @@ func (u *BaseBackupSupervisor) purgeBackups(
 	return nil
 }
 
-func (u *BaseBackupSupervisor) getBackupIDs(ctx context.Context, cfg *config.Config) (storage.Storage, map[string]bool, error) {
+func (u *BaseBackupSupervisor) getBackupIDs(ctx context.Context, cfg *config.Config) (st.Storage, map[string]bool, error) {
 	// setup storage
 	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(cfg.Main.Directory),

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"sync"
 
-	st "github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type StreamingFile struct {

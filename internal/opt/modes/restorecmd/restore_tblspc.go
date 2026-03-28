@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/modes/dto/backupdto"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/tarx"
-	"github.com/hashmap-kz/storecrypt/pkg/storage"
 )
 
 func getTblspcLocation(tarName string, mf *backupdto.Result) (backupdto.Tablespace, error) {
@@ -98,7 +98,7 @@ func checkTblspcDirsEmpty(
 func restoreTblspc(
 	ctx context.Context,
 	id, pgdata string,
-	stor storage.Storage,
+	stor st.Storage,
 	ri *backupdto.RestoreInfo,
 	mf *backupdto.Result,
 ) error {

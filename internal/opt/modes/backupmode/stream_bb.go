@@ -15,7 +15,7 @@ import (
 
 	"github.com/hashmap-kz/pgrwl/internal/opt/shared/x/fsx"
 
-	st "github.com/hashmap-kz/storecrypt/pkg/storage"
+	st "github.com/hashmap-kz/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
