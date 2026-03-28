@@ -1,10 +1,12 @@
 package storecrypt
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -112,17 +114,33 @@ func ChooseUploadPartSize(size int64) int64 {
 func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) error {
 	remotePath = s.fullPath(remotePath)
 
-	objInput := &transfermanager.UploadObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(remotePath),
-		Body:   r,
+	// If we know the size, use transfermanager with computed part size.
+	if f, ok := isSeekable(r); ok {
+		st, err := f.Stat()
+		if err == nil {
+			size := st.Size()
+			partSize := ChooseUploadPartSize(size)
+			uploader := CreateUploader(s.client, partSize, DefaultS3Conc)
+
+			if _, err := f.Seek(0, io.SeekStart); err != nil {
+				return fmt.Errorf("seek file for %q: %w", remotePath, err)
+			}
+
+			_, err = uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
+				Bucket: aws.String(s.bucket),
+				Key:    aws.String(remotePath),
+				Body:   f,
+			})
+			if err != nil {
+				return fmt.Errorf("s3 upload %q: %w", remotePath, err)
+			}
+			return nil
+		}
 	}
 
-	_, err := s.uploader.UploadObject(ctx, objInput)
-	if err != nil {
-		return fmt.Errorf("s3 upload %q: %w", remotePath, err)
-	}
-	return nil
+	// Unknown-size stream: use manual multipart with a conservative part size.
+	// 256 MiB gives ~2.44 TiB before hitting 10k parts.
+	return s.putMultipartStream(ctx, remotePath, r, 256*1024*1024)
 }
 
 func (s *s3Storage) Get(ctx context.Context, remotePath string) (io.ReadCloser, error) {
@@ -421,4 +439,118 @@ func (s *s3Storage) Rename(ctx context.Context, oldRemotePath, newRemotePath str
 
 func endsWithSlash(s string) bool {
 	return s != "" && s[len(s)-1] == '/'
+}
+
+// multipart upload
+
+func isSeekable(r io.Reader) (*os.File, bool) {
+	f, ok := r.(*os.File)
+	if !ok {
+		return nil, false
+	}
+	return f, true
+}
+
+func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r io.Reader, partSize int64) error {
+	if partSize < MinS3PartSize {
+		partSize = MinS3PartSize
+	}
+
+	createOut, err := s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(remotePath),
+	})
+	if err != nil {
+		return fmt.Errorf("create multipart upload %q: %w", remotePath, err)
+	}
+
+	uploadID := aws.ToString(createOut.UploadId)
+	completedParts := make([]s3types.CompletedPart, 0, 128)
+
+	abort := func(abortErr error) error {
+		_, _ = s.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+			Bucket:   aws.String(s.bucket),
+			Key:      aws.String(remotePath),
+			UploadId: aws.String(uploadID),
+		})
+		return abortErr
+	}
+
+	buf := make([]byte, partSize)
+	var partNumber int32 = 1
+
+	for {
+		n, readErr := io.ReadFull(r, buf)
+
+		switch {
+		case readErr == nil:
+			// full part
+		case errors.Is(readErr, io.ErrUnexpectedEOF):
+			// final partial part
+		case errors.Is(readErr, io.EOF):
+			// no more data
+			n = 0
+		default:
+			return abort(fmt.Errorf("read source for %q: %w", remotePath, readErr))
+		}
+
+		if n > 0 {
+			if int64(partNumber) > MaxS3UploadParts {
+				return abort(fmt.Errorf(
+					"multipart upload exceeded %d parts for %q; choose larger part size than %d bytes",
+					MaxS3UploadParts, remotePath, partSize,
+				))
+			}
+
+			upOut, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
+				Bucket:        aws.String(s.bucket),
+				Key:           aws.String(remotePath),
+				UploadId:      aws.String(uploadID),
+				PartNumber:    aws.Int32(partNumber),
+				Body:          bytes.NewReader(buf[:n]),
+				ContentLength: aws.Int64(int64(n)),
+			})
+			if err != nil {
+				return abort(fmt.Errorf("upload part %d for %q: %w", partNumber, remotePath, err))
+			}
+
+			completedParts = append(completedParts, s3types.CompletedPart{
+				ETag:       upOut.ETag,
+				PartNumber: aws.Int32(partNumber),
+			})
+
+			partNumber++
+		}
+
+		if errors.Is(readErr, io.ErrUnexpectedEOF) || errors.Is(readErr, io.EOF) {
+			break
+		}
+	}
+
+	// empty object
+	if len(completedParts) == 0 {
+		_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(s.bucket),
+			Key:    aws.String(remotePath),
+			Body:   bytes.NewReader(nil),
+		})
+		if err != nil {
+			return abort(fmt.Errorf("put empty object %q: %w", remotePath, err))
+		}
+		return nil
+	}
+
+	_, err = s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(s.bucket),
+		Key:      aws.String(remotePath),
+		UploadId: aws.String(uploadID),
+		MultipartUpload: &s3types.CompletedMultipartUpload{
+			Parts: completedParts,
+		},
+	})
+	if err != nil {
+		return abort(fmt.Errorf("complete multipart upload %q: %w", remotePath, err))
+	}
+
+	return nil
 }
