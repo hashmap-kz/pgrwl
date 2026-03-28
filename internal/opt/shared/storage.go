@@ -51,7 +51,7 @@ func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 		if err != nil {
 			return nil, err
 		}
-		return st.NewVariadicStorage(backend, alg, writeExt)
+		return st.NewVariadicStorage(st.WithLogging(backend), alg, writeExt)
 	}
 
 	// sftp
@@ -68,7 +68,7 @@ func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 		}
 		remotePath := filepath.ToSlash(filepath.Join(cfg.Storage.SFTP.BaseDir, baseDir))
 		backend := st.NewSFTPStorage(client.SFTPClient(), remotePath)
-		return st.NewVariadicStorage(backend, alg, writeExt)
+		return st.NewVariadicStorage(st.WithLogging(backend), alg, writeExt)
 	}
 
 	// s3
@@ -86,7 +86,7 @@ func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 			return nil, err
 		}
 		backend := st.NewS3Storage(client.Client(), cfg.Storage.S3.Bucket, baseDir)
-		return st.NewVariadicStorage(backend, alg, writeExt)
+		return st.NewVariadicStorage(st.WithLogging(backend), alg, writeExt)
 	}
 
 	return nil, fmt.Errorf("unknown storage name: %s", cfg.Storage.Name)
