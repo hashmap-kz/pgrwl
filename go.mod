@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.1.12
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
 	github.com/go-resty/resty/v2 v2.17.2
+	github.com/hashmap-kz/storecrypt v1.0.16
 	github.com/hashmap-kz/streamcrypt v1.1.1
 	github.com/jackc/pglogrepl v0.0.0-20250509230407-a9884f6bd75a
 	github.com/jackc/pgx/v5 v5.9.1
