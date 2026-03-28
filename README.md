@@ -25,6 +25,7 @@ integration with Kubernetes environments.
   - [Table of Contents](#table-of-contents)
   - [About](#about)
   - [Usage](#usage)
+    - [Kubernetes Quick Start](#kubernetes-quick-start) 
     - [Receive Mode Quick Start](#receive-mode-quick-start)
     - [Serve Mode](#serve-mode)
     - [Backup Mode](#backup-mode)
@@ -79,6 +80,10 @@ integration with Kubernetes environments.
 ## Usage
 
 **[`^        back to top        ^`](#table-of-contents)**
+
+### Kubernetes Quick Start
+
+See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-start)
 
 ### Receive Mode Quick Start
 
