@@ -11,6 +11,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Aqtau
 ENV PATH="/usr/lib/postgresql/${PG_MAJOR}/bin:${PATH}"
 
+RUN touch /etc/apt/apt.conf.d/99verify-peer.conf \
+    && echo >>/etc/apt/apt.conf.d/99verify-peer.conf "Acquire { https::Verify-Peer false }"
+
 ######################################################################
 # Install PostgreSQL and other utilities
 

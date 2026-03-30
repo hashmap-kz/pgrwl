@@ -9,11 +9,11 @@
       "program": "${workspaceFolder}/main.go",
       "buildFlags": "-tags=debug",
       "args": [
-        "restore",
+        "daemon",
         "-c",
         "${workspaceFolder}/hack/configs/localfs/receive.yml",
-        "--dest",
-        "backups"
+        "-m",
+        "receive"
       ],
       "env": {
         "PGHOST": "localhost",

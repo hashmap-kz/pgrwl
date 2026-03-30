@@ -15,6 +15,10 @@ endif
 build: gen ## Build the binary
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(OUTPUT) main.go
 
+.PHONY: build-linux
+build-linux: gen ## Build the binary
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/pgrwl main.go
+
 .PHONY: lint
 lint: ## Run golangci-lint
 	golangci-lint run --output.tab.path=stdout
