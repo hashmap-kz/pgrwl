@@ -2,21 +2,6 @@
 set -Eeuo pipefail
 . /var/lib/postgresql/scripts/tests/utils.sh
 
-
-: "${INITDB_BIN:=initdb}"
-: "${PG_CTL_BIN:=pg_ctl}"
-: "${PSQL_BIN:=psql}"
-: "${PG_RECEIVEWAL_BIN:=pg_receivewal}"
-: "${PGRWL_BIN:=pgrwl}"
-: "${PG_ISREADY_BIN:=pg_isready}"
-
-# PostgreSQL server config
-: "${PGPORT:=55432}"
-: "${PGHOST:=127.0.0.1}"
-: "${PGUSER:=postgres}"
-: "${PGDATABASE:=postgres}"
-: "${PGPASSWORD:=postgres}"
-
 # Timing thresholds
 : "${POLL_INTERVAL_SEC:=0.10}"      # 100ms polling for replication stats
 : "${STREAMING_TIMEOUT_SEC:=30}"
@@ -29,32 +14,29 @@ set -Eeuo pipefail
 : "${PHASE2_BATCHES:=20}"
 : "${PHASE2_ROWS_PER_BATCH:=1000}"
 
-# PostgreSQL init settings
-: "${PG_INITDB_ARGS:=--auth=trust -U postgres}"
-
 ###############################################################################
 # INTERNAL STATE
 ###############################################################################
 
-TEST_ID="receivers_cmp"
-TEST_BASE=/tmp/pgrwl-parity-tests
-TEST_ROOT="${TEST_BASE}/parity-${TEST_ID}"
-RUN_DIR="${TEST_ROOT}/run"
-LOGS_DIR="${TEST_ROOT}/logs"
-ARTIFACTS_DIR="${TEST_ROOT}/artifacts"
-PGDATA="${RUN_DIR}/pgdata"
-POSTGRES_LOG="${LOGS_DIR}/pg.log"
-PGRWL_CONFIG="${RUN_DIR}/pgrwl-config.json"
-PGRWL_DIR="${ARTIFACTS_DIR}/pgrwl"
-PGRWL_LOG="${LOGS_DIR}/pgrwl.log"
-PGRWL_SLOT="pgrwl_v5"
-PGRWL_APPNAME=pgrwl_v5
-PGRECEIVEWAL_DIR="${ARTIFACTS_DIR}/pg_receivewal"
-PGRECEIVEWAL_LOG="${LOGS_DIR}/pg_receivewal.log"
-PGRECEIVEWAL_SLOT="pg_receivewal"
-PGRECEIVEWAL_APPNAME=pg_receivewal
-STATE_FILE="${RUN_DIR}/state.env"
-RESULTS_FILE="${RUN_DIR}/results.txt"
+export TEST_ID="receivers_cmp"
+export TEST_BASE=/tmp/pgrwl-parity-tests
+export TEST_ROOT="${TEST_BASE}/parity-${TEST_ID}"
+export RUN_DIR="${TEST_ROOT}/run"
+export LOGS_DIR="${TEST_ROOT}/logs"
+export ARTIFACTS_DIR="${TEST_ROOT}/artifacts"
+export PGDATA="${RUN_DIR}/pgdata"
+export POSTGRES_LOG="${LOGS_DIR}/pg.log"
+export PGRWL_CONFIG="${RUN_DIR}/pgrwl-config.json"
+export PGRWL_DIR="${ARTIFACTS_DIR}/pgrwl"
+export PGRWL_LOG="${LOGS_DIR}/pgrwl.log"
+export PGRWL_SLOT="pgrwl_v5"
+export PGRWL_APPNAME=pgrwl_v5
+export PGRECEIVEWAL_DIR="${ARTIFACTS_DIR}/pg_receivewal"
+export PGRECEIVEWAL_LOG="${LOGS_DIR}/pg_receivewal.log"
+export PGRECEIVEWAL_SLOT="pg_receivewal"
+export PGRECEIVEWAL_APPNAME=pg_receivewal
+export STATE_FILE="${RUN_DIR}/state.env"
+export RESULTS_FILE="${RUN_DIR}/results.txt"
 
 PGRWL_PID=""
 PGRECEIVEWAL_PID=""
@@ -154,7 +136,7 @@ cleanup() {
   fi
 
   if [[ -n "${PGDATA}" && -d "${PGDATA}" ]]; then
-    "${PG_CTL_BIN}" -D "${PGDATA}" -m fast stop >/dev/null 2>&1 || true
+    pg_ctl -D "${PGDATA}" -m fast stop >/dev/null 2>&1 || true
   fi
 
   if [[ -n "${TEST_ROOT}" && -d "${TEST_ROOT}" ]]; then
@@ -193,22 +175,6 @@ EOF
   log "sandbox: ${TEST_ROOT}"
 }
 
-check_requirements() {
-  need_cmd "${INITDB_BIN}"
-  need_cmd "${PG_CTL_BIN}"
-  need_cmd "${PSQL_BIN}"
-  need_cmd "${PG_RECEIVEWAL_BIN}"
-  need_cmd "${PGRWL_BIN}"
-  need_cmd "${PG_ISREADY_BIN}"
-  need_cmd cmp
-  need_cmd sha256sum
-  need_cmd find
-  need_cmd sort
-  need_cmd awk
-  need_cmd sed
-  need_cmd grep
-}
-
 ###############################################################################
 # POSTGRES HELPERS
 ###############################################################################
@@ -226,7 +192,7 @@ setup_psql_args() {
 }
 
 sql() {
-  PGPASSWORD="${PGPASSWORD}" "${PSQL_BIN}" "${psql_base_args[@]}" -Atqc "$*"
+  psql "${psql_base_args[@]}" -Atqc "$*"
 }
 
 sql_scalar() {
@@ -237,13 +203,13 @@ sql_scalar() {
 
 sql_file() {
   local file="$1"
-  PGPASSWORD="${PGPASSWORD}" "${PSQL_BIN}" "${psql_base_args[@]}" -f "${file}"
+  psql "${psql_base_args[@]}" -f "${file}"
 }
 
 init_cluster() {
   section "init cluster"
 
-  "${INITDB_BIN}" ${PG_INITDB_ARGS} -D "${PGDATA}" > "${LOGS_DIR}/initdb.log" 2>&1
+  initdb --auth=trust -U postgres -D "${PGDATA}" > "${LOGS_DIR}/initdb.log" 2>&1
 
   cat >> "${PGDATA}/postgresql.conf" <<EOF
 listen_addresses         = '*'
@@ -273,7 +239,7 @@ host  all         all all trust
 host  replication all all trust
 EOF
 
-  "${PG_CTL_BIN}" -D "${PGDATA}" -l "${POSTGRES_LOG}" start >/dev/null
+  pg_ctl -D "${PGDATA}" -l "${POSTGRES_LOG}" start >/dev/null
 
   wait_for_postgres
 
@@ -288,7 +254,7 @@ wait_for_postgres() {
   local start now
   start="$(now_epoch_ms)"
   while true; do
-    if "${PG_ISREADY_BIN}" -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" >/dev/null 2>&1; then
+    if pg_isready -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" >/dev/null 2>&1; then
       break
     fi
     now="$(now_epoch_ms)"
@@ -388,7 +354,7 @@ EOF
 start_pg_receivewal() {
   section "start pg_receivewal"
 
-  "${PG_RECEIVEWAL_BIN}" \
+  pg_receivewal \
     --directory="${PGRECEIVEWAL_DIR}" \
     --slot="${PGRECEIVEWAL_SLOT}" \
     --no-loop \
@@ -407,7 +373,7 @@ start_pgrwl() {
 
   write_pgrwl_config
 
-  "${PGRWL_BIN}" daemon -m receive -c "${PGRWL_CONFIG}" >"${PGRWL_LOG}" 2>&1 &
+  /usr/local/bin/pgrwl daemon -m receive -c "${PGRWL_CONFIG}" >"${PGRWL_LOG}" 2>&1 &
 
   PGRWL_PID=$!
   log "pgrwl pid=${PGRWL_PID}"
@@ -526,7 +492,7 @@ measure_reach_time_pair() {
   delta="$(float_abs "$(float_sub "${t1}" "${t2}")")"
 
   {
-    printf 'milestone=%s target_lsn=%s pgrwl_at=%s pg_receivewal_at=%s delta=%s\n' \
+    printf 'milestone=%-7s target_lsn=%s pgrwl_at=%s pg_receivewal_at=%s delta=%s\n' \
       "${label}" "${target_lsn}" "${t1}" "${t2}" "${delta}"
   } | tee -a "${RESULTS_FILE}"
 
@@ -690,21 +656,17 @@ print_summary() {
 }
 
 main() {
-  check_requirements
-  
   echo_delim "cleanup state"
-  x_remake_dirs
+  x_kill_proc_rmrf_tmp
 
   init_sandbox
   init_cluster
 
   create_test_schema
-
   xpg_recreate_slots
 
   start_pg_receivewal
   start_pgrwl
-
   wait_both_streaming
 
   generate_phase_workload "phase1" "${PHASE1_BATCHES}" "${PHASE1_ROWS_PER_BATCH}"

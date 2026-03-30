@@ -34,6 +34,7 @@ export PGHOST="localhost"
 export PGPORT="5432"
 export PGUSER="postgres"
 export PGPASSWORD="postgres"
+export PGDATABASE="postgres"
 
 # cleanup possible state
 
@@ -56,11 +57,15 @@ x_remake_buckets() {
   minio-mc version enable local/backups --insecure
 }
 
-x_remake_dirs() {
+x_kill_proc_rmrf_tmp() {
   # stop all processes, clean ALL state
   sudo pkill -9 postgres || true
   sudo pkill -9 pgrwl || true
   sudo rm -rf /tmp/*
+}
+
+x_remake_dirs() {
+  x_kill_proc_rmrf_tmp
 
   # recreate localFS
   rm -rf "${BASEBACKUP_PATH}" && mkdir -p "${BASEBACKUP_PATH}"
