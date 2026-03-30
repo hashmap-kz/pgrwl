@@ -118,9 +118,6 @@ drop_slot_if_exists() {
 }
 
 cleanup() {
-  ### TODO: enable after debug
-  exit 0
-
   local rc=$?
   set +e
 

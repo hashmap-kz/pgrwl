@@ -23,7 +23,7 @@ EOF
 
 mkdir -p certs
 
-openssl req -x509 -nodes -days 365 \
+openssl req -x509 -nodes -days 3650 \
   -newkey rsa:4096 \
   -keyout certs/private.key \
   -out certs/public.crt \
