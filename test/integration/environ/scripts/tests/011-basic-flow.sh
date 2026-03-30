@@ -1,12 +1,42 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-WORKDIR=/tmp/pgrwl-basic
+###############################################################################
+# Simple 'Point In Time Recovery' tutorial with pgrwl
+#
+# What this script demonstrates:
+#
+#   1. Start a fresh PostgreSQL cluster
+#   2. Start pgrwl in WAL receiver mode
+#   3. Take a base backup
+#   4. Generate more data AFTER the base backup
+#   5. Save a logical dump of the final database state
+#   6. Destroy PGDATA (simulate disaster)
+#   7. Restore from the base backup
+#   8. Replay archived WAL files
+#   9. Compare the restored database with the original state
+#
+# Main idea:
+#
+#   A base backup is only a snapshot at one point in time.
+#   All changes made after that snapshot live in WAL.
+#   To recover to the latest committed transaction, we need BOTH:
+#
+#     - the base backup
+#     - the WAL generated after the backup
+#
+###############################################################################
+
+###############################################################################
+# Configuration
+###############################################################################
+
+WORKDIR="/tmp/pgrwl-basic"
 PGDATA="${WORKDIR}/pgdata"
 WAL_ARCHIVE_DIR="${WORKDIR}/wal-archive"
 PGRWL_CONFIG="${WORKDIR}/pgrwl-config.json"
 
-DBNAME=bench
+DBNAME="bench"
 REPL_SLOT="pgrwl_v5"
 
 export PGHOST="localhost"
@@ -14,7 +44,12 @@ export PGPORT="5432"
 export PGUSER="postgres"
 export PGPASSWORD="postgres"
 
-PGRWL_PID=""
+PGRWL_RECEIVE_PID=""
+PGRWL_SERVE_PID=""
+
+###############################################################################
+# Small helper functions
+###############################################################################
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -26,7 +61,7 @@ die() {
 }
 
 wait_for_postgres() {
-  log "waiting for PostgreSQL to become ready"
+  log "Waiting for PostgreSQL to accept connections..."
   for _ in $(seq 1 120); do
     if pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" >/dev/null 2>&1; then
       return 0
@@ -37,9 +72,9 @@ wait_for_postgres() {
 }
 
 wait_until_out_of_recovery() {
-  log "waiting for PostgreSQL to finish recovery"
+  log "Waiting for PostgreSQL to finish recovery..."
   for _ in $(seq 1 120); do
-    if psql -d postgres -Atqc "select case when pg_is_in_recovery() then 'yes' else 'no' end" 2>/dev/null | grep -q '^no$'; then
+    if psql -d postgres -Atqc "select pg_is_in_recovery()" 2>/dev/null | grep -q '^f$'; then
       return 0
     fi
     sleep 1
@@ -49,42 +84,69 @@ wait_until_out_of_recovery() {
 
 stop_postgres() {
   if [[ -d "$PGDATA" ]]; then
-    log "stopping PostgreSQL"
+    log "Stopping PostgreSQL..."
     pg_ctl -D "$PGDATA" -m immediate stop >/dev/null 2>&1 || true
   fi
 }
 
-stop_pgrwl() {
-  if [[ -n "${PGRWL_PID:-}" ]]; then
-    log "stopping pgrwl"
-    kill "$PGRWL_PID" >/dev/null 2>&1 || true
-    wait "$PGRWL_PID" >/dev/null 2>&1 || true
-    PGRWL_PID=""
+stop_pgrwl_receive() {
+  if [[ -n "${PGRWL_RECEIVE_PID:-}" ]]; then
+    log "Stopping pgrwl receiver..."
+    kill "$PGRWL_RECEIVE_PID" >/dev/null 2>&1 || true
+    wait "$PGRWL_RECEIVE_PID" >/dev/null 2>&1 || true
+    PGRWL_RECEIVE_PID=""
+  fi
+}
+
+stop_pgrwl_serve() {
+  if [[ -n "${PGRWL_SERVE_PID:-}" ]]; then
+    log "Stopping pgrwl restore server..."
+    kill "$PGRWL_SERVE_PID" >/dev/null 2>&1 || true
+    wait "$PGRWL_SERVE_PID" >/dev/null 2>&1 || true
+    PGRWL_SERVE_PID=""
   fi
 }
 
 cleanup() {
-  stop_pgrwl
-  stop_postgres
+  stop_pgrwl_receive
+  stop_pgrwl_serve
 }
 trap cleanup EXIT
 
-### running
+###############################################################################
+# Phase 0. Start from a clean state
+###############################################################################
 
+log "Cleaning up old processes and files..."
 sudo pkill -9 postgres || true
 sudo pkill -9 pgrwl || true
 sudo rm -rf /tmp/*
 
-log "preparing workdir: $WORKDIR"
-rm -rf "$WORKDIR"
+log "Preparing work directory: $WORKDIR"
 mkdir -p "$WORKDIR" "$WAL_ARCHIVE_DIR"
 
-log "initializing PostgreSQL cluster"
+###############################################################################
+# Phase 1. Create and start a fresh PostgreSQL cluster
+###############################################################################
+
+log "Initializing PostgreSQL cluster..."
 initdb -D "$PGDATA" -A trust --auth-local=trust --auth-host=trust >/dev/null
 
 cat >>"$PGDATA/postgresql.conf" <<EOF
-listen_addresses         = '*'
-logging_collector        = on
+listen_addresses      = '*'
+
+# Settings required for WAL streaming / archiving style workflows
+wal_level                = replica
+max_wal_senders          = 10
+max_replication_slots    = 10
+wal_keep_size            = 64MB
+
+# Durability settings
+fsync                    = on
+synchronous_commit       = on
+full_page_writes         = on
+
+# Basic logging settings
 log_directory            = '${WORKDIR}'
 log_filename             = 'pg.log'
 log_lock_waits           = on
@@ -97,29 +159,24 @@ log_hostname             = off
 log_min_messages         = 'WARNING' # DEBUG5, DEBUG4, DEBUG3, DEBUG2, DEBUG1, INFO, NOTICE, WARNING, ERROR, LOG, FATAL, PANIC
 log_timezone             = 'Asia/Aqtau'
 log_line_prefix          = '%t [%p-%l] %r %q%u@%d '
-wal_level                = replica
-max_wal_senders          = 10
-wal_keep_size            = 64MB
-log_replication_commands = on
-
-max_replication_slots    = 10
-shared_buffers           = 256MB
-fsync                    = on
-synchronous_commit       = on
-full_page_writes         = on
 EOF
 
-log "starting PostgreSQL"
+log "Starting PostgreSQL..."
 pg_ctl -D "$PGDATA" -l "$WORKDIR/pg.log" start >/dev/null
 wait_for_postgres
 
-log "creating replication slot: $REPL_SLOT"
-psql -d postgres -v ON_ERROR_STOP=1 -c "select pg_create_physical_replication_slot('$REPL_SLOT');" >/dev/null
+log "Creating physical replication slot: $REPL_SLOT"
+psql -d postgres -v ON_ERROR_STOP=1 \
+  -c "select pg_create_physical_replication_slot('$REPL_SLOT');" >/dev/null
 
-log "creating test database: $DBNAME"
+log "Creating test database: $DBNAME"
 createdb "$DBNAME"
 
-log "writing pgrwl config"
+###############################################################################
+# Phase 2. Configure and start pgrwl in receive mode
+###############################################################################
+
+log "Writing pgrwl configuration..."
 cat >"$PGRWL_CONFIG" <<EOF
 {
   "main": {
@@ -138,66 +195,117 @@ cat >"$PGRWL_CONFIG" <<EOF
 }
 EOF
 
-log "starting pgrwl receiver"
+log "Starting pgrwl receiver..."
 pgrwl daemon -m receive -c "$PGRWL_CONFIG" >"$WORKDIR/pgrwl-receive.log" 2>&1 &
-PGRWL_PID=$!
+PGRWL_RECEIVE_PID=$!
 
+# Give the receiver a moment to connect and begin streaming.
 sleep 3
 
-log "creating base backup"
+###############################################################################
+# Phase 3. Take a base backup
+###############################################################################
+
+log "Creating base backup..."
 pgrwl backup -c "$PGRWL_CONFIG"
 
-log "initializing pgbench with scale=10 (~1 million rows in pgbench_accounts)"
+###############################################################################
+# Phase 4. Generate data AFTER the base backup
+#
+# This is the important part.
+# If we recover only from the base backup, these changes would be lost.
+# They survive only because the WAL receiver captures the WAL stream.
+###############################################################################
+
+log "Initializing pgbench data (scale=10 ~ about 1 million rows in pgbench_accounts)..."
 pgbench -i -s 10 "$DBNAME"
 
-log "running a small pgbench workload"
+log "Running pgbench workload..."
 pgbench -c 4 -j 2 -t 200 "$DBNAME"
 
-log "dumping cluster state before destruction"
+###############################################################################
+# Phase 5. Save the final logical state before disaster
+#
+# This dump becomes our ground truth.
+# After restore + WAL replay, we expect the cluster to match this state.
+###############################################################################
+
+log "Dumping cluster state before destruction..."
 pg_dumpall --quote-all-identifiers --restrict-key=0 >"$WORKDIR/before.sql"
 
-log "forcing WAL switch and checkpoint before crash simulation"
+###############################################################################
+# Phase 6. Force PostgreSQL to emit final WAL and let receiver catch up
+###############################################################################
+
+log "Forcing checkpoint and WAL switch..."
 psql -d postgres -v ON_ERROR_STOP=1 -c "checkpoint;" >/dev/null
 psql -d postgres -v ON_ERROR_STOP=1 -c "select pg_switch_wal();" >/dev/null
 
+# Give pgrwl time to receive the last WAL segment(s).
 sleep 3
 
-log "terminating PostgreSQL and pgrwl"
+###############################################################################
+# Phase 7. Simulate disaster
+###############################################################################
+
+log "Stopping PostgreSQL and pgrwl receiver..."
 stop_postgres
-stop_pgrwl
+stop_pgrwl_receive
 
-log "removing original PGDATA"
-rm -rf "${PGDATA}"
+log "Removing original PGDATA to simulate data loss..."
+rm -rf "$PGDATA"
 
-log "restoring PGDATA from base backup"
-pgrwl restore --dest="${PGDATA}" -c "$PGRWL_CONFIG"
-chmod 0750 "${PGDATA}"
-chown -R postgres:postgres "${PGDATA}"
+###############################################################################
+# Phase 8. Restore the base backup
+###############################################################################
+
+log "Restoring PGDATA from base backup..."
+pgrwl restore --dest="$PGDATA" -c "$PGRWL_CONFIG"
+
+chmod 0750 "$PGDATA"
+chown -R postgres:postgres "$PGDATA"
+
+# recovery.signal tells PostgreSQL to start in archive recovery mode.
 touch "$PGDATA/recovery.signal"
 
+###############################################################################
+# Phase 9. Start pgrwl in serve mode for restore_command
+###############################################################################
+
+log "Starting pgrwl restore server..."
 pgrwl daemon -m serve -c "$PGRWL_CONFIG" >"$WORKDIR/pgrwl-serve.log" 2>&1 &
+PGRWL_SERVE_PID=$!
 
 cat >>"$PGDATA/postgresql.conf" <<EOF
 restore_command = 'pgrwl restore-command --serve-addr=127.0.0.1:7070 %f %p'
 EOF
 
-log "starting restored PostgreSQL cluster"
+###############################################################################
+# Phase 10. Start restored PostgreSQL and let it replay WAL
+###############################################################################
+
+log "Starting restored PostgreSQL cluster..."
 pg_ctl -D "$PGDATA" -l "$WORKDIR/postgres-restored.log" start >/dev/null
+
 wait_for_postgres
 wait_until_out_of_recovery
 
-log "dumping cluster state after recovery"
+###############################################################################
+# Phase 11. Dump restored state and compare
+###############################################################################
+
+log "Dumping cluster state after recovery..."
 pg_dumpall --quote-all-identifiers --restrict-key=0 >"$WORKDIR/after.sql"
 
-log "comparing dumps"
+log "Comparing dumps..."
 if diff -u "$WORKDIR/before.sql" "$WORKDIR/after.sql" >"$WORKDIR/dump.diff"; then
-  log "SUCCESS: dumps are identical"
+  log "SUCCESS: restored cluster matches original state"
   echo "before: $WORKDIR/before.sql"
   echo "after : $WORKDIR/after.sql"
   echo "diff  : $WORKDIR/dump.diff (empty)"
 else
   echo
-  echo "FAIL: dumps differ"
-  echo "See: $WORKDIR/dump.diff"
+  echo "FAIL: restored cluster differs from original state"
+  echo "See diff: $WORKDIR/dump.diff"
   exit 1
 fi
