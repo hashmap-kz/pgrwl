@@ -43,7 +43,7 @@ RUN_DIR="${TEST_ROOT}/run"
 LOGS_DIR="${TEST_ROOT}/logs"
 ARTIFACTS_DIR="${TEST_ROOT}/artifacts"
 PGDATA="${RUN_DIR}/pgdata"
-POSTGRES_LOG="${LOGS_DIR}/postgresql.log"
+POSTGRES_LOG="${LOGS_DIR}/pg.log"
 PGRWL_CONFIG="${RUN_DIR}/pgrwl-config.json"
 PGRWL_DIR="${ARTIFACTS_DIR}/pgrwl"
 PGRWL_LOG="${LOGS_DIR}/pgrwl.log"
@@ -248,8 +248,8 @@ init_cluster() {
   cat >> "${PGDATA}/postgresql.conf" <<EOF
 listen_addresses         = '*'
 logging_collector        = on
-#log_directory            = '/var/log/postgresql'
-#log_filename             = 'pg.log'
+log_directory            = '${LOGS_DIR}'
+log_filename             = 'pg.log'
 log_lock_waits           = on
 log_temp_files           = 0
 log_checkpoints          = on
