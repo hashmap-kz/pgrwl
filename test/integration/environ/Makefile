@@ -43,7 +43,7 @@ status-primary:
 # Restart the cluster
 restart:
 	@rm -rf bin
-	@sh -c 'cd ../../../ && make build && mv bin test/integration/environ'
+	@sh -c 'cd ../../../ && make build-linux && mv bin test/integration/environ'
 	$(MAKE) down
 	sleep 2
 	$(MAKE) up

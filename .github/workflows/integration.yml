@@ -163,6 +163,8 @@ jobs:
           - pg_007_tablespaces_localfs
           - pg_008_dynstor
           - pg_009_s3_remote_only_restore
+          - pg_010_timing_parity_1
+          - pg_010_timing_parity_2
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}

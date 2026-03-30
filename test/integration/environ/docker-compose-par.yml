@@ -60,6 +60,16 @@ services:
     container_name: pg_009_s3_remote_only_restore
     entrypoint: /var/lib/postgresql/scripts/tests/009-s3-remote-only-restore.sh
 
+  pg_010_timing_parity_1:
+    <<: *pg_test_common
+    container_name: pg_010_timing_parity_1
+    entrypoint: /var/lib/postgresql/scripts/tests/010-timing-parity-1.sh
+
+  pg_010_timing_parity_2:
+    <<: *pg_test_common
+    container_name: pg_010_timing_parity_2
+    entrypoint: /var/lib/postgresql/scripts/tests/010-timing-parity-2.sh
+
   sshd:
     build:
       context: .

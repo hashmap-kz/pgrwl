@@ -1,5 +1,7 @@
 FROM alpine:3.22.2
 
+RUN sed -i 's/https/http/' /etc/apk/repositories
+
 # Install OpenSSH
 RUN apk update && apk add --no-cache openssh sudo bash mc vim inetutils-telnet
 

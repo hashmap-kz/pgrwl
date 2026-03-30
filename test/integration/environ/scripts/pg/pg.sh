@@ -170,3 +170,85 @@ wal_keep_size            = 64MB
 log_replication_commands = on
 EOF
 }
+
+xpg_sql() {
+  psql -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${PGDATABASE}" -Atqc "$1"
+}
+
+xpg_lsn_ge() {
+  local left="$1"
+  local right="$2"
+  local res
+  res="$(xpg_sql "select case when '${left}'::pg_lsn >= '${right}'::pg_lsn then 1 else 0 end")"
+  [[ "${res}" == "1" ]]
+}
+
+xpg_current_insert_lsn() {
+  xpg_sql "select pg_current_wal_insert_lsn();"
+}
+
+xpg_init_fns() {
+  psql -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" -d "${PGDATABASE}" \
+    -f /var/lib/postgresql/scripts/pg/functions.sql
+}
+
+# measure timing
+
+xpg_dump_pg_stat_replication() {
+  xpg_sql "
+    select
+      application_name,
+      state,
+      sent_lsn,
+      write_lsn,
+      flush_lsn,
+      sync_state
+    from pg_stat_replication
+    order by application_name
+  " || true
+}
+
+xpg_wait_until_streaming() {
+  local app="$1"
+  local timeout="${2:-$STREAMING_TIMEOUT_SEC}"
+  local start now state
+
+  start="$(x_now_epoch_ms)"
+  while true; do
+    state="$(xpg_sql "
+      select coalesce(
+        (select state
+         from pg_stat_replication
+         where application_name='${app}'
+         limit 1),
+        ''
+      )
+    ")"
+
+    if [[ "${state}" == "streaming" ]]; then
+      return 0
+    fi
+
+    now="$(x_now_epoch_ms)"
+    if x_float_gt "$(x_float_sub "${now}" "${start}")" "${timeout}"; then
+      echo "pg_stat_replication:"
+      xpg_dump_pg_stat_replication
+      return 1
+    fi
+
+    sleep "${POLL_INTERVAL_SEC}"
+  done
+}
+
+xpg_get_flush_lsn_for_app() {
+  local app="$1"
+  xpg_sql "
+    select coalesce(
+      (select flush_lsn::text
+       from pg_stat_replication
+       where application_name='${app}'
+       limit 1),
+      ''
+    )
+  "
+}
