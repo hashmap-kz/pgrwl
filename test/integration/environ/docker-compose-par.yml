@@ -70,6 +70,11 @@ services:
     container_name: pg_010_timing_parity_2
     entrypoint: /var/lib/postgresql/scripts/tests/010-timing-parity-2.sh
 
+  pg_011_basic_flow:
+    <<: *pg_test_common
+    container_name: pg_011_basic_flow
+    entrypoint: /var/lib/postgresql/scripts/tests/011-basic-flow.sh
+
   sshd:
     build:
       context: .
