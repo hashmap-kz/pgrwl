@@ -5,10 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pgrwl/pgrwl/internal/opt/shared/streamcrypt/codec"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/streamcrypt/crypt/aesgcm"
+
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/hashmap-kz/streamcrypt/pkg/codec"
-	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
 	"github.com/pgrwl/pgrwl/config"
 )
 

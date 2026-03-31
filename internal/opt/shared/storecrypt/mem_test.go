@@ -159,7 +159,7 @@ func TestInMemoryStorage_ListTopLevelDirs(t *testing.T) {
 	assert.Empty(t, result3)
 }
 
-// --- New tests below ---
+// New tests below
 
 func TestInMemoryStorage_DeleteDir(t *testing.T) {
 	ctx := context.Background()

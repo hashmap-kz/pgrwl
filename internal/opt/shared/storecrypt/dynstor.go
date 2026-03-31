@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashmap-kz/streamcrypt/pkg/codec"
-	"github.com/hashmap-kz/streamcrypt/pkg/crypt"
-	"github.com/hashmap-kz/streamcrypt/pkg/pipe"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/streamcrypt/codec"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/streamcrypt/crypt"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/streamcrypt/pipe"
 )
 
 // CodecPair groups a compressor and its matching decompressor.
