@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hashmap-kz/streamcrypt/pkg/codec"
-	"github.com/hashmap-kz/streamcrypt/pkg/crypt/aesgcm"
 	storage "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/streamcrypt/codec"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/streamcrypt/crypt/aesgcm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
