@@ -31,10 +31,9 @@ set -Eeuo pipefail
 # Configuration
 ###############################################################################
 
-WORKDIR="/tmp/pgrwl-basic"
-PGDATA="${WORKDIR}/pgdata"
-WAL_ARCHIVE_DIR="${WORKDIR}/wal-archive"
-PGRWL_CONFIG="${WORKDIR}/pgrwl-config.json"
+PGDATA="/tmp/pgrwl-basic/pgdata"
+WAL_ARCHIVE_DIR="/tmp/pgrwl-basic/wal-archive"
+PGRWL_CONFIG="/tmp/pgrwl-basic/pgrwl-config.json"
 
 DBNAME="bench"
 REPL_SLOT="pgrwl_v5"
@@ -120,10 +119,10 @@ trap cleanup EXIT
 log "Cleaning up old processes and files..."
 sudo pkill -9 postgres || true
 sudo pkill -9 pgrwl || true
-sudo rm -rf /tmp/*
+sudo rm -rf "/tmp/pgrwl-basic"
 
-log "Preparing work directory: $WORKDIR"
-mkdir -p "$WORKDIR" "$WAL_ARCHIVE_DIR"
+log "Preparing work directory: /tmp/pgrwl-basic"
+mkdir -p "/tmp/pgrwl-basic" "$WAL_ARCHIVE_DIR"
 
 ###############################################################################
 # Phase 1. Create and start a fresh PostgreSQL cluster
@@ -147,7 +146,7 @@ synchronous_commit       = on
 full_page_writes         = on
 
 # Basic logging settings
-log_directory            = '${WORKDIR}'
+log_directory            = '/tmp/pgrwl-basic'
 log_filename             = 'pg.log'
 log_lock_waits           = on
 log_temp_files           = 0
@@ -162,7 +161,7 @@ log_line_prefix          = '%t [%p-%l] %r %q%u@%d '
 EOF
 
 log "Starting PostgreSQL..."
-pg_ctl -D "$PGDATA" -l "$WORKDIR/pg.log" start >/dev/null
+pg_ctl -D "$PGDATA" -l "/tmp/pgrwl-basic/pg.log" start >/dev/null
 wait_for_postgres
 
 log "Creating physical replication slot: $REPL_SLOT"
@@ -196,7 +195,7 @@ cat >"$PGRWL_CONFIG" <<EOF
 EOF
 
 log "Starting pgrwl receiver..."
-pgrwl daemon -m receive -c "$PGRWL_CONFIG" >"$WORKDIR/pgrwl-receive.log" 2>&1 &
+pgrwl daemon -m receive -c "$PGRWL_CONFIG" >"/tmp/pgrwl-basic/pgrwl-receive.log" 2>&1 &
 PGRWL_RECEIVE_PID=$!
 
 # Give the receiver a moment to connect and begin streaming.
@@ -231,7 +230,7 @@ pgbench -c 4 -j 2 -t 200 "$DBNAME"
 ###############################################################################
 
 log "Dumping cluster state before destruction..."
-pg_dumpall --quote-all-identifiers --restrict-key=0 >"$WORKDIR/before.sql"
+pg_dumpall --quote-all-identifiers --restrict-key=0 >"/tmp/pgrwl-basic/before.sql"
 
 ###############################################################################
 # Phase 6. Force PostgreSQL to emit final WAL and let receiver catch up
@@ -273,7 +272,7 @@ touch "$PGDATA/recovery.signal"
 ###############################################################################
 
 log "Starting pgrwl restore server..."
-pgrwl daemon -m serve -c "$PGRWL_CONFIG" >"$WORKDIR/pgrwl-serve.log" 2>&1 &
+pgrwl daemon -m serve -c "$PGRWL_CONFIG" >"/tmp/pgrwl-basic/pgrwl-serve.log" 2>&1 &
 PGRWL_SERVE_PID=$!
 
 cat >>"$PGDATA/postgresql.conf" <<EOF
@@ -285,7 +284,7 @@ EOF
 ###############################################################################
 
 log "Starting restored PostgreSQL cluster..."
-pg_ctl -D "$PGDATA" -l "$WORKDIR/postgres-restored.log" start >/dev/null
+pg_ctl -D "$PGDATA" -l "/tmp/pgrwl-basic/postgres-restored.log" start >/dev/null
 
 wait_for_postgres
 wait_until_out_of_recovery
@@ -295,17 +294,17 @@ wait_until_out_of_recovery
 ###############################################################################
 
 log "Dumping cluster state after recovery..."
-pg_dumpall --quote-all-identifiers --restrict-key=0 >"$WORKDIR/after.sql"
+pg_dumpall --quote-all-identifiers --restrict-key=0 >"/tmp/pgrwl-basic/after.sql"
 
 log "Comparing dumps..."
-if diff -u "$WORKDIR/before.sql" "$WORKDIR/after.sql" >"$WORKDIR/dump.diff"; then
+if diff -u "/tmp/pgrwl-basic/before.sql" "/tmp/pgrwl-basic/after.sql" >"/tmp/pgrwl-basic/dump.diff"; then
   log "SUCCESS: restored cluster matches original state"
-  echo "before: $WORKDIR/before.sql"
-  echo "after : $WORKDIR/after.sql"
-  echo "diff  : $WORKDIR/dump.diff (empty)"
+  echo "before: /tmp/pgrwl-basic/before.sql"
+  echo "after : /tmp/pgrwl-basic/after.sql"
+  echo "diff  : /tmp/pgrwl-basic/dump.diff (empty)"
 else
   echo
   echo "FAIL: restored cluster differs from original state"
-  echo "See diff: $WORKDIR/dump.diff"
+  echo "See diff: /tmp/pgrwl-basic/dump.diff"
   exit 1
 fi
