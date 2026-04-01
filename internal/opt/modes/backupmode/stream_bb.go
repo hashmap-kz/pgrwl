@@ -93,6 +93,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 		NoWait:        true,
 		MaxRate:       0,
 		TablespaceMap: true,
+		Manifest:      true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start base backup: %w", err)
@@ -112,6 +113,9 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 	var curFile *StreamingFile
 	var totalBytes int64
 	var remotePath string
+
+	manifestBuf := bytes.Buffer{}
+	inManifest := false
 
 	closeCurrent := func() error {
 		if curFile == nil {
@@ -140,6 +144,8 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 		case *pgproto3.CopyData:
 			switch m.Data[0] {
 			case 'n':
+				inManifest = false
+
 				if err := closeCurrent(); err != nil {
 					return nil, err
 				}
@@ -162,7 +168,22 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 					slog.String("tablespace-path", tsPath),
 				)
 
+				// Identifies the message as containing archive or manifest data.
 			case 'd':
+
+				// manifest
+
+				if inManifest {
+					mData := m.Data[1:]
+					log.Info("writing manifest data", slog.Int("len", len(mData)))
+					if _, err := manifestBuf.Write(mData); err != nil {
+						return nil, fmt.Errorf("write manifest buffer: %w", err)
+					}
+					continue
+				}
+
+				// archive
+
 				if curFile == nil {
 					//nolint:errcheck
 					_ = closeCurrent()
@@ -177,7 +198,14 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 				totalBytes += int64(n)
 
 			case 'm':
-				log.Info("received manifest message type, ignored")
+				log.Info("received manifest msg")
+
+				if err := closeCurrent(); err != nil {
+					return nil, err
+				}
+
+				inManifest = true
+				manifestBuf.Reset() // only once, at manifest start
 
 			case 'p':
 				// only if Progress: true
@@ -210,6 +238,14 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 			result.StopLSN = stopRes.LSN
 			result.BytesTotal = totalBytes
+
+			if manifestBuf.Len() > 0 {
+				manifest := backupdto.BackupManifest{}
+				if err := json.Unmarshal(manifestBuf.Bytes(), &manifest); err != nil {
+					return nil, fmt.Errorf("parse manifest: %w", err)
+				}
+				result.Manifest = &manifest
+			}
 
 			return result, nil
 
