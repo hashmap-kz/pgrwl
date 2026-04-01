@@ -24,6 +24,34 @@ type Result struct {
 
 // PostgreSQL manifest
 
+// {
+//     "PostgreSQL-Backup-Manifest-Version": 1,
+//     "Files": [
+//         {
+//             "Path": "pg_tblspc/108562/PG_16_202307071/106992/107015",
+//             "Size": 0,
+//             "Last-Modified": "2025-11-28 06:19:09 GMT",
+//             "Checksum-Algorithm": "CRC32C",
+//             "Checksum": "00000000"
+//         },
+//         {
+//             "Path": "pg_tblspc/108562/PG_16_202307071/106992/107016",
+//             "Size": 8192,
+//             "Last-Modified": "2025-11-28 06:19:09 GMT",
+//             "Checksum-Algorithm": "CRC32C",
+//             "Checksum": "8ee8be27"
+//         }
+//     ],
+//     "WAL-Ranges": [
+//         {
+//             "Timeline": 1,
+//             "Start-LSN": "12/48000028",
+//             "End-LSN": "12/48000138"
+//         }
+//     ],
+//     "Manifest-Checksum": "12c7b73706ba9c82429483ad1f97c394de347cb86b7ad1e28377012228389d63"
+// }
+
 // BackupManifest represents PostgreSQL backup manifest
 type BackupManifest struct {
 	Version          int                `json:"PostgreSQL-Backup-Manifest-Version"`
