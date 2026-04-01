@@ -143,6 +143,10 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 		case *pgproto3.CopyData:
 			switch m.Data[0] {
+
+			// Identifies the message as indicating the start of a new archive.
+			// There will be one archive for the main data directory and one for each additional tablespace;
+			// each will use tar format (following the "ustar interchange format" specified in the POSIX 1003.1-2008 standard).
 			case 'n':
 				inManifest = false
 
@@ -197,6 +201,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 				}
 				totalBytes += int64(n)
 
+				// Identifies the message as indicating the start of the backup manifest.
 			case 'm':
 				log.Info("received manifest msg")
 
@@ -207,6 +212,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 				inManifest = true
 				manifestBuf.Reset() // only once, at manifest start
 
+				// Identifies the message as a progress report.
 			case 'p':
 				// only if Progress: true
 				if len(m.Data) >= 9 {
