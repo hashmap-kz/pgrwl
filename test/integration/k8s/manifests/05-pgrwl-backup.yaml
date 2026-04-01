@@ -182,8 +182,8 @@ spec:
               memory: "128Mi"
               cpu: "32m"
             limits:
-              memory: "1Gi"
-              cpu: "1"
+              memory: "3Gi"
+              cpu: "2"
           volumeMounts:
             - mountPath: /wals
               name: storage
