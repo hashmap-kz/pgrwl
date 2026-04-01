@@ -143,7 +143,6 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 		case *pgproto3.CopyData:
 			switch m.Data[0] {
-
 			// Identifies the message as indicating the start of a new archive.
 			// There will be one archive for the main data directory and one for each additional tablespace;
 			// each will use tar format (following the "ustar interchange format" specified in the POSIX 1003.1-2008 standard).
