@@ -73,6 +73,7 @@ spec:
           image: "prom/prometheus:v3.4.1"
           args:
             - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
           ports:
             - containerPort: 9090
           volumeMounts:

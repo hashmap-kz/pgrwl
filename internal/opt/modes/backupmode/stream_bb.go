@@ -93,6 +93,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 		NoWait:        true,
 		MaxRate:       0,
 		TablespaceMap: true,
+		Manifest:      true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start base backup: %w", err)
@@ -112,6 +113,9 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 	var curFile *StreamingFile
 	var totalBytes int64
 	var remotePath string
+
+	manifestBuf := bytes.Buffer{}
+	inManifest := false
 
 	closeCurrent := func() error {
 		if curFile == nil {
@@ -139,7 +143,12 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 		case *pgproto3.CopyData:
 			switch m.Data[0] {
+			// Identifies the message as indicating the start of a new archive.
+			// There will be one archive for the main data directory and one for each additional tablespace;
+			// each will use tar format (following the "ustar interchange format" specified in the POSIX 1003.1-2008 standard).
 			case 'n':
+				inManifest = false
+
 				if err := closeCurrent(); err != nil {
 					return nil, err
 				}
@@ -162,7 +171,22 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 					slog.String("tablespace-path", tsPath),
 				)
 
+				// Identifies the message as containing archive or manifest data.
 			case 'd':
+
+				// manifest
+
+				if inManifest {
+					mData := m.Data[1:]
+					log.Info("writing manifest data", slog.Int("len", len(mData)))
+					if _, err := manifestBuf.Write(mData); err != nil {
+						return nil, fmt.Errorf("write manifest buffer: %w", err)
+					}
+					continue
+				}
+
+				// archive
+
 				if curFile == nil {
 					//nolint:errcheck
 					_ = closeCurrent()
@@ -176,9 +200,18 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 				}
 				totalBytes += int64(n)
 
+				// Identifies the message as indicating the start of the backup manifest.
 			case 'm':
-				log.Info("received manifest message type, ignored")
+				log.Info("received manifest msg")
 
+				if err := closeCurrent(); err != nil {
+					return nil, err
+				}
+
+				inManifest = true
+				manifestBuf.Reset() // only once, at manifest start
+
+				// Identifies the message as a progress report.
 			case 'p':
 				// only if Progress: true
 				if len(m.Data) >= 9 {
@@ -210,6 +243,14 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 			result.StopLSN = stopRes.LSN
 			result.BytesTotal = totalBytes
+
+			if manifestBuf.Len() > 0 {
+				manifest := backupdto.BackupManifest{}
+				if err := json.Unmarshal(manifestBuf.Bytes(), &manifest); err != nil {
+					return nil, fmt.Errorf("parse manifest: %w", err)
+				}
+				result.Manifest = &manifest
+			}
 
 			return result, nil
 
