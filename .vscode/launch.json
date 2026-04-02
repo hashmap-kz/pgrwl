@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug",
+      "name": "backup",
       "type": "go",
       "request": "launch",
       "mode": "debug",
@@ -13,11 +13,25 @@
         "-c",
         "${workspaceFolder}/hack/configs/localfs/receive.yml"
       ],
+      "envFile": "${workspaceFolder}/.vscode/pg.env"
+    },
+    {
+      "name": "receive",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/main.go",
+      "buildFlags": "-tags=debug",
+      "args": [
+        "daemon",
+        "-c",
+        "${workspaceFolder}/hack/configs/localfs/receive.yml",
+        "-m",
+        "receive"
+      ],
+      "envFile": "${workspaceFolder}/.vscode/pg.env",
       "env": {
-        "PGHOST": "localhost",
-        "PGPORT": "5432",
-        "PGUSER": "postgres",
-        "PGPASSWORD": "postgres"
+        "TZ": "UTC"
       }
     }
   ]
