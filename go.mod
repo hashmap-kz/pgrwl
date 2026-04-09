@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.14
 	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.1.14
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.98.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.0
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/jackc/pglogrepl v0.0.0-20260401131349-e37c41485510
 	github.com/jackc/pgx/v5 v5.9.1
