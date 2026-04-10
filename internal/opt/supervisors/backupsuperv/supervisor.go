@@ -73,6 +73,9 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 }
 
 func (u *BaseBackupSupervisor) Run(ctx context.Context) {
+	// set cron schedule metric
+	backupmetrics.M.SetCronSchedule(u.cfg.Backup.Cron)
+
 	// get necessary info
 	conn, err := pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
 	if err != nil {
@@ -118,7 +121,10 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 			}
 		}
 		// create backup
-		_, err := backupmode.CreateBaseBackup(&backupmode.CreateBaseBackupOpts{Directory: u.opts.Directory})
+		_, err := backupmode.CreateBaseBackup(&backupmode.CreateBaseBackupOpts{
+			Directory: u.opts.Directory,
+			Cron:      u.cfg.Backup.Cron,
+		})
 		if err != nil {
 			u.log().Error("basebackup failed", slog.Any("err", err))
 		} else {
