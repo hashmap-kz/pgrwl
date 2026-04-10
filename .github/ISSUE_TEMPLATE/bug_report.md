@@ -29,16 +29,15 @@ If applicable, add screenshots to help explain your problem.
 
 ### **Environment (please complete the following information):**
 
-- **OS:** (e.g., Linux)
-- **PostgreSQL major version:** (e.g., 17)
-- **Version:** (e.g., 1.0.28)
-- **Logs** (attach or paste)
-- **Configuration:**
-  - Config file **or** environment variables (if running as a standalone application)
-- **Image tag** (if running as a container): (e.g., quay.io/pgrwl/pgrwl:1.0.28)
-- **Helm chart version** (if applicable): (e.g., chart-version=0.0.8, app-version=1.0.28)
-- **Helm values:** (attach or paste)
-
+- OS: (e.g., Linux)
+- PostgreSQL major version: (e.g., 17)
+- Version: (e.g., 1.0.28)
+- Logs (attach or paste)
+- Configuration:
+    - Config file or environment variables (if running as a standalone application)
+- Image tag (if running as a container): (e.g., quay.io/pgrwl/pgrwl:1.0.28)
+- Helm chart version (if applicable): (e.g., chart-version=0.0.8, app-version=1.0.28)
+- Helm values: (attach or paste)
 
 **Additional context**
 
