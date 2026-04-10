@@ -109,6 +109,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 	log := bb.log()
 	log.Info("started backup",
 		slog.String("StartLSN", startResp.LSN.String()),
+		slog.Int("tablespaces", len(startResp.Tablespaces)),
 	)
 
 	startTime := time.Now()
