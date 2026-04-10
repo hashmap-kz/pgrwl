@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/core/logger"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
 
@@ -89,7 +88,7 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*backupdto.Result, erro
 func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, error) {
 	startResp, err := pglogrepl.StartBaseBackup(ctx, bb.conn, pglogrepl.BaseBackupOptions{
 		Label:         fmt.Sprintf("pgrwl_%s", bb.timestamp),
-		Progress:      true,
+		Progress:      false, // or true if you want to use 'p'
 		Fast:          true,
 		WAL:           false,
 		NoWait:        true,
@@ -110,13 +109,11 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 	log := bb.log()
 	log.Info("started backup",
 		slog.String("StartLSN", startResp.LSN.String()),
-		slog.Int("tablespaces", len(startResp.Tablespaces)),
 	)
 
 	startTime := time.Now()
 	var curFile *StreamingFile
 	var totalBytes int64
-	var totalEstimatedBytes int64
 	var remotePath string
 
 	manifestBuf := bytes.Buffer{}
@@ -143,15 +140,11 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 		switch m := msg.(type) {
 		case *pgproto3.CopyOutResponse:
-			log.LogAttrs(ctx, logger.LevelTrace, "copy-out response received")
+			// nothing interesting here
+			log.Debug("copy-out response received")
 			continue
 
 		case *pgproto3.CopyData:
-			log.LogAttrs(ctx, logger.LevelTrace, "copy-data message",
-				slog.String("type", string(m.Data[0])),
-				slog.Int("len", len(m.Data)),
-			)
-
 			switch m.Data[0] {
 			// Identifies the message as indicating the start of a new archive.
 			// There will be one archive for the main data directory and one for each additional tablespace;
@@ -188,7 +181,7 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 				if inManifest {
 					mData := m.Data[1:]
-					log.LogAttrs(ctx, logger.LevelTrace, "writing manifest data", slog.Int("len", len(mData)))
+					log.Info("writing manifest data", slog.Int("len", len(mData)))
 					if _, err := manifestBuf.Write(mData); err != nil {
 						return nil, fmt.Errorf("write manifest buffer: %w", err)
 					}
@@ -209,10 +202,6 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 					return nil, fmt.Errorf("write to storage pipe: %w", err)
 				}
 				totalBytes += int64(n)
-				log.LogAttrs(ctx, logger.LevelTrace, "wrote chunk",
-					slog.Int("chunk_bytes", n),
-					slog.Int64("total_bytes", totalBytes),
-				)
 
 				// Identifies the message as indicating the start of the backup manifest.
 			case 'm':
@@ -226,33 +215,17 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 				manifestBuf.Reset() // only once, at manifest start
 
 				// Identifies the message as a progress report.
-				// Contains the estimated total backup size in bytes.
 			case 'p':
+				// only if Progress: true
 				if len(m.Data) >= 9 {
 					//nolint:gosec
-					totalEstimatedBytes = int64(binary.BigEndian.Uint64(m.Data[1:9]))
+					bytesDone := int64(binary.BigEndian.Uint64(m.Data[1:9]))
 					elapsed := time.Since(startTime)
-
-					etaStr := "unknown"
-					if totalBytes > 0 && totalEstimatedBytes > 0 && elapsed.Seconds() > 0 {
-						rate := float64(totalBytes) / elapsed.Seconds()
-						remaining := float64(totalEstimatedBytes - totalBytes)
-						if rate > 0 && remaining > 0 {
-							eta := time.Duration(remaining / rate * float64(time.Second))
-							etaStr = eta.Round(time.Second).String()
-						} else if remaining <= 0 {
-							etaStr = "0s"
-						}
-					}
-
 					log.Info("progress",
 						slog.String("file", remotePath),
-						slog.Int64("bytes_done", totalBytes),
-						slog.String("bytes_done_iec", fsx.ByteCountIEC(totalBytes)),
-						slog.Int64("total_estimated", totalEstimatedBytes),
-						slog.String("total_estimated_iec", fsx.ByteCountIEC(totalEstimatedBytes)),
+						slog.Int64("bytes_done", bytesDone),
+						slog.String("bytes_done_iec", fsx.ByteCountIEC(bytesDone)),
 						slog.String("elapsed", elapsed.Round(time.Millisecond).String()),
-						slog.String("eta", etaStr),
 					)
 				}
 
