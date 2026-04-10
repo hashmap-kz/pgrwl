@@ -32,7 +32,7 @@ x_remake_config() {
       "pass": "qwerty123"
     },
     "s3": {
-      "url": "https://minio:9000",
+      "url": "https://toxiproxy:9005",
       "access_key_id": "minioadmin",
       "secret_access_key": "minioadmin123",
       "bucket": "backups",
@@ -45,11 +45,11 @@ x_remake_config() {
 EOF
 }
 
-x_backup_restore_with_flapping_minio() {
+x_backup_restore_with_toxiproxy() {
   echo_delim "cleanup state"
   x_remake_dirs
+  x_toxiproxy_setup_minio
   x_remake_config
-  x_wait_minio_up
 
   echo_delim "init and run a cluster"
   xpg_rebuild
@@ -58,14 +58,14 @@ x_backup_restore_with_flapping_minio() {
   echo_delim "running wal receiver"
   x_start_receiver "/tmp/config.json"
 
-  echo_delim "creating base backup"
+  echo_delim "creating backup"
   /usr/local/bin/pgrwl backup -c "/tmp/config.json"
 
   chmod +x "${BACKGROUND_INSERTS_SCRIPT_PATH}"
   nohup "${BACKGROUND_INSERTS_SCRIPT_PATH}" >>"${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}" 2>&1 &
 
-  echo_delim "generate load while minio flaps"
-  x_minio_flap 1 2 3
+  echo_delim "generate load while minio is flapping through toxiproxy"
+  x_toxiproxy_flap_minio 1 2 5 3
   pgbench -i -s 10 postgres
   x_generate_wal 50
   sleep 10
@@ -79,13 +79,15 @@ x_backup_restore_with_flapping_minio() {
   x_stop_receiver
   xpg_teardown
 
-  echo_delim "restore base backup while minio flaps again"
-  x_minio_flap 1 2 3
+  echo_delim "restore backup while minio is cut through toxiproxy"
+  x_toxiproxy_cut_minio_after_delay 1 5
   /usr/local/bin/pgrwl restore --dest="${PGDATA}" -c "/tmp/config.json"
 
   chmod 0750 "${PGDATA}"
   chown -R postgres:postgres "${PGDATA}"
   touch "${PGDATA}/recovery.signal"
+
+  find "${WAL_PATH}" -type f -name "*.partial" -exec bash -c 'for f; do mv -v "$f" "${f%.partial}"; done' _ {} +
 
   xpg_config
   cat <<EOF >>"${PG_CFG}"
@@ -103,7 +105,7 @@ EOF
   xpg_wait_is_in_recovery
   cat /var/log/postgresql/pg.log
 
-  echo_delim "compare before and after"
+  echo_delim "diff pg_dumpall before vs after"
   pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
   diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
 
@@ -112,4 +114,4 @@ EOF
   tail -10 "${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}" || true
 }
 
-x_backup_restore_with_flapping_minio "$@"
+x_backup_restore_with_toxiproxy "$@"

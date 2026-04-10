@@ -27,6 +27,7 @@ env:
   CACHE_FILE_DOCKER_PG_STANDBY: docker-cache/docker_pg_standby.tgz
   CACHE_FILE_DOCKER_MINIO: docker-cache/docker_minio.tgz
   CACHE_FILE_DOCKER_MINIO_MC: docker-cache/docker_minio_mc.tgz
+  CACHE_FILE_DOCKER_TOXIPROXY: docker-cache/docker_toxiproxy.tgz
   COMPOSE_FILE: "test/integration/environ/docker-compose.yml"
 
 jobs:
@@ -70,6 +71,7 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
             ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
+            ${{ env.CACHE_FILE_DOCKER_TOXIPROXY }}
           key: ${{ steps.cache-key.outputs.value }}
 
       - name: Load images from cache (if present)
@@ -86,6 +88,7 @@ jobs:
             "${CACHE_FILE_DOCKER_SSHD}" \
             "${CACHE_FILE_DOCKER_MINIO}" \
             "${CACHE_FILE_DOCKER_MINIO_MC}" \
+            "${CACHE_FILE_DOCKER_TOXIPROXY}" \
           | xargs -n1 -P4 bash -c '
             set -euo pipefail
             f="$0"
@@ -130,6 +133,7 @@ jobs:
             "pgrwl/sshd"                    "${CACHE_FILE_DOCKER_SSHD}" \
             "pgrwl/minio"                   "${CACHE_FILE_DOCKER_MINIO}" \
             "pgrwl/minio-mc"                "${CACHE_FILE_DOCKER_MINIO_MC}" \
+            "pgrwl/toxiproxy"               "${CACHE_FILE_DOCKER_TOXIPROXY}" \
           | xargs -n2 -P4 bash -c '
               set -euo pipefail
               img="$1"
@@ -166,7 +170,7 @@ jobs:
           - pg_010_timing_parity_1
           - pg_010_timing_parity_2
           - pg_011_basic_flow
-          - pg_012_restore_s3_flapping
+          - pg_012_restore_s3_toxiproxy
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}
@@ -203,6 +207,7 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_SSHD }}
             ${{ env.CACHE_FILE_DOCKER_MINIO }}
             ${{ env.CACHE_FILE_DOCKER_MINIO_MC }}
+            ${{ env.CACHE_FILE_DOCKER_TOXIPROXY }}
           key: ${{ steps.cache-key.outputs.value }}
 
       - name: Fail if cache is missing
@@ -223,6 +228,7 @@ jobs:
             "${CACHE_FILE_DOCKER_SSHD}" \
             "${CACHE_FILE_DOCKER_MINIO}" \
             "${CACHE_FILE_DOCKER_MINIO_MC}" \
+            "${CACHE_FILE_DOCKER_TOXIPROXY}" \
           | xargs -n1 -P4 bash -c '
             set -euo pipefail
             f="$0"

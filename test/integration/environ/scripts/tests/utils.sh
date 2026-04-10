@@ -146,80 +146,107 @@ x_start_serving() {
   SERVE_PID=$!
 }
 
-# minio utils
+# toxiproxy utils
 
-x_minio_alias_set() {
-  minio-mc alias set local https://minio:9000 minioadmin minioadmin123 --insecure
-}
+export TOXIPROXY_API="http://toxiproxy:8474"
+export TOXIPROXY_MINIO_PROXY="minio_s3"
+export TOXIPROXY_MINIO_LISTEN="0.0.0.0:9005"
+export TOXIPROXY_MINIO_UPSTREAM="minio:9000"
 
-x_minio_is_up() {
-  curl -ks https://minio:9000/minio/health/ready >/dev/null 2>&1
-}
-
-x_wait_minio_up() {
-  local timeout="${1:-60}"
+x_wait_http_ok() {
+  local url="${1:?url required}"
+  local timeout="${2:-30}"
   local i
 
   for ((i = 0; i < timeout; i++)); do
-    if x_minio_is_up; then
-      log_info "minio is up"
+    if curl -fsS "${url}" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
   done
 
-  log_error "minio did not become ready"
   return 1
 }
 
-x_wait_minio_down() {
-  local timeout="${1:-30}"
-  local i
-
-  for ((i = 0; i < timeout; i++)); do
-    if ! x_minio_is_up; then
-      log_info "minio is down"
-      return 0
-    fi
-    sleep 1
-  done
-
-  log_error "minio did not go down"
-  return 1
+x_wait_toxiproxy_up() {
+  log_info "waiting toxiproxy api"
+  x_wait_http_ok "${TOXIPROXY_API}/version" 30
 }
 
-x_minio_restart() {
-  x_minio_alias_set
-  log_info "restarting minio"
-  minio-mc admin service restart local --insecure
+x_toxiproxy_reset() {
+  log_info "resetting toxiproxy"
+  curl -fsS -X POST "${TOXIPROXY_API}/reset" >/dev/null
 }
 
-# Optional: use only if your compose restart policy really brings it back
-x_minio_stop() {
-  x_minio_alias_set
-  log_info "stopping minio"
-  minio-mc admin service stop local --insecure
+x_toxiproxy_create_minio_proxy() {
+  log_info "creating toxiproxy minio proxy"
+  curl -fsS -X POST "${TOXIPROXY_API}/proxies" \
+    -H 'Content-Type: application/json' \
+    -d "{
+      \"name\": \"${TOXIPROXY_MINIO_PROXY}\",
+      \"listen\": \"${TOXIPROXY_MINIO_LISTEN}\",
+      \"upstream\": \"${TOXIPROXY_MINIO_UPSTREAM}\"
+    }" >/dev/null || true
 }
 
-x_minio_flap() {
+x_toxiproxy_delete_minio_proxy() {
+  curl -fsS -X DELETE "${TOXIPROXY_API}/proxies/${TOXIPROXY_MINIO_PROXY}" >/dev/null 2>&1 || true
+}
+
+x_toxiproxy_enable_minio() {
+  log_info "enabling minio proxy"
+  curl -fsS -X POST "${TOXIPROXY_API}/proxies/${TOXIPROXY_MINIO_PROXY}" \
+    -H 'Content-Type: application/json' \
+    -d '{"enabled":true}' >/dev/null
+}
+
+x_toxiproxy_disable_minio() {
+  log_info "disabling minio proxy"
+  curl -fsS -X POST "${TOXIPROXY_API}/proxies/${TOXIPROXY_MINIO_PROXY}" \
+    -H 'Content-Type: application/json' \
+    -d '{"enabled":false}' >/dev/null
+}
+
+x_toxiproxy_setup_minio() {
+  x_wait_toxiproxy_up
+  x_toxiproxy_reset
+  x_toxiproxy_delete_minio_proxy
+  x_toxiproxy_create_minio_proxy
+  x_toxiproxy_enable_minio
+}
+
+x_toxiproxy_cut_minio_after_delay() {
+  local delay="${1:-2}"
+  local downtime="${2:-5}"
+
+  (
+    sleep "${delay}"
+    log_info "cutting minio through toxiproxy for ${downtime}s"
+    x_toxiproxy_disable_minio
+    sleep "${downtime}"
+    x_toxiproxy_enable_minio
+    log_info "restored minio through toxiproxy"
+  ) &
+}
+
+x_toxiproxy_flap_minio() {
   local delay_before_first="${1:-2}"
   local cycles="${2:-2}"
-  local pause_between_cycles="${3:-3}"
+  local downtime="${3:-4}"
+  local pause_between="${4:-3}"
 
   (
     sleep "${delay_before_first}"
-
     local i
     for ((i = 1; i <= cycles; i++)); do
-      log_info "minio flap cycle ${i}/${cycles}: restart"
-      x_minio_restart || true
-      x_wait_minio_down 10 || true
-      x_wait_minio_up 60 || true
+      log_info "toxiproxy minio flap cycle ${i}/${cycles}: down ${downtime}s"
+      x_toxiproxy_disable_minio
+      sleep "${downtime}"
+      x_toxiproxy_enable_minio
 
       if (( i < cycles )); then
-        sleep "${pause_between_cycles}"
+        sleep "${pause_between}"
       fi
     done
   ) &
 }
-

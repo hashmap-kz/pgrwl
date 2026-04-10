@@ -75,10 +75,10 @@ services:
     container_name: pg_011_basic_flow
     entrypoint: /var/lib/postgresql/scripts/tests/011-basic-flow.sh
 
-  pg_012_restore_s3_flapping:
+  pg_012_restore_s3_toxiproxy:
     <<: *pg_test_common
-    container_name: pg_012_restore_s3_flapping
-    entrypoint: /var/lib/postgresql/scripts/tests/012-restore-s3-flapping.sh
+    container_name: pg_012_restore_s3_toxiproxy
+    entrypoint: /var/lib/postgresql/scripts/tests/012-restore-s3-toxiproxy.sh
 
   sshd:
     build:
@@ -128,6 +128,17 @@ services:
       mc version enable local/backups --insecure && \
       exit 0;
       "
+
+  toxiproxy:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/toxiproxy/Dockerfile
+    image: pgrwl/toxiproxy
+    container_name: pgrwl_toxiproxy
+    ports:
+      - "8474:8474"   # control API
+      - "9005:9005"   # MinIO proxy port used by tests
+    restart: unless-stopped
 
 volumes:
   minio_data:
