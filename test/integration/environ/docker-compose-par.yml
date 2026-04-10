@@ -12,6 +12,8 @@ services:
         condition: service_healthy
       sshd:
         condition: service_started
+      toxiproxy:
+        condition: service_started
 
   #  docker run --rm --user postgres test1
 
