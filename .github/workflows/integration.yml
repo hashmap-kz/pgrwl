@@ -166,6 +166,7 @@ jobs:
           - pg_010_timing_parity_1
           - pg_010_timing_parity_2
           - pg_011_basic_flow
+          - pg_012_restore_s3_flapping
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}
