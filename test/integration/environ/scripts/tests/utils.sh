@@ -145,3 +145,81 @@ x_start_serving() {
 
   SERVE_PID=$!
 }
+
+# minio utils
+
+x_minio_alias_set() {
+  minio-mc alias set local https://minio:9000 minioadmin minioadmin123 --insecure
+}
+
+x_minio_is_up() {
+  curl -ks https://minio:9000/minio/health/ready >/dev/null 2>&1
+}
+
+x_wait_minio_up() {
+  local timeout="${1:-60}"
+  local i
+
+  for ((i = 0; i < timeout; i++)); do
+    if x_minio_is_up; then
+      log_info "minio is up"
+      return 0
+    fi
+    sleep 1
+  done
+
+  log_error "minio did not become ready"
+  return 1
+}
+
+x_wait_minio_down() {
+  local timeout="${1:-30}"
+  local i
+
+  for ((i = 0; i < timeout; i++)); do
+    if ! x_minio_is_up; then
+      log_info "minio is down"
+      return 0
+    fi
+    sleep 1
+  done
+
+  log_error "minio did not go down"
+  return 1
+}
+
+x_minio_restart() {
+  x_minio_alias_set
+  log_info "restarting minio"
+  minio-mc admin service restart local --insecure
+}
+
+# Optional: use only if your compose restart policy really brings it back
+x_minio_stop() {
+  x_minio_alias_set
+  log_info "stopping minio"
+  minio-mc admin service stop local --insecure
+}
+
+x_minio_flap() {
+  local delay_before_first="${1:-2}"
+  local cycles="${2:-2}"
+  local pause_between_cycles="${3:-3}"
+
+  (
+    sleep "${delay_before_first}"
+
+    local i
+    for ((i = 1; i <= cycles; i++)); do
+      log_info "minio flap cycle ${i}/${cycles}: restart"
+      x_minio_restart || true
+      x_wait_minio_down 10 || true
+      x_wait_minio_up 60 || true
+
+      if (( i < cycles )); then
+        sleep "${pause_between_cycles}"
+      fi
+    done
+  ) &
+}
+
