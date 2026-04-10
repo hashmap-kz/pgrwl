@@ -119,7 +119,7 @@ jobs:
           set -euo pipefail
 
           echo "Building images for PG_MAJOR=${PG_MAJOR} from scratch (no cache hit)..."
-          docker compose -f "${{ env.COMPOSE_FILE }}" build pg-primary pg-standby sshd minio createbuckets
+          docker compose -f "${{ env.COMPOSE_FILE }}" build pg-primary pg-standby sshd minio createbuckets toxiproxy
 
           echo "=== Images after build ==="
           docker images || true
