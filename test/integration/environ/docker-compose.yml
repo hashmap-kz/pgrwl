@@ -103,6 +103,17 @@ services:
       exit 0;
       "
 
+  toxiproxy:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/toxiproxy/Dockerfile
+    image: pgrwl/toxiproxy
+    container_name: pgrwl_toxiproxy
+    ports:
+      - "8474:8474"   # control API
+      - "9005:9005"   # MinIO proxy port used by tests
+    restart: unless-stopped
+
 volumes:
   pg-primary-data:
   pg-standby-data:
