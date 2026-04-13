@@ -21,32 +21,30 @@ integration with Kubernetes environments.
 
 ## Table of Contents
 
-- [pgrwl](#pgrwl)
-  - [Table of Contents](#table-of-contents)
-  - [About](#about)
-  - [Usage](#usage)
-    - [Kubernetes Quick Start](#kubernetes-quick-start) 
-    - [Receive Mode Quick Start](#receive-mode-quick-start)
-    - [Serve Mode](#serve-mode)
-    - [Backup Mode](#backup-mode)
-    - [Restore Command](#restore-command)
-  - [Configuration Reference](#configuration-reference)
-  - [Installation](#installation)
-    - [Docker images are available at quay.io/pgrwl/pgrwl](#docker-images-are-available-at-quayiohashmap_kzpgrwl)
-    - [Helm Chart](#helm-chart)
-    - [Manual Installation](#manual-installation)
-    - [Installation script for Unix-Based OS _(requires: tar, curl, jq)_](#installation-script-for-unix-based-os-requires-tar-curl-jq)
-    - [Package-Based installation (suitable in CI/CD)](#package-based-installation-suitable-in-cicd)
-      - [Debian](#debian)
-      - [Alpine Linux](#apline-linux)
-  - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
-  - [Architecture](#architecture)
-    - [Design Notes](#design-notes)
-    - [Durability \& `fsync`](#durability--fsync)
-    - [Why Not `archive_command`?](#why-not-archive_command)
-  - [Contributing](#contributing)
-    - [Links](#links)
-  - [License](#license)
+- [About](#about)
+- [Usage](#usage)
+  - [Kubernetes Quick Start](#kubernetes-quick-start)
+  - [Receive Mode Quick Start](#receive-mode-quick-start)
+  - [Serve Mode](#serve-mode)
+  - [Backup Mode](#backup-mode)
+  - [Restore Command](#restore-command)
+- [Configuration Reference](#configuration-reference)
+- [Installation](#installation)
+  - [Docker images](#docker-images)
+  - [Helm Chart](#helm-chart)
+  - [Manual Installation](#manual-installation)
+  - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
+  - [Package-Based installation](#package-based-installation)
+    - [Debian](#debian)
+    - [Alpine Linux](#apline-linux)
+- [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
+- [Architecture](#architecture)
+  - [Design Notes](#design-notes)
+  - [Durability \& `fsync`](#durability--fsync)
+  - [Why Not `archive_command`?](#why-not-archive_command)
+- [Contributing](#contributing)
+  - [Links](#links)
+- [License](#license)
 
 ---
 
@@ -344,7 +342,9 @@ PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
 
 **[`^        back to top        ^`](#table-of-contents)**
 
-### Docker images are available at [quay.io/pgrwl/pgrwl](https://quay.io/repository/pgrwl/pgrwl)
+### Docker images
+
+[quay.io/pgrwl/pgrwl](https://quay.io/repository/pgrwl/pgrwl)
 
 ```bash
 docker pull quay.io/pgrwl/pgrwl:latest
@@ -374,7 +374,9 @@ helm upgrade pgrwl pgrwl/pgrwl \
    the [Releases page](https://github.com/pgrwl/pgrwl/releases).
 2. Place the binary in your system's `PATH` (e.g., `/usr/local/bin`).
 
-### Installation script for Unix-Based OS _(requires: tar, curl, jq)_
+### Installation script for Unix-Based OS
+
+_requires: tar, curl, jq_
 
 ```bash
 (
@@ -390,7 +392,7 @@ chmod +x /usr/local/bin/pgrwl
 )
 ```
 
-### Package-Based installation (suitable in CI/CD)
+### Package-Based installation
 
 #### Debian
 
