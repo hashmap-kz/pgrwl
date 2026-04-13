@@ -36,7 +36,7 @@ integration with Kubernetes environments.
   - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
   - [Package-Based installation](#package-based-installation)
     - [Debian](#debian)
-    - [Alpine Linux](#apline-linux)
+    - [Alpine Linux](#alpine-linux)
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
   - [Design Notes](#design-notes)
