@@ -43,7 +43,7 @@ integration with Kubernetes environments.
   - [Durability \& `fsync`](#durability--fsync)
   - [Why Not `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
-  - [Links](#links)
+- [Links](#links)
 - [License](#license)
 
 ---
@@ -502,7 +502,7 @@ Check also the [Developer Notes](docs/developer_notes.md) for additional informa
 
 ---
 
-### Links
+## Links
 
 **[`^        back to top        ^`](#table-of-contents)**
 
