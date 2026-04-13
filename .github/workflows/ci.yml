@@ -3,10 +3,10 @@ name: CI
 
 on:
   push:
-    branches:
+    branches: &branches
       - "master"
       - "release/**"
-    paths-ignore:
+    paths-ignore: &paths-ignore
       - ".github/**"
       - "docs/**"
       - "examples/**"
@@ -18,20 +18,8 @@ on:
       - "Makefile"
       - ".golangci.yml"
   pull_request:
-    branches:
-      - "master"
-      - "release/**"
-    paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "examples/**"
-      - "charts/**"
-      - "hack/**"
-      - "**/*.md"
-      - "**/*.gitignore"
-      - "**/*.gitattributes"
-      - "Makefile"
-      - ".golangci.yml"
+    branches: *branches
+    paths-ignore: *paths-ignore
   workflow_dispatch:
 
 jobs:
@@ -59,13 +47,3 @@ jobs:
       - name: Run unit tests
         run: go test -v -race ./...
         shell: bash
-
-      # Uncomment these when you're ready to use GoReleaser
-      #
-      # - name: Install GoReleaser
-      #   uses: goreleaser/goreleaser-action@v6
-      #   with:
-      #     install-only: true
-      #
-      # - name: Run GoReleaser (snapshot)
-      #   run: make snapshot
