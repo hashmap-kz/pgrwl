@@ -50,8 +50,7 @@ integration with Kubernetes environments.
 
 ## About
 
-- The project serves as a **research platform** to explore streaming WAL archiving with a target of **RPO=0** during
-  recovery.
+- The project is a production-ready tool for streaming WAL archiving, designed to achieve an RPO of 0 during recovery.
 
 - _It's primarily designed for use in containerized environments._
 
