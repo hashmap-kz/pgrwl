@@ -145,7 +145,7 @@ func (pgrw *pgReceiveWal) streamLog(ctx context.Context) error {
 
 	walSegSz := pgrw.walSegSz
 
-	// 3
+	// 2 - slot: create if missing, then read restart position
 	var slotRestartInfo *ReadReplicationSlotResultResult
 	_, err = GetSlotInformation(pgrw.conn, pgrw.slotName)
 	if err != nil {
@@ -166,32 +166,64 @@ func (pgrw *pgReceiveWal) streamLog(ctx context.Context) error {
 		return fmt.Errorf("cannot get slot information: %w", err)
 	}
 
-	// 3
+	// 3 - server identity: current timeline and WAL position
 	sysident, err := pglogrepl.IdentifySystem(ctx, pgrw.conn)
 	if err != nil {
 		return fmt.Errorf("cannot identify system: %w", err)
 	}
 
-	// 4
+	serverTLI := conv.ToUint32(sysident.Timeline)
+
+	// 4 - resolve the streaming start position
+	//
+	// Priority (highest to lowest):
+	//   a. WAL files on disk, but ONLY when their timeline matches the
+	//      server's current timeline.  If the server has promoted (new TLI),
+	//      the disk segments belong to a superseded timeline and must be
+	//      ignored - using them would send a start LSN the server rejects as
+	//      "not in this server's history".
+	//   b. Slot restart_lsn / restart_tli - always consistent with the
+	//      server because the slot tracks the server's own WAL position.
+	//   c. IDENTIFY_SYSTEM xlogpos / timeline - last resort when the slot
+	//      has no restart position (freshly created).
 	streamStartLSN, streamStartTimeline, err := pgrw.findStreamingStart()
 	if err != nil {
 		if !errors.Is(err, ErrNoWalEntries) {
-			// just log an error and continue, stream-start-lsn and timeline
-			// are required, and we will proceed with slot-info or sysident
 			pgrw.log().Error("cannot find streaming start", slog.Any("err", err))
 		}
+	}
+
+	if streamStartLSN != 0 && streamStartTimeline != serverTLI {
+		// The disk has segments from a different (older) timeline than the
+		// server is currently on.  Discard them: the server cannot accept a
+		// start position on a timeline it has already left behind.
+		pgrw.log().Warn(
+			"disk WAL timeline does not match server timeline, ignoring disk-derived start position",
+			slog.Uint64("disk_tli", uint64(streamStartTimeline)),
+			slog.Uint64("server_tli", uint64(serverTLI)),
+		)
+		streamStartLSN = 0
+		streamStartTimeline = 0
 	}
 
 	if streamStartLSN == 0 {
 		if slotRestartInfo.RestartLSN != 0 {
 			streamStartLSN = slotRestartInfo.RestartLSN
 			streamStartTimeline = slotRestartInfo.RestartTLI
+			pgrw.log().Info("using slot restart position",
+				slog.String("lsn", streamStartLSN.String()),
+				slog.Uint64("tli", uint64(streamStartTimeline)),
+			)
 		}
 	}
 
 	if streamStartLSN == 0 {
 		streamStartLSN = sysident.XLogPos
-		streamStartTimeline = conv.ToUint32(sysident.Timeline)
+		streamStartTimeline = serverTLI
+		pgrw.log().Info("using sysident position",
+			slog.String("lsn", streamStartLSN.String()),
+			slog.Uint64("tli", uint64(streamStartTimeline)),
+		)
 	}
 
 	// final check
@@ -199,9 +231,7 @@ func (pgrw *pgReceiveWal) streamLog(ctx context.Context) error {
 		return fmt.Errorf("cannot find start LSN for streaming")
 	}
 
-	// 5
-
-	// Always start streaming at the beginning of a segment
+	// 5 - always start streaming at the beginning of a segment
 	curPos := uint64(streamStartLSN) - XLogSegmentOffset(streamStartLSN, walSegSz)
 	streamStartLSN = pglogrepl.LSN(curPos)
 
@@ -256,7 +286,9 @@ func (pgrw *pgReceiveWal) SetStream(s *StreamCtl) {
 	pgrw.stream = s
 }
 
-// findStreamingStart scans baseDir for WAL files and returns (startLSN, timeline)
+// findStreamingStart scans baseDir for WAL files and returns (startLSN, timeline).
+// The caller is responsible for validating the returned timeline against the
+// server's current timeline before using the result.
 func (pgrw *pgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
 	type walEntry struct {
 		tli       uint32
