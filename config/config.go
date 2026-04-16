@@ -26,6 +26,10 @@ const (
 	// ModeServe represents the HTTP API serving mode.
 	ModeServe = "serve"
 
+	// ModeCombined runs WAL receiving and WAL serving in a single process.
+	// The receiver can be started/stopped at runtime via POST /receiver.
+	ModeCombined = "combined"
+
 	// ModeBackup used in pgrwl streaming basebackup mode.
 	ModeBackup = "backup"
 
@@ -78,19 +82,21 @@ var (
 		ModeBackup,
 		ModeReceive,
 		ModeServe,
+		ModeCombined,
 	}
 )
 
 // Config is the root configuration for the WAL receiver application.
 // Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
-	Main      MainConfig    `json:"main,omitzero"`      // Main application settings.
-	Receiver  ReceiveConfig `json:"receiver,omitzero"`  // WAL receiver configuration.
-	Metrics   MetricsConfig `json:"metrics,omitzero"`   // Prometheus metrics configuration.
-	Log       LogConfig     `json:"log,omitzero"`       // Logging configuration.
-	Storage   StorageConfig `json:"storage,omitzero"`   // Storage backend configuration.
-	DevConfig DevConfig     `json:"devconfig,omitzero"` // Various dev options.
-	Backup    BackupConfig  `json:"backup,omitzero"`    // Streaming basebackup options.
+	Main      MainConfig     `json:"main,omitzero"`      // Main application settings.
+	Receiver  ReceiveConfig  `json:"receiver,omitzero"`  // WAL receiver configuration.
+	Combined  CombinedConfig `json:"combined,omitzero"`  // Combined mode configuration.
+	Metrics   MetricsConfig  `json:"metrics,omitzero"`   // Prometheus metrics configuration.
+	Log       LogConfig      `json:"log,omitzero"`       // Logging configuration.
+	Storage   StorageConfig  `json:"storage,omitzero"`   // Storage backend configuration.
+	DevConfig DevConfig      `json:"devconfig,omitzero"` // Various dev options.
+	Backup    BackupConfig   `json:"backup,omitzero"`    // Streaming basebackup options.
 }
 
 // MainConfig holds top-level application settings.
@@ -110,6 +116,13 @@ type DevConfig struct {
 // DevConfigPprof configures pprof.
 type DevConfigPprof struct {
 	Enable bool `json:"enable,omitzero" env:"PGRWL_DEVCONFIG_PPROF_ENABLE"`
+}
+
+// CombinedConfig configures the combined receive+serve mode.
+type CombinedConfig struct {
+	// AutoStart controls whether WAL streaming begins immediately on process
+	// startup. Set to false to require an explicit POST /receiver {"state":"running"}.
+	AutoStart bool `json:"auto_start,omitzero" env:"PGRWL_COMBINED_AUTO_START"`
 }
 
 // BackupConfig configures streaming basebackup properties.
@@ -423,8 +436,8 @@ func checkMainConfig(c *Config, errs []string) []string {
 }
 
 func checkReceiverConfig(c *Config, mode string, errs []string) []string {
-	// Validate receiver (only in receive mode)
-	if mode == ModeReceive {
+	// Validate receiver (only in receive / combined mode)
+	if mode == ModeReceive || mode == ModeCombined {
 		if strings.TrimSpace(c.Receiver.Slot) == "" {
 			errs = append(errs, "receiver.slot is required in receive mode")
 		}
