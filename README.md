@@ -23,25 +23,25 @@ integration with Kubernetes environments.
 
 - [About](#about)
 - [Usage](#usage)
-  - [Kubernetes Quick Start](#kubernetes-quick-start)
-  - [Receive Mode Quick Start](#receive-mode-quick-start)
-  - [Serve Mode](#serve-mode)
-  - [Backup Mode](#backup-mode)
-  - [Restore Command](#restore-command)
+    - [Kubernetes Quick Start](#kubernetes-quick-start)
+    - [Receive Mode Quick Start](#receive-mode-quick-start)
+    - [Backup Mode](#backup-mode)
+    - [Restore Command](#restore-command)
+    - [REST API](#rest-api)
 - [Configuration Reference](#configuration-reference)
 - [Installation](#installation)
-  - [Docker images](#docker-images)
-  - [Helm Chart](#helm-chart)
-  - [Manual Installation](#manual-installation)
-  - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
-  - [Package-Based installation](#package-based-installation)
-    - [Debian](#debian)
-    - [Alpine Linux](#alpine-linux)
+    - [Docker images](#docker-images)
+    - [Helm Chart](#helm-chart)
+    - [Manual Installation](#manual-installation)
+    - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
+    - [Package-Based installation](#package-based-installation)
+        - [Debian](#debian)
+        - [Alpine Linux](#alpine-linux)
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
-  - [Design Notes](#design-notes)
-  - [Durability \& `fsync`](#durability--fsync)
-  - [Why Not `archive_command`?](#why-not-archive_command)
+    - [Design Notes](#design-notes)
+    - [Durability \& `fsync`](#durability--fsync)
+    - [Why Not `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
 - [Links](#links)
 - [License](#license)
@@ -63,10 +63,6 @@ integration with Kubernetes environments.
 **`pgrwl` running in `receive` mode**
 
 ![Receive Mode](docs/assets/svg/loop-v1.svg)
-
-**`pgrwl` running in `serve` mode**
-
-![Serve Mode](docs/assets/svg/serve-mode.svg)
 
 **`pgrwl` running in `backup` mode**
 
@@ -154,26 +150,6 @@ export PGRWL_DAEMON_MODE=receive
 go run main.go daemon -c config.yml
 ```
 
-### Serve Mode
-
-`Serve` mode is _used during restore to serve archived WAL files from storage_.
-
-```bash
-cat <<EOF >config.yml
-main:
-  listen_port: 7070
-  directory: wals
-log:
-  level: trace
-  format: text
-  add_source: true
-EOF
-
-export PGRWL_DAEMON_MODE=serve
-
-pgrwl daemon -c config.yml
-```
-
 ### Backup Mode
 
 `Backup` mode performs a full base backup of your PostgreSQL cluster on a configured schedule.
@@ -210,9 +186,25 @@ pgrwl daemon -c config.yml
 
 ```ini
 # where 'k8s-worker5:30266' represents the host and port
-# of a 'pgrwl' instance running in 'serve' mode.
+# of a 'pgrwl' instance running in 'receive' mode.
 restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 ```
+
+### REST API
+
+`receive` mode exposes an HTTP API for health checks, status, and receiver lifecycle control.
+
+| Method   | Path                       | Description                                                 |
+|----------|----------------------------|-------------------------------------------------------------|
+| `GET`    | `/healthz`                 | Liveness probe                                              |
+| `GET`    | `/status`                  | Current receiver state and stream status                    |
+| `GET`    | `/receiver`                | Current receiver state and stream status                    |
+| `POST`   | `/receiver/states/running` | Start WAL streaming                                         |
+| `POST`   | `/receiver/states/stopped` | Stop WAL streaming (waits for goroutine to exit)            |
+| `GET`    | `/wal/{filename}`          | Download a single WAL file (used by `restore_command`)      |
+| `GET`    | `/config`                  | Brief config (used by `backup` mode for WAL retention)      |
+| `DELETE` | `/wal-before/{filename}`   | Schedule deletion of WAL files older than the given segment |
+| `GET`    | `/metrics`                 | Prometheus metrics (when `metrics.enable: true`)            |
 
 ---
 
@@ -227,7 +219,7 @@ You may either use `pgrwl daemon -c config.yml -m receive` or provide the corres
 `pgrwl daemon`.
 
 ```
-main:                                    # Required for both modes: receive/serve
+main:                                    # Required for both modes: receive/backup
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
 
@@ -293,7 +285,7 @@ storage:                                 # Optional
 Corresponding env-vars.
 
 ```
-PGRWL_DAEMON_MODE                        # receive/serve/backup
+PGRWL_DAEMON_MODE                        # receive/backup
 PGRWL_MAIN_LISTEN_PORT                   # HTTP server port (used for management)
 PGRWL_MAIN_DIRECTORY                     # Base directory for storing WAL files
 PGRWL_RECEIVER_SLOT                      # Replication slot to use
@@ -430,8 +422,9 @@ _The full process may look like this (a typical, rough, and simplified example):
   and subject to **retention policies** for cleanup. The built-in cron scheduler enables fully automated backups without
   requiring external orchestration.
 
-- During recovery, the same `receive` StatefulSet can be reconfigured to run in `serve` mode,
-  exposing previously archived WALs via HTTP to support **Point-in-Time Recovery (PITR)** through `restore_command`.
+- During recovery, the same `receive` StatefulSet continues running as-is. WAL streaming can be stopped
+  via `POST /receiver/states/stopped` while the HTTP server keeps running, exposing previously archived
+  WALs via `GET /wal/{filename}` to support **Point-in-Time Recovery (PITR)** through `restore_command`.
 
 - With this setup, you're able to restore your cluster - in the event of a crash -
   to **any second within the past three days**, using the most recent base backup and available WAL segments.
