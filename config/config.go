@@ -20,23 +20,18 @@ import (
 
 // Constants for application modes.
 const (
-	// ModeReceive represents the WAL receiving mode.
+	// ModeReceive is the only long-running daemon mode.
+	// It receives WAL from PostgreSQL, serves WAL files for restore_command,
+	// and exposes receiver lifecycle control via the HTTP API.
 	ModeReceive = "receive"
 
-	// ModeServe represents the HTTP API serving mode.
-	ModeServe = "serve"
-
-	// ModeCombined runs WAL receiving and WAL serving in a single process.
-	// The receiver can be started/stopped at runtime via POST /receiver.
-	ModeCombined = "combined"
-
-	// ModeBackup used in pgrwl streaming basebackup mode.
+	// ModeBackup runs the scheduled base-backup daemon.
 	ModeBackup = "backup"
 
-	// ModeBackupCMD used in pgrwl backup CLI command.
+	// ModeBackupCMD is used by the `pgrwl backup` CLI command.
 	ModeBackupCMD = "backup-cmd"
 
-	// ModeRestoreCMD used in pgrwl restore CLI command.
+	// ModeRestoreCMD is used by the `pgrwl restore` CLI command.
 	ModeRestoreCMD = "restore"
 
 	// StorageNameS3 is the identifier for the S3 storage backend.
@@ -45,13 +40,15 @@ const (
 	// StorageNameSFTP is the identifier for the SFTP storage backend.
 	StorageNameSFTP = "sftp"
 
-	// StorageNameLocalFS is the identifier for the local storage.
+	// StorageNameLocalFS is the identifier for the local filesystem storage.
 	StorageNameLocalFS = "local"
 
-	// LocalFSStorageSubpath when storage name is 'local', uploader worker uses this as a storage.
+	// LocalFSStorageSubpath is the subdirectory used by the uploader worker
+	// when storage.name is "local".
 	LocalFSStorageSubpath = "wal-archive"
 
-	// BaseBackupSubpath when storage name is 'local', put basebackups to this directory.
+	// BaseBackupSubpath is the subdirectory used for base backups when
+	// storage.name is "local".
 	BaseBackupSubpath = "backups"
 
 	// RepoEncryptorAes256Gcm is the AES-256-GCM encryption algorithm identifier.
@@ -75,14 +72,10 @@ var (
 	config *Config
 
 	modes = []string{
-		// CMD
 		ModeBackupCMD,
 		ModeRestoreCMD,
-		// serving
 		ModeBackup,
 		ModeReceive,
-		ModeServe,
-		ModeCombined,
 	}
 )
 
@@ -138,7 +131,7 @@ type BackupRetentionConfig struct {
 	KeepLast *int `json:"keep_last,omitzero" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
 }
 
-// BackupWalRetentionConfig configures related setting for WAL-archive.
+// BackupWalRetentionConfig configures related settings for the WAL archive.
 type BackupWalRetentionConfig struct {
 	Enable       bool   `json:"enable,omitzero" env:"PGRWL_BACKUP_WALRETENTION_ENABLE"`
 	ReceiverAddr string `json:"receiver_addr,omitzero" env:"PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR"`
@@ -238,58 +231,29 @@ type EncryptionConfig struct {
 
 // SFTPConfig defines parameters for connecting to an SFTP server.
 type SFTPConfig struct {
-	// Host is the SFTP server hostname or IP.
-	Host string `json:"host,omitzero" env:"PGRWL_STORAGE_SFTP_HOST"`
-
-	// Port is the TCP port for the SFTP server.
-	Port int `json:"port,omitzero" env:"PGRWL_STORAGE_SFTP_PORT"`
-
-	// User is the username for SFTP authentication.
-	User string `json:"user,omitzero" env:"PGRWL_STORAGE_SFTP_USER"`
-
-	// Pass is the password for SFTP authentication (if not using a key).
-	Pass string `json:"pass,omitzero" env:"PGRWL_STORAGE_SFTP_PASS"`
-
-	// PKeyPath is the file path to the private key for key-based authentication.
+	Host     string `json:"host,omitzero" env:"PGRWL_STORAGE_SFTP_HOST"`
+	Port     int    `json:"port,omitzero" env:"PGRWL_STORAGE_SFTP_PORT"`
+	User     string `json:"user,omitzero" env:"PGRWL_STORAGE_SFTP_USER"`
+	Pass     string `json:"pass,omitzero" env:"PGRWL_STORAGE_SFTP_PASS"`
 	PKeyPath string `json:"pkey_path,omitzero" env:"PGRWL_STORAGE_SFTP_PKEY_PATH"`
-
-	// PKeyPass is the passphrase for the private key, if encrypted.
 	PKeyPass string `json:"pkey_pass,omitzero" env:"PGRWL_STORAGE_SFTP_PKEY_PASS"`
-
-	// Base directory with sufficient user permissions
-	BaseDir string `json:"base_dir,omitzero" env:"PGRWL_STORAGE_SFTP_BASE_DIR"`
+	BaseDir  string `json:"base_dir,omitzero" env:"PGRWL_STORAGE_SFTP_BASE_DIR"`
 }
 
 // S3Config defines configuration for S3-compatible object storage.
 type S3Config struct {
-	// URL is the S3-compatible endpoint URL (e.g., "https://s3.amazonaws.com").
-	URL string `json:"url,omitzero" env:"PGRWL_STORAGE_S3_URL"`
-
-	// AccessKeyID is the S3 access key ID.
-	AccessKeyID string `json:"access_key_id,omitzero" env:"PGRWL_STORAGE_S3_ACCESS_KEY_ID"`
-
-	// SecretAccessKey is the S3 secret access key.
+	URL             string `json:"url,omitzero" env:"PGRWL_STORAGE_S3_URL"`
+	AccessKeyID     string `json:"access_key_id,omitzero" env:"PGRWL_STORAGE_S3_ACCESS_KEY_ID"`
 	SecretAccessKey string `json:"secret_access_key,omitzero" env:"PGRWL_STORAGE_S3_SECRET_ACCESS_KEY"`
-
-	// Bucket is the name of the S3 bucket to store WAL files.
-	Bucket string `json:"bucket,omitzero" env:"PGRWL_STORAGE_S3_BUCKET"`
-
-	// Region is the AWS region (for Amazon S3).
-	Region string `json:"region,omitzero" env:"PGRWL_STORAGE_S3_REGION"`
-
-	// UsePathStyle forces path-style requests instead of virtual-hosted style.
-	UsePathStyle bool `json:"use_path_style,omitzero" env:"PGRWL_STORAGE_S3_USE_PATH_STYLE"`
-
-	// DisableSSL disables HTTPS for connections to the S3 endpoint.
-	DisableSSL bool `json:"disable_ssl,omitzero" env:"PGRWL_STORAGE_S3_DISABLE_SSL"`
+	Bucket          string `json:"bucket,omitzero" env:"PGRWL_STORAGE_S3_BUCKET"`
+	Region          string `json:"region,omitzero" env:"PGRWL_STORAGE_S3_REGION"`
+	UsePathStyle    bool   `json:"use_path_style,omitzero" env:"PGRWL_STORAGE_S3_USE_PATH_STYLE"`
+	DisableSSL      bool   `json:"disable_ssl,omitzero" env:"PGRWL_STORAGE_S3_DISABLE_SSL"`
 }
 
 // String returns a pretty-printed structure where sensitive fields are hidden.
 func (c *Config) String() string {
-	// Step 1: Make a shallow copy
 	cp := *c
-
-	// Step 2: Redact sensitive fields (distinct between empty and filled)
 	const redacted = "[REDACTED]"
 	if cp.Storage.Encryption.Pass != "" {
 		cp.Storage.Encryption.Pass = redacted
@@ -303,8 +267,6 @@ func (c *Config) String() string {
 	if cp.Storage.S3.SecretAccessKey != "" {
 		cp.Storage.S3.SecretAccessKey = redacted
 	}
-
-	// Step 3: Marshal the copy
 	b, err := json.MarshalIndent(cp, "", "  ")
 	if err != nil {
 		return ""
@@ -317,7 +279,6 @@ func expandEnvsWithPrefix(input, prefix string) string {
 		if strings.HasPrefix(key, prefix) {
 			return os.Getenv(key)
 		}
-		// Leave unexpanded
 		return "${" + key + "}"
 	})
 }
@@ -400,24 +361,17 @@ func validate(c *Config, mode string) error {
 	return nil
 }
 
-// checks
-
 func checkMode(mode string, errs []string) []string {
-	found := false
 	for _, m := range modes {
 		if strings.EqualFold(m, mode) {
-			found = true
-			break
+			return errs
 		}
 	}
-	if !found {
-		errs = append(errs, fmt.Sprintf("invalid mode: %q (must be %q)", mode, strings.Join(modes, "|")))
-	}
+	errs = append(errs, fmt.Sprintf("invalid mode: %q (must be one of: %s)", mode, strings.Join(modes, "|")))
 	return errs
 }
 
 func checkMainConfig(c *Config, errs []string) []string {
-	// Validate main section
 	if c.Main.ListenPort == 0 {
 		errs = append(errs, "main.listen_port is required")
 	}
@@ -428,54 +382,48 @@ func checkMainConfig(c *Config, errs []string) []string {
 }
 
 func checkReceiverConfig(c *Config, mode string, errs []string) []string {
-	// Validate receiver (only in receive / combined mode)
-	if mode == ModeReceive || mode == ModeCombined {
-		if strings.TrimSpace(c.Receiver.Slot) == "" {
-			errs = append(errs, "receiver.slot is required in receive mode")
+	if mode != ModeReceive {
+		return errs
+	}
+	if strings.TrimSpace(c.Receiver.Slot) == "" {
+		errs = append(errs, "receiver.slot is required in receive mode")
+	}
+	// uploader conf is required when external storage is used, or when local
+	// storage is used with compression/encryption configured.
+	if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
+		if duration, err := time.ParseDuration(c.Receiver.Uploader.SyncInterval); err != nil {
+			errs = append(errs, fmt.Sprintf("receiver.uploader.sync_interval cannot parse: %s, %v",
+				c.Receiver.Uploader.SyncInterval, err))
+		} else {
+			c.Receiver.Uploader.SyncIntervalParsed = duration
 		}
-		// uploader conf is required:
-		// * when external storage is used
-		// * when local storage used with compression || encryption configured
-		if c.IsExternalStor() || c.Storage.Compression.Algo != "" || c.Storage.Encryption.Algo != "" {
-			// uploader
-			syncIntervalUploader := c.Receiver.Uploader.SyncInterval
-			if duration, err := time.ParseDuration(syncIntervalUploader); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.uploader.sync_interval cannot parse: %s, %v", syncIntervalUploader, err))
-			} else {
-				c.Receiver.Uploader.SyncIntervalParsed = duration
-			}
-			if c.Receiver.Uploader.MaxConcurrency <= 0 {
-				errs = append(errs, "receiver.uploader.max_concurrency must be > 0 if uploader is configured")
-			}
+		if c.Receiver.Uploader.MaxConcurrency <= 0 {
+			errs = append(errs, "receiver.uploader.max_concurrency must be > 0 if uploader is configured")
 		}
-		// retention
-		if c.Receiver.Retention.Enable {
-			syncIntervalRetention := c.Receiver.Retention.SyncInterval
-			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
-			} else {
-				c.Receiver.Retention.SyncIntervalParsed = duration
-			}
-			keepPeriodRetention := c.Receiver.Retention.KeepPeriod
-			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
-			} else {
-				c.Receiver.Retention.KeepPeriodParsed = duration
-			}
+	}
+	if c.Receiver.Retention.Enable {
+		if duration, err := time.ParseDuration(c.Receiver.Retention.SyncInterval); err != nil {
+			errs = append(errs, fmt.Sprintf("receiver.retention.sync_interval cannot parse: %s, %v",
+				c.Receiver.Retention.SyncInterval, err))
+		} else {
+			c.Receiver.Retention.SyncIntervalParsed = duration
+		}
+		if duration, err := time.ParseDuration(c.Receiver.Retention.KeepPeriod); err != nil {
+			errs = append(errs, fmt.Sprintf("receiver.retention.keep_period cannot parse: %s, %v",
+				c.Receiver.Retention.KeepPeriod, err))
+		} else {
+			c.Receiver.Retention.KeepPeriodParsed = duration
 		}
 	}
 	return errs
 }
 
 func checkStorageModifiersConfig(c *Config, errs []string) []string {
-	// Validate optional compression
 	if c.Storage.Compression.Algo != "" {
 		if c.Storage.Compression.Algo != RepoCompressorGzip && c.Storage.Compression.Algo != RepoCompressorZstd {
 			errs = append(errs, fmt.Sprintf("unsupported compression algo: %s", c.Storage.Compression.Algo))
 		}
 	}
-
-	// Validate optional encryption
 	if c.Storage.Encryption.Algo != "" {
 		if c.Storage.Encryption.Algo != RepoEncryptorAes256Gcm {
 			errs = append(errs, fmt.Sprintf("unsupported encryption algo: %s", c.Storage.Encryption.Algo))
@@ -488,7 +436,6 @@ func checkStorageModifiersConfig(c *Config, errs []string) []string {
 }
 
 func checkStorageConfig(c *Config, errs []string) []string {
-	// Validate storage
 	switch c.Storage.Name {
 	case "", StorageNameLocalFS:
 		// ok, storage is optional
@@ -533,48 +480,37 @@ func checkStorageConfig(c *Config, errs []string) []string {
 }
 
 func checkBackupConfig(c *Config, mode string, errs []string) []string {
-	// Backup
-	if mode == ModeBackup {
-		if c.Backup.Cron == "" {
-			errs = append(errs, "backup.cron is required in backup mode")
-		}
-		if c.Backup.Retention.Enable {
-			if c.Backup.Retention.Type == BackupRetentionTypeTime || c.Backup.Retention.Type == BackupRetentionTypeCount {
-				// time-based retention
-				if c.Backup.Retention.Type == BackupRetentionTypeTime {
-					basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.Value)
-					if err != nil {
-						errs = append(errs, fmt.Sprintf(
-							"backup.retention.value cannot parse duration: %s, %v",
-							c.Backup.Retention.Value, err),
-						)
-					} else {
-						c.Backup.Retention.KeepDurationParsed = basebackupKeepPeriodParsed
-					}
-				}
-
-				// count-based retention
-				if c.Backup.Retention.Type == BackupRetentionTypeCount {
-					backupCountParsed, err := strconv.ParseInt(c.Backup.Retention.Value, 10, 32)
-					if err != nil || backupCountParsed <= 0 {
-						errs = append(errs, fmt.Sprintf(
-							"backup.retention.value cannot parse count: %s, %v",
-							c.Backup.Retention.Value, err),
-						)
-					} else {
-						c.Backup.Retention.KeepCountParsed = backupCountParsed
-					}
-				}
+	if mode != ModeBackup {
+		return errs
+	}
+	if c.Backup.Cron == "" {
+		errs = append(errs, "backup.cron is required in backup mode")
+	}
+	if c.Backup.Retention.Enable {
+		switch c.Backup.Retention.Type {
+		case BackupRetentionTypeTime:
+			if duration, err := time.ParseDuration(c.Backup.Retention.Value); err != nil {
+				errs = append(errs, fmt.Sprintf("backup.retention.value cannot parse duration: %s, %v",
+					c.Backup.Retention.Value, err))
 			} else {
-				errs = append(errs, "backup.retention.type: must be one of: time/count (got: %q)", c.Backup.Retention.Type)
+				c.Backup.Retention.KeepDurationParsed = duration
 			}
+		case BackupRetentionTypeCount:
+			if n, err := strconv.ParseInt(c.Backup.Retention.Value, 10, 32); err != nil || n <= 0 {
+				errs = append(errs, fmt.Sprintf("backup.retention.value cannot parse count: %s, %v",
+					c.Backup.Retention.Value, err))
+			} else {
+				c.Backup.Retention.KeepCountParsed = n
+			}
+		default:
+			errs = append(errs, fmt.Sprintf("backup.retention.type: must be one of: time/count (got: %q)",
+				c.Backup.Retention.Type))
 		}
 	}
 	return errs
 }
 
 func checkLogConfig(c *Config, errs []string) []string {
-	// Validate log (optional)
 	if c.Log.Level != "" {
 		validLevels := map[string]bool{"trace": true, "debug": true, "info": true, "warn": true, "error": true}
 		if !validLevels[strings.ToLower(c.Log.Level)] {
