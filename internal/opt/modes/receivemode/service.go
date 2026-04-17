@@ -31,6 +31,7 @@ type receiveModeSvc struct {
 	baseDir  string
 	storage  *st.VariadicStorage
 	jobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	verbose  bool
 }
 
 var _ Service = &receiveModeSvc{}
@@ -40,6 +41,7 @@ type ReceiveServiceOpts struct {
 	BaseDir  string
 	Storage  *st.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	Verbose  bool
 }
 
 func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
@@ -49,6 +51,7 @@ func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
 		baseDir:  opts.BaseDir,
 		storage:  opts.Storage,
 		jobQueue: opts.JobQueue,
+		verbose:  opts.Verbose,
 	}
 }
 
@@ -115,7 +118,7 @@ func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string)
 				return
 			}
 
-			if config.Verbose {
+			if s.verbose {
 				s.log().LogAttrs(context.Background(), logger.LevelTrace, "begin to delete wal files")
 				for _, w := range walFilesToDelete {
 					s.log().LogAttrs(context.Background(), logger.LevelTrace, "wal file to delete",

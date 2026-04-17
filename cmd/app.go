@@ -48,6 +48,7 @@ func App() *cli.Command {
 				Action: func(_ context.Context, c *cli.Command) error {
 					mode := c.String("mode")
 					cfg := loadConfig(c, mode)
+					verbose := strings.EqualFold(cfg.Log.Level, "trace")
 
 					//nolint:staticcheck
 					if mode == config.ModeReceive {
@@ -57,11 +58,13 @@ func App() *cli.Command {
 							ListenPort:       cfg.Main.ListenPort,
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
+							Verbose:          verbose,
 						})
 					} else if mode == config.ModeServe {
 						RunServeMode(&ServeModeOpts{
 							Directory:  filepath.ToSlash(cfg.Main.Directory),
 							ListenPort: cfg.Main.ListenPort,
+							Verbose:    verbose,
 						})
 					} else if mode == config.ModeCombined {
 						checkPgEnvsAreSet()
@@ -70,11 +73,13 @@ func App() *cli.Command {
 							ListenPort:       cfg.Main.ListenPort,
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
+							Verbose:          verbose,
 						})
 					} else if mode == config.ModeBackup {
 						checkPgEnvsAreSet()
 						RunBackupMode(&BackupModeOpts{
 							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
+							Verbose:          verbose,
 						})
 					} else {
 						log.Fatalf("unknown mode: %s", mode)

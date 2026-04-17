@@ -25,6 +25,7 @@ type CombinedModeOpts struct {
 	Slot             string
 	NoLoop           bool
 	ListenPort       int
+	Verbose          bool
 }
 
 // RunCombinedMode starts a single process that:
@@ -48,6 +49,7 @@ func RunCombinedMode(opts *CombinedModeOpts) {
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
+		Verbose:          opts.Verbose,
 	})
 
 	loggr.Info("starting WAL receiver")
@@ -71,6 +73,7 @@ func RunCombinedMode(opts *CombinedModeOpts) {
 	// Storage (optional)
 	stor := mustInitStorageIfRequired(cfg, loggr, &ReceiveModeOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
+		Verbose:          opts.Verbose,
 	})
 
 	// HTTP server
@@ -89,6 +92,7 @@ func RunCombinedMode(opts *CombinedModeOpts) {
 		handlers := combinedAPI.Init(&combinedAPI.HandlerOpts{
 			Receiver: receiver,
 			BaseDir:  opts.ReceiveDirectory,
+			Verbose:  opts.Verbose,
 			Storage:  stor,
 		})
 		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
@@ -115,7 +119,8 @@ func RunCombinedMode(opts *CombinedModeOpts) {
 				// The supervisor calls pgrw.CurrentOpenWALFileName() to skip
 				// the currently-open segment. RestartablePgReceiver satisfies
 				// PgReceiveWal, so we can pass it directly.
-				PGRW: receiver,
+				PGRW:    receiver,
+				Verbose: opts.Verbose,
 			})
 			if cfg.Receiver.Retention.Enable {
 				u.RunWithRetention(ctx, jobQueue)

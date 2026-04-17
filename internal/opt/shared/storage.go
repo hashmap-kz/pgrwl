@@ -20,6 +20,7 @@ type SetupStorageOpts struct {
 
 func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 	cfg := config.Cfg()
+	verbose := strings.EqualFold(cfg.Log.Level, "trace")
 
 	// storage configs
 	alg := st.Algorithms{
@@ -86,7 +87,9 @@ func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 		if err != nil {
 			return nil, err
 		}
-		backend := st.NewS3StorageWithOptions(client.Client(), cfg.Storage.S3.Bucket, baseDir, st.S3Options{})
+		backend := st.NewS3StorageWithOptions(client.Client(), cfg.Storage.S3.Bucket, baseDir, st.S3Options{
+			Verbose: verbose,
+		})
 		return st.NewVariadicStorage(backend, alg, writeExt)
 	}
 

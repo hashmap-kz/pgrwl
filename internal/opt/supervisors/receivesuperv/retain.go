@@ -7,7 +7,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
 	"github.com/pgrwl/pgrwl/internal/core/logger"
@@ -40,7 +39,7 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, keepPeriod tim
 		return nil
 	}
 
-	if config.Verbose {
+	if u.verbose {
 		for i := range fileInfos {
 			u.log().LogAttrs(ctx, logger.LevelTrace, "files in storage",
 				slog.String("modtime", fileInfos[i].ModTime.Format(time.DateTime)),
@@ -55,7 +54,7 @@ func (u *ArchiveSupervisor) performRetention(ctx context.Context, keepPeriod tim
 		return nil
 	}
 
-	if config.Verbose {
+	if u.verbose {
 		for i := range olderThan {
 			u.log().LogAttrs(ctx, logger.LevelTrace, "files to retain",
 				slog.String("path", olderThan[i]),

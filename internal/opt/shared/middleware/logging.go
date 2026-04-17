@@ -4,12 +4,11 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/pgrwl/pgrwl/config"
 )
 
 type LoggingMiddleware struct {
-	Logger *slog.Logger
+	Logger  *slog.Logger
+	Verbose bool
 }
 
 // responseWriter is a minimal wrapper for http.ResponseWriter that allows the
@@ -44,7 +43,7 @@ func (m *LoggingMiddleware) Middleware(next http.Handler) http.Handler {
 		start := time.Now()
 		wrapped := wrapResponseWriter(w)
 		next.ServeHTTP(wrapped, r)
-		if config.Verbose {
+		if m.Verbose {
 			m.Logger.Debug("HTTP request",
 				slog.Int("status", wrapped.status),
 				slog.String("method", r.Method),

@@ -30,6 +30,7 @@ type ReceiveModeOpts struct {
 	Slot             string
 	NoLoop           bool
 	ListenPort       int
+	Verbose          bool
 }
 
 func RunReceiveMode(opts *ReceiveModeOpts) {
@@ -112,6 +113,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
 			PGRW:     pgrw,
 			BaseDir:  opts.ReceiveDirectory,
+			Verbose:  opts.Verbose,
 			Storage:  stor,
 			JobQueue: jobQueue,
 		})
@@ -137,6 +139,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
+				Verbose:          opts.Verbose,
 			})
 			if cfg.Receiver.Retention.Enable {
 				u.RunWithRetention(ctx, jobQueue)
@@ -185,6 +188,7 @@ func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal 
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
+		Verbose:          opts.Verbose,
 	})
 	if err != nil {
 		log.Fatal(err)

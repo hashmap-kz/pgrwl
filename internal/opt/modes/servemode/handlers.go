@@ -12,6 +12,7 @@ import (
 
 type ServeHandlerOpts struct {
 	BaseDir string
+	Verbose bool
 	Storage *st.VariadicStorage
 }
 
@@ -22,12 +23,14 @@ func Init(opts *ServeHandlerOpts) http.Handler {
 	service := NewServeModeService(&ServeServiceOpts{
 		BaseDir: opts.BaseDir,
 		Storage: opts.Storage,
+		Verbose: opts.Verbose,
 	})
 	controller := NewServeModeController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
-		Logger: l,
+		Logger:  l,
+		Verbose: opts.Verbose,
 	}
 
 	plainChain := middleware.Chain(

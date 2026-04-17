@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
 	"github.com/jackc/pglogrepl"
@@ -30,6 +29,7 @@ type StreamOpts struct {
 	WalSegSz         uint64
 	ReceiveDirectory string
 	Conn             *pgconn.PgConn
+	Verbose          bool
 }
 
 type StreamCtl struct {
@@ -49,6 +49,7 @@ type StreamCtl struct {
 	stopPos               pglogrepl.LSN
 	conn                  *pgconn.PgConn
 	walfile               *walfileT
+	verbose               bool
 	startedAt             time.Time
 	mu                    sync.RWMutex
 }
@@ -66,6 +67,7 @@ func NewStream(o *StreamOpts) *StreamCtl {
 		walSegSz:              o.WalSegSz,
 		receiveDir:            o.ReceiveDirectory,
 		conn:                  o.Conn,
+		verbose:               o.Verbose,
 		startedAt:             time.Now(),
 	}
 }
@@ -200,7 +202,7 @@ func (stream *StreamCtl) ReceiveXlogStream(ctx context.Context) error {
 		 * End of replication (i.e. controlled shut down of the server).
 		 */
 
-		if config.Verbose {
+		if stream.verbose {
 			stream.log().LogAttrs(ctx, logger.LevelTrace, "stream termination",
 				slog.String("job", "receive_xlog_stream"),
 				slog.String("reason", "controlled shutdown"),
@@ -224,7 +226,7 @@ func (stream *StreamCtl) handleCopyStream(ctx context.Context) (*pglogrepl.CopyD
 
 		// If synchronous, flush WAL file and update server immediately
 		if stream.synchronous && stream.lastFlushPosition < stream.blockPos && stream.walfile != nil {
-			if config.Verbose {
+			if stream.verbose {
 				stream.log().LogAttrs(ctx, logger.LevelTrace, "SYNC-1",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
@@ -321,7 +323,7 @@ func (stream *StreamCtl) processOneMsg(ctx context.Context, msg pgproto3.Backend
 				return nil, fmt.Errorf("parse xlogdata failed: %w", err)
 			}
 
-			if config.Verbose {
+			if stream.verbose {
 				stream.log().LogAttrs(ctx, logger.LevelTrace, "begin to process xlog data msg",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
@@ -335,7 +337,7 @@ func (stream *StreamCtl) processOneMsg(ctx context.Context, msg pgproto3.Backend
 				return nil, fmt.Errorf("processing xlogdata failed: %w", err)
 			}
 
-			if config.Verbose {
+			if stream.verbose {
 				stream.log().LogAttrs(ctx, logger.LevelTrace, "log data msg processed",
 					slog.String("job", "handle_copy_stream"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
@@ -380,7 +382,7 @@ func (stream *StreamCtl) processKeepaliveMsg(ctx context.Context, keepalive pglo
 			 * shutdown of the server.
 			 */
 
-			if config.Verbose {
+			if stream.verbose {
 				stream.log().LogAttrs(ctx, logger.LevelTrace, "SYNC-K",
 					slog.String("job", "process_keepalive_msg"),
 					slog.String("flush_pos", stream.lastFlushPosition.String()),
@@ -432,7 +434,7 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 	bytesLeft := uint64(len(data))
 	bytesWritten := uint64(0)
 
-	if config.Verbose {
+	if stream.verbose {
 		stream.log().LogAttrs(ctx, logger.LevelTrace, "begin to write xlog data msg",
 			slog.String("job", "process_xlog_data_msg"),
 			slog.String("flush_pos", stream.lastFlushPosition.String()),
@@ -499,7 +501,7 @@ func (stream *StreamCtl) processXLogDataMsg(ctx context.Context, xld pglogrepl.X
 }
 
 func (stream *StreamCtl) sendFeedback(ctx context.Context, now time.Time, replyRequested bool) error {
-	if config.Verbose {
+	if stream.verbose {
 		stream.log().LogAttrs(ctx, logger.LevelTrace, "sending feedback",
 			slog.String("flush_pos", stream.lastFlushPosition.String()),
 			slog.String("block_pos", stream.blockPos.String()),
@@ -551,7 +553,7 @@ func (stream *StreamCtl) handleEndOfCopyStream(ctx context.Context) (*pglogrepl.
 }
 
 func (stream *StreamCtl) updateLastFlushPosition(ctx context.Context, p pglogrepl.LSN, reason string) {
-	if config.Verbose {
+	if stream.verbose {
 		stream.log().LogAttrs(ctx, logger.LevelTrace, "updating last-flush position",
 			slog.String("prev", stream.lastFlushPosition.String()),
 			slog.String("next", p.String()),

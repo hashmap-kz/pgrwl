@@ -17,6 +17,7 @@ import (
 type ServeModeOpts struct {
 	Directory  string
 	ListenPort int
+	Verbose    bool
 }
 
 func RunServeMode(opts *ServeModeOpts) {
@@ -56,6 +57,7 @@ func RunServeMode(opts *ServeModeOpts) {
 
 		handlers := serveAPI.Init(&serveAPI.ServeHandlerOpts{
 			BaseDir: opts.Directory,
+			Verbose: opts.Verbose,
 			Storage: stor,
 		})
 		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
