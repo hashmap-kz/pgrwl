@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
@@ -44,7 +45,7 @@ type BaseBackupSupervisor struct {
 	opts          *BaseBackupSupervisorOpts
 	verbose       bool
 	restyClient   *resty.Client
-	backupRunning sync.Mutex
+	backupRunning tryMutex
 
 	// opts (for fast-access without traverse the config)
 	storageName string
@@ -364,4 +365,24 @@ func (u *BaseBackupSupervisor) getBackupIDs(ctx context.Context, cfg *config.Con
 		}
 	}
 	return stor, backupTs, nil
+}
+
+// locsks
+
+type tryMutex struct {
+	locked int32
+	m      sync.Mutex
+}
+
+func (tm *tryMutex) TryLock() bool {
+	if !atomic.CompareAndSwapInt32(&tm.locked, 0, 1) {
+		return false
+	}
+	tm.m.Lock()
+	return true
+}
+
+func (tm *tryMutex) Unlock() {
+	atomic.StoreInt32(&tm.locked, 0)
+	tm.m.Unlock()
 }

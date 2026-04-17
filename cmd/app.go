@@ -26,7 +26,7 @@ func App() *cli.Command {
 	}
 	modeFlag := &cli.StringFlag{
 		Name:     "mode",
-		Usage:    "Daemon mode: receive/backup",
+		Usage:    "Daemon mode: receive/serve/backup",
 		Aliases:  []string{"m"},
 		Required: true,
 		Sources:  cli.EnvVars("PGRWL_DAEMON_MODE"),
@@ -59,6 +59,12 @@ func App() *cli.Command {
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
 							Verbose:          verbose,
+						})
+					} else if mode == config.ModeServe {
+						RunServeMode(&ServeModeOpts{
+							Directory:  filepath.ToSlash(cfg.Main.Directory),
+							ListenPort: cfg.Main.ListenPort,
+							Verbose:    verbose,
 						})
 					} else if mode == config.ModeBackup {
 						checkPgEnvsAreSet()

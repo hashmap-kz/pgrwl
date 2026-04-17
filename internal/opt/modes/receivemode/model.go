@@ -1,7 +1,5 @@
 package receivemode
 
-import "github.com/pgrwl/pgrwl/internal/core/xlog"
-
 type StreamStatus struct {
 	Slot         string `json:"slot,omitempty"`
 	Timeline     uint32 `json:"timeline,omitempty"`
@@ -17,11 +15,4 @@ type PgRwlStatus struct {
 
 type BriefConfig struct {
 	RetentionEnable bool `json:"retention_enable"`
-}
-
-// ReceiverStateResponse is returned by GET /receiver,
-// POST /receiver/states/running, and POST /receiver/states/stopped.
-type ReceiverStateResponse struct {
-	State        xlog.ReceiverState `json:"state"`
-	StreamStatus *xlog.StreamStatus `json:"stream_status,omitempty"`
 }

@@ -23,6 +23,9 @@ const (
 	// ModeReceive represents the WAL receiving mode.
 	ModeReceive = "receive"
 
+	// ModeServe represents the HTTP API serving mode.
+	ModeServe = "serve"
+
 	// ModeBackup used in pgrwl streaming basebackup mode.
 	ModeBackup = "backup"
 
@@ -74,6 +77,7 @@ var (
 		// serving
 		ModeBackup,
 		ModeReceive,
+		ModeServe,
 	}
 )
 

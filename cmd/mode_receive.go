@@ -39,7 +39,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
@@ -47,16 +46,42 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
 	//////////////////////////////////////////////////////////////////////
-	// Init WAL-receiver
+	// Init WAL-receiver loop first
 
-	// Build a restartable receiver. It does not connect to Postgres until
-	// Start() is called.
-	pgrw := xlog.NewRestartablePgReceiver(ctx, &xlog.PgReceiveWalOpts{
-		ReceiveDirectory: opts.ReceiveDirectory,
-		Slot:             opts.Slot,
-		NoLoop:           opts.NoLoop,
-		Verbose:          opts.Verbose,
-	})
+	// setup wal-receiver
+	pgrw := mustInitPgrw(ctx, opts)
+
+	// Use WaitGroup to wait for all goroutines to finish
+	var wg sync.WaitGroup
+
+	// Signal channel to indicate that pgrw.Run() has started
+	started := make(chan struct{})
+
+	// main streaming loop
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				loggr.Error("wal-receiver panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "wal-receiver"),
+				)
+			}
+		}()
+
+		// Signal that we are starting Run()
+		close(started)
+
+		if err := pgrw.Run(ctx); err != nil {
+			loggr.Error("streaming failed", slog.Any("err", err))
+			cancel() // cancel everything on error
+		}
+	}()
+
+	// Wait until pgrw.Run() has started
+	<-started
+	loggr.Info("wal-receiver started")
 
 	//////////////////////////////////////////////////////////////////////
 	// Init OPT components
@@ -72,37 +97,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// setup storage: it may be nil
 	stor := mustInitStorageIfRequired(cfg, loggr, opts)
 
-	// ArchiveSupervisor runs as a Worker inside the receiver's start/stop
-	// lifecycle. When the receiver is stopped via the API, the archiver is
-	// also cancelled. When the receiver is restarted, the archiver restarts
-	// with it on the new child context.
-	if stor != nil {
-		u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
-			ReceiveDirectory: opts.ReceiveDirectory,
-			PGRW:             pgrw,
-			Verbose:          opts.Verbose,
-		})
-		if cfg.Receiver.Retention.Enable {
-			pgrw.AddWorker("archive-supervisor", func(ctx context.Context) {
-				u.RunWithRetention(ctx, jobQueue)
-			})
-		} else {
-			pgrw.AddWorker("archive-supervisor", func(ctx context.Context) {
-				u.RunUploader(ctx, jobQueue)
-			})
-		}
-	}
-
-	loggr.Info("starting WAL receiver")
-	if err := pgrw.Start(); err != nil {
-		loggr.Error("failed to start WAL receiver", slog.Any("err", err))
-		cancel()
-		return
-	}
-
-	// Use WaitGroup to wait for all goroutines to finish
-	var wg sync.WaitGroup
-
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
 	wg.Add(1)
@@ -117,7 +111,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 			}
 		}()
 		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
-			Receiver: pgrw,
+			PGRW:     pgrw,
 			BaseDir:  opts.ReceiveDirectory,
 			Verbose:  opts.Verbose,
 			Storage:  stor,
@@ -129,12 +123,37 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		}
 	}()
 
+	// ArchiveSupervisor (run this goroutine ONLY when storage is required)
+	if stor != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					loggr.Error("upload loop panicked",
+						slog.Any("panic", r),
+						slog.String("goroutine", "wal-supervisor"),
+					)
+				}
+			}()
+			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
+				ReceiveDirectory: opts.ReceiveDirectory,
+				PGRW:             pgrw,
+				Verbose:          opts.Verbose,
+			})
+			if cfg.Receiver.Retention.Enable {
+				u.RunWithRetention(ctx, jobQueue)
+			} else {
+				u.RunUploader(ctx, jobQueue)
+			}
+		}()
+	}
+
 	// Wait for signal (context cancellation)
 	<-ctx.Done()
-	loggr.Info("shutting down, stopping receiver...")
-	pgrw.Stop()
+	loggr.Info("shutting down, waiting for goroutines...")
 
-	loggr.Info("waiting for goroutines...")
+	// Wait for all goroutines to finish
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
 }
@@ -162,6 +181,19 @@ func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 		return hasCfg
 	}
 	return true
+}
+
+func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal {
+	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
+		ReceiveDirectory: opts.ReceiveDirectory,
+		Slot:             opts.Slot,
+		NoLoop:           opts.NoLoop,
+		Verbose:          opts.Verbose,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return pgrw
 }
 
 func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts) *st.VariadicStorage {

@@ -16,7 +16,7 @@ import (
 )
 
 type ReceiveHandlerOpts struct {
-	Receiver *xlog.RestartablePgReceiver
+	PGRW     xlog.PgReceiveWal
 	BaseDir  string
 	Verbose  bool
 	Storage  *st.VariadicStorage
@@ -28,7 +28,7 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 	l := slog.With("component", "receive-api")
 
 	service := NewReceiveModeService(&ReceiveServiceOpts{
-		PGRW:     opts.Receiver,
+		PGRW:     opts.PGRW,
 		BaseDir:  opts.BaseDir,
 		Storage:  opts.Storage,
 		JobQueue: opts.JobQueue,
@@ -49,10 +49,6 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 		loggingMiddleware.Middleware,
 		rateLimitMiddleware.Middleware,
 	)
-	plainChain := middleware.Chain(
-		middleware.SafeHandlerMiddleware,
-		loggingMiddleware.Middleware,
-	)
 
 	// Init handlers
 	mux := http.NewServeMux()
@@ -64,14 +60,6 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
 	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
-
-	// Receiver lifecycle control
-	mux.Handle("GET /receiver", secureChain(http.HandlerFunc(controller.GetReceiverHandler)))
-	mux.Handle("POST /receiver/states/running", secureChain(http.HandlerFunc(controller.StartReceiverHandler)))
-	mux.Handle("POST /receiver/states/stopped", secureChain(http.HandlerFunc(controller.StopReceiverHandler)))
-
-	// WAL file serving (for restore_command / standby)
-	mux.Handle("GET /wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
 	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
