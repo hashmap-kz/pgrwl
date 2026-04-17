@@ -1,0 +1,7 @@
+# restore branch from reverted commit: refactor/receive-only-mode-v1
+
+git checkout master
+git pull origin master
+git checkout -b refactor/receive-only-mode-v2
+git revert aa2a881f
+
