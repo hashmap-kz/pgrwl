@@ -26,10 +26,6 @@ type CombinedModeOpts struct {
 	NoLoop           bool
 	ListenPort       int
 	Verbose          bool
-	// AutoStart controls whether WAL streaming begins immediately on startup.
-	// Defaults to true so the combined mode behaves like receive mode out of
-	// the box; set to false if you want operator-controlled startup.
-	AutoStart bool
 }
 
 // RunCombinedMode starts a single process that:
@@ -56,16 +52,10 @@ func RunCombinedMode(opts *CombinedModeOpts) {
 		Verbose:          opts.Verbose,
 	})
 
-	if opts.AutoStart {
-		loggr.Info("auto-starting WAL receiver")
-		if err := receiver.Start(); err != nil {
-			loggr.Error("failed to auto-start receiver", slog.Any("err", err))
-			return
-		}
-	} else {
-		loggr.Info("receiver not auto-started",
-			slog.String("hint", `POST /receiver {"state":"running"} to start WAL streaming`),
-		)
+	loggr.Info("starting WAL receiver")
+	if err := receiver.Start(); err != nil {
+		loggr.Error("failed to auto-start receiver", slog.Any("err", err))
+		return
 	}
 
 	var wg sync.WaitGroup

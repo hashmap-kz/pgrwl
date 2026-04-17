@@ -74,7 +74,6 @@ func App() *cli.Command {
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
 							Verbose:          verbose,
-							AutoStart:        cfg.Combined.AutoStart,
 						})
 					} else if mode == config.ModeBackup {
 						checkPgEnvsAreSet()
