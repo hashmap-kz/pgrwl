@@ -26,7 +26,7 @@ func App() *cli.Command {
 	}
 	modeFlag := &cli.StringFlag{
 		Name:     "mode",
-		Usage:    "Daemon mode: receive/serve/backup",
+		Usage:    "Daemon mode: receive|backup",
 		Aliases:  []string{"m"},
 		Required: true,
 		Sources:  cli.EnvVars("PGRWL_DAEMON_MODE"),
@@ -37,10 +37,10 @@ func App() *cli.Command {
 		Usage:   "Cloud-Native PostgreSQL WAL receiver",
 		Version: version.Version,
 		Commands: []*cli.Command{
-			// server modes
+			// daemon
 			{
 				Name:  "daemon",
-				Usage: "Running in a daemon mode: receive/serve/backup",
+				Usage: "Run a long-lived daemon (receive|backup)",
 				Flags: []cli.Flag{
 					configFlag,
 					modeFlag,
@@ -50,8 +50,8 @@ func App() *cli.Command {
 					cfg := loadConfig(c, mode)
 					verbose := strings.EqualFold(cfg.Log.Level, "trace")
 
-					//nolint:staticcheck
-					if mode == config.ModeReceive {
+					switch mode {
+					case config.ModeReceive:
 						checkPgEnvsAreSet()
 						RunReceiveMode(&ReceiveModeOpts{
 							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
@@ -60,19 +60,13 @@ func App() *cli.Command {
 							NoLoop:           cfg.Receiver.NoLoop,
 							Verbose:          verbose,
 						})
-					} else if mode == config.ModeServe {
-						RunServeMode(&ServeModeOpts{
-							Directory:  filepath.ToSlash(cfg.Main.Directory),
-							ListenPort: cfg.Main.ListenPort,
-							Verbose:    verbose,
-						})
-					} else if mode == config.ModeBackup {
+					case config.ModeBackup:
 						checkPgEnvsAreSet()
 						RunBackupMode(&BackupModeOpts{
 							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
 							Verbose:          verbose,
 						})
-					} else {
+					default:
 						log.Fatalf("unknown mode: %s", mode)
 					}
 
@@ -83,61 +77,59 @@ func App() *cli.Command {
 			// basebackup create
 			{
 				Name:  "backup",
-				Usage: "Create basebackup using streaming replication protocol",
+				Usage: "Create a base backup using the streaming replication protocol",
 				Flags: []cli.Flag{
 					configFlag,
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					checkPgEnvsAreSet()
 					cfg := loadConfig(c, config.ModeBackupCMD)
-					err := RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
-					return err
+					return RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
 				},
 			},
 
 			// basebackup restore
 			{
 				Name:  "restore",
-				Usage: "Retrieve basebackup",
+				Usage: "Retrieve a base backup",
 				Flags: []cli.Flag{
 					configFlag,
 					&cli.StringFlag{
 						Name:  "id",
-						Usage: "Backup id to restore (20060102150405), the 'latest' will be used if not set",
+						Usage: "Backup id to restore (20060102150405); uses 'latest' if not set",
 					},
 					&cli.StringFlag{
 						Name:     "dest",
-						Usage:    "Restore to destination",
+						Usage:    "Restore destination directory",
 						Required: true,
 					},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					cfg := loadConfig(c, config.ModeRestoreCMD)
-					err := RestoreBaseBackup(context.Background(), cfg,
+					return RestoreBaseBackup(context.Background(), cfg,
 						c.String("id"),
 						c.String("dest"),
 					)
-					return err
 				},
 			},
 
-			// restore-command
+			// restore-command - called by PostgreSQL during WAL replay
 			{
 				Name:  "restore-command",
-				Usage: "Fetch a single WAL file by name",
+				Usage: "Fetch a single WAL file by name (implements restore_command)",
 
 				Description: strx.HeredocTrim(`
 				Implements PostgreSQL restore_command.
 
 				Example usage in postgresql.conf:
-				restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
+				restore_command = 'pgrwl restore-command --serve-addr=host:7070 %f %p'
 				`),
 
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "serve-addr",
 						Required: true,
-						Usage:    "The address of pgrwl running in a serve mode",
+						Usage:    "Address of the pgrwl receive-mode process",
 					},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
@@ -145,20 +137,15 @@ func App() *cli.Command {
 					if args.Len() != 2 {
 						return fmt.Errorf("usage: restore-command <WAL_FILE_NAME> <DEST_PATH>")
 					}
-
-					walFile := args.Get(0)
-					destPath := args.Get(1)
-
 					return ExecRestoreCommand(
-						walFile,
-						destPath,
-						&RestoreCommandOpts{
-							Addr: c.String("serve-addr"),
-						},
+						args.Get(0),
+						args.Get(1),
+						&RestoreCommandOpts{Addr: c.String("serve-addr")},
 					)
 				},
 			},
-			// Validate command
+
+			// validate
 			{
 				Name:  "validate",
 				Usage: "Validate the config file without running the application",
@@ -214,7 +201,7 @@ func checkPgEnvsAreSet() {
 
 	pgPassFile := os.Getenv("PGPASSFILE")
 
-	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER"} { // you can add additional fields if needed
+	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER"} {
 		if os.Getenv(name) == "" {
 			emptyEnvs = append(emptyEnvs, name)
 		}
