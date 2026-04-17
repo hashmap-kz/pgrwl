@@ -18,7 +18,6 @@ import (
 
 type BackupModeOpts struct {
 	ReceiveDirectory string
-	Verbose          bool
 }
 
 func RunBackupMode(opts *BackupModeOpts) {
@@ -54,7 +53,6 @@ func RunBackupMode(opts *BackupModeOpts) {
 		}()
 		u := backupsuperv.NewBaseBackupSupervisor(cfg, &backupsuperv.BaseBackupSupervisorOpts{
 			Directory: opts.ReceiveDirectory,
-			Verbose:   opts.Verbose,
 		})
 		u.Run(ctx)
 	}()
