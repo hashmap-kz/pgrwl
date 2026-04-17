@@ -16,7 +16,6 @@ import (
 type ArchiveSupervisorOpts struct {
 	ReceiveDirectory string
 	PGRW             xlog.PgReceiveWal
-	Verbose          bool
 }
 
 type uploadBundle struct {
@@ -24,11 +23,10 @@ type uploadBundle struct {
 }
 
 type ArchiveSupervisor struct {
-	l       *slog.Logger
-	cfg     *config.Config
-	stor    st.Storage
-	opts    *ArchiveSupervisorOpts
-	verbose bool
+	l    *slog.Logger
+	cfg  *config.Config
+	stor st.Storage
+	opts *ArchiveSupervisorOpts
 
 	// opts (for fast-access without traverse the config)
 	storageName string
@@ -40,7 +38,6 @@ func NewArchiveSupervisor(cfg *config.Config, stor st.Storage, opts *ArchiveSupe
 		cfg:         cfg,
 		stor:        stor,
 		opts:        opts,
-		verbose:     opts.Verbose,
 		storageName: cfg.Storage.Name,
 	}
 }

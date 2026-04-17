@@ -16,7 +16,6 @@ import (
 type HandlerOpts struct {
 	Receiver *xlog.RestartablePgReceiver
 	BaseDir  string
-	Verbose  bool
 	Storage  *st.VariadicStorage
 }
 
@@ -43,7 +42,7 @@ func Init(opts *HandlerOpts) http.Handler {
 	})
 	ctrl := NewController(svc)
 
-	loggingMW := middleware.LoggingMiddleware{Logger: l, Verbose: opts.Verbose}
+	loggingMW := middleware.LoggingMiddleware{Logger: l}
 	rateLimitMW := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
 
 	secureChain := middleware.Chain(

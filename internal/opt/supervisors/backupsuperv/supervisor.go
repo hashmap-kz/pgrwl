@@ -36,14 +36,12 @@ import (
 
 type BaseBackupSupervisorOpts struct {
 	Directory string
-	Verbose   bool
 }
 
 type BaseBackupSupervisor struct {
 	l             *slog.Logger
 	cfg           *config.Config
 	opts          *BaseBackupSupervisorOpts
-	verbose       bool
 	restyClient   *resty.Client
 	backupRunning tryMutex
 
@@ -59,7 +57,6 @@ func NewBaseBackupSupervisor(cfg *config.Config, opts *BaseBackupSupervisorOpts)
 		l:           slog.With(slog.String("component", "basebackup-supervisor")),
 		cfg:         cfg,
 		opts:        opts,
-		verbose:     opts.Verbose,
 		restyClient: client,
 		storageName: cfg.Storage.Name,
 	}
@@ -297,7 +294,7 @@ func (u *BaseBackupSupervisor) purgeBackups(
 	stor st.Storage,
 ) error {
 	// list backups in storage
-	if u.verbose {
+	if config.Verbose {
 		for k := range backupTs {
 			u.log().LogAttrs(ctx, logger.LevelTrace, "backups in storage",
 				slog.String("path", k),
@@ -306,7 +303,7 @@ func (u *BaseBackupSupervisor) purgeBackups(
 	}
 
 	// list backups to delete
-	if u.verbose {
+	if config.Verbose {
 		for _, k := range backupsToDelete {
 			u.log().LogAttrs(ctx, logger.LevelTrace, "backups to delete",
 				slog.String("path", k),

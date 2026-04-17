@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/logger"
 )
 
@@ -31,7 +32,6 @@ type S3Options struct {
 	PartSizeBytes int64
 	Concurrency   int
 	Log           *slog.Logger
-	Verbose       bool
 }
 
 type s3Storage struct {
@@ -40,7 +40,6 @@ type s3Storage struct {
 	prefix   string
 	uploader *transfermanager.Client
 	log      *slog.Logger
-	verbose  bool
 }
 
 var _ Storage = &s3Storage{}
@@ -74,7 +73,6 @@ func NewS3StorageWithOptions(client *s3.Client, bucket, prefix string, opts S3Op
 		prefix:   filepath.ToSlash(strings.TrimPrefix(prefix, "/")),
 		uploader: tmClient,
 		log:      opts.Log,
-		verbose:  opts.Verbose,
 	}
 }
 
@@ -546,7 +544,7 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				))
 			}
 
-			if s.verbose {
+			if config.Verbose {
 				log.LogAttrs(ctx, logger.LevelTrace, "uploading multipart chunk",
 					slog.Int64("part_number", int64(partNumber)),
 					slog.Int("chunk_size_bytes", n),
@@ -570,7 +568,7 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				PartNumber: aws.Int32(partNumber),
 			})
 
-			if s.verbose {
+			if config.Verbose {
 				log.LogAttrs(ctx, logger.LevelTrace, "multipart chunk uploaded",
 					slog.Int64("part_number", int64(partNumber)),
 					slog.Int("chunk_size_bytes", n),
@@ -610,7 +608,7 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 		return abort(fmt.Errorf("complete multipart upload %q: %w", remotePath, err))
 	}
 
-	if s.verbose {
+	if config.Verbose {
 		log.LogAttrs(ctx, logger.LevelTrace, "multipart upload completed",
 			slog.Int("parts", len(completedParts)),
 		)
