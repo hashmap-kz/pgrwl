@@ -195,7 +195,7 @@ spec:
             name: postgresql-conf
       containers:
         - name: server
-          image: postgres:17-bookworm
+          image: postgres:17.9-bookworm
           imagePullPolicy: IfNotPresent
           args:
             - -c

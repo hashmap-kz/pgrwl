@@ -31,7 +31,7 @@
       },
       "id": 10,
       "panels": [],
-      "title": "⚙️  WAL Receiver",
+      "title": "WAL Receiver",
       "type": "row"
     },
     {
@@ -505,7 +505,7 @@
       },
       "id": 13,
       "panels": [],
-      "title": "🗄️  Backups",
+      "title": "Backups",
       "type": "row"
     },
     {
@@ -801,7 +801,7 @@
       },
       "id": 12,
       "panels": [],
-      "title": "🔧  Job Queue",
+      "title": "Job Queue",
       "type": "row"
     },
     {
