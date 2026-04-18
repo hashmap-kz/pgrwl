@@ -153,8 +153,10 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "pgrwl_wal_files_received_total",
+          "editorMode": "code",
+          "expr": "increase(pgrwl_wal_files_received_total[$__range])",
           "format": "time_series",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -216,8 +218,10 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "pgrwl_wal_files_uploaded_total",
+          "editorMode": "code",
+          "expr": "increase(pgrwl_wal_files_uploaded_total[$__range])",
           "format": "time_series",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -311,8 +315,10 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "pgrwl_wal_bytes_received_total",
+          "editorMode": "code",
+          "expr": "rate(pgrwl_wal_bytes_received_total[1m])",
           "format": "time_series",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -374,8 +380,10 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "expr": "pgrwl_wal_files_deleted_total",
+          "editorMode": "code",
+          "expr": "increase(pgrwl_wal_files_deleted_total[$__range])",
           "format": "time_series",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -636,7 +644,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "pgrwl_basebackup_bytes_received_total - pgrwl_basebackup_bytes_deleted_total",
+          "expr": "pgrwl_basebackup_bytes_received_total-pgrwl_basebackup_bytes_deleted_total",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -741,7 +749,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(pgrwl_jobq_jobs_submitted_total) by (name)",
+          "expr": "sum(rate(pgrwl_jobq_jobs_submitted_total[1m])) by (name)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -833,7 +841,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(pgrwl_jobq_jobs_executed_total) by (name)",
+          "expr": "sum(rate(pgrwl_jobq_jobs_executed_total[1m])) by (name)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1017,7 +1025,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(pgrwl_jobq_jobs_dropped_total) by (name, reason)",
+          "expr": "sum(rate(pgrwl_jobq_jobs_dropped_total[1m])) by (name, reason)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
