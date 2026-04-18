@@ -197,16 +197,16 @@ func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal 
 func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts, pgrw xlog.PgReceiveWal) *st.VariadicStorage {
 	loggr.Info("init storage")
 
-	var err error
-
-	walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
-	if err != nil {
-		log.Fatal(err)
-	}
-	loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
-
 	var stor *st.VariadicStorage
 	if needSupervisorLoop(cfg, loggr) {
+		var err error
+
+		walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
+		if err != nil {
+			log.Fatal(err)
+		}
+		loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
+
 		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
 			BaseDir:         opts.ReceiveDirectory,
 			SubPath:         config.LocalFSStorageSubpath,
