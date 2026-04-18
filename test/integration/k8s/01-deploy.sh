@@ -9,9 +9,10 @@ if [[ "$LOCALDEV" == "true" ]]; then
     cd ../../../ && make image
   )
   IMAGE='localhost:5000/pgrwl:latest'
-  sed -i "s|__PGRWL_IMAGE__|${IMAGE}|g" manifests/04-pgrwl-receive.yaml
-  sed -i "s|__PGRWL_IMAGE__|${IMAGE}|g" manifests/05-pgrwl-backup.yaml
 fi
+
+sed -i "s|__PGRWL_IMAGE__|${IMAGE}|g" manifests/04-pgrwl-receive.yaml
+sed -i "s|__PGRWL_IMAGE__|${IMAGE}|g" manifests/05-pgrwl-backup.yaml
 
 kubectl create ns pgrwl-test --dry-run=client -oyaml | kubectl apply -f -
 kubectl create ns mon --dry-run=client -oyaml | kubectl apply -f -
