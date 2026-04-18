@@ -168,7 +168,7 @@ spec:
             - name: PGRWL_DAEMON_MODE
               value: "backup"
             - name: PGRWL_CONFIG_PATH
-              value: "/tmp/configs/config-localfs.yml"
+              value: "/tmp/configs/config-s3.yml"
           ports:
             - containerPort: 7070
               name: http
