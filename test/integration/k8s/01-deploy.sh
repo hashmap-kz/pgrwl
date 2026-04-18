@@ -1,18 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-LOCALDEV=true
-IMAGE="quay.io/pgrwl/pgrwl:latest"
-
-if [[ "$LOCALDEV" == "true" ]]; then
-  (
-    cd ../../../ && make image
-  )
-  IMAGE='localhost:5000/pgrwl:latest'
-fi
-
-sed -i "s|__PGRWL_IMAGE__|${IMAGE}|g" manifests/04-pgrwl-receive.yaml
-sed -i "s|__PGRWL_IMAGE__|${IMAGE}|g" manifests/05-pgrwl-backup.yaml
+(
+  cd ../../../ && make image
+)
 
 kubectl create ns pgrwl-test --dry-run=client -oyaml | kubectl apply -f -
 kubectl create ns mon --dry-run=client -oyaml | kubectl apply -f -
