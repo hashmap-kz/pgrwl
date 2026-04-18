@@ -24,6 +24,7 @@ type PgReceiveWal interface {
 	Run(ctx context.Context) error
 	Status() *StreamStatus
 	CurrentOpenWALFileName() string
+	WalSegSz() uint64
 }
 
 type pgReceiveWal struct {
@@ -336,4 +337,8 @@ func (pgrw *pgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
 		slog.String("wal", best.basename),
 	)
 	return startLSN, best.tli, nil
+}
+
+func (pgrw *pgReceiveWal) WalSegSz() uint64 {
+	return pgrw.walSegSz
 }

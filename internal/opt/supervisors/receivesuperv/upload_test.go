@@ -40,6 +40,10 @@ func (m *MockPgReceiveWal) Status() *xlog.StreamStatus {
 	return nil
 }
 
+func (m *MockPgReceiveWal) WalSegSz() uint64 {
+	return 16 * 1024 * 1024
+}
+
 func TestArchiveSupervisor_PerformUploads(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()

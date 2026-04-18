@@ -16,6 +16,11 @@ import (
 type SetupStorageOpts struct {
 	BaseDir string
 	SubPath string // for localfs storage, or basebackups
+	// S3PartSizeBytes overrides the multipart upload part size for S3.
+	// When zero the S3 backend default is used (suitable for large objects
+	// such as base backups). For WAL uploads set this to the WAL segment
+	// size (16 MiB) so each segment is uploaded as a single part.
+	S3PartSizeBytes int64
 }
 
 func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
@@ -86,7 +91,9 @@ func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
 		if err != nil {
 			return nil, err
 		}
-		backend := st.NewS3StorageWithOptions(client.Client(), cfg.Storage.S3.Bucket, baseDir, st.S3Options{})
+		backend := st.NewS3StorageWithOptions(client.Client(), cfg.Storage.S3.Bucket, baseDir, st.S3Options{
+			PartSizeBytes: opts.S3PartSizeBytes,
+		})
 		return st.NewVariadicStorage(backend, alg, writeExt)
 	}
 

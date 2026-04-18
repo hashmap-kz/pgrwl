@@ -9,6 +9,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
 	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
@@ -94,7 +96,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	initMetrics(ctx, cfg, loggr)
 
 	// setup storage: it may be nil
-	stor := mustInitStorageIfRequired(cfg, loggr, opts)
+	stor := mustInitStorageIfRequired(cfg, loggr, opts, pgrw)
 
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
@@ -192,13 +194,23 @@ func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal 
 	return pgrw
 }
 
-func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts) *st.VariadicStorage {
-	var stor *st.VariadicStorage
+func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts, pgrw xlog.PgReceiveWal) *st.VariadicStorage {
+	loggr.Info("init storage")
+
 	var err error
+
+	walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
+	if err != nil {
+		log.Fatal(err)
+	}
+	loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
+
+	var stor *st.VariadicStorage
 	if needSupervisorLoop(cfg, loggr) {
 		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
-			BaseDir: opts.ReceiveDirectory,
-			SubPath: config.LocalFSStorageSubpath,
+			BaseDir:         opts.ReceiveDirectory,
+			SubPath:         config.LocalFSStorageSubpath,
+			S3PartSizeBytes: walSegSz,
 		})
 		if err != nil {
 			log.Fatal(err)
