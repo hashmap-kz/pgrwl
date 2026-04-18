@@ -2,7 +2,10 @@ package receivemode
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"slices"
 
@@ -17,17 +20,27 @@ import (
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
 )
 
 type Service interface {
 	Status() *PgRwlStatus
 	DeleteWALsBefore(ctx context.Context, walFileName string) error
 	BriefConfig(ctx context.Context) *BriefConfig
+
+	// Receiver lifecycle control (used by POST /receiver and GET /receiver).
+	ReceiverStart() error
+	ReceiverStop()
+	ReceiverState() xlog.ReceiverState
+	ReceiverStatus() *xlog.StreamStatus
+
+	// WAL file serving (used by GET /wal/{filename} for restore_command).
+	GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error)
 }
 
 type receiveModeSvc struct {
 	l        *slog.Logger
-	pgrw     xlog.PgReceiveWal // direct access to running state
+	pgrw     *xlog.RestartablePgReceiver // restartable receiver; Start/Stop via API
 	baseDir  string
 	storage  *st.VariadicStorage
 	jobQueue *jobq.JobQueue // optional, nil in 'serve' mode
@@ -37,7 +50,7 @@ type receiveModeSvc struct {
 var _ Service = &receiveModeSvc{}
 
 type ReceiveServiceOpts struct {
-	PGRW     xlog.PgReceiveWal
+	PGRW     *xlog.RestartablePgReceiver
 	BaseDir  string
 	Storage  *st.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
@@ -102,7 +115,7 @@ func filterWalBefore(walFiles []string, cutoff string) []string {
 }
 
 func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string) error {
-	if s.jobQueue != nil {
+	if s.jobQueue != nil && s.storage != nil {
 		err := s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
 			s.log().Info("deleting WAL files")
 			walFilesInStorage, err := s.storage.List(context.Background(), "")
@@ -149,4 +162,55 @@ func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string)
 func (s *receiveModeSvc) BriefConfig(_ context.Context) *BriefConfig {
 	cfg := config.Cfg()
 	return &BriefConfig{RetentionEnable: cfg.Receiver.Retention.Enable}
+}
+
+func (s *receiveModeSvc) ReceiverStart() error {
+	return s.pgrw.Start()
+}
+
+func (s *receiveModeSvc) ReceiverStop() {
+	s.pgrw.Stop()
+}
+
+func (s *receiveModeSvc) ReceiverState() xlog.ReceiverState {
+	return s.pgrw.State()
+}
+
+func (s *receiveModeSvc) ReceiverStatus() *xlog.StreamStatus {
+	return s.pgrw.Status()
+}
+
+func (s *receiveModeSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error) {
+	// 1) Fast-path: check that file exists locally
+	// 2) Check *.partial file locally
+	// 3) Fetch from storage (if it's not nil)
+
+	// TODO: send checksum in headers
+
+	s.log().Debug("fetching WAL file", slog.String("filename", filename))
+
+	// 1) trying to find local completed segment
+	// 2) trying to find partial segment
+	filePath := filepath.Join(s.baseDir, filename)
+	partialFilePath := filePath + xlog.PartialSuffix
+
+	s.log().Debug("wal-restore, fetching local file", slog.String("path", filePath))
+	if fsx.FileExists(filePath) {
+		s.log().Debug("wal-restore, found local file", slog.String("path", filePath))
+		//nolint:gosec
+		return os.Open(filePath)
+	}
+	if fsx.FileExists(partialFilePath) {
+		s.log().Debug("wal-restore, found local partial file", slog.String("path", partialFilePath))
+		//nolint:gosec
+		return os.Open(partialFilePath)
+	}
+
+	// 3) trying remote
+	if s.storage != nil {
+		s.log().Debug("wal-restore, fetching remote file", slog.String("filename", filename))
+		return s.storage.Get(ctx, filename)
+	}
+
+	return nil, fmt.Errorf("cannot fetch file: %s", filename)
 }

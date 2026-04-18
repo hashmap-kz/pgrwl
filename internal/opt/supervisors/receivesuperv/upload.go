@@ -35,6 +35,11 @@ func (u *ArchiveSupervisor) filterFilesToUpload(files []os.DirEntry) []uploadBun
 		if filepath.Base(name) == ".manifest.json" {
 			continue
 		}
+		streamStatus := u.opts.PGRW.Status()
+		if !streamStatus.Running {
+			u.log().Debug("stream is not running, skipped", slog.String("path", filepath.ToSlash(name)))
+			continue
+		}
 		currentOpenWALFileName := u.opts.PGRW.CurrentOpenWALFileName()
 		if filepath.Base(name) == filepath.Base(currentOpenWALFileName) {
 			u.log().Debug("skipped currently opened file", slog.String("path", filepath.ToSlash(name)))

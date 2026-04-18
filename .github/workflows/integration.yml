@@ -172,6 +172,8 @@ jobs:
           - pg_010_timing_parity_2
           - pg_011_basic_flow
           - pg_012_restore_s3_toxiproxy
+          - pg_014_rest_api
+          - pg_015_upgrade_restart_no_gap
 
     env:
       PG_MAJOR: ${{ matrix.pg_major }}
