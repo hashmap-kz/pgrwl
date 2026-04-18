@@ -18,7 +18,6 @@ import (
 type ReceiveHandlerOpts struct {
 	PGRW     xlog.PgReceiveWal
 	BaseDir  string
-	Verbose  bool
 	Storage  *st.VariadicStorage
 	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
 }
@@ -32,14 +31,12 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 		BaseDir:  opts.BaseDir,
 		Storage:  opts.Storage,
 		JobQueue: opts.JobQueue,
-		Verbose:  opts.Verbose,
 	})
 	controller := NewReceiveController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
-		Logger:  l,
-		Verbose: opts.Verbose,
+		Logger: l,
 	}
 	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
 
