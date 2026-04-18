@@ -24,6 +24,7 @@ type PgReceiveWal interface {
 	Run(ctx context.Context) error
 	Status() *StreamStatus
 	CurrentOpenWALFileName() string
+	WalSegSz() uint64
 }
 
 type pgReceiveWal struct {
@@ -34,7 +35,6 @@ type pgReceiveWal struct {
 	connStrRepl      string
 	slotName         string
 	noLoop           bool
-	verbose          bool
 	streamMu         sync.RWMutex
 	stream           *StreamCtl // current active stream (or nil)
 }
@@ -45,7 +45,6 @@ type PgReceiveWalOpts struct {
 	ReceiveDirectory string
 	Slot             string
 	NoLoop           bool
-	Verbose          bool
 }
 
 var ErrNoWalEntries = fmt.Errorf("no valid WAL segments found")
@@ -78,8 +77,6 @@ func NewPgReceiver(ctx context.Context, opts *PgReceiveWalOpts) (PgReceiveWal, e
 		connStrRepl:      connStrRepl,
 		slotName:         opts.Slot,
 		noLoop:           opts.NoLoop,
-		// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
-		verbose: opts.Verbose,
 	}, nil
 }
 
@@ -217,7 +214,6 @@ func (pgrw *pgReceiveWal) streamLog(ctx context.Context) error {
 		WalSegSz:         pgrw.walSegSz,
 		ReceiveDirectory: pgrw.receiveDirectory,
 		Conn:             pgrw.conn,
-		Verbose:          pgrw.verbose,
 	})
 	pgrw.SetStream(stream)
 
@@ -341,4 +337,8 @@ func (pgrw *pgReceiveWal) findStreamingStart() (pglogrepl.LSN, uint32, error) {
 		slog.String("wal", best.basename),
 	)
 	return startLSN, best.tli, nil
+}
+
+func (pgrw *pgReceiveWal) WalSegSz() uint64 {
+	return pgrw.walSegSz
 }

@@ -23,7 +23,6 @@ type serveModeSvc struct {
 	l       *slog.Logger
 	baseDir string
 	storage *st.VariadicStorage
-	verbose bool
 }
 
 var _ Service = &serveModeSvc{}
@@ -31,7 +30,6 @@ var _ Service = &serveModeSvc{}
 type ServeServiceOpts struct {
 	BaseDir string
 	Storage *st.VariadicStorage
-	Verbose bool
 }
 
 func NewServeModeService(opts *ServeServiceOpts) Service {
@@ -39,7 +37,6 @@ func NewServeModeService(opts *ServeServiceOpts) Service {
 		l:       slog.With("component", "serve-service"),
 		baseDir: opts.BaseDir,
 		storage: opts.Storage,
-		verbose: opts.Verbose,
 	}
 }
 

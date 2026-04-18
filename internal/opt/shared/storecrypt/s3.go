@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pgrwl/pgrwl/config"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -24,6 +26,8 @@ const (
 	DefaultS3Conc           = 2
 	MaxS3UploadParts  int64 = 10000
 
+	// MultipartDefaultPartSizeBytes is used for large unknown-size streams
+	// such as base backups. 256 MiB x 10000 parts = ~2.44 TiB max object.
 	MultipartDefaultPartSizeBytes = 256 * 1024 * 1024
 )
 
@@ -31,16 +35,15 @@ type S3Options struct {
 	PartSizeBytes int64
 	Concurrency   int
 	Log           *slog.Logger
-	Verbose       bool
 }
 
 type s3Storage struct {
 	client   *s3.Client
 	bucket   string
 	prefix   string
+	partSize int64 // part size for the streaming multipart path
 	uploader *transfermanager.Client
 	log      *slog.Logger
-	verbose  bool
 }
 
 var _ Storage = &s3Storage{}
@@ -68,13 +71,20 @@ func NewS3StorageWithOptions(client *s3.Client, bucket, prefix string, opts S3Op
 		o.Concurrency = concurrency
 	})
 
+	// streamPartSize: the part size used when the reader has unknown size
+	// (e.g. after compression/encryption wraps it in an io.Pipe).
+	streamPartSize := opts.PartSizeBytes
+	if streamPartSize <= 0 {
+		streamPartSize = MultipartDefaultPartSizeBytes
+	}
+
 	return &s3Storage{
 		client:   client,
 		bucket:   bucket,
 		prefix:   filepath.ToSlash(strings.TrimPrefix(prefix, "/")),
+		partSize: streamPartSize,
 		uploader: tmClient,
 		log:      opts.Log,
-		verbose:  opts.Verbose,
 	}
 }
 
@@ -173,12 +183,13 @@ func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) err
 	}
 
 	log.Debug("using streaming multipart upload path",
-		slog.Int64("part_size_bytes", MultipartDefaultPartSizeBytes),
+		slog.Int64("part_size_bytes", s.partSize),
 	)
 
-	// Unknown-size stream: use manual multipart with a conservative part size.
-	// 256 MiB gives ~2.44 TiB before hitting 10k parts.
-	return s.putMultipartStream(ctx, fullPath, r, MultipartDefaultPartSizeBytes)
+	// Unknown-size stream: use manual multipart upload.
+	// Part size is configured per-instance: large for backups (256 MiB),
+	// small for WAL segments (16 MiB). See WALPartSizeBytes / MultipartDefaultPartSizeBytes.
+	return s.putMultipartStream(ctx, fullPath, r, s.partSize)
 }
 
 func (s *s3Storage) Get(ctx context.Context, remotePath string) (io.ReadCloser, error) {
@@ -546,7 +557,7 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				))
 			}
 
-			if s.verbose {
+			if config.Verbose {
 				log.LogAttrs(ctx, logger.LevelTrace, "uploading multipart chunk",
 					slog.Int64("part_number", int64(partNumber)),
 					slog.Int("chunk_size_bytes", n),
@@ -570,7 +581,7 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				PartNumber: aws.Int32(partNumber),
 			})
 
-			if s.verbose {
+			if config.Verbose {
 				log.LogAttrs(ctx, logger.LevelTrace, "multipart chunk uploaded",
 					slog.Int64("part_number", int64(partNumber)),
 					slog.Int("chunk_size_bytes", n),
@@ -610,7 +621,7 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 		return abort(fmt.Errorf("complete multipart upload %q: %w", remotePath, err))
 	}
 
-	if s.verbose {
+	if config.Verbose {
 		log.LogAttrs(ctx, logger.LevelTrace, "multipart upload completed",
 			slog.Int("parts", len(completedParts)),
 		)

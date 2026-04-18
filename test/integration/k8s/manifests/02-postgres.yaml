@@ -9,17 +9,62 @@ data:
     #!/bin/bash
     set -euo pipefail
 
-    # https://hub.docker.com/_/postgres
-    # Initialization scripts
-
     echo ">>> Initializing PostgreSQL server"
 
-    ####### extensions (optional) #######
-
-    echo ">>> Enabling [pg_stat_statements] module on database"
-    psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" <<-EOSQL
-        CREATE EXTENSION pg_stat_statements;
+    echo ">>> Enabling [pg_stat_statements] module"
+    psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname postgres <<'EOSQL'
+      CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
     EOSQL
+
+    echo ">>> Creating ~1GiB test dataset"
+
+    psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname postgres <<'EOSQL'
+      CREATE SCHEMA IF NOT EXISTS loadtest;
+
+      DROP TABLE IF EXISTS loadtest.data_1g;
+
+      CREATE TABLE loadtest.data_1g (
+          id         bigserial PRIMARY KEY,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          payload    text        NOT NULL
+      );
+
+      DO $$
+      DECLARE
+          target_bytes bigint := 1024::bigint * 1024 * 1024; -- 1 GiB
+          batch_size   integer := 10000;
+          current_size bigint := 0;
+          inserted     bigint := 0;
+      BEGIN
+          LOOP
+              INSERT INTO loadtest.data_1g(payload)
+              SELECT repeat(md5(random()::text || clock_timestamp()::text), 32)
+              FROM generate_series(1, batch_size);
+
+              inserted := inserted + batch_size;
+
+              SELECT pg_total_relation_size('loadtest.data_1g')
+              INTO current_size;
+
+              RAISE NOTICE 'inserted rows=%, table size=%',
+                  inserted,
+                  pg_size_pretty(current_size);
+
+              EXIT WHEN current_size >= target_bytes;
+          END LOOP;
+      END $$;
+
+      ANALYZE loadtest.data_1g;
+
+      SELECT
+          count(*) AS rows,
+          pg_size_pretty(pg_relation_size('loadtest.data_1g')) AS heap_size,
+          pg_size_pretty(pg_indexes_size('loadtest.data_1g')) AS index_size,
+          pg_size_pretty(pg_total_relation_size('loadtest.data_1g')) AS total_size
+      FROM loadtest.data_1g;
+    EOSQL
+
+    echo ">>> PostgreSQL test dataset initialized"
 
 ---
 apiVersion: v1
@@ -79,6 +124,7 @@ data:
     min_wal_size                    = 80MB
     max_wal_senders                 = 10
     max_replication_slots           = 10
+    #synchronous_standby_names       = 'pgrwl_v5'
 
 ---
 apiVersion: v1
@@ -149,7 +195,7 @@ spec:
             name: postgresql-conf
       containers:
         - name: server
-          image: postgres:17-bookworm
+          image: postgres:17.9-bookworm
           imagePullPolicy: IfNotPresent
           args:
             - -c

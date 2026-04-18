@@ -70,6 +70,10 @@ var (
 	// config holds the global application configuration.
 	config *Config
 
+	// Verbose set to true when log.level == 'trace'
+	// To prevent log-attributes evaluation, and fully eliminate function calls for non-trace levels
+	Verbose bool
+
 	modes = []string{
 		// CMD
 		ModeBackupCMD,
@@ -334,6 +338,7 @@ func MustLoad(path, mode string) *Config {
 		if err := validate(config, mode); err != nil {
 			log.Fatalf("Invalid config: %v", err)
 		}
+		Verbose = strings.EqualFold(config.Log.Level, "trace")
 	})
 	return config
 }
@@ -347,6 +352,7 @@ func MustEnvconfig(mode string) *Config {
 		if err := validate(config, mode); err != nil {
 			log.Fatalf("Invalid config: %v", err)
 		}
+		Verbose = strings.EqualFold(config.Log.Level, "trace")
 	})
 	return config
 }
