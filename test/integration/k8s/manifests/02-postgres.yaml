@@ -124,6 +124,7 @@ data:
     min_wal_size                    = 80MB
     max_wal_senders                 = 10
     max_replication_slots           = 10
+    synchronous_standby_names       = 'pgrwl_v5'
 
 ---
 apiVersion: v1
