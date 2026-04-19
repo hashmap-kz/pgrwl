@@ -1,20 +1,20 @@
-package restorecmd
+package basebackup
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	backupdto2 "github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"log/slog"
 	"path/filepath"
 	"strings"
 
-	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
-func makeRestoreInfo(backupID string, backupFiles []string) *backupdto.RestoreInfo {
+func makeRestoreInfo(backupID string, backupFiles []string) *backupdto2.RestoreInfo {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", backupID))
-	r := backupdto.RestoreInfo{}
+	r := backupdto2.RestoreInfo{}
 
 	// 0 = {string} "20251203150245/20251203150245.json"
 	// 1 = {string} "20251203150245/25222.tar"
@@ -49,8 +49,8 @@ func readManifestFile(
 	ctx context.Context,
 	backupID string,
 	stor st.Storage,
-	ri *backupdto.RestoreInfo,
-) (*backupdto.Result, error) {
+	ri *backupdto2.RestoreInfo,
+) (*backupdto2.Result, error) {
 	if ri.ManifestFile == "" {
 		return nil, fmt.Errorf("no manifest file (*%s.json*) found for backup %s", backupID+".json", backupID)
 	}
@@ -58,7 +58,7 @@ func readManifestFile(
 	if err != nil {
 		return nil, fmt.Errorf("get manifest %s: %w", ri.ManifestFile, err)
 	}
-	var mf backupdto.Result
+	var mf backupdto2.Result
 	if err := json.NewDecoder(mrc).Decode(&mf); err != nil {
 		mrc.Close()
 		return nil, fmt.Errorf("decode manifest %s: %w", ri.ManifestFile, err)

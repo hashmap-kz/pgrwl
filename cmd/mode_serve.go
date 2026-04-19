@@ -54,7 +54,7 @@ func RunServeMode(opts *ServeModeOpts) {
 			}
 		}()
 
-		handlers := serveAPI.Init(&serveAPI.ServeHandlerOpts{
+		handlers := serveAPI.Init(&serveAPI.ServeAPIOpts{
 			BaseDir: opts.Directory,
 			Storage: stor,
 		})

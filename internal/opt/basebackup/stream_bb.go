@@ -1,4 +1,4 @@
-package backupmode
+package basebackup
 
 import (
 	"bytes"
@@ -6,14 +6,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"io"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
-	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
-
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
 
 	"github.com/jackc/pglogrepl"

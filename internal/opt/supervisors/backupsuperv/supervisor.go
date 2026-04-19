@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -11,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
 	"github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
 
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
@@ -24,8 +25,6 @@ import (
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/cmdx"
-
-	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/pgrwl/pgrwl/config"
@@ -115,7 +114,7 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 			}
 		}
 		// create backup
-		_, err := backupmode.CreateBaseBackup(&backupmode.CreateBaseBackupOpts{Directory: u.opts.Directory})
+		_, err := basebackup.CreateBaseBackup(&basebackup.CreateBaseBackupOpts{Directory: u.opts.Directory})
 		if err != nil {
 			u.log().Error("basebackup failed", slog.Any("err", err))
 		} else {

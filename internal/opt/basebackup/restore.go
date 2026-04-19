@@ -1,4 +1,4 @@
-package restorecmd
+package basebackup
 
 import (
 	"context"

@@ -4,26 +4,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/opt/shared"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/middleware"
-	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
-type ServeHandlerOpts struct {
-	BaseDir string
-	Storage *st.VariadicStorage
-}
-
-func Init(opts *ServeHandlerOpts) http.Handler {
-	cfg := config.Cfg()
+func initHandlers(controller *ServeController) http.Handler {
 	l := slog.With("component", "serve-api")
-
-	service := NewServeModeService(&ServeServiceOpts{
-		BaseDir: opts.BaseDir,
-		Storage: opts.Storage,
-	})
-	controller := NewServeModeController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -44,6 +29,5 @@ func Init(opts *ServeHandlerOpts) http.Handler {
 	// Standalone mode (i.e. just serving wal-archive during restore)
 	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
-	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
 }

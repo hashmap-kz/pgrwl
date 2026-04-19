@@ -4,35 +4,13 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/pgrwl/pgrwl/internal/opt/jobq"
-	"github.com/pgrwl/pgrwl/internal/opt/shared"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/middleware"
 
-	"github.com/pgrwl/pgrwl/config"
-	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
-
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"golang.org/x/time/rate"
 )
 
-type ReceiveHandlerOpts struct {
-	PGRW     xlog.PgReceiveWal
-	BaseDir  string
-	Storage  *st.VariadicStorage
-	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
-}
-
-func Init(opts *ReceiveHandlerOpts) http.Handler {
-	cfg := config.Cfg()
+func initHandlers(controller *ReceiveController) http.Handler {
 	l := slog.With("component", "receive-api")
-
-	service := NewReceiveModeService(&ReceiveServiceOpts{
-		PGRW:     opts.PGRW,
-		BaseDir:  opts.BaseDir,
-		Storage:  opts.Storage,
-		JobQueue: opts.JobQueue,
-	})
-	controller := NewReceiveController(service)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -58,6 +36,5 @@ func Init(opts *ReceiveHandlerOpts) http.Handler {
 	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
 	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
 
-	shared.InitOptionalHandlers(cfg, mux, l)
 	return mux
 }

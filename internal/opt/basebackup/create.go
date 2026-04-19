@@ -1,14 +1,14 @@
-package backupmode
+package basebackup
 
 import (
 	"context"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"log/slog"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/opt/modes/dto/backupdto"
 	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
 	"github.com/jackc/pgx/v5/pgconn"

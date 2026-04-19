@@ -1,4 +1,4 @@
-package backupmode
+package basebackup
 
 import (
 	"context"

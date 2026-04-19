@@ -256,7 +256,7 @@ func (m *Manager) buildReceiveHandler(
 	stor *st.VariadicStorage,
 	jobQueue *jobq.JobQueue,
 ) http.Handler {
-	return receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
+	return receiveAPI.Init(&receiveAPI.ReceiveAPIOpts{
 		PGRW:     pgrw,
 		BaseDir:  m.opts.ReceiveDirectory,
 		Storage:  stor,
@@ -265,7 +265,7 @@ func (m *Manager) buildReceiveHandler(
 }
 
 func (m *Manager) buildServeHandler(stor *st.VariadicStorage) http.Handler {
-	return serveAPI.Init(&serveAPI.ServeHandlerOpts{
+	return serveAPI.Init(&serveAPI.ServeAPIOpts{
 		BaseDir: m.opts.ReceiveDirectory,
 		Storage: stor,
 	})
