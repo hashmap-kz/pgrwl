@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/pgrwl/pgrwl/config"
@@ -22,31 +21,35 @@ import (
 const defaultModeStopTimeout = 30 * time.Second
 
 // ManagerOpts holds static configuration that does not change between mode switches.
-// No PGRW here — it is initialised on demand only when entering receive mode.
+//
+// No PGRW here: it is initialized on demand only when entering receive mode.
 type ManagerOpts struct {
 	ReceiveDirectory string
 	Slot             string
 	NoLoop           bool
 }
 
-// Manager owns the mode state machine. Exactly one mode's supervisor runs at a time.
-// Switch is the only entry point for transitions; it is serialised by a mutex.
+// Manager owns the mode state machine.
+//
+// Exactly one mode is active at a time.
+// Receive mode has a supervisor.
+// Serve mode currently has no background goroutines, so it has no supervisor.
 type Manager struct {
-	appCtx context.Context // root context; outlives individual mode supervisors
+	appCtx context.Context
 	opts   *ManagerOpts
 	cfg    *config.Config
 	loggr  *slog.Logger
 	router *ModeRouter
 
-	// initReceiveStorage / initServeStorage are injected so cmd layer can
-	// supply the right storage-factory functions without import cycles.
+	// initReceiveStorage / initServeStorage are injected so the cmd layer can
+	// supply storage-factory functions without import cycles.
 	initReceiveStorage func(pgrw xlog.PgReceiveWal) *st.VariadicStorage
 	initServeStorage   func() *st.VariadicStorage
 	initPgrw           func() xlog.PgReceiveWal
 
-	mu      sync.Mutex // serialises Switch/Stop calls
+	mu      sync.Mutex
 	sup     *supervisor.Supervisor
-	current atomic.Value // string: config.ModeReceive | config.ModeServe | ""
+	current string
 }
 
 type ManagerDeps struct {
@@ -62,7 +65,7 @@ func NewManager(
 	router *ModeRouter,
 	deps ManagerDeps,
 ) *Manager {
-	m := &Manager{
+	return &Manager{
 		appCtx:             appCtx,
 		opts:               opts,
 		cfg:                cfg,
@@ -72,22 +75,28 @@ func NewManager(
 		initReceiveStorage: deps.InitReceiveStorage,
 		initServeStorage:   deps.InitServeStorage,
 	}
-	m.current.Store("")
-	return m
 }
 
-// CurrentMode returns the name of the active mode ("receive", "serve", or "").
-func (m *Manager) CurrentMode() string {
-	//nolint:errcheck
-	mode, _ := m.current.Load().(string)
-	return mode
-}
-
-// Switch transitions to mode. Safe to call concurrently; calls are serialised.
+// CurrentMode returns the active mode name.
 //
-// It uses a default timeout while stopping the previously running mode. This is
-// important because a bad task that ignores ctx.Done() must not hang the HTTP
-// mode-switch request forever.
+// Possible values are:
+//
+//   - config.ModeReceive
+//   - config.ModeServe
+//   - "" when no mode is active
+func (m *Manager) CurrentMode() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.current
+}
+
+// Switch transitions to mode.
+//
+// Switch is safe to call concurrently; calls are serialized.
+//
+// A default timeout is used while stopping the previous mode. This protects the
+// HTTP mode-switch request from hanging forever if a task ignores ctx.Done().
 func (m *Manager) Switch(mode string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultModeStopTimeout)
 	defer cancel()
@@ -109,19 +118,25 @@ func (m *Manager) SwitchContext(ctx context.Context, mode string) error {
 		return fmt.Errorf("unknown mode: %s", mode)
 	}
 
-	current := m.CurrentMode()
-	if current == mode {
+	if m.current == mode {
 		return fmt.Errorf("already in %s mode", mode)
 	}
 
 	m.loggr.Info("switching mode",
-		slog.String("from", current),
+		slog.String("from", m.current),
 		slog.String("to", mode),
 	)
 
 	if err := m.stopLocked(ctx); err != nil {
 		return fmt.Errorf("stop current supervisor: %w", err)
 	}
+
+	// Be explicitly empty while the next mode is being built.
+	//
+	// This avoids exposing a stale receive/serve handler if constructing the
+	// next mode fails after the previous mode has already been stopped.
+	m.current = ""
+	m.router.SwapHandler(http.NotFoundHandler())
 
 	switch mode {
 	case config.ModeReceive:
@@ -133,13 +148,16 @@ func (m *Manager) SwitchContext(ctx context.Context, mode string) error {
 		m.switchToServeLocked()
 	}
 
-	m.current.Store(mode)
+	m.current = mode
 
 	m.loggr.Info("mode switched", slog.String("mode", mode))
 	return nil
 }
 
 // Stop shuts down whichever supervisor is currently running.
+//
+// Stop also resets the router to NotFoundHandler so stopped mode handlers do not
+// remain reachable.
 func (m *Manager) Stop(ctx context.Context) error {
 	if ctx == nil {
 		return supervisor.ErrNilContext
@@ -152,19 +170,18 @@ func (m *Manager) Stop(ctx context.Context) error {
 }
 
 func (m *Manager) stopLocked(ctx context.Context) error {
-	if m.sup == nil {
-		m.current.Store("")
-		return nil
+	if m.sup != nil {
+		m.loggr.Info("stopping current supervisor")
+
+		if err := m.sup.Stop(ctx); err != nil {
+			return err
+		}
+
+		m.sup = nil
 	}
 
-	m.loggr.Info("stopping current supervisor")
-
-	if err := m.sup.Stop(ctx); err != nil {
-		return err
-	}
-
-	m.sup = nil
-	m.current.Store("")
+	m.current = ""
+	m.router.SwapHandler(http.NotFoundHandler())
 
 	return nil
 }
@@ -232,6 +249,7 @@ func (m *Manager) registerReceiveTasks(
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
+
 			u.Run(ctx, jobQueue)
 			return nil
 		}); err != nil {

@@ -39,11 +39,13 @@ type task struct {
 // Register all tasks first, then call Start. After the first successful Start,
 // the task set is sealed and cannot be changed.
 //
-// A Supervisor is safe for concurrent lifecycle calls.
+// A Supervisor is safe for concurrent Start, Stop, Restart, and Running calls.
+// Wait intentionally does not hold the lifecycle mutex while blocking, so a
+// concurrent Stop can still interrupt a long wait.
 type Supervisor struct {
 	loggr *slog.Logger
 
-	// lifeMu serializes Start, Stop, Wait, and Restart.
+	// lifeMu serializes mutating lifecycle operations.
 	lifeMu sync.Mutex
 
 	// mu guards fields below.
@@ -140,11 +142,24 @@ func (s *Supervisor) Stop(ctx context.Context) error {
 // Wait waits until all tasks exit naturally.
 //
 // Wait does not cancel the supervisor context.
+//
+// Wait does not hold lifeMu while blocking. This is intentional: another
+// goroutine must still be able to call Stop while somebody is waiting.
 func (s *Supervisor) Wait(ctx context.Context) error {
-	s.lifeMu.Lock()
-	defer s.lifeMu.Unlock()
+	if ctx == nil {
+		return ErrNilContext
+	}
 
-	return s.wait(ctx)
+	s.mu.Lock()
+	if !s.running {
+		s.mu.Unlock()
+		return nil
+	}
+
+	done := s.done
+	s.mu.Unlock()
+
+	return wait(ctx, done)
 }
 
 // Restart stops the current run and starts the same task set again.
@@ -208,6 +223,12 @@ func (s *Supervisor) start(parent context.Context) error {
 	go func() {
 		wg.Wait()
 
+		// Clear the state before closing done.
+		//
+		// This ordering keeps Start simple after a natural exit: once all tasks
+		// are finished, Running can become false immediately. The goroutine does
+		// not touch supervisor state after close(done), so a later Start cannot
+		// be accidentally cleared by this old run.
 		s.mu.Lock()
 		s.running = false
 		s.cancel = nil
@@ -238,25 +259,6 @@ func (s *Supervisor) stop(ctx context.Context) error {
 	s.mu.Unlock()
 
 	cancel()
-
-	return wait(ctx, done)
-}
-
-func (s *Supervisor) wait(ctx context.Context) error {
-	if ctx == nil {
-		return ErrNilContext
-	}
-
-	s.mu.Lock()
-
-	if !s.running {
-		s.mu.Unlock()
-		return nil
-	}
-
-	done := s.done
-
-	s.mu.Unlock()
 
 	return wait(ctx, done)
 }

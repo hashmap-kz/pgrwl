@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/opt/jobq"
-
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/opt/jobq"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
@@ -27,7 +26,7 @@ type ArchiveSupervisor struct {
 	stor st.Storage
 	opts *ArchiveSupervisorOpts
 
-	// opts (for fast-access without traverse the config)
+	// storageName is kept as a fast-access copy to avoid repeatedly walking cfg.
 	storageName string
 }
 
@@ -45,9 +44,18 @@ func (u *ArchiveSupervisor) log() *slog.Logger {
 	if u.l != nil {
 		return u.l
 	}
+
 	return slog.With(slog.String("component", "archive-supervisor"))
 }
 
+// Run schedules archive maintenance jobs until ctx is cancelled.
+//
+// The queue is intentionally single-worker. upload and retain jobs must not run
+// at the same time because both can inspect or mutate WAL archive state.
+//
+// SubmitUnique is used so slow periodic jobs do not pile up behind themselves.
+// For example, if an upload takes longer than one upload interval, the next
+// upload tick is dropped instead of queueing stale duplicate upload work.
 func (u *ArchiveSupervisor) Run(ctx context.Context, queue *jobq.JobQueue) {
 	if queue == nil {
 		u.log().Error("job queue is nil")
@@ -86,7 +94,7 @@ func (u *ArchiveSupervisor) Run(ctx context.Context, queue *jobq.JobQueue) {
 			return
 
 		case <-uploadTicker.C:
-			if err := queue.Submit("upload", func(ctx context.Context) {
+			if err := queue.SubmitUnique("upload", func(ctx context.Context) {
 				u.log().Debug("upload worker is running")
 				defer u.log().Debug("upload worker is done")
 
@@ -98,7 +106,7 @@ func (u *ArchiveSupervisor) Run(ctx context.Context, queue *jobq.JobQueue) {
 			}
 
 		case <-retentionC:
-			if err := queue.Submit("retain", func(ctx context.Context) {
+			if err := queue.SubmitUnique("retain", func(ctx context.Context) {
 				u.log().Debug("retention worker is running")
 				defer u.log().Debug("retention worker is done")
 
@@ -111,67 +119,3 @@ func (u *ArchiveSupervisor) Run(ctx context.Context, queue *jobq.JobQueue) {
 		}
 	}
 }
-
-// func (u *ArchiveSupervisor) RunUploader(ctx context.Context, queue *jobq.JobQueue) {
-// 	ticker := time.NewTicker(u.cfg.Receiver.Uploader.SyncIntervalParsed)
-// 	defer ticker.Stop()
-//
-// 	for {
-// 		select {
-// 		case <-ctx.Done():
-// 			u.log().Info("context is done, exiting...")
-// 			return
-// 		case <-ticker.C:
-// 			err := queue.Submit("upload", func(ctx context.Context) {
-// 				u.log().Debug("upload worker is running")
-// 				err := u.performUploads(ctx)
-// 				if err != nil {
-// 					u.log().Error("error upload files", slog.Any("err", err))
-// 				}
-// 				u.log().Debug("upload worker is done")
-// 			})
-// 			if err != nil {
-// 				u.log().Error("error submit upload files job", slog.Any("err", err))
-// 			}
-// 		}
-// 	}
-// }
-//
-// func (u *ArchiveSupervisor) RunWithRetention(ctx context.Context, queue *jobq.JobQueue) {
-// 	uploadTicker := time.NewTicker(u.cfg.Receiver.Uploader.SyncIntervalParsed)
-// 	retentionTicker := time.NewTicker(u.cfg.Receiver.Retention.SyncIntervalParsed)
-// 	defer uploadTicker.Stop()
-// 	defer retentionTicker.Stop()
-//
-// 	for {
-// 		select {
-// 		case <-ctx.Done():
-// 			u.log().Info("context is done, exiting...")
-// 			return
-// 		case <-uploadTicker.C:
-// 			err := queue.Submit("upload", func(ctx context.Context) {
-// 				u.log().Debug("upload worker is running")
-// 				err := u.performUploads(ctx)
-// 				if err != nil {
-// 					u.log().Error("error upload files", slog.Any("err", err))
-// 				}
-// 				u.log().Debug("upload worker is done")
-// 			})
-// 			if err != nil {
-// 				u.log().Error("error submit upload files job", slog.Any("err", err))
-// 			}
-// 		case <-retentionTicker.C:
-// 			err := queue.Submit("retain", func(ctx context.Context) {
-// 				u.log().Debug("retention worker is running")
-// 				err := u.performRetention(ctx, u.cfg.Receiver.Retention.KeepPeriodParsed)
-// 				if err != nil {
-// 					u.log().Error("error retain files", slog.Any("err", err))
-// 				}
-// 				u.log().Debug("retention worker is done")
-// 			})
-// 			if err != nil {
-// 				u.log().Error("error submit retain files job", slog.Any("err", err))
-// 			}
-// 		}
-// 	}
-// }
