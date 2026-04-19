@@ -3,495 +3,878 @@ package supervisor
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-// helpers
-
-var noopLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-
-// blockUntilCancelled is a task that blocks until its context is cancelled.
-func blockUntilCancelled(ctx context.Context) error {
-	<-ctx.Done()
-	return nil
+func newTestSupervisor() *Supervisor {
+	return New(slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
-// taskThatErrors returns an error immediately.
-func taskThatErrors(err error) Task {
-	return func(_ context.Context) error { return err }
-}
+func TestRegisterValidation(t *testing.T) {
+	t.Parallel()
 
-// taskThatPanics panics immediately.
-func taskThatPanics(msg string) Task {
-	return func(_ context.Context) error { panic(msg) }
-}
+	sup := newTestSupervisor()
 
-// taskThatSignals closes done when started, then blocks until ctx is done.
-func taskThatSignals(done chan<- struct{}) Task {
-	return func(ctx context.Context) error {
-		close(done)
-		<-ctx.Done()
-		return nil
+	err := sup.Register("", func(context.Context) error { return nil })
+	if !errors.Is(err, ErrEmptyTaskName) {
+		t.Fatalf("expected ErrEmptyTaskName, got %v", err)
+	}
+
+	err = sup.Register("worker", nil)
+	if !errors.Is(err, ErrNilTask) {
+		t.Fatalf("expected ErrNilTask, got %v", err)
+	}
+
+	err = sup.Register("worker", func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	err = sup.Register("worker", func(context.Context) error { return nil })
+	if !errors.Is(err, ErrDuplicateTaskName) {
+		t.Fatalf("expected ErrDuplicateTaskName, got %v", err)
 	}
 }
 
-// shortTimeout returns a context that times out after 2 s (safety net for tests).
-func shortTimeout(t *testing.T) context.Context {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	t.Cleanup(cancel)
-	return ctx
+func TestRegisterCriticalValidation(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	err := sup.RegisterCritical("", func(context.Context) error { return nil })
+	if !errors.Is(err, ErrEmptyTaskName) {
+		t.Fatalf("expected ErrEmptyTaskName, got %v", err)
+	}
+
+	err = sup.RegisterCritical("critical", nil)
+	if !errors.Is(err, ErrNilTask) {
+		t.Fatalf("expected ErrNilTask, got %v", err)
+	}
+
+	err = sup.RegisterCritical("critical", func(context.Context) error { return nil })
+	if err != nil {
+		t.Fatalf("register critical: %v", err)
+	}
+
+	err = sup.RegisterCritical("critical", func(context.Context) error { return nil })
+	if !errors.Is(err, ErrDuplicateTaskName) {
+		t.Fatalf("expected ErrDuplicateTaskName, got %v", err)
+	}
 }
 
-// basic lifecycle
+func TestRegisterAfterStartIsRejected(t *testing.T) {
+	t.Parallel()
 
-func TestStart_RunsAllTasks(t *testing.T) {
-	var count atomic.Int32
-	sup := New(noopLogger)
+	sup := newTestSupervisor()
 
-	for i := 0; i < 3; i++ {
-		name := string(rune('a' + i))
-		sup.Register(name, func(ctx context.Context) error {
-			count.Add(1)
+	err := sup.Register("worker", func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	err = sup.Register("late-worker", func(context.Context) error { return nil })
+	if !errors.Is(err, ErrRegistrationClosed) {
+		t.Fatalf("expected ErrRegistrationClosed, got %v", err)
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+}
+
+func TestStartValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil context", func(t *testing.T) {
+		t.Parallel()
+
+		sup := newTestSupervisor()
+
+		//nolint:staticcheck
+		err := sup.Start(nil)
+		if !errors.Is(err, ErrNilContext) {
+			t.Fatalf("expected ErrNilContext, got %v", err)
+		}
+	})
+
+	t.Run("no tasks", func(t *testing.T) {
+		t.Parallel()
+
+		sup := newTestSupervisor()
+
+		err := sup.Start(context.Background())
+		if !errors.Is(err, ErrNoTasks) {
+			t.Fatalf("expected ErrNoTasks, got %v", err)
+		}
+	})
+
+	t.Run("already running", func(t *testing.T) {
+		t.Parallel()
+
+		sup := newTestSupervisor()
+
+		err := sup.Register("worker", func(ctx context.Context) error {
 			<-ctx.Done()
-			return nil
+			return ctx.Err()
 		})
-	}
+		if err != nil {
+			t.Fatalf("register: %v", err)
+		}
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
+		err = sup.Start(context.Background())
+		if err != nil {
+			t.Fatalf("start: %v", err)
+		}
 
-	// Give goroutines a moment to start.
-	time.Sleep(20 * time.Millisecond)
-	if got := count.Load(); got != 3 {
-		t.Fatalf("expected 3 tasks running, got %d", got)
-	}
+		err = sup.Start(context.Background())
+		if !errors.Is(err, ErrAlreadyRunning) {
+			t.Fatalf("expected ErrAlreadyRunning, got %v", err)
+		}
 
-	sup.Stop()
+		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		err = sup.Stop(stopCtx)
+		if err != nil {
+			t.Fatalf("stop: %v", err)
+		}
+	})
 }
 
-func TestStop_WaitsForAllTasks(t *testing.T) {
-	done := make(chan struct{}, 3)
-	sup := New(noopLogger)
+func TestStopBeforeStartIsNoop(t *testing.T) {
+	t.Parallel()
 
-	for _, name := range []string{"a", "b", "c"} {
-		name := name
-		sup.Register(name, func(ctx context.Context) error {
+	sup := newTestSupervisor()
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err := sup.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("stop before start should be nil, got %v", err)
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running")
+	}
+}
+
+func TestWaitBeforeStartIsNoop(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err := sup.Wait(waitCtx)
+	if err != nil {
+		t.Fatalf("wait before start should be nil, got %v", err)
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running")
+	}
+}
+
+func TestStopNilContext(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	//nolint:staticcheck
+	err := sup.Stop(nil)
+	if !errors.Is(err, ErrNilContext) {
+		t.Fatalf("expected ErrNilContext, got %v", err)
+	}
+}
+
+func TestWaitNilContext(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	//nolint:staticcheck
+	err := sup.Wait(nil)
+	if !errors.Is(err, ErrNilContext) {
+		t.Fatalf("expected ErrNilContext, got %v", err)
+	}
+}
+
+func TestRestartNilContext(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	//nolint:staticcheck
+	err := sup.Restart(nil, context.Background())
+	if !errors.Is(err, ErrNilContext) {
+		t.Fatalf("expected ErrNilContext, got %v", err)
+	}
+
+	err = sup.Restart(context.Background(), nil)
+	if !errors.Is(err, ErrNilContext) {
+		t.Fatalf("expected ErrNilContext, got %v", err)
+	}
+}
+
+func TestStartStopCooperativeTasks(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	const taskCount = 5
+
+	var started atomic.Int32
+	var stopped atomic.Int32
+
+	for i := 0; i < taskCount; i++ {
+		name := fmt.Sprintf("worker-%d", i)
+
+		err := sup.Register(name, func(ctx context.Context) error {
+			started.Add(1)
 			<-ctx.Done()
-			time.Sleep(10 * time.Millisecond) // simulate cleanup
-			done <- struct{}{}
-			return nil
+			stopped.Add(1)
+			return ctx.Err()
 		})
+		if err != nil {
+			t.Fatalf("register: %v", err)
+		}
 	}
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	sup.Stop()
+	err := sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
 
-	if len(done) != 3 {
-		t.Fatalf("Stop returned before all tasks finished; got %d/3 done", len(done))
+	waitUntil(t, time.Second, func() bool {
+		return started.Load() == taskCount
+	})
+
+	if !sup.Running() {
+		t.Fatal("supervisor should be running")
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	if started.Load() != taskCount {
+		t.Fatalf("started = %d, want %d", started.Load(), taskCount)
+	}
+
+	if stopped.Load() != taskCount {
+		t.Fatalf("stopped = %d, want %d", stopped.Load(), taskCount)
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running after Stop")
 	}
 }
 
-func TestStop_BeforeStart_IsNoop(_ *testing.T) {
-	sup := New(noopLogger)
-	// Should not panic or block.
-	sup.Stop()
-}
+func TestWaitForNaturalTaskExit(t *testing.T) {
+	t.Parallel()
 
-func TestStart_IsIdempotent(t *testing.T) {
-	var count atomic.Int32
-	sup := New(noopLogger)
-	sup.Register("a", func(ctx context.Context) error {
-		count.Add(1)
-		<-ctx.Done()
+	sup := newTestSupervisor()
+
+	var ran atomic.Bool
+
+	err := sup.Register("short-task", func(context.Context) error {
+		ran.Store(true)
 		return nil
 	})
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	sup.Start(ctx) // second call must be a no-op
-	sup.Start(ctx) // third call must be a no-op
-
-	time.Sleep(20 * time.Millisecond)
-	if got := count.Load(); got != 1 {
-		t.Fatalf("expected 1 task started, got %d (Start is not idempotent)", got)
+	if err != nil {
+		t.Fatalf("register: %v", err)
 	}
-	sup.Stop()
+
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Wait(waitCtx)
+	if err != nil {
+		t.Fatalf("wait: %v", err)
+	}
+
+	if !ran.Load() {
+		t.Fatal("task did not run")
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running after natural exit")
+	}
 }
 
-// critical tasks
+func TestNonCriticalErrorDoesNotCancelOtherTasks(t *testing.T) {
+	t.Parallel()
 
-func TestCriticalTask_ErrorCancelsOthers(t *testing.T) {
-	sup := New(noopLogger)
+	sup := newTestSupervisor()
 
-	criticalErr := errors.New("critical failure")
-	criticalStarted := make(chan struct{})
+	taskErr := errors.New("temporary failure")
 
-	// critical task: signals it started, then returns an error
-	sup.RegisterCritical("critical", func(_ context.Context) error {
-		close(criticalStarted)
-		return criticalErr
+	failedDone := make(chan struct{})
+	workerCanceled := make(chan struct{})
+
+	err := sup.Register("non-critical-failing-task", func(context.Context) error {
+		close(failedDone)
+		return taskErr
 	})
+	if err != nil {
+		t.Fatalf("register failing task: %v", err)
+	}
 
-	// companion task: blocks until its context is cancelled
-	companionDone := make(chan struct{})
-	sup.Register("companion", func(ctx context.Context) error {
+	err = sup.Register("worker", func(ctx context.Context) error {
 		<-ctx.Done()
-		close(companionDone)
-		return nil
+		close(workerCanceled)
+		return ctx.Err()
 	})
+	if err != nil {
+		t.Fatalf("register worker: %v", err)
+	}
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
 
 	select {
-	case <-companionDone:
-		// good — companion was cancelled because critical task failed
-	case <-ctx.Done():
-		t.Fatal("timed out: companion task was not cancelled after critical task error")
+	case <-failedDone:
+	case <-time.After(time.Second):
+		t.Fatal("failing task did not finish")
 	}
-
-	sup.Stop()
-
-	results := sup.Results()
-	for _, r := range results {
-		if r.Name == "critical" && !errors.Is(r.Err, criticalErr) {
-			t.Errorf("expected critical task err=%v, got %v", criticalErr, r.Err)
-		}
-	}
-}
-
-func TestCriticalTask_PanicCancelsOthers(t *testing.T) {
-	sup := New(noopLogger)
-
-	sup.RegisterCritical("critical", taskThatPanics("boom"))
-
-	companionDone := make(chan struct{})
-	sup.Register("companion", func(ctx context.Context) error {
-		<-ctx.Done()
-		close(companionDone)
-		return nil
-	})
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
 
 	select {
-	case <-companionDone:
-		// good
-	case <-ctx.Done():
-		t.Fatal("timed out: companion was not cancelled after critical panic")
+	case <-workerCanceled:
+		t.Fatal("non-critical task error canceled other worker")
+	case <-time.After(50 * time.Millisecond):
 	}
 
-	sup.Stop()
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	results := sup.Results()
-	for _, r := range results {
-		if r.Name == "critical" {
-			if !r.Panicked {
-				t.Error("expected Panicked=true for critical task")
-			}
-			if r.Panic != "boom" {
-				t.Errorf("expected panic value 'boom', got %v", r.Panic)
-			}
-		}
+	err = sup.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("stop: %v", err)
 	}
 }
 
-func TestNonCriticalTask_ErrorDoesNotCancelOthers(t *testing.T) {
-	sup := New(noopLogger)
+func TestCriticalErrorCancelsOtherTasks(t *testing.T) {
+	t.Parallel()
 
-	sup.Register("failing", taskThatErrors(errors.New("non-critical error")))
+	sup := newTestSupervisor()
 
-	companionRunning := make(chan struct{})
-	sup.Register("companion", taskThatSignals(companionRunning))
+	taskErr := errors.New("critical failure")
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
+	workerStarted := make(chan struct{})
+	workerCanceled := make(chan struct{})
 
-	// companion must still be running after the failing task exits
-	select {
-	case <-companionRunning:
-		// good — companion started and is still blocked
-	case <-ctx.Done():
-		t.Fatal("timed out waiting for companion to start")
+	err := sup.Register("worker", func(ctx context.Context) error {
+		close(workerStarted)
+		<-ctx.Done()
+		close(workerCanceled)
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register worker: %v", err)
 	}
 
-	// Give the failing task time to exit and confirm companion is still alive.
-	time.Sleep(30 * time.Millisecond)
-	if sup.RunningCount() < 1 {
-		t.Error("companion task should still be running")
+	err = sup.RegisterCritical("critical", func(context.Context) error {
+		<-workerStarted
+		return taskErr
+	})
+	if err != nil {
+		t.Fatalf("register critical: %v", err)
 	}
 
-	sup.Stop()
-}
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
 
-func TestNonCriticalTask_PanicDoesNotCancelOthers(t *testing.T) {
-	sup := New(noopLogger)
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	sup.Register("panicking", taskThatPanics("non-critical panic"))
-
-	companionRunning := make(chan struct{})
-	sup.Register("companion", taskThatSignals(companionRunning))
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
+	err = sup.Wait(waitCtx)
+	if err != nil {
+		t.Fatalf("wait: %v", err)
+	}
 
 	select {
-	case <-companionRunning:
-	case <-ctx.Done():
-		t.Fatal("timed out waiting for companion to start")
+	case <-workerCanceled:
+	default:
+		t.Fatal("worker was not canceled by critical task failure")
 	}
 
-	time.Sleep(30 * time.Millisecond)
-	if sup.RunningCount() < 1 {
-		t.Error("companion task should still be running after non-critical panic")
-	}
-
-	sup.Stop()
-}
-
-// context cancellation
-
-func TestParentContextCancellation_StopsAll(t *testing.T) {
-	sup := New(noopLogger)
-
-	done := make(chan struct{}, 2)
-	for _, name := range []string{"a", "b"} {
-		name := name
-		sup.Register(name, func(ctx context.Context) error {
-			<-ctx.Done()
-			done <- struct{}{}
-			return nil
-		})
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	sup.Start(ctx)
-
-	time.Sleep(20 * time.Millisecond)
-	cancel() // cancel the parent
-	sup.Wait()
-
-	if len(done) != 2 {
-		t.Fatalf("expected 2 tasks to stop, got %d", len(done))
+	if sup.Running() {
+		t.Fatal("supervisor should not be running after critical failure")
 	}
 }
 
-// results
+func TestCriticalContextCanceledDoesNotCauseExtraProblems(t *testing.T) {
+	t.Parallel()
 
-func TestResults_CleanExit(t *testing.T) {
-	sup := New(noopLogger)
-	sup.Register("quick", func(_ context.Context) error { return nil })
+	sup := newTestSupervisor()
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	sup.Wait()
-
-	results := sup.Results()
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
-	r := results[0]
-	if r.Name != "quick" {
-		t.Errorf("expected name 'quick', got %q", r.Name)
-	}
-	if r.Err != nil {
-		t.Errorf("expected nil error, got %v", r.Err)
-	}
-	if r.Panicked {
-		t.Error("expected Panicked=false")
-	}
-}
-
-func TestResults_ErrorRecorded(t *testing.T) {
-	sup := New(noopLogger)
-	sentinel := errors.New("sentinel")
-	sup.Register("err-task", taskThatErrors(sentinel))
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	sup.Wait()
-
-	results := sup.Results()
-	if !errors.Is(results[0].Err, sentinel) {
-		t.Errorf("expected sentinel error, got %v", results[0].Err)
-	}
-}
-
-func TestResults_PanicRecorded(t *testing.T) {
-	sup := New(noopLogger)
-	sup.Register("panic-task", taskThatPanics("oops"))
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	sup.Wait()
-
-	results := sup.Results()
-	r := results[0]
-	if !r.Panicked {
-		t.Error("expected Panicked=true")
-	}
-	if r.Panic != "oops" {
-		t.Errorf("expected panic value 'oops', got %v", r.Panic)
-	}
-	if r.Err == nil {
-		t.Error("expected non-nil Err wrapping the panic")
-	}
-}
-
-func TestResults_ContextCancelledIsNotAnError(t *testing.T) {
-	sup := New(noopLogger)
-	sup.Register("ctx-task", blockUntilCancelled)
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	sup.Stop()
-
-	results := sup.Results()
-	// task returns nil after ctx cancel, so Err must be nil
-	if results[0].Err != nil {
-		t.Errorf("expected nil Err for clean ctx-cancelled task, got %v", results[0].Err)
-	}
-}
-
-// RunningCount
-
-func TestRunningCount(t *testing.T) {
-	sup := New(noopLogger)
-
-	ready := make(chan struct{})
-	sup.Register("long", func(ctx context.Context) error {
-		close(ready)
+	err := sup.RegisterCritical("critical", func(ctx context.Context) error {
 		<-ctx.Done()
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register critical: %v", err)
+	}
+
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running")
+	}
+}
+
+func TestPanicIsRecoveredForNonCriticalTask(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	panicTaskDone := make(chan struct{})
+	workerCanceled := make(chan struct{})
+
+	err := sup.Register("panic-task", func(context.Context) error {
+		defer close(panicTaskDone)
+		panic("boom")
+	})
+	if err != nil {
+		t.Fatalf("register panic task: %v", err)
+	}
+
+	err = sup.Register("worker", func(ctx context.Context) error {
+		<-ctx.Done()
+		close(workerCanceled)
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register worker: %v", err)
+	}
+
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	select {
+	case <-panicTaskDone:
+	case <-time.After(time.Second):
+		t.Fatal("panic task did not finish")
+	}
+
+	select {
+	case <-workerCanceled:
+		t.Fatal("non-critical panic canceled worker")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+}
+
+func TestPanicIsRecoveredForCriticalTaskAndCancelsOthers(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	workerStarted := make(chan struct{})
+	workerCanceled := make(chan struct{})
+
+	err := sup.Register("worker", func(ctx context.Context) error {
+		close(workerStarted)
+		<-ctx.Done()
+		close(workerCanceled)
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register worker: %v", err)
+	}
+
+	err = sup.RegisterCritical("panic-task", func(context.Context) error {
+		<-workerStarted
+		panic("boom")
+	})
+	if err != nil {
+		t.Fatalf("register panic task: %v", err)
+	}
+
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Wait(waitCtx)
+	if err != nil {
+		t.Fatalf("wait: %v", err)
+	}
+
+	select {
+	case <-workerCanceled:
+	default:
+		t.Fatal("worker was not canceled by critical panic")
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running")
+	}
+}
+
+func TestStopTimeoutWhenTaskIgnoresContext(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	release := make(chan struct{})
+
+	err := sup.Register("bad-worker", func(context.Context) error {
+		<-release
 		return nil
 	})
-	sup.Register("quick", func(_ context.Context) error { return nil })
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-
-	<-ready // long task has started
-
-	time.Sleep(20 * time.Millisecond) // quick task has likely finished
-
-	if c := sup.RunningCount(); c > 2 {
-		t.Errorf("RunningCount %d > 2 (impossible)", c)
+	if err != nil {
+		t.Fatalf("register: %v", err)
 	}
 
-	sup.Stop()
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
 
-	if c := sup.RunningCount(); c != 0 {
-		t.Errorf("expected RunningCount=0 after Stop, got %d", c)
+	stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+
+	err = sup.Stop(stopCtx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context deadline exceeded, got %v", err)
+	}
+
+	if !sup.Running() {
+		t.Fatal("supervisor should still be running after Stop timeout")
+	}
+
+	close(release)
+
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second)
+	defer cleanupCancel()
+
+	err = sup.Stop(cleanupCtx)
+	if err != nil {
+		t.Fatalf("cleanup stop: %v", err)
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running after cleanup stop")
 	}
 }
 
-// Restart
+func TestRestartStopsAndStartsAgain(t *testing.T) {
+	t.Parallel()
 
-func TestRestart_TasksRunTwice(t *testing.T) {
-	var count atomic.Int32
-	sup := New(noopLogger)
-	sup.Register("counter", func(ctx context.Context) error {
-		count.Add(1)
+	sup := newTestSupervisor()
+
+	var starts atomic.Int32
+
+	err := sup.Register("worker", func(ctx context.Context) error {
+		starts.Add(1)
 		<-ctx.Done()
-		return nil
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	waitUntil(t, time.Second, func() bool {
+		return starts.Load() == 1
 	})
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	time.Sleep(20 * time.Millisecond)
-	sup.Restart(ctx)
-	time.Sleep(20 * time.Millisecond)
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
-	if got := count.Load(); got != 2 {
-		t.Fatalf("expected task to run 2 times after Restart, got %d", got)
+	err = sup.Restart(stopCtx, context.Background())
+	if err != nil {
+		t.Fatalf("restart: %v", err)
 	}
-	sup.Stop()
+
+	waitUntil(t, time.Second, func() bool {
+		return starts.Load() == 2
+	})
+
+	if !sup.Running() {
+		t.Fatal("supervisor should be running after Restart")
+	}
+
+	finalStopCtx, finalCancel := context.WithTimeout(context.Background(), time.Second)
+	defer finalCancel()
+
+	err = sup.Stop(finalStopCtx)
+	if err != nil {
+		t.Fatalf("final stop: %v", err)
+	}
 }
 
-// registration guards
+func TestRestartBeforeStartStartsTasks(t *testing.T) {
+	t.Parallel()
 
-func TestRegister_AfterStart_Panics(t *testing.T) {
-	sup := New(noopLogger)
-	sup.Register("a", blockUntilCancelled)
+	sup := newTestSupervisor()
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	defer sup.Stop()
+	var ran atomic.Bool
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic when registering after Start")
-		}
-	}()
-	sup.Register("b", blockUntilCancelled)
+	err := sup.Register("worker", func(ctx context.Context) error {
+		ran.Store(true)
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Restart(stopCtx, context.Background())
+	if err != nil {
+		t.Fatalf("restart before start: %v", err)
+	}
+
+	waitUntil(t, time.Second, ran.Load)
+
+	if !sup.Running() {
+		t.Fatal("supervisor should be running")
+	}
+
+	finalStopCtx, finalCancel := context.WithTimeout(context.Background(), time.Second)
+	defer finalCancel()
+
+	err = sup.Stop(finalStopCtx)
+	if err != nil {
+		t.Fatalf("final stop: %v", err)
+	}
 }
 
-func TestRegister_EmptyName_Panics(t *testing.T) {
-	sup := New(noopLogger)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for empty task name")
-		}
-	}()
-	sup.Register("", blockUntilCancelled)
-}
+func TestConcurrentStopCallsAreSafe(t *testing.T) {
+	t.Parallel()
 
-func TestRegister_NilFn_Panics(t *testing.T) {
-	sup := New(noopLogger)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for nil task function")
-		}
-	}()
-	sup.Register("a", nil)
-}
+	sup := newTestSupervisor()
 
-func TestRegister_DuplicateName_Panics(t *testing.T) {
-	sup := New(noopLogger)
-	sup.Register("a", blockUntilCancelled)
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for duplicate task name")
-		}
-	}()
-	sup.Register("a", blockUntilCancelled)
-}
+	err := sup.Register("worker", func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
 
-// nil logger
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
 
-func TestNew_NilLogger_UsesDefault(t *testing.T) {
-	sup := New(nil) // must not panic
-	sup.Register("a", func(_ context.Context) error { return nil })
+	var wg sync.WaitGroup
+	errs := make(chan error, 16)
 
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-	sup.Wait()
-}
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
 
-// concurrent Stop calls
-
-func TestStop_Concurrent_IsRaceFree(t *testing.T) {
-	sup := New(noopLogger)
-	sup.Register("a", blockUntilCancelled)
-
-	ctx := shortTimeout(t)
-	sup.Start(ctx)
-
-	// Fire multiple Stop() calls concurrently; should not race or panic.
-	var wg2 sync.WaitGroup // local wg, not the supervisor's
-	for i := 0; i < 10; i++ {
-		wg2.Add(1)
 		go func() {
-			defer wg2.Done()
-			sup.Stop()
+			defer wg.Done()
+
+			stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			errs <- sup.Stop(stopCtx)
 		}()
 	}
-	wg2.Wait()
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("stop returned error: %v", err)
+		}
+	}
+
+	if sup.Running() {
+		t.Fatal("supervisor should not be running")
+	}
+}
+
+func TestConcurrentStartCallsOnlyOneSucceeds(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	err := sup.Register("worker", func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 16)
+
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			errs <- sup.Start(context.Background())
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	var success int
+	var alreadyRunning int
+
+	for err := range errs {
+		switch {
+		case err == nil:
+			success++
+		case errors.Is(err, ErrAlreadyRunning):
+			alreadyRunning++
+		default:
+			t.Fatalf("unexpected start error: %v", err)
+		}
+	}
+
+	if success != 1 {
+		t.Fatalf("successful starts = %d, want 1", success)
+	}
+
+	if alreadyRunning != 15 {
+		t.Fatalf("ErrAlreadyRunning count = %d, want 15", alreadyRunning)
+	}
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Stop(stopCtx)
+	if err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+}
+
+func TestConcurrentRunningCallsAreSafe(t *testing.T) {
+	t.Parallel()
+
+	sup := newTestSupervisor()
+
+	release := make(chan struct{})
+
+	err := sup.Register("worker", func(ctx context.Context) error {
+		select {
+		case <-release:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	err = sup.Start(context.Background())
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for j := 0; j < 1000; j++ {
+				_ = sup.Running()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	close(release)
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err = sup.Wait(waitCtx)
+	if err != nil {
+		t.Fatalf("wait: %v", err)
+	}
+}
+
+//nolint:unparam
+func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	t.Fatal("condition was not met before timeout")
 }

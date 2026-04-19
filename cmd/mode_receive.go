@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/pgrwl/pgrwl/internal/opt/shared/supervisor"
 
@@ -75,21 +76,36 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 
 	// HTTP server runs for the lifetime of the process.
 	httpSup := supervisor.New(loggr)
-	httpSup.RegisterCritical("http-server", func(ctx context.Context) error {
+	if err := httpSup.RegisterCritical("http-server", func(ctx context.Context) error {
 		return shared.NewHTTPSrv(opts.ListenPort, topMux).Run(ctx)
-	})
-	httpSup.Start(ctx)
+	}); err != nil {
+		//nolint:gocritic
+		log.Fatal(err)
+	}
+	if err := httpSup.Start(ctx); err != nil {
+		log.Fatal(err)
+	}
 
 	// Default mode is receive.
 	if err := mgr.Switch(config.ModeReceive); err != nil {
-		//nolint:gocritic
 		log.Fatal(err)
 	}
 
 	<-ctx.Done()
 	loggr.Info("shutting down...")
-	mgr.Stop()
-	httpSup.Stop()
+
+	managerStopCtx, managerCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer managerCancel()
+	if err := mgr.Stop(managerStopCtx); err != nil {
+		loggr.Error("failed to stop mode manager", slog.Any("err", err))
+	}
+
+	httpStopCtx, httpCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer httpCancel()
+	if err := httpSup.Stop(httpStopCtx); err != nil {
+		loggr.Error("failed to stop http supervisor", slog.Any("err", err))
+	}
+
 	loggr.Info("all components shut down cleanly")
 }
 

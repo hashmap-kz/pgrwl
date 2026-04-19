@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
-
-	"github.com/pgrwl/pgrwl/internal/opt/shared/supervisor"
+	"time"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
@@ -16,8 +15,11 @@ import (
 	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
 	serveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/servemode"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/supervisor"
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesuperv"
 )
+
+const defaultModeStopTimeout = 30 * time.Second
 
 // ManagerOpts holds static configuration that does not change between mode switches.
 // No PGRW here — it is initialised on demand only when entering receive mode.
@@ -42,7 +44,7 @@ type Manager struct {
 	initServeStorage   func() *st.VariadicStorage
 	initPgrw           func() xlog.PgReceiveWal
 
-	mu      sync.Mutex // serialises Switch calls
+	mu      sync.Mutex // serialises Switch/Stop calls
 	sup     *supervisor.Supervisor
 	current atomic.Value // string: config.ModeReceive | config.ModeServe | ""
 }
@@ -77,101 +79,174 @@ func NewManager(
 // CurrentMode returns the name of the active mode ("receive", "serve", or "").
 func (m *Manager) CurrentMode() string {
 	//nolint:errcheck
-	return m.current.Load().(string)
+	mode, _ := m.current.Load().(string)
+	return mode
 }
 
 // Switch transitions to mode. Safe to call concurrently; calls are serialised.
+//
+// It uses a default timeout while stopping the previously running mode. This is
+// important because a bad task that ignores ctx.Done() must not hang the HTTP
+// mode-switch request forever.
 func (m *Manager) Switch(mode string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultModeStopTimeout)
+	defer cancel()
+
+	return m.SwitchContext(ctx, mode)
+}
+
+// SwitchContext transitions to mode using ctx as the stop-wait context for the
+// currently running supervisor.
+func (m *Manager) SwitchContext(ctx context.Context, mode string) error {
+	if ctx == nil {
+		return supervisor.ErrNilContext
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	//nolint:errcheck
-	if m.current.Load().(string) == mode {
+	if mode != config.ModeReceive && mode != config.ModeServe {
+		return fmt.Errorf("unknown mode: %s", mode)
+	}
+
+	current := m.CurrentMode()
+	if current == mode {
 		return fmt.Errorf("already in %s mode", mode)
 	}
 
 	m.loggr.Info("switching mode",
-		//nolint:errcheck
-		slog.String("from", m.current.Load().(string)),
+		slog.String("from", current),
 		slog.String("to", mode),
 	)
 
-	// Stop the running supervisor before starting the next one.
-	if m.sup != nil {
-		m.loggr.Info("stopping current supervisor")
-		m.sup.Stop()
-		m.sup = nil
+	if err := m.stopLocked(ctx); err != nil {
+		return fmt.Errorf("stop current supervisor: %w", err)
 	}
-
-	sup := supervisor.New(m.loggr)
 
 	switch mode {
 	case config.ModeReceive:
-		pgrw := m.initPgrw()
-		stor := m.initReceiveStorage(pgrw)
-		jobQueue := m.registerReceiveTasks(sup, pgrw, stor)
-		m.router.SwapHandler(m.buildReceiveHandler(pgrw, stor, jobQueue))
+		if err := m.switchToReceiveLocked(); err != nil {
+			return err
+		}
 
 	case config.ModeServe:
-		stor := m.initServeStorage()
-		// Serve mode has no background tasks beyond the HTTP handler swap.
-		m.router.SwapHandler(m.buildServeHandler(stor))
-
-	default:
-		return fmt.Errorf("unknown mode: %s", mode)
+		m.switchToServeLocked()
 	}
 
-	m.sup = sup
 	m.current.Store(mode)
-	sup.Start(m.appCtx)
 
 	m.loggr.Info("mode switched", slog.String("mode", mode))
 	return nil
 }
 
 // Stop shuts down whichever supervisor is currently running.
-func (m *Manager) Stop() {
+func (m *Manager) Stop(ctx context.Context) error {
+	if ctx == nil {
+		return supervisor.ErrNilContext
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.sup != nil {
-		m.sup.Stop()
-		m.sup = nil
-	}
+
+	return m.stopLocked(ctx)
 }
 
-// private
+func (m *Manager) stopLocked(ctx context.Context) error {
+	if m.sup == nil {
+		m.current.Store("")
+		return nil
+	}
 
-func (m *Manager) registerReceiveTasks(sup *supervisor.Supervisor, pgrw xlog.PgReceiveWal, stor *st.VariadicStorage) *jobq.JobQueue {
+	m.loggr.Info("stopping current supervisor")
+
+	if err := m.sup.Stop(ctx); err != nil {
+		return err
+	}
+
+	m.sup = nil
+	m.current.Store("")
+
+	return nil
+}
+
+func (m *Manager) switchToReceiveLocked() error {
+	sup := supervisor.New(m.loggr)
+
+	pgrw := m.initPgrw()
+	stor := m.initReceiveStorage(pgrw)
+
+	jobQueue, err := m.registerReceiveTasks(sup, pgrw, stor)
+	if err != nil {
+		return fmt.Errorf("register receive tasks: %w", err)
+	}
+
+	if err := sup.Start(m.appCtx); err != nil {
+		return fmt.Errorf("start receive supervisor: %w", err)
+	}
+
+	m.sup = sup
+	m.router.SwapHandler(m.buildReceiveHandler(pgrw, stor, jobQueue))
+
+	return nil
+}
+
+func (m *Manager) switchToServeLocked() {
+	stor := m.initServeStorage()
+
+	// Serve mode has no background tasks. Do not create or start an empty
+	// supervisor, because Supervisor.Start would correctly return ErrNoTasks.
+	m.sup = nil
+	m.router.SwapHandler(m.buildServeHandler(stor))
+}
+
+func (m *Manager) registerReceiveTasks(
+	sup *supervisor.Supervisor,
+	pgrw xlog.PgReceiveWal,
+	stor *st.VariadicStorage,
+) (*jobq.JobQueue, error) {
 	cfg := m.cfg
 	opts := m.opts
 
 	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(m.appCtx)
+
+	// The job queue belongs to receive mode and must stop when receive mode
+	// stops. Do not start it with m.appCtx, otherwise it can survive a
+	// receive -> serve switch.
+	if err := sup.Register("job-queue", func(ctx context.Context) error {
+		jobQueue.Run(ctx)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
 
 	// Critical: WAL receiver failure must stop all receive-mode tasks.
-	sup.RegisterCritical("wal-receiver", func(ctx context.Context) error {
+	if err := sup.RegisterCritical("wal-receiver", func(ctx context.Context) error {
 		return pgrw.Run(ctx)
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	if stor != nil {
-		sup.Register("wal-supervisor", func(ctx context.Context) error {
+		if err := sup.Register("wal-supervisor", func(ctx context.Context) error {
 			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
-			if cfg.Receiver.Retention.Enable {
-				u.RunWithRetention(ctx, jobQueue)
-			} else {
-				u.RunUploader(ctx, jobQueue)
-			}
+			u.Run(ctx, jobQueue)
 			return nil
-		})
+		}); err != nil {
+			return nil, err
+		}
 	}
 
-	return jobQueue
+	return jobQueue, nil
 }
 
-func (m *Manager) buildReceiveHandler(pgrw xlog.PgReceiveWal, stor *st.VariadicStorage, jobQueue *jobq.JobQueue) http.Handler {
+func (m *Manager) buildReceiveHandler(
+	pgrw xlog.PgReceiveWal,
+	stor *st.VariadicStorage,
+	jobQueue *jobq.JobQueue,
+) http.Handler {
 	return receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
 		PGRW:     pgrw,
 		BaseDir:  m.opts.ReceiveDirectory,
