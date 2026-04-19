@@ -73,8 +73,7 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 	// get necessary info
 	conn, err := retry.Do(ctx, retry.Policy{
-		MaxAttempts: 50,
-		Delay:       1 * time.Second,
+		Delay: 5 * time.Second,
 		Logger: u.log().With(
 			slog.String("retry-operation", "connect-replication"),
 		),
