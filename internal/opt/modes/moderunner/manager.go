@@ -3,10 +3,15 @@ package moderunner
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
@@ -41,21 +46,9 @@ type Manager struct {
 	loggr  *slog.Logger
 	router *ModeRouter
 
-	// initReceiveStorage / initServeStorage are injected so the cmd layer can
-	// supply storage-factory functions without import cycles.
-	initReceiveStorage func(pgrw xlog.PgReceiveWal) *st.VariadicStorage
-	initServeStorage   func() *st.VariadicStorage
-	initPgrw           func() xlog.PgReceiveWal
-
 	mu      sync.Mutex
 	sup     *supervisor.Supervisor
 	current string
-}
-
-type ManagerDeps struct {
-	InitPgrw           func() xlog.PgReceiveWal
-	InitReceiveStorage func(pgrw xlog.PgReceiveWal) *st.VariadicStorage
-	InitServeStorage   func() *st.VariadicStorage
 }
 
 func NewManager(
@@ -63,17 +56,13 @@ func NewManager(
 	opts *ManagerOpts,
 	cfg *config.Config,
 	router *ModeRouter,
-	deps ManagerDeps,
 ) *Manager {
 	return &Manager{
-		appCtx:             appCtx,
-		opts:               opts,
-		cfg:                cfg,
-		loggr:              slog.With("component", "mode-manager"),
-		router:             router,
-		initPgrw:           deps.InitPgrw,
-		initReceiveStorage: deps.InitReceiveStorage,
-		initServeStorage:   deps.InitServeStorage,
+		appCtx: appCtx,
+		opts:   opts,
+		cfg:    cfg,
+		loggr:  slog.With("component", "mode-manager"),
+		router: router,
 	}
 }
 
@@ -189,8 +178,8 @@ func (m *Manager) stopLocked(ctx context.Context) error {
 func (m *Manager) switchToReceiveLocked() error {
 	sup := supervisor.New(m.loggr)
 
-	pgrw := m.initPgrw()
-	stor := m.initReceiveStorage(pgrw)
+	pgrw := m.mustInitPgrw()
+	stor := m.mustInitReceiveStorage(pgrw)
 
 	jobQueue, err := m.registerReceiveTasks(sup, pgrw, stor)
 	if err != nil {
@@ -208,7 +197,7 @@ func (m *Manager) switchToReceiveLocked() error {
 }
 
 func (m *Manager) switchToServeLocked() {
-	stor := m.initServeStorage()
+	stor := m.mustInitServeStorage()
 
 	// Serve mode has no background tasks. Do not create or start an empty
 	// supervisor, because Supervisor.Start would correctly return ErrNoTasks.
@@ -260,6 +249,8 @@ func (m *Manager) registerReceiveTasks(
 	return jobQueue, nil
 }
 
+// handlers
+
 func (m *Manager) buildReceiveHandler(
 	pgrw xlog.PgReceiveWal,
 	stor *st.VariadicStorage,
@@ -278,4 +269,76 @@ func (m *Manager) buildServeHandler(stor *st.VariadicStorage) http.Handler {
 		BaseDir: m.opts.ReceiveDirectory,
 		Storage: stor,
 	})
+}
+
+// cmd
+
+// needSupervisorLoop decides whether we need to boot the storage supervisor.
+// Skipped for local-fs with no compression, encryption, or retention configured.
+func needSupervisorLoop(cfg *config.Config, loggr *slog.Logger) bool {
+	if cfg.IsLocalStor() {
+		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
+			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
+			cfg.Receiver.Retention.Enable
+		if !hasCfg {
+			loggr.Info("supervisor loop is skipped",
+				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
+			)
+		}
+		return hasCfg
+	}
+	return true
+}
+
+func (m *Manager) mustInitPgrw() xlog.PgReceiveWal {
+	pgrw, err := xlog.NewPgReceiver(m.appCtx, &xlog.PgReceiveWalOpts{
+		ReceiveDirectory: m.opts.ReceiveDirectory,
+		Slot:             m.opts.Slot,
+		NoLoop:           m.opts.NoLoop,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return pgrw
+}
+
+// mustInitReceiveStorage sets up storage for receive mode.
+// S3PartSizeBytes is set to walSegSz so each WAL segment is uploaded as a single part.
+func (m *Manager) mustInitReceiveStorage(pgrw xlog.PgReceiveWal) *st.VariadicStorage {
+	m.loggr.Info("init receive storage")
+
+	if !needSupervisorLoop(m.cfg, m.loggr) {
+		return nil
+	}
+
+	walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
+	if err != nil {
+		log.Fatal(err)
+	}
+	m.loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
+
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
+		BaseDir:         m.opts.ReceiveDirectory,
+		SubPath:         config.LocalFSStorageSubpath,
+		S3PartSizeBytes: walSegSz,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return stor
+}
+
+// mustInitServeStorage sets up storage for serve mode.
+// No pgrw needed — S3PartSizeBytes is 0, letting the S3 backend use its own default.
+func (m *Manager) mustInitServeStorage() *st.VariadicStorage {
+	m.loggr.Info("init serve storage")
+
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
+		BaseDir: m.opts.ReceiveDirectory,
+		SubPath: config.LocalFSStorageSubpath,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return stor
 }

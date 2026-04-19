@@ -1,4 +1,4 @@
-package cmd
+package moderunner
 
 import (
 	"log/slog"
