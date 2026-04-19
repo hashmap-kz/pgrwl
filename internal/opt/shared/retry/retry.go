@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand/v2"
 	"time"
 )
 
@@ -16,22 +15,24 @@ var discardLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 type Policy struct {
 	// MaxAttempts limits the number of tries.
-	// If MaxAttempts <= 0, retry forever until ctx is cancelled.
+	//
+	// If MaxAttempts <= 0, Do retries forever until ctx is cancelled
+	// or RetryIf rejects an error.
 	MaxAttempts int
 
-	BaseDelay time.Duration
-	MaxDelay  time.Duration
-
-	// Jitter adds random delay from 0 to Jitter.
-	// Example: Jitter = 250 * time.Millisecond.
-	Jitter time.Duration
+	// Delay is the wait time between failed attempts.
+	//
+	// If Delay <= 0, a small default delay is used.
+	Delay time.Duration
 
 	// RetryIf decides whether an error should be retried.
-	// If nil, all errors are retried.
+	//
+	// If RetryIf is nil, all errors are retried.
 	RetryIf func(error) bool
 
 	// Logger is optional.
-	// If nil, logs are discarded.
+	//
+	// If Logger is nil, logs are discarded.
 	Logger *slog.Logger
 }
 
@@ -101,14 +102,12 @@ func Do[T any](ctx context.Context, policy Policy, op func(context.Context) (T, 
 			return zero, fmt.Errorf("retry failed after %d attempts: %w", attempt, lastErr)
 		}
 
-		delay := policy.delay(attempt)
-
 		loggr.Debug("retry sleeping before next attempt",
 			slog.Int("attempt", attempt),
-			slog.Duration("delay", delay),
+			slog.Duration("delay", policy.Delay),
 		)
 
-		if err := sleepContext(ctx, delay); err != nil {
+		if err := sleepContext(ctx, policy.Delay); err != nil {
 			loggr.Debug("retry sleep interrupted",
 				slog.Int("attempt", attempt),
 				slog.Any("err", err),
@@ -120,16 +119,8 @@ func Do[T any](ctx context.Context, policy Policy, op func(context.Context) (T, 
 }
 
 func (p Policy) withDefaults() Policy {
-	if p.BaseDelay <= 0 {
-		p.BaseDelay = 100 * time.Millisecond
-	}
-
-	if p.MaxDelay <= 0 {
-		p.MaxDelay = 5 * time.Second
-	}
-
-	if p.MaxDelay < p.BaseDelay {
-		p.MaxDelay = p.BaseDelay
+	if p.Delay <= 0 {
+		p.Delay = 100 * time.Millisecond
 	}
 
 	return p
@@ -139,30 +130,8 @@ func (p Policy) logger() *slog.Logger {
 	if p.Logger != nil {
 		return p.Logger
 	}
+
 	return discardLogger
-}
-
-func (p Policy) delay(attempt int) time.Duration {
-	if attempt < 1 {
-		attempt = 1
-	}
-
-	delay := p.BaseDelay
-
-	for i := 1; i < attempt; i++ {
-		delay *= 2
-		if delay >= p.MaxDelay {
-			delay = p.MaxDelay
-			break
-		}
-	}
-
-	if p.Jitter > 0 {
-		//nolint:gosec
-		delay += time.Duration(rand.Int64N(int64(p.Jitter)))
-	}
-
-	return delay
 }
 
 func sleepContext(ctx context.Context, delay time.Duration) error {
