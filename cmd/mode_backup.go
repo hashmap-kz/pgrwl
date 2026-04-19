@@ -76,7 +76,7 @@ func RunBackupMode(opts *BackupModeOpts) {
 				}
 			}()
 
-			srv := shared.NewHTTPSrv(cfg.Main.ListenPort, backupmode.Init())
+			srv := shared.NewHTTPSrv(cfg.Main.ListenPort, backupmode.Init(cfg))
 			if err := srv.Run(ctx); err != nil {
 				loggr.Error("http server failed", slog.Any("err", err))
 			}
