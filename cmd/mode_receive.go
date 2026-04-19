@@ -84,12 +84,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	defer managerCancel()
 	if err := mgr.Stop(managerStopCtx); err != nil {
 		loggr.Error("failed to stop mode manager", slog.Any("err", err))
+	} else {
+		loggr.Info("mode manager -> stopped")
 	}
 
 	httpStopCtx, httpCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer httpCancel()
 	if err := httpSup.Stop(httpStopCtx); err != nil {
 		loggr.Error("failed to stop http supervisor", slog.Any("err", err))
+	} else {
+		loggr.Info("http server -> stopped")
 	}
 
 	loggr.Info("all components shut down cleanly")
