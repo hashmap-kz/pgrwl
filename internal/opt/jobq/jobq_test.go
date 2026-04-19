@@ -3,646 +3,468 @@ package jobq
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestJobQueue_RunSingleJob(t *testing.T) {
-	queue := NewJobQueue(10)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func TestSubmitUniqueNilQueue(t *testing.T) {
+	t.Parallel()
 
-	var ran bool
-	var mu sync.Mutex
-
-	queue.Start(ctx)
-
-	err := queue.Submit("test-job", func(_ context.Context) {
-		mu.Lock()
-		ran = true
-		mu.Unlock()
-	})
-	assert.NoError(t, err)
-
-	time.Sleep(100 * time.Millisecond) // allow job to run
-
-	mu.Lock()
-	assert.True(t, ran, "job should have been executed")
-	mu.Unlock()
-}
-
-func TestJobQueue_JobOrder(t *testing.T) {
-	queue := NewJobQueue(10)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var results []string
-	var mu sync.Mutex
-
-	queue.Start(ctx)
-
-	assert.NoError(t, queue.Submit("job1", func(_ context.Context) {
-		mu.Lock()
-		results = append(results, "job1")
-		mu.Unlock()
-	}))
-	assert.NoError(t, queue.Submit("job2", func(_ context.Context) {
-		mu.Lock()
-		results = append(results, "job2")
-		mu.Unlock()
-	}))
-	time.Sleep(200 * time.Millisecond)
-
-	mu.Lock()
-	assert.Equal(t, []string{"job1", "job2"}, results)
-	mu.Unlock()
-}
-
-func TestSubmit_ExecutesJob(t *testing.T) {
-	queue := NewJobQueue(2)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var wg sync.WaitGroup
-	var ran bool
-
-	queue.Start(ctx)
-
-	wg.Add(1)
-	err := queue.Submit("test-job", func(_ context.Context) {
-		defer wg.Done()
-		ran = true
-	})
-	assert.NoError(t, err)
-
-	wg.Wait()
-	assert.True(t, ran, "job should have run")
-}
-
-func TestSubmit_ReturnsErrWhenQueueIsFull(t *testing.T) {
-	queue := NewJobQueue(1)
-	_, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	blocked := make(chan struct{})
-
-	// Fill the queue with a blocking job
-	err := queue.Submit("job1", func(_ context.Context) {
-		<-blocked // block forever
-	})
-	assert.NoError(t, err)
-
-	// Try to submit another job — should fail
-	err = queue.Submit("job2", func(_ context.Context) {})
-	assert.ErrorIs(t, err, ErrJobQueueFull)
-	assert.Contains(t, err.Error(), "job2")
-	close(blocked) // cleanup
-}
-
-// v2
-
-func TestNewJobQueueUsesDefaultBufferWhenInvalid(t *testing.T) {
-	q := NewJobQueue(0)
-
-	require.NotNil(t, q)
-	assert.Equal(t, 0, q.Len())
-
-	err := q.Submit("one", func(_ context.Context) {})
-	require.NoError(t, err)
-
-	err = q.Submit("two", func(_ context.Context) {})
-	require.ErrorIs(t, err, ErrJobQueueFull)
-}
-
-func TestSubmitRejectsNilQueue(t *testing.T) {
 	var q *JobQueue
 
-	err := q.Submit("upload", func(_ context.Context) {})
-
-	require.ErrorIs(t, err, ErrNilQueue)
-}
-
-func TestSubmitUniqueRejectsNilQueue(t *testing.T) {
-	var q *JobQueue
-
-	err := q.SubmitUnique("upload", func(_ context.Context) {})
-
-	require.ErrorIs(t, err, ErrNilQueue)
-}
-
-func TestSubmitRejectsNilJob(t *testing.T) {
-	q := NewJobQueue(1)
-
-	err := q.Submit("upload", nil)
-
-	require.ErrorIs(t, err, ErrNilJob)
-	assert.Equal(t, 0, q.Len())
+	err := q.SubmitUnique("upload", func(context.Context) {})
+	if !errors.Is(err, ErrNilQueue) {
+		t.Fatalf("expected ErrNilQueue, got %v", err)
+	}
 }
 
 func TestSubmitUniqueRejectsNilJob(t *testing.T) {
+	t.Parallel()
+
 	q := NewJobQueue(1)
 
 	err := q.SubmitUnique("upload", nil)
+	if !errors.Is(err, ErrNilJob) {
+		t.Fatalf("expected ErrNilJob, got %v", err)
+	}
 
-	require.ErrorIs(t, err, ErrNilJob)
-	assert.False(t, q.IsActive("upload"))
-	assert.Equal(t, 0, q.Len())
-}
-
-func TestSubmitReturnsQueueFull(t *testing.T) {
-	q := NewJobQueue(1)
-
-	err := q.Submit("first", func(_ context.Context) {})
-	require.NoError(t, err)
-
-	err = q.Submit("second", func(_ context.Context) {})
-
-	require.ErrorIs(t, err, ErrJobQueueFull)
-	assert.Equal(t, 1, q.Len())
-}
-
-func TestSubmitUniqueReturnsQueueFullAndReleasesReservation(t *testing.T) {
-	q := NewJobQueue(1)
-
-	err := q.Submit("ordinary", func(_ context.Context) {})
-	require.NoError(t, err)
-
-	err = q.SubmitUnique("upload", func(_ context.Context) {})
-	require.ErrorIs(t, err, ErrJobQueueFull)
-
-	assert.False(t, q.IsActive("upload"))
-
-	// If reservation was not released, this would return ErrJobAlreadyQueued
-	// instead of ErrJobQueueFull.
-	err = q.SubmitUnique("upload", func(_ context.Context) {})
-	require.ErrorIs(t, err, ErrJobQueueFull)
+	if q.IsActive("upload") {
+		t.Fatal("nil job must not reserve active name")
+	}
 }
 
 func TestSubmitUniqueRejectsDuplicateQueuedJob(t *testing.T) {
-	q := NewJobQueue(10)
+	t.Parallel()
 
-	err := q.SubmitUnique("upload", func(_ context.Context) {})
-	require.NoError(t, err)
+	q := NewJobQueue(2)
 
-	err = q.SubmitUnique("upload", func(_ context.Context) {})
-
-	require.ErrorIs(t, err, ErrJobAlreadyQueued)
-	assert.True(t, q.IsActive("upload"))
-	assert.Equal(t, 1, q.Len())
-}
-
-func TestSubmitUniqueAllowsDifferentJobNames(t *testing.T) {
-	q := NewJobQueue(10)
-
-	err := q.SubmitUnique("upload", func(_ context.Context) {})
-	require.NoError(t, err)
-
-	err = q.SubmitUnique("retain", func(_ context.Context) {})
-	require.NoError(t, err)
-
-	assert.True(t, q.IsActive("upload"))
-	assert.True(t, q.IsActive("retain"))
-	assert.Equal(t, 2, q.Len())
-}
-
-func TestSubmitUniqueRejectsDuplicateRunningJob(t *testing.T) {
-	q := NewJobQueue(10)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	started := make(chan struct{})
-	release := make(chan struct{})
-
-	q.Start(ctx)
-
-	err := q.SubmitUnique("upload", func(_ context.Context) {
-		close(started)
-		<-release
-	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		select {
-		case <-started:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-
-	err = q.SubmitUnique("upload", func(_ context.Context) {})
-
-	require.ErrorIs(t, err, ErrJobAlreadyQueued)
-	assert.True(t, q.IsActive("upload"))
-
-	close(release)
-
-	require.Eventually(t, func() bool {
-		return !q.IsActive("upload")
-	}, time.Second, time.Millisecond)
-}
-
-func TestSubmitUniqueReleasesAfterSuccessfulRun(t *testing.T) {
-	q := NewJobQueue(10)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var runs atomic.Int64
-	done := make(chan struct{})
-
-	q.Start(ctx)
-
-	err := q.SubmitUnique("upload", func(_ context.Context) {
-		runs.Add(1)
-		close(done)
-	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		select {
-		case <-done:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		return !q.IsActive("upload")
-	}, time.Second, time.Millisecond)
-
-	err = q.SubmitUnique("upload", func(_ context.Context) {
-		runs.Add(1)
-	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		return runs.Load() == 2
-	}, time.Second, time.Millisecond)
-}
-
-func TestSubmitUniqueReleasesAfterPanic(t *testing.T) {
-	q := NewJobQueue(10)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	firstStarted := make(chan struct{})
-	secondDone := make(chan struct{})
-
-	q.Start(ctx)
-
-	err := q.SubmitUnique("upload", func(_ context.Context) {
-		close(firstStarted)
-		panic("boom")
-	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		select {
-		case <-firstStarted:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		return !q.IsActive("upload")
-	}, time.Second, time.Millisecond)
-
-	err = q.SubmitUnique("upload", func(_ context.Context) {
-		close(secondDone)
-	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		select {
-		case <-secondDone:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-}
-
-func TestPanicDoesNotKillWorker(t *testing.T) {
-	q := NewJobQueue(10)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	afterPanicRan := make(chan struct{})
-
-	q.Start(ctx)
-
-	err := q.Submit("panic", func(_ context.Context) {
-		panic("bad job")
-	})
-	require.NoError(t, err)
-
-	err = q.Submit("after-panic", func(_ context.Context) {
-		close(afterPanicRan)
-	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		select {
-		case <-afterPanicRan:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-}
-
-func TestStartIsIdempotentAndJobsNeverRunConcurrently(t *testing.T) {
-	q := NewJobQueue(100)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// This is the chaos-prevention test.
-	//
-	// Even if someone accidentally calls Start many times, only one worker must
-	// run. Therefore maxRunning must stay exactly 1.
-	for i := 0; i < 32; i++ {
-		q.Start(ctx)
+	err := q.SubmitUnique("upload", func(context.Context) {})
+	if err != nil {
+		t.Fatalf("first submit: %v", err)
 	}
 
-	const totalJobs = 50
+	err = q.SubmitUnique("upload", func(context.Context) {})
+	if !errors.Is(err, ErrJobAlreadyQueued) {
+		t.Fatalf("expected ErrJobAlreadyQueued, got %v", err)
+	}
 
-	var wg sync.WaitGroup
-	wg.Add(totalJobs)
+	if !q.IsActive("upload") {
+		t.Fatal("upload should be active while queued")
+	}
 
-	var running atomic.Int64
-	var maxRunning atomic.Int64
+	if got := q.Len(); got != 1 {
+		t.Fatalf("queue len = %d, want 1", got)
+	}
+}
 
-	for i := 0; i < totalJobs; i++ {
-		err := q.Submit(fmt.Sprintf("job-%d", i), func(_ context.Context) {
+func TestSubmitUniqueReleasesReservationWhenQueueIsFull(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(1)
+
+	err := q.SubmitUnique("upload", func(context.Context) {})
+	if err != nil {
+		t.Fatalf("submit upload: %v", err)
+	}
+
+	err = q.SubmitUnique("retain", func(context.Context) {})
+	if !errors.Is(err, ErrJobQueueFull) {
+		t.Fatalf("expected ErrJobQueueFull, got %v", err)
+	}
+
+	if q.IsActive("retain") {
+		t.Fatal("retain reservation should be released when queue is full")
+	}
+
+	if !q.IsActive("upload") {
+		t.Fatal("upload should still be active")
+	}
+}
+
+func TestRunExecutesJobsSequentially(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(4)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var running atomic.Int32
+	var maxRunning atomic.Int32
+	var completed atomic.Int32
+
+	for i := 0; i < 4; i++ {
+		name := string(rune('a' + i))
+
+		err := q.SubmitUnique(name, func(context.Context) {
 			now := running.Add(1)
 			updateMax(&maxRunning, now)
 
-			time.Sleep(2 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 
 			running.Add(-1)
-			wg.Done()
+			completed.Add(1)
 		})
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("submit %s: %v", name, err)
+		}
 	}
 
-	waitDone(t, &wg, time.Second)
+	go q.Run(ctx)
 
-	assert.Equal(t, int64(1), maxRunning.Load())
-	assert.Equal(t, int64(0), running.Load())
-}
-
-func TestUploadAndRetainNeverRunSimultaneously(t *testing.T) {
-	q := NewJobQueue(100)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	q.Start(ctx)
-
-	const totalPairs = 30
-
-	var wg sync.WaitGroup
-	wg.Add(totalPairs * 2)
-
-	var runningArchiveMutators atomic.Int64
-	var maxRunningArchiveMutators atomic.Int64
-
-	archiveJob := func(_ context.Context) {
-		now := runningArchiveMutators.Add(1)
-		updateMax(&maxRunningArchiveMutators, now)
-
-		time.Sleep(2 * time.Millisecond)
-
-		runningArchiveMutators.Add(-1)
-		wg.Done()
-	}
-
-	for i := 0; i < totalPairs; i++ {
-		require.NoError(t, q.Submit("upload", archiveJob))
-		require.NoError(t, q.Submit("retain", archiveJob))
-	}
-
-	waitDone(t, &wg, time.Second)
-
-	assert.Equal(t, int64(1), maxRunningArchiveMutators.Load())
-	assert.Equal(t, int64(0), runningArchiveMutators.Load())
-}
-
-func TestSubmitUniquePreventsTickerSpamForUpload(t *testing.T) {
-	q := NewJobQueue(100)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	q.Start(ctx)
-
-	started := make(chan struct{})
-	release := make(chan struct{})
-
-	var runs atomic.Int64
-	var alreadyQueued int64
-
-	err := q.SubmitUnique("upload", func(_ context.Context) {
-		runs.Add(1)
-		close(started)
-		<-release
+	waitUntil(t, time.Second, func() bool {
+		return completed.Load() == 4
 	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		select {
-		case <-started:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-
-	for i := 0; i < 100; i++ {
-		err := q.SubmitUnique("upload", func(_ context.Context) {
-			runs.Add(1)
-		})
-		if errors.Is(err, ErrJobAlreadyQueued) {
-			alreadyQueued++
-			continue
-		}
-		require.NoError(t, err)
-	}
-
-	assert.Equal(t, int64(100), alreadyQueued)
-	assert.Equal(t, int64(1), runs.Load())
-
-	close(release)
-
-	require.Eventually(t, func() bool {
-		return !q.IsActive("upload")
-	}, time.Second, time.Millisecond)
-}
-
-func TestSubmitUniqueAllowsUploadAndRetainToQueueButTheyStillRunSequentially(t *testing.T) {
-	q := NewJobQueue(10)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	q.Start(ctx)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	var running atomic.Int64
-	var maxRunning atomic.Int64
-
-	job := func(_ context.Context) {
-		now := running.Add(1)
-		updateMax(&maxRunning, now)
-
-		time.Sleep(10 * time.Millisecond)
-
-		running.Add(-1)
-		wg.Done()
-	}
-
-	require.NoError(t, q.SubmitUnique("upload", job))
-	require.NoError(t, q.SubmitUnique("retain", job))
-
-	waitDone(t, &wg, time.Second)
-
-	assert.Equal(t, int64(1), maxRunning.Load())
-	assert.False(t, q.IsActive("upload"))
-	assert.False(t, q.IsActive("retain"))
-}
-
-func TestContextCancellationStopsWorker(t *testing.T) {
-	q := NewJobQueue(10)
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	firstRan := make(chan struct{})
-	secondRan := make(chan struct{})
-
-	q.Start(ctx)
-
-	err := q.Submit("first", func(_ context.Context) {
-		close(firstRan)
-	})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		select {
-		case <-firstRan:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
 
 	cancel()
 
-	require.Eventually(t, func() bool {
-		return ctx.Err() != nil
-	}, time.Second, time.Millisecond)
+	if got := maxRunning.Load(); got != 1 {
+		t.Fatalf("max concurrently running jobs = %d, want 1", got)
+	}
 
-	// Submitting after cancellation can still enqueue because Submit is only a
-	// queue operation. But the worker should not execute it after it has stopped.
-	err = q.Submit("second", func(_ context.Context) {
-		close(secondRan)
-	})
-	require.NoError(t, err)
-
-	select {
-	case <-secondRan:
-		t.Fatal("job ran after queue context was canceled")
-	case <-time.After(50 * time.Millisecond):
-		// expected
+	if got := running.Load(); got != 0 {
+		t.Fatalf("running jobs = %d, want 0", got)
 	}
 }
 
-func TestRunningJobReceivesCanceledContext(t *testing.T) {
-	q := NewJobQueue(10)
+func TestSubmitUniqueRejectsDuplicateWhileJobIsRunningAndAllowsAfterFinish(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(2)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	jobStarted := make(chan struct{})
-	jobObservedCancel := make(chan struct{})
+	releaseJob := make(chan struct{})
+	jobFinished := make(chan struct{})
 
-	q.Start(ctx)
-
-	err := q.Submit("long-running", func(_ context.Context) {
+	err := q.SubmitUnique("upload", func(context.Context) {
 		close(jobStarted)
-		<-ctx.Done()
-		close(jobObservedCancel)
+		<-releaseJob
+		close(jobFinished)
 	})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("first submit: %v", err)
+	}
 
-	require.Eventually(t, func() bool {
-		select {
-		case <-jobStarted:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
+	go q.Run(ctx)
 
-	cancel()
+	select {
+	case <-jobStarted:
+	case <-time.After(time.Second):
+		t.Fatal("job did not start")
+	}
 
-	require.Eventually(t, func() bool {
-		select {
-		case <-jobObservedCancel:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-}
+	err = q.SubmitUnique("upload", func(context.Context) {})
+	if !errors.Is(err, ErrJobAlreadyQueued) {
+		t.Fatalf("expected ErrJobAlreadyQueued while running, got %v", err)
+	}
 
-func TestIsActiveAndLenAreNilSafe(t *testing.T) {
-	var q *JobQueue
+	close(releaseJob)
 
-	assert.False(t, q.IsActive("upload"))
-	assert.Equal(t, 0, q.Len())
-}
+	select {
+	case <-jobFinished:
+	case <-time.After(time.Second):
+		t.Fatal("job did not finish")
+	}
 
-func updateMax(xMax *atomic.Int64, value int64) {
-	for {
-		current := xMax.Load()
-		if value <= current {
-			return
-		}
+	waitUntil(t, time.Second, func() bool {
+		return !q.IsActive("upload")
+	})
 
-		if xMax.CompareAndSwap(current, value) {
-			return
-		}
+	err = q.SubmitUnique("upload", func(context.Context) {})
+	if err != nil {
+		t.Fatalf("submit after previous job finished: %v", err)
 	}
 }
 
-func waitDone(t *testing.T, wg *sync.WaitGroup, timeout time.Duration) {
-	t.Helper()
+func TestJobPanicIsRecoveredAndReservationIsReleased(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(2)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	jobStarted := make(chan struct{})
+
+	err := q.SubmitUnique("upload", func(context.Context) {
+		close(jobStarted)
+		panic("boom")
+	})
+	if err != nil {
+		t.Fatalf("submit panic job: %v", err)
+	}
+
+	go q.Run(ctx)
+
+	select {
+	case <-jobStarted:
+	case <-time.After(time.Second):
+		t.Fatal("panic job did not start")
+	}
+
+	waitUntil(t, time.Second, func() bool {
+		return !q.IsActive("upload")
+	})
+
+	err = q.SubmitUnique("upload", func(context.Context) {})
+	if err != nil {
+		t.Fatalf("submit after panic should succeed: %v", err)
+	}
+}
+
+func TestStartIsIdempotentAndStartsOnlyOneWorker(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(2)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for i := 0; i < 16; i++ {
+		q.Start(ctx)
+	}
+
+	firstStarted := make(chan struct{})
+	allowFirstFinish := make(chan struct{})
+	secondStarted := make(chan struct{})
+
+	err := q.SubmitUnique("first", func(context.Context) {
+		close(firstStarted)
+		<-allowFirstFinish
+	})
+	if err != nil {
+		t.Fatalf("submit first: %v", err)
+	}
+
+	err = q.SubmitUnique("second", func(context.Context) {
+		close(secondStarted)
+	})
+	if err != nil {
+		t.Fatalf("submit second: %v", err)
+	}
+
+	select {
+	case <-firstStarted:
+	case <-time.After(time.Second):
+		t.Fatal("first job did not start")
+	}
+
+	select {
+	case <-secondStarted:
+		t.Fatal("second job started while first job was still running; more than one worker exists")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(allowFirstFinish)
+
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("second job did not start after first finished")
+	}
+}
+
+func TestRunCalledTwiceDoesNotStartSecondWorker(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(2)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go q.Run(ctx)
+	go q.Run(ctx)
+
+	firstStarted := make(chan struct{})
+	allowFirstFinish := make(chan struct{})
+	secondStarted := make(chan struct{})
+
+	err := q.SubmitUnique("first", func(context.Context) {
+		close(firstStarted)
+		<-allowFirstFinish
+	})
+	if err != nil {
+		t.Fatalf("submit first: %v", err)
+	}
+
+	err = q.SubmitUnique("second", func(context.Context) {
+		close(secondStarted)
+	})
+	if err != nil {
+		t.Fatalf("submit second: %v", err)
+	}
+
+	select {
+	case <-firstStarted:
+	case <-time.After(time.Second):
+		t.Fatal("first job did not start")
+	}
+
+	select {
+	case <-secondStarted:
+		t.Fatal("second job started while first job was still running; second Run started another worker")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(allowFirstFinish)
+
+	select {
+	case <-secondStarted:
+	case <-time.After(time.Second):
+		t.Fatal("second job did not start after first finished")
+	}
+}
+
+func TestRunStopsOnContextCancel(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(1)
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
 	go func() {
-		wg.Wait()
-		close(done)
+		defer close(done)
+		q.Run(ctx)
 	}()
+
+	cancel()
 
 	select {
 	case <-done:
-	case <-time.After(timeout):
-		t.Fatal("timeout waiting for jobs to finish")
+	case <-time.After(time.Second):
+		t.Fatal("Run did not return after context cancellation")
 	}
+}
+
+func TestQueuedUniqueJobsAreReleasedWhenQueueStopsBeforeRunningThem(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(2)
+
+	err := q.SubmitUnique("upload", func(context.Context) {})
+	if err != nil {
+		t.Fatalf("submit upload: %v", err)
+	}
+
+	err = q.SubmitUnique("retain", func(context.Context) {})
+	if err != nil {
+		t.Fatalf("submit retain: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	q.Run(ctx)
+
+	if q.IsActive("upload") {
+		t.Fatal("upload should be released when queue stops before running queued job")
+	}
+
+	if q.IsActive("retain") {
+		t.Fatal("retain should be released when queue stops before running queued job")
+	}
+
+	if got := q.Len(); got != 0 {
+		t.Fatalf("queue len = %d, want 0", got)
+	}
+}
+
+func TestNilQueueHelpersAreSafe(t *testing.T) {
+	t.Parallel()
+
+	var q *JobQueue
+
+	q.Start(context.Background())
+	q.Run(context.Background())
+
+	if q.IsActive("upload") {
+		t.Fatal("nil queue should not report active job")
+	}
+
+	if got := q.Len(); got != 0 {
+		t.Fatalf("nil queue len = %d, want 0", got)
+	}
+}
+
+func TestManyConcurrentSubmitUniqueCallsOnlyOneWinsPerName(t *testing.T) {
+	t.Parallel()
+
+	q := NewJobQueue(32)
+
+	const goroutines = 32
+
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			errs <- q.SubmitUnique("upload", func(context.Context) {})
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	var success int
+	var duplicates int
+
+	for err := range errs {
+		switch {
+		case err == nil:
+			success++
+
+		case errors.Is(err, ErrJobAlreadyQueued):
+			duplicates++
+
+		default:
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	if success != 1 {
+		t.Fatalf("success count = %d, want 1", success)
+	}
+
+	if duplicates != goroutines-1 {
+		t.Fatalf("duplicate count = %d, want %d", duplicates, goroutines-1)
+	}
+}
+
+func updateMax(xMax *atomic.Int32, value int32) {
+	for {
+		old := xMax.Load()
+		if value <= old {
+			return
+		}
+
+		if xMax.CompareAndSwap(old, value) {
+			return
+		}
+	}
+}
+
+func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	t.Fatal("condition was not met before timeout")
 }

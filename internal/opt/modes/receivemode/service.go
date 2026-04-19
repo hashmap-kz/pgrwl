@@ -100,7 +100,7 @@ func filterWalBefore(walFiles []string, cutoff string) []string {
 
 func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string) error {
 	if s.jobQueue != nil {
-		err := s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
+		err := s.jobQueue.SubmitUnique("delete-wal-before-"+walFileName, func(_ context.Context) {
 			s.log().Info("deleting WAL files")
 			walFilesInStorage, err := s.storage.List(context.Background(), "")
 			if err != nil {

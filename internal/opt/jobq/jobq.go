@@ -1,12 +1,18 @@
-// Package jobq - manages a single job at a time
-// 1. Start() is idempotent.
-// 2. Only one worker goroutine is ever started.
-// 3. Jobs are executed sequentially.
-// 4. SubmitUnique(name, fn) allows only one queued-or-running job per name.
-// 5. upload and retain cannot run simultaneously.
-// 6. nil jobs are rejected.
-// 7. job panics are recovered, logged, and do not kill the queue.
-// 8. active unique jobs are released even if the job panics.
+// Package jobq manages a single deduplicated job queue.
+//
+// Important semantics:
+//
+//  1. Only one worker loop may run at a time.
+//  2. Jobs are executed sequentially.
+//  3. SubmitUnique(name, fn) allows only one queued-or-running job per name.
+//  4. upload and retain cannot run simultaneously.
+//  5. duplicate upload/retain jobs cannot pile up behind themselves.
+//  6. nil jobs are rejected.
+//  7. job panics are recovered, logged, and do not kill the queue.
+//  8. active unique jobs are released even if the job panics.
+//  9. queued unique jobs are released if the queue stops before running them.
+//
+// This is intentionally not a generic worker queue.
 package jobq
 
 import (
@@ -24,9 +30,9 @@ import (
 var (
 	// ErrJobQueueFull is returned when the queue buffer is full.
 	//
-	// Submit and SubmitUnique are intentionally non-blocking. The queue is used
-	// by periodic supervisors, where blocking the ticker loop is usually worse
-	// than dropping one redundant maintenance job.
+	// SubmitUnique is intentionally non-blocking. The queue is used by periodic
+	// supervisors, where blocking the ticker loop is usually worse than dropping
+	// one redundant maintenance job.
 	ErrJobQueueFull = errors.New("job queue full")
 
 	// ErrNilJob is returned when a nil job function is submitted.
@@ -46,8 +52,8 @@ var (
 
 // Job is a unit of work executed by the queue.
 //
-// The job receives the queue context passed to Start. The queue cannot forcibly
-// stop a running job. Long-running jobs must observe ctx themselves.
+// The job receives the queue context passed to Run/Start. The queue cannot
+// forcibly stop a running job. Long-running jobs must observe ctx themselves.
 type Job func(ctx context.Context)
 
 // NamedJob is the internal representation of a queued job.
@@ -56,24 +62,28 @@ type NamedJob struct {
 	Run  Job
 }
 
-// JobQueue is a small non-blocking, single-worker queue.
+// JobQueue is a small non-blocking, single-worker, deduplicating queue.
 //
 // Important properties:
 //
+//   - Run blocks until ctx is cancelled.
+//   - Start runs Run in a background goroutine.
 //   - Start is idempotent.
-//   - Only one worker goroutine is started.
+//   - Only one worker loop may run at a time.
 //   - Jobs never run concurrently with each other.
 //   - SubmitUnique prevents duplicate queued/running jobs by name.
-//   - Submit is available for ordinary non-unique jobs.
 //
-// This queue is intentionally not a worker pool. For archive maintenance this is
-// a feature, not a limitation: "upload" and "retain" must not mutate the same WAL
-// archive state at the same time.
+// This queue is intentionally not a worker pool. For archive maintenance this
+// is a feature: "upload" and "retain" must not mutate the same WAL archive
+// state at the same time.
 type JobQueue struct {
 	l    *slog.Logger
 	jobs chan NamedJob
 
 	startOnce sync.Once
+
+	workerMu sync.Mutex
+	running  bool
 
 	mu     sync.Mutex
 	active map[string]struct{}
@@ -100,13 +110,13 @@ func (q *JobQueue) log() *slog.Logger {
 	if q != nil && q.l != nil {
 		return q.l
 	}
+
 	return slog.With("component", "job-queue")
 }
 
-// Start starts the single queue worker in a new goroutine.
+// Start starts the queue worker in a new goroutine.
 //
 // Start is safe to call multiple times. Only the first call starts a worker.
-// Later calls are ignored.
 //
 // Prefer Run(ctx) when the queue is managed by supervisor.Supervisor, because
 // Run blocks until ctx is cancelled and therefore lets the supervisor actually
@@ -130,12 +140,31 @@ func (q *JobQueue) Start(ctx context.Context) {
 //	    return nil
 //	})
 //
-// Jobs are executed sequentially. This is the core guarantee of the queue:
-// upload/retain jobs cannot run simultaneously.
+// Only one Run loop may be active at a time. If Run is called while another
+// Run loop is already active, the second call simply waits for its context to
+// be cancelled and returns. It does not start another worker.
 func (q *JobQueue) Run(ctx context.Context) {
 	if q == nil {
 		return
 	}
+
+	if ctx == nil {
+		q.log().Error("job queue cannot run with nil context")
+		return
+	}
+
+	if !q.acquireWorker() {
+		q.log().Warn("job queue already running")
+		<-ctx.Done()
+		return
+	}
+	defer q.releaseWorker()
+
+	q.run(ctx)
+}
+
+func (q *JobQueue) run(ctx context.Context) {
+	defer q.releaseQueuedJobs()
 
 	for {
 		select {
@@ -148,6 +177,7 @@ func (q *JobQueue) Run(ctx context.Context) {
 			// select may choose the job case. Avoid starting new work after
 			// cancellation.
 			if ctx.Err() != nil {
+				q.release(job.Name)
 				q.log().Info(
 					"job queue stopped before running job",
 					slog.String("job-name", job.Name),
@@ -163,6 +193,7 @@ func (q *JobQueue) Run(ctx context.Context) {
 
 func (q *JobQueue) runJob(ctx context.Context, job NamedJob) {
 	if job.Run == nil {
+		q.release(job.Name)
 		q.log().Error("nil job skipped", slog.String("job-name", job.Name))
 		return
 	}
@@ -195,36 +226,6 @@ func (q *JobQueue) runJob(ctx context.Context, job NamedJob) {
 	job.Run(ctx)
 }
 
-// Submit submits a normal job.
-//
-// Submit is non-blocking. If the queue buffer is full, ErrJobQueueFull is
-// returned.
-//
-// Submit does not deduplicate jobs. For periodic archive maintenance tasks,
-// prefer SubmitUnique.
-func (q *JobQueue) Submit(name string, jobFunc Job) error {
-	if q == nil {
-		return ErrNilQueue
-	}
-
-	if jobFunc == nil {
-		return fmt.Errorf("%w: %s", ErrNilJob, name)
-	}
-
-	receivemetrics.M.IncJobsSubmitted(name)
-
-	job := NamedJob{Name: name, Run: jobFunc}
-
-	select {
-	case q.jobs <- job:
-		return nil
-
-	default:
-		receivemetrics.M.IncJobsDropped(name)
-		return fmt.Errorf("%w: %s", ErrJobQueueFull, name)
-	}
-}
-
 // SubmitUnique submits a job only if a job with the same name is not already
 // queued or running.
 //
@@ -246,7 +247,7 @@ func (q *JobQueue) Submit(name string, jobFunc Job) error {
 //
 // If "upload" is already queued or running, ErrJobAlreadyQueued is returned.
 //
-// SubmitUnique is also non-blocking. If the queue buffer is full, the unique
+// SubmitUnique is non-blocking. If the queue buffer is full, the unique
 // reservation is released and ErrJobQueueFull is returned.
 func (q *JobQueue) SubmitUnique(name string, jobFunc Job) error {
 	if q == nil {
@@ -282,6 +283,25 @@ func (q *JobQueue) SubmitUnique(name string, jobFunc Job) error {
 	}
 }
 
+func (q *JobQueue) acquireWorker() bool {
+	q.workerMu.Lock()
+	defer q.workerMu.Unlock()
+
+	if q.running {
+		return false
+	}
+
+	q.running = true
+	return true
+}
+
+func (q *JobQueue) releaseWorker() {
+	q.workerMu.Lock()
+	defer q.workerMu.Unlock()
+
+	q.running = false
+}
+
 func (q *JobQueue) reserve(name string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -299,6 +319,18 @@ func (q *JobQueue) release(name string) {
 	defer q.mu.Unlock()
 
 	delete(q.active, name)
+}
+
+func (q *JobQueue) releaseQueuedJobs() {
+	for {
+		select {
+		case job := <-q.jobs:
+			q.release(job.Name)
+
+		default:
+			return
+		}
+	}
 }
 
 // IsActive reports whether a unique job with this name is queued or running.
