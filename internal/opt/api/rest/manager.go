@@ -179,8 +179,9 @@ func (m *Manager) switchToReceiveLocked() error {
 
 	pgrw := m.mustInitPgrw()
 	stor := m.mustInitReceiveStorage(pgrw)
+	jobQueue := jobq.NewJobQueue(5)
 
-	jobQueue, err := m.registerReceiveTasks(sup, pgrw, stor)
+	err := m.registerReceiveTasks(sup, pgrw, stor, jobQueue)
 	if err != nil {
 		return fmt.Errorf("register receive tasks: %w", err)
 	}
@@ -208,11 +209,10 @@ func (m *Manager) registerReceiveTasks(
 	sup *supervisor.Supervisor,
 	pgrw xlog.PgReceiveWal,
 	stor *st.VariadicStorage,
-) (*jobq.JobQueue, error) {
+	jobQueue *jobq.JobQueue,
+) error {
 	cfg := m.cfg
 	opts := m.opts
-
-	jobQueue := jobq.NewJobQueue(5)
 
 	// The job queue belongs to receive mode and must stop when receive mode
 	// stops. Do not start it with m.appCtx, otherwise it can survive a
@@ -221,14 +221,14 @@ func (m *Manager) registerReceiveTasks(
 		jobQueue.Run(ctx)
 		return nil
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Critical: WAL receiver failure must stop all receive-mode tasks.
 	if err := sup.RegisterCritical("wal-receiver", func(ctx context.Context) error {
 		return pgrw.Run(ctx)
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
 	if stor != nil {
@@ -241,11 +241,11 @@ func (m *Manager) registerReceiveTasks(
 			u.Run(ctx, jobQueue)
 			return nil
 		}); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return jobQueue, nil
+	return nil
 }
 
 // handlers
