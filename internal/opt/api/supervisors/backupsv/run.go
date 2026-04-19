@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -70,11 +71,19 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 
 func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 	// get necessary info
-	conn, err := pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
+	conn, err := retry.Do(ctx, retry.Policy{
+		MaxAttempts: 10,
+		BaseDelay:   500 * time.Millisecond,
+		MaxDelay:    30 * time.Second,
+		Jitter:      250 * time.Millisecond,
+	}, func(ctx context.Context) (*pgconn.PgConn, error) {
+		return pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
+	})
 	if err != nil {
 		u.log().Error("basebackup create-conn failed", slog.Any("err", err))
 		return
 	}
+
 	startupInfo, err := xlog.GetStartupInfo(conn)
 	if err != nil {
 		u.log().Error("basebackup get-startup-info failed", slog.Any("err", err))
