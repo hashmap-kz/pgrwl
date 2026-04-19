@@ -128,13 +128,11 @@ func (m *Manager) SwitchContext(ctx context.Context, mode string) error {
 	m.current = ""
 	m.router.SwapHandler(http.NotFoundHandler())
 
-	switch mode {
-	case config.ModeReceive:
+	if mode == config.ModeReceive {
 		if err := m.switchToReceiveLocked(); err != nil {
 			return err
 		}
-
-	case config.ModeServe:
+	} else {
 		m.switchToServeLocked()
 	}
 
