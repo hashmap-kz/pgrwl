@@ -1,8 +1,10 @@
 package retry
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -129,5 +131,67 @@ func TestDoStopsWhenRetryIfReturnsFalse(t *testing.T) {
 
 	assert.ErrorIs(t, err, permanentErr)
 	assert.Empty(t, got)
+	assert.Equal(t, 1, attempts)
+}
+
+func TestDoLogsAttemptsWhenLoggerProvided(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	loggr := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	attempts := 0
+	temporaryErr := errors.New("temporary")
+
+	got, err := Do(context.Background(), Policy{
+		MaxAttempts: 3,
+		BaseDelay:   time.Millisecond,
+		MaxDelay:    time.Millisecond,
+		Logger:      loggr,
+	}, func(context.Context) (string, error) {
+		attempts++
+
+		if attempts < 3 {
+			return "", temporaryErr
+		}
+
+		return "ok", nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "ok", got)
+	assert.Equal(t, 3, attempts)
+
+	logs := buf.String()
+
+	assert.Contains(t, logs, "retry attempt started")
+	assert.Contains(t, logs, "retry attempt failed")
+	assert.Contains(t, logs, "retry sleeping before next attempt")
+	assert.Contains(t, logs, "retry attempt succeeded")
+	assert.Contains(t, logs, "attempt=1")
+	assert.Contains(t, logs, "attempt=2")
+	assert.Contains(t, logs, "attempt=3")
+}
+
+func TestDoWithNilLoggerDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	attempts := 0
+
+	got, err := Do(context.Background(), Policy{
+		MaxAttempts: 2,
+		BaseDelay:   time.Millisecond,
+		MaxDelay:    time.Millisecond,
+		Logger:      nil,
+	}, func(context.Context) (int, error) {
+		attempts++
+		return 42, nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 42, got)
 	assert.Equal(t, 1, attempts)
 }

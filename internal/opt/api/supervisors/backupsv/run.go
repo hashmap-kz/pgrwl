@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
 
 	"github.com/pgrwl/pgrwl/internal/opt/api/rest/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup"
@@ -76,6 +77,9 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 		BaseDelay:   500 * time.Millisecond,
 		MaxDelay:    30 * time.Second,
 		Jitter:      250 * time.Millisecond,
+		Logger: u.log().With(
+			slog.String("retry-operation", "connect-replication"),
+		),
 	}, func(ctx context.Context) (*pgconn.PgConn, error) {
 		return pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
 	})

@@ -1,8 +1,9 @@
 package backupmode
 
 import (
-	"github.com/pgrwl/pgrwl/config"
 	"net/http"
+
+	"github.com/pgrwl/pgrwl/config"
 )
 
 func Init(cfg *config.Config) http.Handler {

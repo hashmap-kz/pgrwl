@@ -1,10 +1,11 @@
 package backupmode
 
 import (
-	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/opt/shared"
 	"log/slog"
 	"net/http"
+
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 )
 
 func initHandlers(cfg *config.Config) http.Handler {
