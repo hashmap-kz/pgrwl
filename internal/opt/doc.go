@@ -3,11 +3,11 @@
 //
 // It includes the following subpackages:
 //
+//   - api: entry point (REST API, long-running background supervisors and orchestrators)
+//   - basebackup: streaming backup logic
 //   - jobq: job queue and background task processing
 //   - metrics: Prometheus metrics and observability helpers
-//   - modes: runtime modes and configuration logic
 //   - shared: internal shared code used by optional components
-//   - supervisors: long-running background supervisors and orchestrators
 //
 // These components are modular and can be imported selectively.
 package opt
