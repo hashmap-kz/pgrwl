@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="backup-local" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="backup-daemon" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="pgrwl" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="backup -c hack/configs/localfs/receive.yml" />
+    <parameters value="daemon -m backup -c hack/configs/localfs/backup-count-retention.yml" />
     <envs>
       <env name="PGHOST" value="localhost" />
       <env name="PGPASSWORD" value="postgres" />
