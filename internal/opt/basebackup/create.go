@@ -2,12 +2,13 @@ package basebackup
 
 import (
 	"context"
-	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"log/slog"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 
 	"github.com/pgrwl/pgrwl/internal/opt/shared"
 

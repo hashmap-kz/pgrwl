@@ -1,4 +1,4 @@
-package moderunner
+package rest
 
 import (
 	"net/http"

@@ -1,11 +1,9 @@
-package backupsuperv
+package backupsv
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pgrwl/pgrwl/internal/opt/basebackup"
-	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,7 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
+	"github.com/pgrwl/pgrwl/internal/opt/api/rest/receivemode"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 

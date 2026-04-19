@@ -1,4 +1,4 @@
-package moderunner
+package rest
 
 import (
 	"context"
@@ -10,17 +10,18 @@ import (
 	"sync"
 	"time"
 
+	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/rest/receivemode"
+	serveAPI "github.com/pgrwl/pgrwl/internal/opt/api/rest/servemode"
+	"github.com/pgrwl/pgrwl/internal/opt/api/supervisors/archivesv"
+
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/jobq"
-	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
-	serveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/servemode"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/supervisor"
-	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesuperv"
 )
 
 const defaultModeStopTimeout = 30 * time.Second
@@ -234,7 +235,7 @@ func (m *Manager) registerReceiveTasks(
 
 	if stor != nil {
 		if err := sup.Register("wal-supervisor", func(ctx context.Context) error {
-			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
+			u := archivesv.NewArchiveSupervisor(cfg, stor, &archivesv.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})

@@ -8,12 +8,13 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/pgrwl/pgrwl/internal/opt/api/rest/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/api/supervisors/backupsv"
+
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
-	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
 	"github.com/pgrwl/pgrwl/internal/opt/shared"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsuperv"
 )
 
 type BackupModeOpts struct {
@@ -51,7 +52,7 @@ func RunBackupMode(opts *BackupModeOpts) {
 				)
 			}
 		}()
-		u := backupsuperv.NewBaseBackupSupervisor(cfg, &backupsuperv.BaseBackupSupervisorOpts{
+		u := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
 			Directory: opts.ReceiveDirectory,
 		})
 		u.Run(ctx)

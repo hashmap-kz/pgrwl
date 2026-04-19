@@ -9,11 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pgrwl/pgrwl/internal/opt/api/rest"
+
 	"github.com/pgrwl/pgrwl/internal/opt/shared/supervisor"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
-	"github.com/pgrwl/pgrwl/internal/opt/modes/moderunner"
 	"github.com/pgrwl/pgrwl/internal/opt/shared"
 )
 
@@ -36,7 +37,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	initMetrics(ctx, cfg, loggr)
 
 	// Build the swappable router — placeholder until the first Switch call.
-	modeRouter := moderunner.NewModeRouter(http.NotFoundHandler())
+	modeRouter := rest.NewModeRouter(http.NotFoundHandler())
 
 	// Top-level mux: permanent routes + mode-delegating catch-all.
 	topMux := http.NewServeMux()
@@ -45,9 +46,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	})
 	shared.InitOptionalHandlers(cfg, topMux, loggr)
 
-	mgr := moderunner.NewManager(
+	mgr := rest.NewManager(
 		ctx,
-		&moderunner.ManagerOpts{
+		&rest.ManagerOpts{
 			ReceiveDirectory: opts.ReceiveDirectory,
 			Slot:             opts.Slot,
 			NoLoop:           opts.NoLoop,
@@ -56,7 +57,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 		modeRouter,
 	)
 
-	moderunner.MountModeRoutes(topMux, mgr)
+	rest.MountModeRoutes(topMux, mgr)
 	topMux.Handle("/", modeRouter)
 
 	// HTTP server runs for the lifetime of the process.
