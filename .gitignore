@@ -20,3 +20,4 @@ __debug_bin*
 restore_tmp/
 pprof/
 nohup.out
+test_logs/
