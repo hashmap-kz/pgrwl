@@ -5,7 +5,7 @@ set -euo pipefail
 # clean up on exit or interrupt
 cleanup() {
   log_info "Cleaning up"
-  x_stop_receiver
+  x_kill_receiver
 }
 trap cleanup EXIT INT TERM
 
@@ -115,19 +115,21 @@ x_backup_restore() {
   # switch config files with different compression/encryption settings
   echo_delim "configs switching loop"
   declare -a config_files=(
-    "/tmp/config-gzip-aes.yaml" 
+    "/tmp/config-gzip-aes.yaml"
     "/tmp/config-aes.yaml"
     "/tmp/config-plain.yaml"
   )
   for config_file in "${config_files[@]}"; do
     # rerun receiver with a new config
+    # x_kill_receiver fully terminates the process so a new one can bind
+    # the same port and acquire the same replication slot with a fresh config.
     echo_delim "running wal-receiver with config: ${config_file}"
-    x_stop_receiver
+    x_kill_receiver
     x_start_receiver "${config_file}"
 
     # generate some wals
     x_generate_wal 25
-    
+
     # wait compressor/encryptor/uploader
     sleep 10
   done
@@ -137,6 +139,13 @@ x_backup_restore() {
 
   # stop cluster, cleanup data
   echo_delim "teardown"
+  # The last config in the loop is config-plain.yaml which has no storage
+  # and cannot decode the compressed/encrypted WAL files written by earlier
+  # configs. Restart with a storage-aware config so the receiver that stays
+  # alive for WAL serving during recovery has the correct codec pipeline.
+  x_kill_receiver
+  x_start_receiver "/tmp/config-gzip-aes.yaml"
+  x_wait_http_ok "http://127.0.0.1:7070/healthz" 15
   x_stop_receiver
   xpg_teardown
 
@@ -155,7 +164,19 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl daemon -c "/tmp/config-gzip-aes.yaml" -m serve >>"$LOG_FILE" 2>&1 &
+
+  ## NOTE: version-1
+  ##
+  # nohup /usr/local/bin/pgrwl daemon -c "/tmp/config-gzip-aes.yaml" -m serve >>"$LOG_FILE" 2>&1 &
+
+  ## NOTE: version-2 (single controlled mode)
+  # stop receive loop, start serving wal files
+  curl -X POST http://127.0.0.1:7070/mode/serve
+
+  # diagnostic: log archive contents before recovery so 404s can be diagnosed
+  echo_delim "wal-archive contents before recovery"
+  ls -lah "${WAL_PATH}/" || true
+  ls -lah "${WAL_PATH}/wal-archive/" || true
 
   # cleanup logs
   >/var/log/postgresql/pg.log
@@ -171,7 +192,7 @@ EOF
   # check diffs
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
   pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
-  diff -u "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"  
+  diff -u "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
 }
 
 x_backup_restore "${@}"

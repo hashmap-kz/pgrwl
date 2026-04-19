@@ -163,7 +163,14 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
-  nohup /usr/local/bin/pgrwl daemon -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  
+  ## NOTE: version-1
+  ##  
+  # nohup /usr/local/bin/pgrwl daemon -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
+  
+  ## NOTE: version-2 (single controlled mode)
+  # stop receive loop, start serving wal files  
+  curl -X POST http://127.0.0.1:7070/mode/serve
 
   # cleanup logs
   >/var/log/postgresql/pg.log
