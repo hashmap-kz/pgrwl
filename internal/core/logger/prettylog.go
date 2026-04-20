@@ -58,6 +58,9 @@ type PrettyTextHandler struct {
 }
 
 func NewPrettyTextHandler(out io.Writer, opts *PrettyTextOptions) *PrettyTextHandler {
+	if opts == nil {
+		opts = &PrettyTextOptions{}
+	}
 	if out == nil {
 		out = io.Discard
 	}
