@@ -19,7 +19,7 @@ devconfig:
 
 log:
   level: info
-  format: text
+  format: pretty
   add_source: true
 
 storage:
