@@ -57,7 +57,15 @@ func App() *cli.Command {
 							ListenPort:       cfg.Main.ListenPort,
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
-						})
+						}, config.ModeReceive)
+					} else if mode == config.ModeServe {
+						checkPgEnvsAreSet()
+						RunReceiveMode(&ReceiveModeOpts{
+							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
+							ListenPort:       cfg.Main.ListenPort,
+							Slot:             cfg.Receiver.Slot,
+							NoLoop:           cfg.Receiver.NoLoop,
+						}, config.ModeServe)
 					} else if mode == config.ModeBackup {
 						checkPgEnvsAreSet()
 						RunBackupMode(&BackupModeOpts{

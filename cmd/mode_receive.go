@@ -25,7 +25,7 @@ type ReceiveModeOpts struct {
 	ListenPort       int
 }
 
-func RunReceiveMode(opts *ReceiveModeOpts) {
+func RunReceiveMode(opts *ReceiveModeOpts, withInitMode string) {
 	cfg := config.Cfg()
 	loggr := slog.With("component", "receive-mode-runner")
 
@@ -73,7 +73,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	}
 
 	// Default mode is receive.
-	if err := mgr.Switch(config.ModeReceive); err != nil {
+	if err := mgr.Switch(withInitMode); err != nil {
 		log.Fatal(err)
 	}
 
