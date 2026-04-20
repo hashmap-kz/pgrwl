@@ -225,7 +225,7 @@ restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 | `GET`    | `/status`                | Current receiver state and stream status                    |
 | `GET`    | `/receiver`              | Current receiver state and stream status                    |
 | `POST`   | `/mode/receive`          | Start WAL streaming                                         |
-| `POST`   | `/mode/serve`            | Stop WAL streaming, start serve WAL archive                 |
+| `POST`   | `/mode/serve`            | Stop WAL streaming, start serving WAL archive               |
 | `GET`    | `/wal/{filename}`        | Download a single WAL file (used by `restore_command`)      |
 | `GET`    | `/config`                | Brief config (used by `backup` mode for WAL retention)      |
 | `DELETE` | `/wal-before/{filename}` | Schedule deletion of WAL files older than the given segment |
