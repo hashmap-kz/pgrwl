@@ -15,7 +15,7 @@ x_remake_config() {
   },
   "log": {
     "level": "${LOG_LEVEL_DEFAULT}",
-    "format": "text",
+    "format": "${LOG_FORMAT_DEFAULT}",
     "add_source": true
   }
 }

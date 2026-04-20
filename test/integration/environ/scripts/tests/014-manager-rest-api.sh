@@ -140,7 +140,7 @@ write_config() {
   },
   "log": {
     "level": "debug",
-    "format": "text",
+    "format": "pretty",
     "add_source": false
   }
 }

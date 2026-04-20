@@ -19,6 +19,11 @@ x_remake_config() {
        "max_concurrency": 4
      }
   },
+  "log": {
+    "level": "${LOG_LEVEL_DEFAULT}",
+    "format": "${LOG_FORMAT_DEFAULT}",
+    "add_source": true
+  },
   "storage": {
     "name": "s3",
     "compression": { "algo": "gzip" },

@@ -20,6 +20,7 @@ export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
 export LOG_FILE="/tmp/pgrwl.log"
 export LOG_LEVEL_DEFAULT=info
+export LOG_FORMAT_DEFAULT=pretty
 export PG_RECEIVEWAL_WAL_PATH="/tmp/wal-archive-pg_receivewal"
 export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
 export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
@@ -95,29 +96,8 @@ x_start_receiver() {
 x_stop_receiver() {
   if [[ -n "${RECEIVER_PID:-}" ]]; then
     log_info "stopping receiver (PID $RECEIVER_PID)"
-
-    ## NOTE: version-1
-    ##    
-    # kill -TERM "$RECEIVER_PID" 2>/dev/null || true
-    # wait "$RECEIVER_PID" 2>/dev/null || true
-
-    ## NOTE: version-2 (single controlled mode)
-    # stop receive loop, start serving wal files
-    curl -X POST http://127.0.0.1:7070/mode/serve
-  fi
-}
-
-# x_kill_receiver terminates the receiver process entirely.
-# Use this when a config change requires a fresh process on the same port,
-# or when the process must be fully gone before the next step.
-# For the serve-during-recovery pattern, use x_stop_receiver instead so
-# the HTTP server stays alive to serve WAL files via GET /wal/{filename}.
-x_kill_receiver() {
-  if [[ -n "${RECEIVER_PID:-}" ]]; then
-    log_info "killing receiver process (PID $RECEIVER_PID)"
     kill -TERM "$RECEIVER_PID" 2>/dev/null || true
     wait "$RECEIVER_PID" 2>/dev/null || true
-    RECEIVER_PID=""
   fi
 }
 
@@ -157,18 +137,12 @@ x_start_serving() {
   local cfg=$1
   log_info "starting wal-serving with $cfg"
 
-  ## NOTE: version-1
-  ##
-  # # Run the 'serve' mode in background.
-  # #   * stdout  -> tee -> log file (append) -> /dev/null (discard)
-  # #   * stderr  -> tee -> log file (append) -> original stderr (so it appears on console)
-  # /usr/local/bin/pgrwl daemon -c "${cfg}" -m serve \
-  #   > >(tee -a "$LOG_FILE") \
-  #   2> >(tee -a "$LOG_FILE" >&2) &
-
-  ## NOTE: version-2 (single controlled mode)
-  # stop receive loop, start serving wal files
-  curl -X POST http://127.0.0.1:7070/mode/serve
+  # Run the 'serve' mode in background.
+  #   * stdout  -> tee -> log file (append) -> /dev/null (discard)
+  #   * stderr  -> tee -> log file (append) -> original stderr (so it appears on console)
+  /usr/local/bin/pgrwl daemon -c "${cfg}" -m serve \
+    > >(tee -a "$LOG_FILE") \
+    2> >(tee -a "$LOG_FILE" >&2) &
 
   SERVE_PID=$!
 }

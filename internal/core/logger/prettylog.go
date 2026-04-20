@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultTimeFormat   = "2006-01-02 15:04:05"
-	defaultMessageWidth = 45
+	defaultMessageWidth = 34
 )
 
 type PrettyTextOptions struct {
@@ -42,7 +42,7 @@ type PrettyTextOptions struct {
 	TimeFormat string
 
 	// MessageWidth controls the padded message column.
-	// Default: 45.
+	// Default: 34.
 	MessageWidth int
 }
 

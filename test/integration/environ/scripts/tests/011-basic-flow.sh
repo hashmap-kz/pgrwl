@@ -188,7 +188,7 @@ cat >"$PGRWL_CONFIG" <<EOF
   },
   "log": {
     "level": "debug",
-    "format": "text",
+    "format": "pretty",
     "add_source": false
   }
 }
@@ -249,6 +249,7 @@ sleep 3
 
 log "Stopping PostgreSQL and pgrwl receiver..."
 stop_postgres
+stop_pgrwl_receive
 
 log "Removing original PGDATA to simulate data loss..."
 rm -rf "$PGDATA"
@@ -271,8 +272,8 @@ touch "$PGDATA/recovery.signal"
 ###############################################################################
 
 log "Starting pgrwl restore server..."
-# stop receive loop, start serving wal files  
-curl -X POST http://127.0.0.1:7070/mode/serve
+pgrwl daemon -m serve -c "$PGRWL_CONFIG" >"/tmp/pgrwl-basic/pgrwl-serve.log" 2>&1 &
+PGRWL_SERVE_PID=$!
 
 cat >>"$PGDATA/postgresql.conf" <<EOF
 restore_command = 'pgrwl restore-command --serve-addr=127.0.0.1:7070 %f %p'
