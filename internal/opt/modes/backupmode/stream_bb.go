@@ -34,9 +34,11 @@ type baseBackup struct {
 	conn      *pgconn.PgConn
 	storage   st.Storage
 	timestamp string
+	cron      string
+	startTime time.Time
 }
 
-func NewBaseBackup(conn *pgconn.PgConn, storage st.Storage, timestamp string) (BaseBackup, error) {
+func NewBaseBackup(conn *pgconn.PgConn, storage st.Storage, timestamp string, cron string) (BaseBackup, error) {
 	if conn == nil {
 		return nil, fmt.Errorf("basebackup: connection is required")
 	}
@@ -51,6 +53,7 @@ func NewBaseBackup(conn *pgconn.PgConn, storage st.Storage, timestamp string) (B
 		conn:      conn,
 		storage:   storage,
 		timestamp: timestamp,
+		cron:      cron,
 	}, nil
 }
 
@@ -62,8 +65,12 @@ func (bb *baseBackup) log() *slog.Logger {
 }
 
 func (bb *baseBackup) StreamBackup(ctx context.Context) (*backupdto.Result, error) {
+	bb.startTime = time.Now()
+	backupmetrics.M.BackupStarted(bb.timestamp, bb.cron, bb.startTime)
+
 	result, err := bb.streamBaseBackup(ctx)
 	if err != nil {
+		backupmetrics.M.BackupFailed(bb.timestamp)
 		return nil, err
 	}
 
@@ -82,6 +89,8 @@ func (bb *baseBackup) StreamBackup(ctx context.Context) (*backupdto.Result, erro
 	// metrics
 	bb.log().Debug("bytes received", slog.Int64("total", result.BytesTotal))
 	backupmetrics.M.AddBasebackupBytesReceived(float64(result.BytesTotal))
+	duration := time.Since(bb.startTime)
+	backupmetrics.M.BackupFinished(bb.timestamp, duration)
 	return result, nil
 }
 

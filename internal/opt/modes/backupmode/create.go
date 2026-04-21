@@ -17,6 +17,7 @@ import (
 
 type CreateBaseBackupOpts struct {
 	Directory string
+	Cron      string
 }
 
 func CreateBaseBackup(opts *CreateBaseBackupOpts) (*backupdto.Result, error) {
@@ -48,7 +49,7 @@ func CreateBaseBackup(opts *CreateBaseBackupOpts) (*backupdto.Result, error) {
 	}
 
 	// init module
-	baseBackup, err := NewBaseBackup(conn, stor, ts)
+	baseBackup, err := NewBaseBackup(conn, stor, ts, opts.Cron)
 	if err != nil {
 		loggr.Error("cannot init basebackup module", slog.Any("err", err))
 		return nil, err
