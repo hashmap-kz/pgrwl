@@ -59,7 +59,6 @@ func App() *cli.Command {
 							NoLoop:           cfg.Receiver.NoLoop,
 						}, config.ModeReceive)
 					} else if mode == config.ModeServe {
-						checkPgEnvsAreSet()
 						RunReceiveMode(&ReceiveModeOpts{
 							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
 							ListenPort:       cfg.Main.ListenPort,
