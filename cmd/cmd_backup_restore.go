@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/opt/modes/restorecmd"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/restore"
 )
 
 func RestoreBaseBackup(ctx context.Context, cfg *config.Config, id, dest string) error {
-	return restorecmd.RestoreBaseBackup(ctx, cfg, id, dest)
+	return restore.RestoreBaseBackup(ctx, cfg, id, dest)
 }

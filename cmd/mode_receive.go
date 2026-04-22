@@ -10,13 +10,10 @@ import (
 	"syscall"
 
 	"github.com/pgrwl/pgrwl/internal/core/conv"
-
+	"github.com/pgrwl/pgrwl/internal/opt/api"
+	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
-
-	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
-	"github.com/pgrwl/pgrwl/internal/opt/shared"
-
-	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesuperv"
+	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesv"
 
 	"github.com/pgrwl/pgrwl/internal/opt/jobq"
 
@@ -111,13 +108,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 				)
 			}
 		}()
-		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
+		handlers := receiveAPI.Init(&receiveAPI.Opts{
 			PGRW:     pgrw,
 			BaseDir:  opts.ReceiveDirectory,
 			Storage:  stor,
 			JobQueue: jobQueue,
+			Cfg:      cfg,
 		})
-		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := api.NewHTTPServer(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Error("http server failed", slog.Any("err", err))
 		}
@@ -136,7 +134,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 					)
 				}
 			}()
-			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
+			u := receivesv.NewArchiveSupervisor(cfg, stor, &receivesv.ArchiveSupervisorOpts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
@@ -207,7 +205,7 @@ func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *Rec
 		}
 		loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
 
-		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
+		stor, err = api.SetupStorage(&api.SetupStorageOpts{
 			BaseDir:         opts.ReceiveDirectory,
 			SubPath:         config.LocalFSStorageSubpath,
 			S3PartSizeBytes: walSegSz,

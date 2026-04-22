@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backup"
 )
 
 type BaseBackupCmdOpts struct {
@@ -9,6 +9,6 @@ type BaseBackupCmdOpts struct {
 }
 
 func RunBaseBackup(opts *BaseBackupCmdOpts) error {
-	_, err := backupmode.CreateBaseBackup(&backupmode.CreateBaseBackupOpts{Directory: opts.Directory})
+	_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: opts.Directory})
 	return err
 }

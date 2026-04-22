@@ -8,12 +8,11 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
-	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
-	"github.com/pgrwl/pgrwl/internal/opt/shared"
-
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsuperv"
+	"github.com/pgrwl/pgrwl/internal/opt/api"
+	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsv"
 )
 
 type BackupModeOpts struct {
@@ -51,7 +50,7 @@ func RunBackupMode(opts *BackupModeOpts) {
 				)
 			}
 		}()
-		u := backupsuperv.NewBaseBackupSupervisor(cfg, &backupsuperv.BaseBackupSupervisorOpts{
+		u := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
 			Directory: opts.ReceiveDirectory,
 		})
 		u.Run(ctx)
@@ -75,7 +74,7 @@ func RunBackupMode(opts *BackupModeOpts) {
 				}
 			}()
 
-			srv := shared.NewHTTPSrv(cfg.Main.ListenPort, backupmode.Init())
+			srv := api.NewHTTPServer(cfg.Main.ListenPort, backupmode.Init(cfg))
 			if err := srv.Run(ctx); err != nil {
 				loggr.Error("http server failed", slog.Any("err", err))
 			}
