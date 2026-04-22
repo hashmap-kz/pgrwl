@@ -3,6 +3,8 @@ package receivemode
 import (
 	"net/http"
 
+	"github.com/pgrwl/pgrwl/internal/opt/api/middleware"
+
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/jobq"
@@ -25,5 +27,5 @@ func Init(opts *Opts) http.Handler {
 		JobQueue: opts.JobQueue,
 	})
 	controller := NewReceiveController(service)
-	return initHandlers(opts.Cfg, controller)
+	return middleware.Cors(initHandlers(opts.Cfg, controller))
 }
