@@ -6,7 +6,7 @@ import (
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
-	middleware2 "github.com/pgrwl/pgrwl/internal/opt/api/middleware"
+	"github.com/pgrwl/pgrwl/internal/opt/api/middleware"
 	"golang.org/x/time/rate"
 )
 
@@ -14,14 +14,14 @@ func initHandlers(cfg *config.Config, controller *ReceiveController) http.Handle
 	l := slog.With("component", "receive-api")
 
 	// init middlewares
-	loggingMiddleware := middleware2.LoggingMiddleware{
+	loggingMiddleware := middleware.LoggingMiddleware{
 		Logger: l,
 	}
-	rateLimitMiddleware := middleware2.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
+	rateLimitMiddleware := middleware.RateLimiterMiddleware{Limiter: rate.NewLimiter(5, 10)}
 
 	// Build middleware chain
-	secureChain := middleware2.Chain(
-		middleware2.SafeHandlerMiddleware,
+	secureChain := middleware.Chain(
+		middleware.SafeHandlerMiddleware,
 		loggingMiddleware.Middleware,
 		rateLimitMiddleware.Middleware,
 	)

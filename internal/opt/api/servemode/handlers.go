@@ -4,19 +4,19 @@ import (
 	"log/slog"
 	"net/http"
 
-	middleware2 "github.com/pgrwl/pgrwl/internal/opt/api/middleware"
+	"github.com/pgrwl/pgrwl/internal/opt/api/middleware"
 )
 
 func initHandlers(controller *ServeController) http.Handler {
 	l := slog.With("component", "serve-api")
 
 	// init middlewares
-	loggingMiddleware := middleware2.LoggingMiddleware{
+	loggingMiddleware := middleware.LoggingMiddleware{
 		Logger: l,
 	}
 
-	plainChain := middleware2.Chain(
-		middleware2.SafeHandlerMiddleware,
+	plainChain := middleware.Chain(
+		middleware.SafeHandlerMiddleware,
 		loggingMiddleware.Middleware,
 	)
 
