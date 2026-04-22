@@ -23,25 +23,26 @@ integration with Kubernetes environments.
 
 - [About](#about)
 - [Usage](#usage)
-  - [Kubernetes Quick Start](#kubernetes-quick-start)
-  - [Receive Mode Quick Start](#receive-mode-quick-start)
-  - [Serve Mode](#serve-mode)
-  - [Backup Mode](#backup-mode)
-  - [Restore Command](#restore-command)
+    - [Kubernetes Quick Start](#kubernetes-quick-start)
+    - [Receive Mode Quick Start](#receive-mode-quick-start)
+    - [Serve Mode](#serve-mode)
+    - [Backup Mode](#backup-mode)
+    - [Restore Command](#restore-command)
+    - [REST API](#rest-api)
 - [Configuration Reference](#configuration-reference)
 - [Installation](#installation)
-  - [Docker images](#docker-images)
-  - [Helm Chart](#helm-chart)
-  - [Manual Installation](#manual-installation)
-  - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
-  - [Package-Based installation](#package-based-installation)
-    - [Debian](#debian)
-    - [Alpine Linux](#alpine-linux)
+    - [Docker images](#docker-images)
+    - [Helm Chart](#helm-chart)
+    - [Manual Installation](#manual-installation)
+    - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
+    - [Package-Based installation](#package-based-installation)
+        - [Debian](#debian)
+        - [Alpine Linux](#alpine-linux)
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
-  - [Design Notes](#design-notes)
-  - [Durability \& `fsync`](#durability--fsync)
-  - [Why Not `archive_command`?](#why-not-archive_command)
+    - [Design Notes](#design-notes)
+    - [Durability \& `fsync`](#durability--fsync)
+    - [Why Not `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
 - [Links](#links)
 - [License](#license)
@@ -213,6 +214,22 @@ pgrwl daemon -c config.yml
 # of a 'pgrwl' instance running in 'serve' mode.
 restore_command = 'pgrwl restore-command --serve-addr=k8s-worker5:30266 %f %p'
 ```
+
+### REST API
+
+`receive` mode exposes an HTTP API for health checks, status, and receiver lifecycle control.
+
+| Method   | Path                     | Description                                                 |
+|----------|--------------------------|-------------------------------------------------------------|
+| `GET`    | `/healthz`               | Liveness probe                                              |
+| `GET`    | `/status`                | Current receiver state and stream status                    |
+| `GET`    | `/receiver`              | Current receiver state and stream status                    |
+| `POST`   | `/mode/receive`          | Start WAL streaming                                         |
+| `POST`   | `/mode/serve`            | Stop WAL streaming, start serving WAL archive               |
+| `GET`    | `/wal/{filename}`        | Download a single WAL file (used by `restore_command`)      |
+| `GET`    | `/config`                | Brief config (used by `backup` mode for WAL retention)      |
+| `DELETE` | `/wal-before/{filename}` | Schedule deletion of WAL files older than the given segment |
+| `GET`    | `/metrics`               | Prometheus metrics (when `metrics.enable: true`)            |
 
 ---
 

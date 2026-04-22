@@ -75,7 +75,7 @@ x_remake_dirs() {
   },
   "log": {
     "level": "trace",
-    "format": "text",
+    "format": "pretty",
     "add_source": true
   }
 }
@@ -163,6 +163,7 @@ EOF
 
   # run serve-mode
   echo_delim "running wal fetcher"
+  pkill -9 -f pgrwl
   nohup /usr/local/bin/pgrwl daemon -c "/tmp/config.json" -m serve >>"$LOG_FILE" 2>&1 &
 
   # cleanup logs

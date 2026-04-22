@@ -341,7 +341,7 @@ write_pgrwl_config() {
   },
   "log": {
     "level": "trace",
-    "format": "text",
+    "format": "pretty",
     "add_source": true
   }
 }

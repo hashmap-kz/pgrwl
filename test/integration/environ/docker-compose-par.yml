@@ -82,6 +82,11 @@ services:
     container_name: pg_012_restore_s3_toxiproxy
     entrypoint: /var/lib/postgresql/scripts/tests/012-restore-s3-toxiproxy.sh
 
+  pg_014_manager_rest_api:
+    <<: *pg_test_common
+    container_name: pg_014_manager_rest_api
+    entrypoint: /var/lib/postgresql/scripts/tests/014-manager-rest-api.sh
+
   sshd:
     build:
       context: .

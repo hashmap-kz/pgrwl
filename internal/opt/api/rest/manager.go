@@ -1,0 +1,343 @@
+package rest
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"log/slog"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
+	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/rest/receivemode"
+	serveAPI "github.com/pgrwl/pgrwl/internal/opt/api/rest/servemode"
+	"github.com/pgrwl/pgrwl/internal/opt/api/supervisors/archivesv"
+
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
+
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/opt/jobq"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/supervisor"
+)
+
+const defaultModeStopTimeout = 30 * time.Second
+
+// ManagerOpts holds static configuration that does not change between mode switches.
+//
+// No PGRW here: it is initialized on demand only when entering receive mode.
+type ManagerOpts struct {
+	ReceiveDirectory string
+	Slot             string
+	NoLoop           bool
+}
+
+// Manager owns the mode state machine.
+//
+// Exactly one mode is active at a time.
+// Receive mode has a supervisor.
+// Serve mode currently has no background goroutines, so it has no supervisor.
+type Manager struct {
+	appCtx context.Context
+	opts   *ManagerOpts
+	cfg    *config.Config
+	loggr  *slog.Logger
+	router *ModeRouter
+
+	mu      sync.Mutex
+	sup     *supervisor.Supervisor
+	current string
+}
+
+func NewManager(
+	appCtx context.Context,
+	opts *ManagerOpts,
+	cfg *config.Config,
+	router *ModeRouter,
+) *Manager {
+	return &Manager{
+		appCtx: appCtx,
+		opts:   opts,
+		cfg:    cfg,
+		loggr:  slog.With("component", "mode-manager"),
+		router: router,
+	}
+}
+
+// CurrentMode returns the active mode name.
+//
+// Possible values are:
+//
+//   - config.ModeReceive
+//   - config.ModeServe
+//   - "" when no mode is active
+func (m *Manager) CurrentMode() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.current
+}
+
+// Switch transitions to mode.
+//
+// Switch is safe to call concurrently; calls are serialized.
+//
+// A default timeout is used while stopping the previous mode. This protects the
+// HTTP mode-switch request from hanging forever if a task ignores ctx.Done().
+func (m *Manager) Switch(mode string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultModeStopTimeout)
+	defer cancel()
+
+	return m.SwitchContext(ctx, mode)
+}
+
+// SwitchContext transitions to mode using ctx as the stop-wait context for the
+// currently running supervisor.
+func (m *Manager) SwitchContext(ctx context.Context, mode string) error {
+	if ctx == nil {
+		return supervisor.ErrNilContext
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if mode != config.ModeReceive && mode != config.ModeServe {
+		return fmt.Errorf("unknown mode: %s", mode)
+	}
+
+	if m.current == mode {
+		return fmt.Errorf("already in %s mode", mode)
+	}
+
+	m.loggr.Info("switching mode",
+		slog.String("from", m.current),
+		slog.String("to", mode),
+	)
+
+	if err := m.stopLocked(ctx); err != nil {
+		return fmt.Errorf("stop current supervisor: %w", err)
+	}
+
+	// Be explicitly empty while the next mode is being built.
+	//
+	// This avoids exposing a stale receive/serve handler if constructing the
+	// next mode fails after the previous mode has already been stopped.
+	m.current = ""
+	m.router.SwapHandler(http.NotFoundHandler())
+
+	if mode == config.ModeReceive {
+		if err := m.switchToReceiveLocked(); err != nil {
+			return err
+		}
+	} else {
+		m.switchToServeLocked()
+	}
+
+	m.current = mode
+
+	m.loggr.Info("mode switched", slog.String("mode", mode))
+	return nil
+}
+
+// Stop shuts down whichever supervisor is currently running.
+//
+// Stop also resets the router to NotFoundHandler so stopped mode handlers do not
+// remain reachable.
+func (m *Manager) Stop(ctx context.Context) error {
+	if ctx == nil {
+		return supervisor.ErrNilContext
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.stopLocked(ctx)
+}
+
+func (m *Manager) stopLocked(ctx context.Context) error {
+	if m.sup != nil {
+		m.loggr.Info("stopping current supervisor")
+
+		if err := m.sup.Stop(ctx); err != nil {
+			return err
+		}
+
+		m.sup = nil
+	}
+
+	m.current = ""
+	m.router.SwapHandler(http.NotFoundHandler())
+
+	return nil
+}
+
+func (m *Manager) switchToReceiveLocked() error {
+	sup := supervisor.New(m.loggr)
+
+	pgrw := m.mustInitPgrw()
+	stor := m.mustInitReceiveStorage(pgrw)
+	jobQueue := jobq.NewJobQueue(5)
+
+	err := m.registerReceiveTasks(sup, pgrw, stor, jobQueue)
+	if err != nil {
+		return fmt.Errorf("register receive tasks: %w", err)
+	}
+
+	if err := sup.Start(m.appCtx); err != nil {
+		return fmt.Errorf("start receive supervisor: %w", err)
+	}
+
+	m.sup = sup
+	m.router.SwapHandler(m.buildReceiveHandler(pgrw, stor, jobQueue))
+
+	return nil
+}
+
+func (m *Manager) switchToServeLocked() {
+	stor := m.mustInitServeStorage()
+
+	// Serve mode has no background tasks. Do not create or start an empty
+	// supervisor, because Supervisor.Start would correctly return ErrNoTasks.
+	m.sup = nil
+	m.router.SwapHandler(m.buildServeHandler(stor))
+}
+
+func (m *Manager) registerReceiveTasks(
+	sup *supervisor.Supervisor,
+	pgrw xlog.PgReceiveWal,
+	stor *st.VariadicStorage,
+	jobQueue *jobq.JobQueue,
+) error {
+	cfg := m.cfg
+	opts := m.opts
+
+	// The job queue belongs to receive mode and must stop when receive mode
+	// stops. Do not start it with m.appCtx, otherwise it can survive a
+	// receive -> serve switch.
+	if err := sup.Register("job-queue", func(ctx context.Context) error {
+		jobQueue.Run(ctx)
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// Critical: WAL receiver failure must stop all receive-mode tasks.
+	if err := sup.RegisterCritical("wal-receiver", func(ctx context.Context) error {
+		return pgrw.Run(ctx)
+	}); err != nil {
+		return err
+	}
+
+	if stor != nil {
+		if err := sup.Register("wal-supervisor", func(ctx context.Context) error {
+			u := archivesv.NewArchiveSupervisor(cfg, stor, &archivesv.ArchiveSupervisorOpts{
+				ReceiveDirectory: opts.ReceiveDirectory,
+				PGRW:             pgrw,
+			})
+
+			u.Run(ctx, jobQueue)
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// handlers
+
+func (m *Manager) buildReceiveHandler(
+	pgrw xlog.PgReceiveWal,
+	stor *st.VariadicStorage,
+	jobQueue *jobq.JobQueue,
+) http.Handler {
+	return receiveAPI.Init(&receiveAPI.ReceiveAPIOpts{
+		PGRW:     pgrw,
+		BaseDir:  m.opts.ReceiveDirectory,
+		Storage:  stor,
+		JobQueue: jobQueue,
+	})
+}
+
+func (m *Manager) buildServeHandler(stor *st.VariadicStorage) http.Handler {
+	return serveAPI.Init(&serveAPI.ServeAPIOpts{
+		BaseDir: m.opts.ReceiveDirectory,
+		Storage: stor,
+	})
+}
+
+// cmd
+
+// needSupervisorLoop decides whether we need to boot the storage supervisor.
+// Skipped for local-fs with no compression, encryption, or retention configured.
+func needSupervisorLoop(cfg *config.Config, loggr *slog.Logger) bool {
+	if cfg.IsLocalStor() {
+		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
+			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
+			cfg.Receiver.Retention.Enable
+		if !hasCfg {
+			loggr.Info("supervisor loop is skipped",
+				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
+			)
+		}
+		return hasCfg
+	}
+	return true
+}
+
+func (m *Manager) mustInitPgrw() xlog.PgReceiveWal {
+	pgrw, err := xlog.NewPgReceiver(m.appCtx, &xlog.PgReceiveWalOpts{
+		ReceiveDirectory: m.opts.ReceiveDirectory,
+		Slot:             m.opts.Slot,
+		NoLoop:           m.opts.NoLoop,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return pgrw
+}
+
+// mustInitReceiveStorage sets up storage for receive mode.
+// S3PartSizeBytes is set to walSegSz so each WAL segment is uploaded as a single part.
+func (m *Manager) mustInitReceiveStorage(pgrw xlog.PgReceiveWal) *st.VariadicStorage {
+	m.loggr.Info("init receive storage")
+
+	if !needSupervisorLoop(m.cfg, m.loggr) {
+		return nil
+	}
+
+	walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
+	if err != nil {
+		log.Fatal(err)
+	}
+	m.loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
+
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
+		BaseDir:         m.opts.ReceiveDirectory,
+		SubPath:         config.LocalFSStorageSubpath,
+		S3PartSizeBytes: walSegSz,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return stor
+}
+
+// mustInitServeStorage sets up storage for serve mode.
+// No pgrw needed — S3PartSizeBytes is 0, letting the S3 backend use its own default.
+func (m *Manager) mustInitServeStorage() *st.VariadicStorage {
+	m.loggr.Info("init serve storage")
+
+	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
+		BaseDir: m.opts.ReceiveDirectory,
+		SubPath: config.LocalFSStorageSubpath,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return stor
+}

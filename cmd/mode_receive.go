@@ -4,27 +4,18 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"net/http"
 	"os/signal"
-	"strings"
-	"sync"
 	"syscall"
+	"time"
 
-	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/opt/api/rest"
 
-	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
-
-	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/receivemode"
-	"github.com/pgrwl/pgrwl/internal/opt/shared"
-
-	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesuperv"
-
-	"github.com/pgrwl/pgrwl/internal/opt/jobq"
-
-	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/supervisor"
 
 	"github.com/pgrwl/pgrwl/config"
-
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
+	"github.com/pgrwl/pgrwl/internal/opt/shared"
 )
 
 type ReceiveModeOpts struct {
@@ -34,126 +25,77 @@ type ReceiveModeOpts struct {
 	ListenPort       int
 }
 
-func RunReceiveMode(opts *ReceiveModeOpts) {
+func RunReceiveMode(opts *ReceiveModeOpts, withInitMode string) {
 	cfg := config.Cfg()
 	loggr := slog.With("component", "receive-mode-runner")
 
-	// setup context
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	ctx, signalCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	//////////////////////////////////////////////////////////////////////
-	// Init WAL-receiver loop first
-
-	// setup wal-receiver
-	pgrw := mustInitPgrw(ctx, opts)
-
-	// Use WaitGroup to wait for all goroutines to finish
-	var wg sync.WaitGroup
-
-	// Signal channel to indicate that pgrw.Run() has started
-	started := make(chan struct{})
-
-	// main streaming loop
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				loggr.Error("wal-receiver panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "wal-receiver"),
-				)
-			}
-		}()
-
-		// Signal that we are starting Run()
-		close(started)
-
-		if err := pgrw.Run(ctx); err != nil {
-			loggr.Error("streaming failed", slog.Any("err", err))
-			cancel() // cancel everything on error
-		}
-	}()
-
-	// Wait until pgrw.Run() has started
-	<-started
-	loggr.Info("wal-receiver started")
-
-	//////////////////////////////////////////////////////////////////////
-	// Init OPT components
-
-	// setup job queue
-	loggr.Info("running job queue")
-	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
-
-	// setup metrics
 	initMetrics(ctx, cfg, loggr)
 
-	// setup storage: it may be nil
-	stor := mustInitStorageIfRequired(cfg, loggr, opts, pgrw)
+	// Build the swappable router — placeholder until the first Switch call.
+	modeRouter := rest.NewModeRouter(http.NotFoundHandler())
 
-	// HTTP server
-	// It shouldn't cancel() the main streaming loop even on error.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				loggr.Error("http server panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "http-server"),
-				)
-			}
-		}()
-		handlers := receiveAPI.Init(&receiveAPI.ReceiveHandlerOpts{
-			PGRW:     pgrw,
-			BaseDir:  opts.ReceiveDirectory,
-			Storage:  stor,
-			JobQueue: jobQueue,
-		})
-		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
-		if err := srv.Run(ctx); err != nil {
-			loggr.Error("http server failed", slog.Any("err", err))
-		}
-	}()
+	// Top-level mux: permanent routes + mode-delegating catch-all.
+	topMux := http.NewServeMux()
+	topMux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	shared.InitOptionalHandlers(cfg, topMux, loggr)
 
-	// ArchiveSupervisor (run this goroutine ONLY when storage is required)
-	if stor != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					loggr.Error("upload loop panicked",
-						slog.Any("panic", r),
-						slog.String("goroutine", "wal-supervisor"),
-					)
-				}
-			}()
-			u := receivesuperv.NewArchiveSupervisor(cfg, stor, &receivesuperv.ArchiveSupervisorOpts{
-				ReceiveDirectory: opts.ReceiveDirectory,
-				PGRW:             pgrw,
-			})
-			if cfg.Receiver.Retention.Enable {
-				u.RunWithRetention(ctx, jobQueue)
-			} else {
-				u.RunUploader(ctx, jobQueue)
-			}
-		}()
+	mgr := rest.NewManager(
+		ctx,
+		&rest.ManagerOpts{
+			ReceiveDirectory: opts.ReceiveDirectory,
+			Slot:             opts.Slot,
+			NoLoop:           opts.NoLoop,
+		},
+		cfg,
+		modeRouter,
+	)
+
+	rest.MountModeRoutes(topMux, mgr)
+	topMux.Handle("/", modeRouter)
+
+	// HTTP server runs for the lifetime of the process.
+	httpSup := supervisor.New(loggr)
+	if err := httpSup.RegisterCritical("http-server", func(ctx context.Context) error {
+		return shared.NewHTTPSrv(opts.ListenPort, topMux).Run(ctx)
+	}); err != nil {
+		//nolint:gocritic
+		log.Fatal(err)
+	}
+	if err := httpSup.Start(ctx); err != nil {
+		log.Fatal(err)
 	}
 
-	// Wait for signal (context cancellation)
-	<-ctx.Done()
-	loggr.Info("shutting down, waiting for goroutines...")
+	// Default mode is receive.
+	if err := mgr.Switch(withInitMode); err != nil {
+		log.Fatal(err)
+	}
 
-	// Wait for all goroutines to finish
-	wg.Wait()
+	<-ctx.Done()
+	loggr.Info("shutting down...")
+
+	managerStopCtx, managerCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer managerCancel()
+	if err := mgr.Stop(managerStopCtx); err != nil {
+		loggr.Error("failed to stop mode manager", slog.Any("err", err))
+	} else {
+		loggr.Info("mode manager -> stopped")
+	}
+
+	httpStopCtx, httpCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer httpCancel()
+	if err := httpSup.Stop(httpStopCtx); err != nil {
+		loggr.Error("failed to stop http supervisor", slog.Any("err", err))
+	} else {
+		loggr.Info("http server -> stopped")
+	}
+
 	loggr.Info("all components shut down cleanly")
 }
 
@@ -162,59 +104,4 @@ func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
 		loggr.Debug("init prom metrics")
 		receivemetrics.InitPromMetrics(ctx)
 	}
-}
-
-// needSupervisorLoop decides whether we actually need to boot the storage
-// we don't need if:
-// * it's a localfs storage configured with no compression/encryption/retain
-func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
-	if cfg.IsLocalStor() {
-		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
-			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
-			cfg.Receiver.Retention.Enable
-		if !hasCfg {
-			l.Info("supervisor loop is skipped",
-				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
-			)
-		}
-		return hasCfg
-	}
-	return true
-}
-
-func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal {
-	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
-		ReceiveDirectory: opts.ReceiveDirectory,
-		Slot:             opts.Slot,
-		NoLoop:           opts.NoLoop,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return pgrw
-}
-
-func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts, pgrw xlog.PgReceiveWal) *st.VariadicStorage {
-	loggr.Info("init storage")
-
-	var stor *st.VariadicStorage
-	if needSupervisorLoop(cfg, loggr) {
-		var err error
-
-		walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
-		if err != nil {
-			log.Fatal(err)
-		}
-		loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
-
-		stor, err = shared.SetupStorage(&shared.SetupStorageOpts{
-			BaseDir:         opts.ReceiveDirectory,
-			SubPath:         config.LocalFSStorageSubpath,
-			S3PartSizeBytes: walSegSz,
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	return stor
 }

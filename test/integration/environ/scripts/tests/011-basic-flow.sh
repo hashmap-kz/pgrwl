@@ -188,7 +188,7 @@ cat >"$PGRWL_CONFIG" <<EOF
   },
   "log": {
     "level": "debug",
-    "format": "text",
+    "format": "pretty",
     "add_source": false
   }
 }
