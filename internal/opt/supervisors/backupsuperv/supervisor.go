@@ -18,12 +18,12 @@ import (
 
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
-
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/cmdx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
 
 	"github.com/pgrwl/pgrwl/internal/opt/modes/backupmode"
 
@@ -71,7 +71,14 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 
 func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 	// get necessary info
-	conn, err := pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
+	conn, err := retry.Do(ctx, retry.Policy{
+		Delay: 5 * time.Second,
+		Logger: u.log().With(
+			slog.String("retry-operation", "connect-replication"),
+		),
+	}, func(ctx context.Context) (*pgconn.PgConn, error) {
+		return pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
+	})
 	if err != nil {
 		u.log().Error("basebackup create-conn failed", slog.Any("err", err))
 		return
