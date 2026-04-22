@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="backup-local" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="backup-cmd" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="pgrwl" />
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="backup -c hack/configs/localfs/receive.yml" />

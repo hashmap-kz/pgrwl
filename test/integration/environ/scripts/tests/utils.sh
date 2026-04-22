@@ -20,6 +20,7 @@ export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
 export LOG_FILE="/tmp/pgrwl.log"
 export LOG_LEVEL_DEFAULT=info
+export LOG_FORMAT_DEFAULT=pretty
 export PG_RECEIVEWAL_WAL_PATH="/tmp/wal-archive-pg_receivewal"
 export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
 export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"

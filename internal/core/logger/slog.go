@@ -73,6 +73,12 @@ func Init(o *Opts) {
 			Level:       lvl,
 			ReplaceAttr: replaceAttr,
 		})
+	} else if strings.EqualFold(logFormat, "pretty") {
+		baseHandler = NewPrettyTextHandler(os.Stderr, &PrettyTextOptions{
+			AddSource:   logAddSource,
+			Level:       lvl,
+			ReplaceAttr: replaceAttr,
+		})
 	} else {
 		baseHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 			AddSource:   logAddSource,

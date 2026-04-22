@@ -195,7 +195,7 @@ type LogConfig struct {
 	// Level sets the log level (e.g., "trace", "debug", "info", "warn", "error").
 	Level string `json:"level,omitzero" env:"PGRWL_LOG_LEVEL"`
 
-	// Format sets the log format ("text" or "json").
+	// Format sets the log format ("text", "pretty" or "json").
 	Format string `json:"format,omitzero" env:"PGRWL_LOG_FORMAT"`
 
 	// AddSource includes source file and line in log entries.
@@ -583,7 +583,7 @@ func checkLogConfig(c *Config, errs []string) []string {
 		}
 	}
 	if c.Log.Format != "" {
-		if c.Log.Format != "text" && c.Log.Format != "json" {
+		if c.Log.Format != "text" && c.Log.Format != "pretty" && c.Log.Format != "json" {
 			errs = append(errs, fmt.Sprintf("log.format must be 'text' or 'json' (got: %s)", c.Log.Format))
 		}
 	}
