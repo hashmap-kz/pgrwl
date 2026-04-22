@@ -255,7 +255,7 @@ backup:                                  # Required for 'backup' mode
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)
-  format: text                           # One of: (text / json)
+  format: text                           # One of: (text / pretty / json)
   add_source: true                       # Include file:line in log messages (for local development)
 
 metrics:                                 # Optional
@@ -311,7 +311,7 @@ PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable 
 PGRWL_BACKUP_WALRETENTION_ENABLE         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
 PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
 PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
-PGRWL_LOG_FORMAT                         # One of: (text / json)
+PGRWL_LOG_FORMAT                         # One of: (text / pretty / json)
 PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)
 PGRWL_METRICS_ENABLE                     # Optional (used in receive mode: http://host:port/metrics)
 PGRWL_DEVCONFIG_PPROF_ENABLE             # Enable pprof handlers

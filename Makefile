@@ -38,7 +38,7 @@ snapshot: ## Run snapshot build with goreleaser
 
 .PHONY: test
 test: ## Run unit tests
-	go test -v -cover ./...
+	go test -v -race -cover ./...
 
 .PHONY: test-cov
 test-cov: ## Run tests with coverage report

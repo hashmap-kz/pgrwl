@@ -20,8 +20,8 @@ receiver:
     sync_interval: 3s
     max_concurrency: 4
 log:
-  level: debug
-  format: text
+  level: ${LOG_LEVEL_DEFAULT}
+  format: ${LOG_FORMAT_DEFAULT}
   add_source: true
 storage:
   name: "local"
@@ -40,7 +40,7 @@ receiver:
     max_concurrency: 4
 log:
   level: ${LOG_LEVEL_DEFAULT}
-  format: text
+  format: ${LOG_FORMAT_DEFAULT}
   add_source: true
 storage:
   name: "local"
@@ -62,7 +62,7 @@ receiver:
     max_concurrency: 4
 log:
   level: ${LOG_LEVEL_DEFAULT}
-  format: text
+  format: ${LOG_FORMAT_DEFAULT}
   add_source: true
 storage:
   name: "local"
@@ -82,7 +82,7 @@ receiver:
     max_concurrency: 4
 log:
   level: ${LOG_LEVEL_DEFAULT}
-  format: text
+  format: ${LOG_FORMAT_DEFAULT}
   add_source: true
 EOF
 
