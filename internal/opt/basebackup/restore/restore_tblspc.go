@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	backupdto2 "github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/fsx"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/tarx"
 )
 
-func getTblspcLocation(tarName string, mf *backupdto2.Result) (backupdto2.Tablespace, error) {
+func getTblspcLocation(tarName string, mf *backupdto.Result) (backupdto.Tablespace, error) {
 	// storage:
 	//
 	// 0 = {string} "20251203150245/20251203150245.json"
@@ -50,7 +50,7 @@ func getTblspcLocation(tarName string, mf *backupdto2.Result) (backupdto2.Tables
 	// drwx------ 3 postgres postgres 4.0K Dec  3 19:40 PG_17_202406281
 
 	if len(mf.Tablespaces) == 0 {
-		return backupdto2.Tablespace{}, fmt.Errorf("tablespaces map is empty")
+		return backupdto.Tablespace{}, fmt.Errorf("tablespaces map is empty")
 	}
 	for _, ts := range mf.Tablespaces {
 		// tarName -> "20251203150245/25222.tar"
@@ -59,13 +59,13 @@ func getTblspcLocation(tarName string, mf *backupdto2.Result) (backupdto2.Tables
 			return ts, nil
 		}
 	}
-	return backupdto2.Tablespace{}, fmt.Errorf("cannot find tablespace target location: %s", tarName)
+	return backupdto.Tablespace{}, fmt.Errorf("cannot find tablespace target location: %s", tarName)
 }
 
 func checkTblspcDirsEmpty(
 	id string,
-	ri *backupdto2.RestoreInfo,
-	mf *backupdto2.Result,
+	ri *backupdto.RestoreInfo,
+	mf *backupdto.Result,
 ) error {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
 	if len(ri.TablespacesTars) == 0 {
@@ -99,8 +99,8 @@ func restoreTblspc(
 	ctx context.Context,
 	id, pgdata string,
 	stor st.Storage,
-	ri *backupdto2.RestoreInfo,
-	mf *backupdto2.Result,
+	ri *backupdto.RestoreInfo,
+	mf *backupdto.Result,
 ) error {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", id))
 
