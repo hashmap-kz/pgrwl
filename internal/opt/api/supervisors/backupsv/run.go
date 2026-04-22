@@ -21,12 +21,12 @@ import (
 
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
-
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/cmdx"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/pgrwl/pgrwl/config"
