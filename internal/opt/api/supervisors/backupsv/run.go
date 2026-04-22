@@ -11,8 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
-
 	"github.com/pgrwl/pgrwl/internal/opt/api/rest/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
