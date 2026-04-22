@@ -8,10 +8,9 @@ import (
 	"sync"
 	"syscall"
 
-	serveAPI "github.com/pgrwl/pgrwl/internal/opt/modes/servemode"
-	"github.com/pgrwl/pgrwl/internal/opt/shared"
-
 	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/opt/api"
+	serveAPI "github.com/pgrwl/pgrwl/internal/opt/api/servemode"
 )
 
 type ServeModeOpts struct {
@@ -28,7 +27,7 @@ func RunServeMode(opts *ServeModeOpts) {
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
-	stor, err := shared.SetupStorage(&shared.SetupStorageOpts{
+	stor, err := api.SetupStorage(&api.SetupStorageOpts{
 		BaseDir: opts.Directory,
 		SubPath: config.LocalFSStorageSubpath,
 	})
@@ -54,11 +53,11 @@ func RunServeMode(opts *ServeModeOpts) {
 			}
 		}()
 
-		handlers := serveAPI.Init(&serveAPI.ServeHandlerOpts{
+		handlers := serveAPI.Init(&serveAPI.Opts{
 			BaseDir: opts.Directory,
 			Storage: stor,
 		})
-		srv := shared.NewHTTPSrv(opts.ListenPort, handlers)
+		srv := api.NewHTTPServer(opts.ListenPort, handlers)
 		if err := srv.Run(ctx); err != nil {
 			loggr.Info("http server failed", slog.Any("err", err))
 			cancel()
