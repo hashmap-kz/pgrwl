@@ -27,7 +27,7 @@ func initHandlers(controller *ServeController) http.Handler {
 	})
 
 	// Standalone mode (i.e. just serving wal-archive during restore)
-	mux.Handle("/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
+	mux.Handle("/api/v1/wal/{filename}", plainChain(http.HandlerFunc(controller.WalFileDownloadHandler)))
 
 	return mux
 }

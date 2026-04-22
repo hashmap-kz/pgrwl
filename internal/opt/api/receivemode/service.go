@@ -23,6 +23,7 @@ type Service interface {
 	Status() *PgRwlStatus
 	DeleteWALsBefore(ctx context.Context, walFileName string) error
 	BriefConfig(ctx context.Context) *BriefConfig
+	FullRedactedConfig(ctx context.Context) *config.Config
 }
 
 type receiveModeSvc struct {
@@ -146,4 +147,9 @@ func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string)
 func (s *receiveModeSvc) BriefConfig(_ context.Context) *BriefConfig {
 	cfg := config.Cfg()
 	return &BriefConfig{RetentionEnable: cfg.Receiver.Retention.Enable}
+}
+
+func (s *receiveModeSvc) FullRedactedConfig(_ context.Context) *config.Config {
+	c := config.RedactedCopy()
+	return &c
 }

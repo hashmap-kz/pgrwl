@@ -29,6 +29,11 @@ func (c *ReceiveController) BriefConfig(w http.ResponseWriter, r *http.Request) 
 	httpx.WriteJSON(w, http.StatusOK, briefConfig)
 }
 
+func (c *ReceiveController) FullRedactedConfig(w http.ResponseWriter, r *http.Request) {
+	briefConfig := c.Service.FullRedactedConfig(r.Context())
+	httpx.WriteJSON(w, http.StatusOK, briefConfig)
+}
+
 func (c *ReceiveController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *http.Request) {
 	filename, err := httpx.PathValueString(r, "filename")
 	if err != nil {

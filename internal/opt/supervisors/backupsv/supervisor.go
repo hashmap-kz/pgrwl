@@ -189,7 +189,7 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 
 	// get WAL filename as a starting point (to clean everything before that name)
 	filename := xlog.XLogFileName(conv.ToUint32(info.TimelineID), uint64(info.StopLSN), startupInfo.WalSegSz)
-	url := fmt.Sprintf("%s/wal-before/%s", addr, filename)
+	url := fmt.Sprintf("%s/api/v1/wal-before/%s", addr, filename)
 
 	u.log().Info("cleanup data",
 		slog.String("receiver-addr", addr),
@@ -231,7 +231,7 @@ func (u *BaseBackupSupervisor) getReceiverConfig() (*receivemode.BriefConfig, er
 	}
 
 	var c receivemode.BriefConfig
-	resp, err := u.restyClient.R().SetResult(&c).Get(addr + "/config")
+	resp, err := u.restyClient.R().SetResult(&c).Get(addr + "/api/v1/brief-config")
 	if err != nil {
 		return nil, err
 	}
