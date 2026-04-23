@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/jackc/pglogrepl v0.0.0-20260401131349-e37c41485510
-	github.com/jackc/pgx/v5 v5.9.1
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/klauspost/compress v1.18.5
 	github.com/pkg/sftp v1.13.10
 	github.com/prometheus/client_golang v1.23.2
