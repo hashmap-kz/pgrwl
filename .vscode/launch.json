@@ -2,20 +2,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "backup",
-      "type": "go",
-      "request": "launch",
-      "mode": "debug",
-      "program": "${workspaceFolder}/main.go",
-      "buildFlags": "-tags=debug",
-      "args": [
-        "backup",
-        "-c",
-        "${workspaceFolder}/hack/configs/localfs/receive.yml"
-      ],
-      "envFile": "${workspaceFolder}/.vscode/pg.env"
-    },
-    {
       "name": "receive",
       "type": "go",
       "request": "launch",
@@ -33,6 +19,36 @@
       "env": {
         "TZ": "UTC"
       }
+    },
+    {
+      "name": "backup-cmd",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/main.go",
+      "buildFlags": "-tags=debug",
+      "args": [
+        "backup",
+        "-c",
+        "${workspaceFolder}/hack/configs/localfs/receive.yml"
+      ],
+      "envFile": "${workspaceFolder}/.vscode/pg.env"
+    },
+    {
+      "name": "restore-cmd",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/main.go",
+      "buildFlags": "-tags=debug",
+      "args": [
+        "restore",
+        "-c",
+        "${workspaceFolder}/hack/configs/localfs/receive.yml",
+        "--dest",
+        "restore_test"
+      ],
+      "envFile": "${workspaceFolder}/.vscode/pg.env"
     }
   ]
 }
