@@ -34,6 +34,31 @@ func (c *ReceiveController) FullRedactedConfig(w http.ResponseWriter, r *http.Re
 	httpx.WriteJSON(w, http.StatusOK, briefConfig)
 }
 
+func (c *ReceiveController) SnapshotHandler(w http.ResponseWriter, r *http.Request) {
+	snap := c.Service.Snapshot(r.Context())
+	httpx.WriteJSON(w, http.StatusOK, snap)
+}
+
+func (c *ReceiveController) WalsHandler(w http.ResponseWriter, r *http.Request) {
+	snap, err := c.Service.ListWALFiles(r.Context())
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{
+			"err": err.Error(),
+		})
+	}
+	httpx.WriteJSON(w, http.StatusOK, snap)
+}
+
+func (c *ReceiveController) BackupsHandler(w http.ResponseWriter, r *http.Request) {
+	snap, err := c.Service.ListBackups(r.Context())
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{
+			"err": err.Error(),
+		})
+	}
+	httpx.WriteJSON(w, http.StatusOK, snap)
+}
+
 func (c *ReceiveController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *http.Request) {
 	filename, err := httpx.PathValueString(r, "filename")
 	if err != nil {
