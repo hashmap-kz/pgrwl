@@ -26,6 +26,10 @@ const (
 	// ModeServe represents the HTTP API serving mode.
 	ModeServe = "serve"
 
+	// ModeCombined runs WAL receiving and WAL serving in a single process.
+	// The receiver can be started/stopped at runtime via POST /receiver.
+	ModeCombined = "combined"
+
 	// ModeBackup used in pgrwl streaming basebackup mode.
 	ModeBackup = "backup"
 
@@ -82,6 +86,7 @@ var (
 		ModeBackup,
 		ModeReceive,
 		ModeServe,
+		ModeCombined,
 	}
 )
 
@@ -429,8 +434,8 @@ func checkMainConfig(c *Config, errs []string) []string {
 }
 
 func checkReceiverConfig(c *Config, mode string, errs []string) []string {
-	// Validate receiver (only in receive mode)
-	if mode == ModeReceive {
+	// Validate receiver (only in receive / combined mode)
+	if mode == ModeReceive || mode == ModeCombined {
 		if strings.TrimSpace(c.Receiver.Slot) == "" {
 			errs = append(errs, "receiver.slot is required in receive mode")
 		}

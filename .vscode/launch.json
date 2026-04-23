@@ -33,6 +33,25 @@
       "env": {
         "TZ": "UTC"
       }
+    },
+    {
+      "name": "receive-combined",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/main.go",
+      "buildFlags": "-tags=debug",
+      "args": [
+        "daemon",
+        "-c",
+        "${workspaceFolder}/hack/configs/localfs/receive.yml",
+        "-m",
+        "combined"
+      ],
+      "envFile": "${workspaceFolder}/.vscode/pg.env",
+      "env": {
+        "TZ": "UTC"
+      }
     }
   ]
 }
