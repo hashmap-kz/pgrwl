@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"github.com/pgrwl/pgrwl/cmd/pgrwl/app"
 	"log"
 	"os"
+
+	"github.com/pgrwl/pgrwl/cmd/pgrwl/app"
 )
 
 func main() {
