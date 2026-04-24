@@ -14,7 +14,7 @@
     <kind value="FILE" />
     <package value="github.com/pgrwl/pgrwl" />
     <directory value="$PROJECT_DIR$" />
-    <filePath value="$PROJECT_DIR$/main.go" />
+    <filePath value="$PROJECT_DIR$/cmd/pgrwl/main.go" />
     <method v="2" />
   </configuration>
 </component>

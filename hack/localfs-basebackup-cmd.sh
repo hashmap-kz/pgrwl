@@ -6,4 +6,4 @@ export PGPORT=5432
 export PGUSER=postgres
 export PGPASSWORD=postgres
 
-go run ../main.go backup -c configs/localfs/receive.yml
+go run ../cmd/pgrwl/main.go backup -c configs/localfs/receive.yml

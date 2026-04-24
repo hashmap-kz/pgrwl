@@ -62,4 +62,4 @@ export PGPORT=15432
 export PGUSER=postgres
 export PGPASSWORD=postgres
 export PGRWL_DAEMON_MODE=receive
-go run main.go daemon -c config.yml
+go run cmd/pgrwl/main.go daemon -c config.yml

@@ -7,4 +7,4 @@ export PGUSER=postgres
 export PGPASSWORD=postgres
 export PGRWL_DAEMON_MODE=receive
 
-go run ../main.go daemon -c configs/localfs/receive.yml
+go run ../cmd/pgrwl/main.go daemon -c configs/localfs/receive.yml

@@ -20,4 +20,4 @@ export PGRWL_LOG_LEVEL="trace"
 export PGRWL_LOG_FORMAT="text"
 export PGRWL_LOG_ADD_SOURCE="true"
 
-go run ../main.go daemon
+go run ../cmd/pgrwl/main.go daemon

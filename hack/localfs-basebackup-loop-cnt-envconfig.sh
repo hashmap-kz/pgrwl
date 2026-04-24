@@ -28,4 +28,4 @@ export PGRWL_BACKUP_RETENTION_TYPE='count'
 export PGRWL_BACKUP_RETENTION_VALUE='2'
 export PGRWL_BACKUP_RETENTION_KEEP_LAST='1'
 
-go run ../main.go daemon
+go run ../cmd/pgrwl/main.go daemon
