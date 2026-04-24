@@ -84,11 +84,6 @@ See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-sta
 
 ### Docker-Compose Quick Start
 
-<details>
-
-<summary>docker-compose.yml</summary>
-
-
 `Receive` mode is _the main loop of the WAL receiver_.
 
 ```yaml
@@ -198,8 +193,6 @@ configs:
         format: text
         add_source: false
 ```
-
-</details>
 
 ### Restore Command
 
