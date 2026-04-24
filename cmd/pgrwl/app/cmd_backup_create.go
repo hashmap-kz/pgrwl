@@ -1,4 +1,4 @@
-package cmd
+package app
 
 import (
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backup"

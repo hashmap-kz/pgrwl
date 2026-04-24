@@ -6,7 +6,7 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/main.go",
+      "program": "${workspaceFolder}/cmd/pgrwl/main.go",
       "buildFlags": "-tags=debug",
       "args": [
         "daemon",
@@ -25,7 +25,7 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/main.go",
+      "program": "${workspaceFolder}/cmd/pgrwl/main.go",
       "buildFlags": "-tags=debug",
       "args": [
         "backup",
@@ -39,7 +39,7 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "program": "${workspaceFolder}/main.go",
+      "program": "${workspaceFolder}/cmd/pgrwl/main.go",
       "buildFlags": "-tags=debug",
       "args": [
         "restore",

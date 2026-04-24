@@ -7,6 +7,7 @@ before:
 builds:
   - id: pgrwl
     binary: pgrwl
+    main: ./cmd/pgrwl/main.go
     ldflags:
       - -s -w
       - -X 'github.com/pgrwl/pgrwl/internal/version.Version={{.Version}}'
@@ -80,7 +81,7 @@ nfpms:
     maintainer: alexey.zh
     homepage: "https://github.com/pgrwl/pgrwl"
     description: "Durable PostgreSQL WAL streaming"
-    license: "Apache-2.0"
+    license: "MIT"
     formats:
       - deb
       - rpm
@@ -100,7 +101,6 @@ dockers:
     extra_files:
       - go.mod
       - go.sum
-      - main.go
       - cmd/
       - config/
       - internal/

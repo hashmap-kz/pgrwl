@@ -13,11 +13,11 @@ endif
 
 .PHONY: build
 build: gen ## Build the binary
-	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(OUTPUT) main.go
+	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(OUTPUT) cmd/pgrwl/main.go
 
 .PHONY: build-linux
 build-linux: gen ## Build the binary
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/pgrwl main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/pgrwl cmd/pgrwl/main.go
 
 .PHONY: lint
 lint: ## Run golangci-lint

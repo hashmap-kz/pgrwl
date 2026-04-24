@@ -7,4 +7,4 @@ export PGUSER=postgres
 export PGPASSWORD=postgres
 export PGRWL_DAEMON_MODE=backup
 
-go run ../main.go daemon -c configs/localfs/backup-count-retention.yml
+go run ../cmd/pgrwl/main.go daemon -c configs/localfs/backup-count-retention.yml

@@ -39,4 +39,4 @@ export PGRWL_STORAGE_S3_REGION=main
 export PGRWL_STORAGE_S3_USE_PATH_STYLE=true
 export PGRWL_STORAGE_S3_DISABLE_SSL=true
 
-go run ../main.go daemon
+go run ../cmd/pgrwl/main.go daemon

@@ -9,4 +9,4 @@ export PGPASSWORD=postgres
 # test/integration/environ
 export PGRWL_MINIO_URL="https://localhost:9000"
 
-go run ../main.go backup -c configs/s3/receive.yml
+go run ../cmd/pgrwl/main.go backup -c configs/s3/receive.yml

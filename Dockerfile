@@ -10,7 +10,7 @@ COPY . .
 
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 
-RUN go test -v ./... && go build -ldflags="-s -w" -o ./pgrwl
+RUN go test -v ./... && go build -ldflags="-s -w" -o ./pgrwl cmd/pgrwl/main.go
 
 FROM alpine:3.21.5 AS build-release-stage
 
