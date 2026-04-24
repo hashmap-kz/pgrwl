@@ -84,11 +84,6 @@ See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-sta
 
 ### Docker-Compose Quick Start
 
-<details>
-
-<summary>docker-compose.yml</summary>
-
-
 `Receive` mode is _the main loop of the WAL receiver_.
 
 ```yaml
@@ -106,7 +101,7 @@ services:
     volumes:
       - pg-primary-data:/var/lib/postgresql/17/main
     command: >
-      -c config_file=/etc/postgresql/postgresql.conf 
+      -c config_file=/etc/postgresql/postgresql.conf
       -c hba_file=/etc/postgresql/pg_hba.conf
     configs:
       - source: pg_hba.conf
@@ -156,6 +151,13 @@ configs:
 
   postgresql.conf:
     content: |
+      # log_error_verbosity:
+      # TERSE, DEFAULT, VERBOSE
+
+      # log_min_messages:
+      # DEBUG5, DEBUG4, DEBUG3, DEBUG2, DEBUG1,
+      # INFO, NOTICE, WARNING, ERROR, LOG, FATAL, PANIC
+
       listen_addresses         = '*'
       logging_collector        = on
       log_directory            = '/var/log/postgresql'
@@ -165,9 +167,9 @@ configs:
       log_checkpoints          = on
       log_connections          = off
       log_destination          = 'stderr'
-      log_error_verbosity      = 'DEFAULT' # TERSE, DEFAULT, VERBOSE
+      log_error_verbosity      = 'DEFAULT'
       log_hostname             = off
-      log_min_messages         = 'WARNING' # DEBUG5, DEBUG4, DEBUG3, DEBUG2, DEBUG1, INFO, NOTICE, WARNING, ERROR, LOG, FATAL, PANIC
+      log_min_messages         = 'WARNING'
       log_timezone             = 'Asia/Aqtau'
       log_line_prefix          = '%t [%p-%l] %r %q%u@%d '
       wal_level                = replica
@@ -191,8 +193,6 @@ configs:
         format: text
         add_source: false
 ```
-
-</details>
 
 ### Restore Command
 
