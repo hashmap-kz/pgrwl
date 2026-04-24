@@ -24,9 +24,7 @@ integration with Kubernetes environments.
 - [About](#about)
 - [Usage](#usage)
   - [Kubernetes Quick Start](#kubernetes-quick-start)
-  - [Receive Mode Quick Start](#receive-mode-quick-start)
-  - [Serve Mode](#serve-mode)
-  - [Backup Mode](#backup-mode)
+  - [Docker Compose Quick Start](#docker-compose-quick-start)
   - [Restore Command](#restore-command)
 - [Configuration Reference](#configuration-reference)
 - [Installation](#installation)
@@ -82,126 +80,116 @@ integration with Kubernetes environments.
 
 See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-start)
 
-### Receive Mode Quick Start
+### Docker-Compose Quick Start
 
 `Receive` mode is _the main loop of the WAL receiver_.
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-# Clone repo
-git clone https://github.com/pgrwl/pgrwl.git
-cd pgrwl
-
-# Prepare docker-compose files
-cat <<EOF >pg_hba.conf
-local all         all     trust
-local replication all     trust
-host  all         all all trust
-host  replication all all trust
-EOF
-
-cat <<EOF >docker-compose.yml
+```yaml
 services:
   pg-primary:
-    image: postgres:17
+    image: postgres:17.9-bookworm
     container_name: pg-primary
     restart: unless-stopped
     environment:
+      TZ: "Asia/Aqtau"
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "15432:5432"
     volumes:
       - pg-primary-data:/var/lib/postgresql/17/main
-      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-    command: -c wal_level=replica
-      -c max_wal_senders=10
-      -c wal_keep_size=64MB
-      -c listen_addresses=*
-      -c log_replication_commands=on
+    command: >
+      -c config_file=/etc/postgresql/postgresql.conf
       -c hba_file=/etc/postgresql/pg_hba.conf
+    configs:
+      - source: pg_hba.conf
+        target: /etc/postgresql/pg_hba.conf
+        mode: "0755"
+      - source: postgresql.conf
+        target: /etc/postgresql/postgresql.conf
+        mode: "0755"
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  pgrwl-receive:
+    container_name: pgrwl-receive
+    image: quay.io/pgrwl/pgrwl:1.0.31
+    environment:
+      TZ: "Asia/Aqtau"
+      PGHOST: pg-primary
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    ports:
+      - "7070:7070"
+    command: daemon -c /etc/pgrwl-config.yaml -m receive
+    configs:
+      - source: pgrwl-config.yaml
+        target: /etc/pgrwl-config.yaml
+        mode: "0755"
+    volumes:
+      - ./wals:/mnt
+    depends_on:
+      pg-primary:
+        condition: service_healthy
+
 volumes:
   pg-primary-data:
-EOF
 
-# Run containers, wait while pg is ready
-docker compose up -d
-until docker exec pg-primary pg_isready -U postgres >/dev/null 2>&1; do
-  echo "Waiting for PostgreSQL to be ready..."
-  sleep 1
-done
+configs:
+  pg_hba.conf:
+    content: |
+      local all         all     trust
+      local replication all     trust
+      host  all         all all trust
+      host  replication all all trust
 
-# Run WAL receiver with local storage
-cat <<EOF >config.yml
-main:
-  listen_port: 7070
-  directory: wals
-receiver:
-  slot: pgrwl_v5
-log:
-  level: trace
-  format: text
-  add_source: true
-EOF
+  postgresql.conf:
+    content: |
+      # log_error_verbosity:
+      # TERSE, DEFAULT, VERBOSE
 
-export PGHOST=localhost
-export PGPORT=15432
-export PGUSER=postgres
-export PGPASSWORD=postgres
-export PGRWL_DAEMON_MODE=receive
-go run main.go daemon -c config.yml
-```
+      # log_min_messages:
+      # DEBUG5, DEBUG4, DEBUG3, DEBUG2, DEBUG1,
+      # INFO, NOTICE, WARNING, ERROR, LOG, FATAL, PANIC
 
-### Serve Mode
+      listen_addresses         = '*'
+      logging_collector        = on
+      log_directory            = '/var/log/postgresql'
+      log_filename             = 'pg.log'
+      log_lock_waits           = on
+      log_temp_files           = 0
+      log_checkpoints          = on
+      log_connections          = off
+      log_destination          = 'stderr'
+      log_error_verbosity      = 'DEFAULT'
+      log_hostname             = off
+      log_min_messages         = 'WARNING'
+      log_timezone             = 'Asia/Aqtau'
+      log_line_prefix          = '%t [%p-%l] %r %q%u@%d '
+      wal_level                = replica
+      max_wal_senders          = 10
+      max_replication_slots    = 10
+      wal_keep_size            = 64MB
+      log_replication_commands = on
+      datestyle                = 'iso, mdy'
+      timezone                 = 'Asia/Aqtau'
+      shared_preload_libraries = 'pg_stat_statements'
 
-`Serve` mode is _used during restore to serve archived WAL files from storage_.
-
-```bash
-cat <<EOF >config.yml
-main:
-  listen_port: 7070
-  directory: wals
-log:
-  level: trace
-  format: text
-  add_source: true
-EOF
-
-export PGRWL_DAEMON_MODE=serve
-
-pgrwl daemon -c config.yml
-```
-
-### Backup Mode
-
-`Backup` mode performs a full base backup of your PostgreSQL cluster on a configured schedule.
-
-```bash
-cat <<EOF >config.yml
-main:
-  listen_port: 7070
-  directory: wals
-backup:
-  cron: "0 0 */3 * *"
-  retention:
-    enable: true
-    type: time
-    value: "96h"
-log:
-  level: trace
-  format: text
-  add_source: true
-EOF
-
-export PGHOST=localhost
-export PGPORT=5432
-export PGUSER=postgres
-export PGPASSWORD=postgres
-export PGRWL_DAEMON_MODE=backup
-
-pgrwl daemon -c config.yml
+  pgrwl-config.yaml:
+    content: |
+      main:
+        listen_port: 7070
+        directory: "/mnt/wal-archive"
+      receiver:
+        slot: pgrwl_v5
+      log:
+        level: info
+        format: text
+        add_source: false
 ```
 
 ### Restore Command
