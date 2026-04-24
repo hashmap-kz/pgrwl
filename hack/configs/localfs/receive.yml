@@ -9,7 +9,7 @@ receiver:
     sync_interval: 10s
     max_concurrency: 4
   retention:
-    enable: true
+    enable: false
     sync_interval: 10s
     keep_period: "30s"
 

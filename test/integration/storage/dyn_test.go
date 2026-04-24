@@ -198,7 +198,7 @@ func TestDynStorage_Get_WithExplicitExtension(t *testing.T) {
 	// Build explicit path with extension
 	fullPath := logical + ".gz.aes"
 
-	// Get by explicit ext through ANY instance – let's use "plain" here.
+	// Get by explicit ext through ANY instance - let's use "plain" here.
 	stPlain := storages["plain"]
 
 	rc, err := stPlain.Get(ctx, fullPath)

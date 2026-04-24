@@ -24,7 +24,7 @@ func ExecRestoreCommand(walFileName, walFilePath string, opts *RestoreCommandOpt
 	if err != nil {
 		return err
 	}
-	baseURL := fmt.Sprintf("%s/wal/%s", addr, walFileName)
+	baseURL := fmt.Sprintf("%s/api/v1/wal/%s", addr, walFileName)
 
 	req, err := http.NewRequest("GET", baseURL, nil)
 	if err != nil {

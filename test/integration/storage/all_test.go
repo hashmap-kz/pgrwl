@@ -69,7 +69,7 @@ func impls(dir, subpath string) map[string]storage.Storage {
 	}
 
 	return map[string]storage.Storage{
-		// dynamic – **each has its own backend** too
+		// dynamic - **each has its own backend** too
 		"dyn-local-gz.aes": newVariadic(mkLocal("dyn-local-gz.aes"), ".gz.aes"),
 		"dyn-s3-gz.aes":    newVariadic(mkS3("dyn-s3-gz.aes"), ".gz.aes"),
 		"dyn-sftp-gz.aes":  newVariadic(mkSFTP("dyn-sftp-gz.aes"), ".gz.aes"),

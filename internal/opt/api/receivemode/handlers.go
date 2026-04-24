@@ -33,9 +33,15 @@ func initHandlers(cfg *config.Config, controller *ReceiveController) http.Handle
 	})
 
 	// Streaming mode (requires that wal-streaming process is running)
-	mux.Handle("/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
-	mux.Handle("/config", secureChain(http.HandlerFunc(controller.BriefConfig)))
-	mux.Handle("DELETE /wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
+	mux.Handle("GET /api/v1/status", secureChain(http.HandlerFunc(controller.StatusHandler)))
+	mux.Handle("GET /api/v1/brief-config", secureChain(http.HandlerFunc(controller.BriefConfig)))
+	mux.Handle("DELETE /api/v1/wal-before/{filename}", secureChain(http.HandlerFunc(controller.DeleteWALsBeforeHandler)))
+
+	// for external clients
+	mux.Handle("GET /api/v1/redacted-config", secureChain(http.HandlerFunc(controller.FullRedactedConfig)))
+	mux.Handle("GET /api/v1/snapshot", secureChain(http.HandlerFunc(controller.SnapshotHandler)))
+	mux.Handle("GET /api/v1/wals", secureChain(http.HandlerFunc(controller.WalsHandler)))
+	mux.Handle("GET /api/v1/backups", secureChain(http.HandlerFunc(controller.BackupsHandler)))
 
 	api.InitOptionalHandlers(cfg, mux, l)
 	return mux

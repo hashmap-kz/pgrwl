@@ -285,8 +285,23 @@ type S3Config struct {
 
 // String returns a pretty-printed structure where sensitive fields are hidden.
 func (c *Config) String() string {
+	cp := RedactedCopy()
+
+	// Marshal the copy
+	b, err := json.MarshalIndent(&cp, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func RedactedCopy() Config {
+	if config == nil {
+		return Config{}
+	}
+
 	// Step 1: Make a shallow copy
-	cp := *c
+	cp := *config
 
 	// Step 2: Redact sensitive fields (distinct between empty and filled)
 	const redacted = "[REDACTED]"
@@ -303,12 +318,7 @@ func (c *Config) String() string {
 		cp.Storage.S3.SecretAccessKey = redacted
 	}
 
-	// Step 3: Marshal the copy
-	b, err := json.MarshalIndent(cp, "", "  ")
-	if err != nil {
-		return ""
-	}
-	return string(b)
+	return cp
 }
 
 func expandEnvsWithPrefix(input, prefix string) string {

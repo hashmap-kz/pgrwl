@@ -94,7 +94,7 @@ func TestSubmit_ReturnsErrWhenQueueIsFull(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	// Try to submit another job — should fail
+	// Try to submit another job - should fail
 	err = queue.Submit("job2", func(_ context.Context) {})
 	assert.ErrorIs(t, err, ErrJobQueueFull)
 	assert.Contains(t, err.Error(), "job2")

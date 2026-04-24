@@ -276,6 +276,15 @@ func (vs *VariadicStorage) ListInfo(ctx context.Context, prefix string) ([]FileI
 	return files, nil
 }
 
+func (vs *VariadicStorage) ListInfoRaw(ctx context.Context, prefix string) ([]FileInfo, error) {
+	prefix = filepath.ToSlash(prefix)
+	files, err := vs.Backend.ListInfo(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
 // Delete deletes all known variants for the given logical path.
 // If you want "only current writeExt" semantics, you can change
 // this to use vs.encodePath() instead.

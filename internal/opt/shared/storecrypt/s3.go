@@ -396,7 +396,7 @@ func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) e
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("delete objects batch %d–%d: %w", i, end, err)
+			return fmt.Errorf("delete objects batch %d-%d: %w", i, end, err)
 		}
 	}
 

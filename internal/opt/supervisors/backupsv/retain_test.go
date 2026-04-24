@@ -57,7 +57,7 @@ func TestFindOldBackupsToDeleteTimeBased(t *testing.T) {
 			backupDirs: []string{
 				"20250613100000", // valid, inside retention
 				"invalid",        // invalid, should be skipped
-				"20250609000000", // old → delete
+				"20250609000000", // old -> delete
 			},
 			wantDelete: []string{
 				"20250609000000",
