@@ -872,7 +872,7 @@ const templates = `
         {{ if eq (len .VisibleWAL) 0 }}<tr><td colspan="5"><div class="empty">no files match filter</div></td></tr>{{ end }}
         {{ range .VisibleWAL }}
         <tr>
-          <td class="mono">{{ .Name }}{{ if .Ext }}<span class="muted">.{{ .Ext }}</span>{{ end }}</td>
+          <td class="mono">{{ .Name }}{{ if .Ext }}<span class="muted">{{ .Ext }}</span>{{ end }}</td>
           <td class="mono">{{ fmtMB .SizeMB }}</td>
           <td class="mono muted">{{ fmtTime .UploadedAt }}</td>
           <td><span class="badge badge-{{ extVariant .Ext }}">{{ extLabel .Ext }}</span></td>
