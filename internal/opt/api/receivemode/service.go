@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 
@@ -221,15 +220,9 @@ func (s *receiveModeSvc) ListBackups(ctx context.Context) ([]Backup, error) {
 	for dir := range dirs {
 		label := filepath.Base(dir)
 
-		// Parse "started" from the timestamp label (format: 20060102150405).
-		started, parseErr := time.ParseInLocation("20060102150405", label, time.UTC)
-
 		b := Backup{
 			Label:  "pgrwl_" + label,
 			Status: "unknown",
-		}
-		if parseErr == nil {
-			b.Started = started
 		}
 
 		// Try to read the manifest to enrich the entry.
@@ -242,10 +235,8 @@ func (s *receiveModeSvc) ListBackups(ctx context.Context) ([]Backup, error) {
 				b.WALStartLSN = result.StartLSN.String()
 				b.WALStopLSN = result.StopLSN.String()
 				b.Status = "completed"
-
-				// Use StopLSN to approximate finish time when we only have the start.
-				// Real finish time isn't stored separately; treat the manifest mtime as a proxy.
-				b.Finished = b.Started // best-effort; callers may enrich via ListInfo
+				b.Started = result.StartedAt
+				b.Finished = result.FinishedAt
 			}
 			_ = rc.Close()
 		} else {
