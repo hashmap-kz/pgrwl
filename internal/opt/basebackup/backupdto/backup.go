@@ -1,8 +1,9 @@
 package backupdto
 
 import (
-	"github.com/jackc/pglogrepl"
 	"time"
+
+	"github.com/jackc/pglogrepl"
 )
 
 // https://www.postgresql.org/docs/current/protocol-replication.html#PROTOCOL-REPLICATION-BASE-BACKUP
