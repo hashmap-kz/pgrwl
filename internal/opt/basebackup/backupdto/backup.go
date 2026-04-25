@@ -1,6 +1,8 @@
 package backupdto
 
 import (
+	"time"
+
 	"github.com/jackc/pglogrepl"
 )
 
@@ -19,6 +21,8 @@ type Result struct {
 	TimelineID  int32           `json:"timeline_id,omitempty"`
 	Tablespaces []Tablespace    `json:"tablespaces,omitempty"`
 	BytesTotal  int64           `json:"bytes_total,omitempty"`
+	StartedAt   time.Time       `json:"started_at"`
+	FinishedAt  time.Time       `json:"finished_at"`
 	Manifest    *BackupManifest `json:"manifest,omitempty"`
 }
 
