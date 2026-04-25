@@ -254,6 +254,8 @@ func (bb *baseBackup) streamBaseBackup(ctx context.Context) (*backupdto.Result, 
 
 			result.StopLSN = stopRes.LSN
 			result.BytesTotal = totalBytes
+			result.StartedAt = startTime.UTC()
+			result.FinishedAt = time.Now().UTC()
 
 			if manifestBuf.Len() > 0 {
 				manifest := backupdto.BackupManifest{}
