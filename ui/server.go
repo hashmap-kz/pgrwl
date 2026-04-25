@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
 	"html/template"
@@ -72,9 +71,11 @@ func (s *Server) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("/ui/fragments/backups-table", s.backupsTableFragment)
 }
 
-// redirectRoot always redirects /ui -> /ui/status.
-// The handler is only called for exactly "/ui" so no path check is needed.
 func (s *Server) redirectRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/ui" {
+		http.NotFound(w, r)
+		return
+	}
 	http.Redirect(w, r, "/ui/status", http.StatusSeeOther)
 }
 
@@ -110,11 +111,6 @@ func (s *Server) backupsTableFragment(w http.ResponseWriter, r *http.Request) {
 func (s *Server) buildView(r *http.Request, active string) View {
 	selected := selectedReceiverIndex(r, len(s.receivers))
 	snap := s.client.Snapshot(r.Context(), s.receivers[selected])
-
-	// Sort WAL files once here, not inside the hot filter path.
-	sort.SliceStable(snap.WALFiles, func(i, j int) bool {
-		return snap.WALFiles[i].UploadedAt.After(snap.WALFiles[j].UploadedAt)
-	})
 
 	walFilter := r.URL.Query().Get("ext")
 	if walFilter == "" {
@@ -152,18 +148,11 @@ func (s *Server) buildView(r *http.Request, active string) View {
 	}
 }
 
-// render buffers the template output so that errors don't result in a
-// partial HTML response with an already-flushed 200 header.
 func (s *Server) render(w http.ResponseWriter, _ *http.Request, name string, data any) {
-	var buf bytes.Buffer
-	if err := s.tpl.ExecuteTemplate(&buf, name, data); err != nil {
-		s.log.Error("render failed", slog.String("template", name), slog.Any("err", err))
-		http.Error(w, "render error", http.StatusInternalServerError)
-		return
-	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	//nolint:errcheck
-	_, _ = buf.WriteTo(w)
+	if err := s.tpl.ExecuteTemplate(w, name, data); err != nil {
+		s.log.Error("render failed", slog.String("template", name), slog.Any("err", err))
+	}
 }
 
 func selectedReceiverIndex(r *http.Request, count int) int {
@@ -182,8 +171,6 @@ func parseNonNegativeInt(s string) int {
 	return v
 }
 
-// filterWAL filters files by filename query and extension.
-// Sorting is done once in buildView; this function only filters.
 func filterWAL(files []WALFile, query, ext string) []WALFile {
 	query = strings.ToLower(query)
 	out := make([]WALFile, 0, len(files))
@@ -203,6 +190,7 @@ func filterWAL(files []WALFile, query, ext string) []WALFile {
 		}
 		out = append(out, f)
 	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].UploadedAt.After(out[j].UploadedAt) })
 	return out
 }
 

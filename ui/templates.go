@@ -65,20 +65,6 @@ func parseTemplates() *template.Template {
 		"config":         func(v View) *BriefConfig { return v.Snapshot.Config },
 		"retentionLabel": retentionLabel,
 		"retentionClass": retentionClass,
-		"pageTitle": func(active string) string {
-			switch active {
-			case "status":
-				return "pgrwl - Status"
-			case "wal":
-				return "pgrwl - WAL files"
-			case "backups":
-				return "pgrwl - Backups"
-			case "config":
-				return "pgrwl - Config"
-			default:
-				return "pgrwl"
-			}
-		},
 		"yesNo": func(v bool) string {
 			if v {
 				return "yes"
@@ -121,7 +107,7 @@ func parseTemplates() *template.Template {
 			if v {
 				return "aes-gcm"
 			}
-			return "-"
+			return "none"
 		},
 		"encVariant": func(v bool) string {
 			if v {
@@ -141,7 +127,6 @@ func parseTemplates() *template.Template {
 		"lastBackup": lastBackup,
 		"duration":   duration,
 		"restore":    restoreReadiness,
-		"showFooter": func(v View) bool { return len(v.FilteredWAL) > 0 },
 	}
 
 	return template.Must(template.New("ui").Funcs(funcs).Parse(templates))
@@ -175,7 +160,6 @@ func statusClass(s *PgrwlStatus) string {
 		//nolint:goconst
 		return "bad"
 	default:
-		//nolint:goconst
 		return "warn"
 	}
 }
@@ -401,17 +385,6 @@ func restoreReadiness(v View) RestoreReadiness {
 
 	coveringWAL, ok := walFileNameForLSN(r.BackupEndLSN, v.Snapshot.WALFiles)
 	if !ok {
-		if len(v.Snapshot.WALFiles) == 0 {
-			r.PossibleLabel = "no"
-			r.StatusClass = "bad"
-			r.Summary = "no WAL files in archive"
-			r.CoveringWAL = "missing"
-			r.CoveringClass = "bad"
-			r.SequenceLabel = "not checked"
-			r.SequenceClass = "warn"
-			r.Note = "No WAL files are present in the archive; cannot verify restore chain."
-			return r
-		}
 		r.PossibleLabel = "no"
 		r.StatusClass = "bad"
 		r.Summary = "covering WAL not found"
@@ -492,10 +465,6 @@ func walSequenceStatus(coveringWAL string, files []WALFile) walSequenceCheck {
 }
 
 func walFileNameForLSN(lsn string, files []WALFile) (string, bool) {
-	if len(files) == 0 {
-		return "", false
-	}
-
 	seg, ok := segmentNoFromLSN(lsn)
 	if !ok {
 		return "", false
@@ -615,7 +584,7 @@ const templates = `
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{{ pageTitle .Active }}</title>
+  <title>pgrwl control room</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/ui/static/app.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -639,10 +608,13 @@ const templates = `
 
 {{ define "topbar" }}
 <header class="topbar">
-  <div class="brand">
-    <span class="brand-title">pgrwl</span>
-    <span class="brand-sub">WAL receiver</span>
+  <div class="brand-block">
+    <div>
+      <div class="logo">PGRWL system panel</div>
+    </div>
   </div>
+
+  <div class="spacer"></div>
 
   <form class="recv-wrap" method="get" action="/ui/{{ .Active }}">
     <span class="recv-label">receiver</span>
@@ -655,30 +627,30 @@ const templates = `
     {{ if .ExtFilter }}<input type="hidden" name="ext" value="{{ .ExtFilter }}">{{ end }}
   </form>
 
-  <div class="topbar-right">
-    <span class="system-chip system-chip-{{ statusClass .Snapshot.Status }}">
-      <span class="small-lamp {{ statusClass .Snapshot.Status }}"></span>{{ statusText .Snapshot.Status }}
-    </span>
-    <a class="btn" href="/ui/{{ .Active }}?receiver={{ .SelectedIndex }}">refresh</a>
-  </div>
+  <span class="system-chip system-chip-{{ statusClass .Snapshot.Status }}">
+    <span class="small-lamp {{ statusClass .Snapshot.Status }}"></span>{{ statusText .Snapshot.Status }}
+  </span>
+
+  <a class="btn" href="/ui/{{ .Active }}?receiver={{ .SelectedIndex }}">refresh</a>
 </header>
 {{ end }}
 
 {{ define "sidebar" }}
 <nav class="sidebar">
-  <div class="side-title">Navigation</div>
+  <div class="side-title">Sections</div>
   <a class="nav-item {{ active .Active "status" }}" href="/ui/status?receiver={{ .SelectedIndex }}">
-    <span>Status</span><span class="side-badge">live</span>
+    <span>Overview</span><span class="side-badge">LIVE</span>
   </a>
   <a class="nav-item {{ active .Active "wal" }}" href="/ui/wal?receiver={{ .SelectedIndex }}">
-    <span>WAL files</span>{{ if walCount . }}<span class="side-badge">{{ walCount . }}</span>{{ end }}
+    <span>WAL Files</span>{{ if walCount . }}<span class="side-badge">{{ walCount . }}</span>{{ end }}
   </a>
   <a class="nav-item {{ active .Active "backups" }}" href="/ui/backups?receiver={{ .SelectedIndex }}">
     <span>Backups</span>{{ if backupCount . }}<span class="side-badge">{{ backupCount . }}</span>{{ end }}
   </a>
   <a class="nav-item {{ active .Active "config" }}" href="/ui/config?receiver={{ .SelectedIndex }}">
-    <span>Config</span>
+    <span>Config</span><span class="side-badge">CFG</span>
   </a>
+
 </nav>
 {{ end }}
 
@@ -836,12 +808,12 @@ const templates = `
       <thead><tr><th>event</th><th>time</th><th>state</th><th>notes</th></tr></thead>
       <tbody>
         {{ if $lastWal }}
-        <tr><td class="mono">WAL uploaded</td><td class="mono muted">{{ fmtShortTime $lastWal.UploadedAt }}</td><td><span class="badge badge-ok">ok</span></td><td class="mono muted">{{ $lastWal.Name }} · {{ extLabel $lastWal.Ext }}{{ if $lastWal.Encrypted }} · encrypted{{ end }}</td></tr>
+        <tr><td class="mono">WAL uploaded {{ $lastWal.Name }}</td><td class="mono muted">{{ fmtShortTime $lastWal.UploadedAt }}</td><td><span class="small-lamp ok"></span>success</td><td>{{ extLabel $lastWal.Ext }} {{ if $lastWal.Encrypted }}+ encrypted{{ end }}</td></tr>
         {{ end }}
         {{ if $lastBackup }}
-        <tr><td class="mono">backup completed</td><td class="mono muted">{{ fmtShortTime $lastBackup.Finished }}</td><td><span class="badge badge-{{ backupVariant $lastBackup.Status }}">{{ $lastBackup.Status }}</span></td><td class="mono muted">{{ $lastBackup.Label }} · {{ fmtGB $lastBackup.SizeGB }} · {{ duration $lastBackup.Started $lastBackup.Finished }}</td></tr>
+        <tr><td class="mono">backup {{ $lastBackup.Label }}</td><td class="mono muted">{{ fmtShortTime $lastBackup.Finished }}</td><td><span class="small-lamp {{ backupVariant $lastBackup.Status }}"></span>{{ $lastBackup.Status }}</td><td>{{ fmtGB $lastBackup.SizeGB }} / {{ duration $lastBackup.Started $lastBackup.Finished }}</td></tr>
         {{ end }}
-        <tr><td class="mono">receiver heartbeat</td><td class="mono muted">now</td><td><span class="badge badge-{{ statusClass .Snapshot.Status }}">{{ chipLabel .Snapshot.Status }}</span></td><td class="mono muted">slot: {{ if $ss }}{{ $ss.Slot }}{{ else }}-{{ end }}</td></tr>
+        <tr><td class="mono">receiver heartbeat</td><td class="mono muted">now</td><td><span class="small-lamp {{ statusClass .Snapshot.Status }}"></span>{{ chipLabel .Snapshot.Status }}</td><td>slot {{ if $ss }}{{ $ss.Slot }}{{ else }}-{{ end }}</td></tr>
       </tbody>
     </table>
   </div>
@@ -852,7 +824,7 @@ const templates = `
 <div class="filter-bar">
   <form hx-get="/ui/fragments/wal-table" hx-target="#wal-table" hx-swap="outerHTML" class="filter-form">
     <input type="hidden" name="receiver" value="{{ .SelectedIndex }}">
-    <input class="search" type="text" name="q" value="{{ .Query }}" placeholder="filter by filename" hx-trigger="keyup changed delay:250ms" hx-get="/ui/fragments/wal-table" hx-target="#wal-table" hx-include="closest form">
+    <input class="search" type="text" name="q" value="{{ .Query }}" placeholder="filter by filename…" hx-trigger="keyup changed delay:250ms" hx-get="/ui/fragments/wal-table" hx-target="#wal-table" hx-include="closest form">
     <button class="filter-chip {{ if isFilter .ExtFilter "all" }}active{{ end }}" name="ext" value="all">all</button>
     <button class="filter-chip {{ if isFilter .ExtFilter "zst" }}active{{ end }}" name="ext" value="zst">zst</button>
     <button class="filter-chip {{ if isFilter .ExtFilter "gz" }}active{{ end }}" name="ext" value="gz">gz</button>
@@ -872,7 +844,7 @@ const templates = `
         {{ if eq (len .VisibleWAL) 0 }}<tr><td colspan="5"><div class="empty">no files match filter</div></td></tr>{{ end }}
         {{ range .VisibleWAL }}
         <tr>
-          <td class="mono">{{ .Name }}{{ if .Ext }}<span class="muted">.{{ .Ext }}</span>{{ end }}</td>
+          <td class="mono">{{ .Name }}{{ if .Ext }}<span class="ext">.{{ .Ext }}</span>{{ end }}</td>
           <td class="mono">{{ fmtMB .SizeMB }}</td>
           <td class="mono muted">{{ fmtTime .UploadedAt }}</td>
           <td><span class="badge badge-{{ extVariant .Ext }}">{{ extLabel .Ext }}</span></td>
@@ -882,18 +854,16 @@ const templates = `
       </tbody>
     </table>
   </div>
-  {{ if showFooter . }}
   <div class="footer">
-    <span class="footer-info">showing {{ .PageFrom }}-{{ .PageTo }} of {{ len .FilteredWAL }}</span>
+    <span class="footer-info">showing {{ .PageFrom }}–{{ .PageTo }} of {{ len .FilteredWAL }}</span>
     <div class="pagination">
-      <a class="pg-btn {{ if eq .Page 0 }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter 0 }}" hx-target="#wal-table" hx-swap="outerHTML">first</a>
-      <a class="pg-btn {{ if eq .Page 0 }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (sub .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML">prev</a>
+      <a class="pg-btn {{ if eq .Page 0 }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter 0 }}" hx-target="#wal-table" hx-swap="outerHTML" title="first page">first</a>
+      <a class="pg-btn {{ if eq .Page 0 }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (sub .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML" title="previous page">prev</a>
       {{ range .PageNums }}<a class="pg-btn {{ if eq $.Page . }}pg-active{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" $.SelectedIndex $.Query $.ExtFilter . }}" hx-target="#wal-table" hx-swap="outerHTML">{{ add . 1 }}</a>{{ end }}
-      <a class="pg-btn {{ if ge .Page (sub .TotalPages 1) }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (add .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML">next</a>
-      <a class="pg-btn {{ if ge .Page (sub .TotalPages 1) }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (sub .TotalPages 1) }}" hx-target="#wal-table" hx-swap="outerHTML">last</a>
+      <a class="pg-btn {{ if ge .Page (sub .TotalPages 1) }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (add .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML" title="next page">next</a>
+      <a class="pg-btn {{ if ge .Page (sub .TotalPages 1) }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (sub .TotalPages 1) }}" hx-target="#wal-table" hx-swap="outerHTML" title="last page">last</a>
     </div>
   </div>
-  {{ end }}
 </div>
 {{ end }}
 
