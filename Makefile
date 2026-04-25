@@ -1,6 +1,7 @@
 # Variables
 APP_NAME 	 := pgrwl
 OUTPUT   	 := $(APP_NAME)
+OUTPUT_UI    := pgrwl-ui
 COV_REPORT 	 := coverage.txt
 TEST_FLAGS 	 := -v -race -timeout 30s
 INSTALL_DIR  := /usr/local/bin
@@ -110,3 +111,18 @@ test-integ-storage-highload:
 .PHONY: test-integ-storage-teardown
 test-integ-storage-teardown:
 	@cd test/integration/storage/environ && bash teardown.sh
+
+### UI related
+
+.PHONY: build-ui
+build-ui: ## Build the binary
+	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(OUTPUT_UI) cmd/pgrwl-ui/main.go
+
+.PHONY: build-linux-ui
+build-linux-ui:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/pgrwl-ui cmd/pgrwl-ui/main.go
+
+.PHONY: image-ui
+image-ui: ## Build and push Docker image to localhost:5000
+	docker buildx build -t localhost:5000/pgrwl-ui -f Dockerfile-ui .
+	docker push localhost:5000/pgrwl-ui
