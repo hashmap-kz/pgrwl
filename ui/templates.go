@@ -157,6 +157,7 @@ func statusClass(s *PgrwlStatus) string {
 	case stateStreaming:
 		return "ok"
 	case stateStopped:
+		//nolint:goconst
 		return "bad"
 	default:
 		return "warn"
@@ -340,6 +341,7 @@ type RestoreReadiness struct {
 	Note        string
 }
 
+//nolint:gocritic
 func restoreReadiness(v View) RestoreReadiness {
 	const unknown = "-"
 
@@ -607,11 +609,12 @@ const templates = `
 {{ define "topbar" }}
 <header class="topbar">
   <div class="brand-block">
-
     <div>
       <div class="logo">PGRWL system panel</div>
     </div>
   </div>
+
+  <div class="spacer"></div>
 
   <form class="recv-wrap" method="get" action="/ui/{{ .Active }}">
     <span class="recv-label">receiver</span>
@@ -623,8 +626,6 @@ const templates = `
     {{ if .Query }}<input type="hidden" name="q" value="{{ .Query }}">{{ end }}
     {{ if .ExtFilter }}<input type="hidden" name="ext" value="{{ .ExtFilter }}">{{ end }}
   </form>
-
-  <div class="spacer"></div>
 
   <span class="system-chip system-chip-{{ statusClass .Snapshot.Status }}">
     <span class="small-lamp {{ statusClass .Snapshot.Status }}"></span>{{ statusText .Snapshot.Status }}
@@ -695,7 +696,7 @@ const templates = `
 <section class="restore-readiness">
   <div class="module-header">
     <h2>Restore Readiness</h2>
-    <span class="module-code">backup end LSN: {{ $restore.BackupEndLSN }}</span>
+    <span class="module-code">chain check</span>
   </div>
 
   <div class="restore-compact">
@@ -706,6 +707,10 @@ const templates = `
     </div>
 
     <div class="restore-facts">
+      <div class="restore-fact">
+        <span>backup end LSN</span>
+        <strong>{{ $restore.BackupEndLSN }}</strong>
+      </div>
       <div class="restore-fact">
         <span>covering WAL</span>
         <strong class="{{ $restore.CoveringClass }}">{{ $restore.CoveringWAL }}</strong>
@@ -816,16 +821,6 @@ const templates = `
 {{ end }}
 
 {{ define "wal-page" }}
-<div class="page-head">
-  <div>
-    <div class="eyebrow">storage module</div>
-    <h1>WAL Files</h1>
-  </div>
-  <div class="page-actions">
-    <span class="system-chip"><span class="small-lamp ok"></span>{{ len .FilteredWAL }} files</span>
-  </div>
-</div>
-
 <div class="filter-bar">
   <form hx-get="/ui/fragments/wal-table" hx-target="#wal-table" hx-swap="outerHTML" class="filter-form">
     <input type="hidden" name="receiver" value="{{ .SelectedIndex }}">
@@ -862,24 +857,17 @@ const templates = `
   <div class="footer">
     <span class="footer-info">showing {{ .PageFrom }}–{{ .PageTo }} of {{ len .FilteredWAL }}</span>
     <div class="pagination">
-      <a class="pg-btn {{ if eq .Page 0 }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (sub .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML">←</a>
+      <a class="pg-btn {{ if eq .Page 0 }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter 0 }}" hx-target="#wal-table" hx-swap="outerHTML" title="first page">first</a>
+      <a class="pg-btn {{ if eq .Page 0 }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (sub .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML" title="previous page">prev</a>
       {{ range .PageNums }}<a class="pg-btn {{ if eq $.Page . }}pg-active{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" $.SelectedIndex $.Query $.ExtFilter . }}" hx-target="#wal-table" hx-swap="outerHTML">{{ add . 1 }}</a>{{ end }}
-      <a class="pg-btn {{ if ge .Page (sub .TotalPages 1) }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (add .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML">→</a>
+      <a class="pg-btn {{ if ge .Page (sub .TotalPages 1) }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (add .Page 1) }}" hx-target="#wal-table" hx-swap="outerHTML" title="next page">next</a>
+      <a class="pg-btn {{ if ge .Page (sub .TotalPages 1) }}disabled{{ end }}" hx-get="{{ url "/ui/fragments/wal-table" .SelectedIndex .Query .ExtFilter (sub .TotalPages 1) }}" hx-target="#wal-table" hx-swap="outerHTML" title="last page">last</a>
     </div>
   </div>
 </div>
 {{ end }}
 
 {{ define "backups-page" }}
-<div class="page-head">
-  <div>
-    <div class="eyebrow">backup module</div>
-    <h1>Base Backups</h1>
-  </div>
-  <div class="page-actions">
-    <span class="system-chip"><span class="small-lamp ok"></span>{{ len .Snapshot.Backups }} backups</span>
-  </div>
-</div>
 {{ template "backups-table" . }}
 {{ end }}
 

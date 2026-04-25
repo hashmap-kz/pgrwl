@@ -84,6 +84,7 @@ func TestRestoreReadinessDetectsCoveringWALAndSequence(t *testing.T) {
 		}},
 	}})
 
+	//nolint:goconst
 	if got.PossibleLabel != "yes" {
 		t.Fatalf("restore possible = %q, want yes: %#v", got.PossibleLabel, got)
 	}

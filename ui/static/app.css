@@ -655,3 +655,177 @@ body::before {
     border-bottom:0;
   }
 }
+
+
+/* Refinement pass: plain nav, stable layout, no decorative magic. */
+body::before {
+  display: none;
+}
+
+.topbar {
+  gap: 12px;
+}
+
+.brand-block {
+  min-width: 220px;
+}
+
+.recv-wrap {
+  margin-left: auto;
+}
+
+.recv-label::before {
+  content: "";
+  margin: 0;
+}
+
+.recv-select {
+  min-width: 360px;
+}
+
+.sidebar {
+  padding: 0;
+}
+
+.side-title {
+  text-align: left;
+  padding: 10px 14px;
+  background: #151a20;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-title::before {
+  content: "";
+}
+
+.nav-item {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.nav-item::before,
+.nav-item.active::before {
+  content: "";
+}
+
+.nav-item.active {
+  background: #202832;
+  color: #fff;
+  border-left: 3px solid var(--blue);
+  padding-left: 11px;
+}
+
+.side-badge {
+  margin-left: auto;
+}
+
+.page-head {
+  display: none;
+}
+
+.module-header {
+  min-height: 36px;
+}
+
+.module-header h2::before {
+  content: "";
+}
+
+.module-code {
+  white-space: nowrap;
+}
+
+.restore-readiness .module-code {
+  color: var(--muted);
+}
+
+.restore-facts {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.restore-fact {
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 0;
+}
+
+.restore-fact:nth-child(2n),
+.restore-fact:nth-last-child(-n+2) {
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 0;
+}
+
+.restore-fact:last-child {
+  border-right: 0;
+}
+
+.footer {
+  align-items: center;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  border: 0;
+}
+
+.pg-btn {
+  min-width: auto;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  background: #151a20;
+}
+
+.pg-btn:last-child {
+  border-right: 1px solid var(--line);
+}
+
+.pg-active {
+  background: #202832;
+  color: #fff;
+  border-color: var(--blue);
+}
+
+.btn,
+.filter-chip,
+.pg-btn,
+.nav-item,
+.recv-select,
+.system-chip {
+  transition: none;
+}
+
+.ring {
+  animation: none;
+}
+
+@media (max-width: 1000px) {
+  .recv-wrap {
+    margin-left: 0;
+  }
+
+  .recv-select {
+    min-width: 220px;
+  }
+
+  .restore-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .restore-fact,
+  .restore-fact:nth-child(2n),
+  .restore-fact:nth-last-child(-n+2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .restore-fact:last-child {
+    border-bottom: 0;
+  }
+}
+
