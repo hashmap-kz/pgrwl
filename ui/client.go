@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,31 +24,64 @@ func NewHTTPClient() *HTTPClient {
 	}
 }
 
+// Snapshot fetches all four endpoints concurrently and merges results.
+// If /status fails the Snapshot.Error field is set; other fields are
+// populated independently so a partial view is still rendered.
 func (c *HTTPClient) Snapshot(ctx context.Context, receiver Receiver) Snapshot {
 	s := Snapshot{Receiver: receiver}
 
-	status, err := getJSON[PgrwlStatus](ctx, c.http(), receiver.Addr, "/api/v1/status")
-	if err != nil {
-		s.Error = fmt.Sprintf("cannot reach receiver at %s: %v", receiver.Addr, err)
-	} else {
-		s.Status = &status
+	var (
+		mu sync.Mutex
+		wg sync.WaitGroup
+	)
+
+	launch := func(fn func()) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			fn()
+		}()
 	}
 
-	cfg, err := getJSON[BriefConfig](ctx, c.http(), receiver.Addr, "/api/v1/brief-config")
-	if err == nil {
-		s.Config = &cfg
-	}
+	launch(func() {
+		status, err := getJSON[PgrwlStatus](ctx, c.http(), receiver.Addr, "/api/v1/status")
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			s.Error = fmt.Sprintf("cannot reach receiver at %s: %v", receiver.Addr, err)
+		} else {
+			s.Status = &status
+		}
+	})
 
-	wal, err := getJSON[[]WALFile](ctx, c.http(), receiver.Addr, "/api/v1/wals")
-	if err == nil {
-		s.WALFiles = wal
-	}
+	launch(func() {
+		cfg, err := getJSON[BriefConfig](ctx, c.http(), receiver.Addr, "/api/v1/brief-config")
+		if err == nil {
+			mu.Lock()
+			s.Config = &cfg
+			mu.Unlock()
+		}
+	})
 
-	backups, err := getJSON[[]Backup](ctx, c.http(), receiver.Addr, "/api/v1/backups")
-	if err == nil {
-		s.Backups = backups
-	}
+	launch(func() {
+		wal, err := getJSON[[]WALFile](ctx, c.http(), receiver.Addr, "/api/v1/wals")
+		if err == nil {
+			mu.Lock()
+			s.WALFiles = wal
+			mu.Unlock()
+		}
+	})
 
+	launch(func() {
+		backups, err := getJSON[[]Backup](ctx, c.http(), receiver.Addr, "/api/v1/backups")
+		if err == nil {
+			mu.Lock()
+			s.Backups = backups
+			mu.Unlock()
+		}
+	})
+
+	wg.Wait()
 	return s
 }
 
