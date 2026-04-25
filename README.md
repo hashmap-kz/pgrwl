@@ -60,7 +60,7 @@ integration with Kubernetes environments.
 
 **basic dashboard**
 
-![UI](https://raw.githubusercontent.com/hashmap-kz/assets/main/pgrwl/pgrwl-ui-v3.png)
+![UI](https://raw.githubusercontent.com/hashmap-kz/assets/main/pgrwl/pgrwl-ui-v5.png)
 
 **`pgrwl` running in `receive` mode**
 
