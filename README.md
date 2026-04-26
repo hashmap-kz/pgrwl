@@ -23,23 +23,23 @@ integration with Kubernetes environments.
 
 - [About](#about)
 - [Usage](#usage)
-  - [Kubernetes Quick Start](#kubernetes-quick-start)
-  - [Docker Compose Quick Start](#docker-compose-quick-start)
-  - [Restore Command](#restore-command)
+    - [Kubernetes Quick Start](#kubernetes-quick-start)
+    - [Docker Compose Quick Start](#docker-compose-quick-start)
+    - [Restore Command](#restore-command)
 - [Configuration Reference](#configuration-reference)
 - [Installation](#installation)
-  - [Docker images](#docker-images)
-  - [Helm Chart](#helm-chart)
-  - [Manual Installation](#manual-installation)
-  - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
-  - [Package-Based installation](#package-based-installation)
-    - [Debian](#debian)
-    - [Alpine Linux](#alpine-linux)
+    - [Docker images](#docker-images)
+    - [Helm Chart](#helm-chart)
+    - [Manual Installation](#manual-installation)
+    - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
+    - [Package-Based installation](#package-based-installation)
+        - [Debian](#debian)
+        - [Alpine Linux](#alpine-linux)
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
-  - [Design Notes](#design-notes)
-  - [Durability \& `fsync`](#durability--fsync)
-  - [Why Not `archive_command`?](#why-not-archive_command)
+    - [Design Notes](#design-notes)
+    - [Durability \& `fsync`](#durability--fsync)
+    - [Why Not `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
 - [Links](#links)
 - [License](#license)
@@ -57,6 +57,10 @@ integration with Kubernetes environments.
 
 - Install as a single binary. Debug with your favorite editor and a local PostgreSQL
   container ([local-dev-infra](test/integration/environ/)).
+
+**basic dashboard**
+
+![UI](https://raw.githubusercontent.com/hashmap-kz/assets/main/pgrwl/pgrwl-ui-v5.png)
 
 **`pgrwl` running in `receive` mode**
 
@@ -82,10 +86,42 @@ See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-sta
 
 ### Docker-Compose Quick Start
 
-`Receive` mode is _the main loop of the WAL receiver_.
+#### Start the stack
+
+Expand the `docker-compose.yml` section below, copy the file content into `docker-compose.yml`, 
+then run: `docker compose up -d`
+
+<details>
+
+<summary>docker-compose.yml</summary>
 
 ```yaml
+# docker-compose.yml
+#
+# Local end-to-end pgrwl playground.
+#
+# It starts:
+#   - PostgreSQL primary
+#   - WAL traffic generator
+#   - pgrwl receiver
+#   - pgrwl backup worker
+#   - pgrwl dashboard UI
+#   - SeaweedFS S3-compatible storage
+#   - SeaweedFS admin dashboard
+#
+# Useful URLs:
+#   pgrwl dashboard:       http://localhost:8585/ui
+#   SeaweedFS admin:       http://localhost:23646
+#   SeaweedFS filer:       http://localhost:8888
+#   SeaweedFS bucket view: http://localhost:8888/buckets/backups/
+#   SeaweedFS S3 API:      http://localhost:8333
+#   PostgreSQL:            localhost:15432
+
 services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL primary
+  # ---------------------------------------------------------------------------
+
   pg-primary:
     image: postgres:17.9-bookworm
     container_name: pg-primary
@@ -114,9 +150,48 @@ services:
       timeout: 2s
       retries: 10
 
+  # ---------------------------------------------------------------------------
+  # WAL generator
+  #
+  # This service continuously writes data into PostgreSQL and forces WAL switches.
+  # It exists only to make local testing visible and active.
+  # ---------------------------------------------------------------------------
+
+  wal-generator:
+    image: postgres:17.9-bookworm
+    container_name: wal-generator
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Aqtau"
+
+      PGHOST: pg-primary
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+
+      INTERVAL_SECONDS: 5
+    configs:
+      - source: wal-generator.sh
+        target: /scripts/generate-wal.sh
+        mode: "0755"
+    command:
+      - /bin/sh
+      - /scripts/generate-wal.sh
+    depends_on:
+      pg-primary:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # pgrwl receiver
+  #
+  # Streams PostgreSQL WAL files and uploads completed WAL segments to S3.
+  # ---------------------------------------------------------------------------
+
   pgrwl-receive:
     container_name: pgrwl-receive
-    image: quay.io/pgrwl/pgrwl:1.0.31
+    image: quay.io/pgrwl/pgrwl:1.0.32
+    restart: unless-stopped
     environment:
       TZ: "Asia/Aqtau"
       PGHOST: pg-primary
@@ -125,19 +200,178 @@ services:
       PGPASSWORD: postgres
     ports:
       - "7070:7070"
-    command: daemon -c /etc/pgrwl-config.yaml -m receive
+    command: daemon -c /etc/pgrwl-receive-config.yaml -m receive
     configs:
-      - source: pgrwl-config.yaml
-        target: /etc/pgrwl-config.yaml
+      - source: pgrwl-receive-config.yaml
+        target: /etc/pgrwl-receive-config.yaml
         mode: "0755"
     volumes:
-      - ./wals:/mnt
+      - pgrwl-wal-archive-data:/mnt
     depends_on:
       pg-primary:
         condition: service_healthy
+      seaweedfs-provision:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # pgrwl backup worker
+  #
+  # Runs scheduled base backups and stores them in the same S3 bucket.
+  # ---------------------------------------------------------------------------
+
+  pgrwl-backup:
+    container_name: pgrwl-backup
+    image: quay.io/pgrwl/pgrwl:1.0.32
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Aqtau"
+      PGHOST: pg-primary
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    ports:
+      - "7071:7070"
+    command: daemon -c /etc/pgrwl-backup-config.yaml -m backup
+    configs:
+      - source: pgrwl-backup-config.yaml
+        target: /etc/pgrwl-backup-config.yaml
+        mode: "0755"
+    depends_on:
+      pg-primary:
+        condition: service_healthy
+      seaweedfs-provision:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # pgrwl dashboard
+  #
+  # Reads receiver/backup status over the internal Docker Compose network.
+  # Open: http://localhost:8585/ui
+  # ---------------------------------------------------------------------------
+
+  pgrwl-ui:
+    container_name: pgrwl-ui
+    image: quay.io/pgrwl/ui:0.1.0
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Aqtau"
+      PGRWL_UI_CONFIG_PATH: /etc/pgrwl-ui-config.yaml
+    ports:
+      - "8585:8585"
+    configs:
+      - source: pgrwl-ui-config.yaml
+        target: /etc/pgrwl-ui-config.yaml
+        mode: "0755"
+
+  # ---------------------------------------------------------------------------
+  # SeaweedFS
+  #
+  # Runs SeaweedFS in all-in-one mode with S3 support enabled.
+  # This is convenient for local testing and behaves like a lightweight
+  # S3-compatible object storage service.
+  # ---------------------------------------------------------------------------
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.21
+    container_name: seaweedfs
+    restart: unless-stopped
+    command:
+      - server
+      - -s3
+      - -dir=/data
+      - -ip=seaweedfs
+      - -ip.bind=0.0.0.0
+      - -master.port=9333
+      - -volume.port=8080
+      - -filer.port=8888
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - "9333:9333" # master UI/API
+      - "8080:8080" # volume UI/API
+      - "8888:8888" # filer UI/API
+      - "8333:8333" # S3 API
+    volumes:
+      - seaweedfs-data:/data
+    configs:
+      - source: seaweedfs-config.json
+        target: /etc/seaweedfs/s3.json
+        mode: "0444"
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8888/" ]
+      interval: 3s
+      timeout: 2s
+      retries: 40
+
+  # ---------------------------------------------------------------------------
+  # SeaweedFS admin dashboard
+  #
+  # Open: http://localhost:23646
+  # ---------------------------------------------------------------------------
+
+  seaweedfs-admin:
+    image: chrislusf/seaweedfs:4.21
+    container_name: seaweedfs-admin
+    restart: unless-stopped
+    command:
+      - admin
+      - -port=23646
+      - -port.grpc=33646
+      - -master=seaweedfs:9333
+      - -dataDir=/data
+    ports:
+      - "23646:23646"
+      - "33646:33646"
+    volumes:
+      - seaweedfs-admin-data:/data
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # SeaweedFS bucket provisioning
+  #
+  # Creates the S3 bucket used by pgrwl.
+  # ---------------------------------------------------------------------------
+
+  seaweedfs-provision:
+    image: chrislusf/seaweedfs:4.21
+    container_name: seaweedfs-provision
+    restart: "no"
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      BUCKETS: "backups"
+    entrypoint: [ "/bin/sh" ]
+    command:
+      - -ec
+      - |
+        echo "waiting for SeaweedFS shell..."
+        until echo "cluster.ps" | weed shell \
+          -master=seaweedfs:9333 \
+          -filer=seaweedfs:8888 >/dev/null 2>&1; do
+          echo "SeaweedFS shell is not ready yet..."
+          sleep 2
+        done
+
+        for bucket in ${BUCKETS}; do
+          echo "creating bucket: ${bucket}"
+          echo "s3.bucket.create -name ${bucket}" | weed shell \
+            -master=seaweedfs:9333 \
+            -filer=seaweedfs:8888 || true
+        done
+
+        echo "created buckets:"
+        echo "s3.bucket.list" | weed shell \
+          -master=seaweedfs:9333 \
+          -filer=seaweedfs:8888
 
 volumes:
+  pgrwl-wal-archive-data:
   pg-primary-data:
+  seaweedfs-data:
+  seaweedfs-admin-data:
 
 configs:
   pg_hba.conf:
@@ -179,18 +413,154 @@ configs:
       timezone                 = 'Asia/Aqtau'
       shared_preload_libraries = 'pg_stat_statements'
 
-  pgrwl-config.yaml:
+  seaweedfs-config.json:
+    content: |
+      {
+        "identities": [
+          {
+            "name": "pgrwl",
+            "credentials": [
+              {
+                "accessKey": "pgrwl",
+                "secretKey": "pgrwl-secret"
+              }
+            ],
+            "actions": [
+              "Admin",
+              "Read",
+              "Write",
+              "List",
+              "Tagging"
+            ]
+          }
+        ]
+      }
+
+  pgrwl-backup-config.yaml:
+    content: |
+      backup:
+        cron: '* * * * *'
+        retention:
+          enable: true
+          type: time
+          value: 10m
+      log:
+        format: text
+        level: info
+      main:
+        directory: "/mnt/wal-archive"
+        listen_port: 7070
+      storage:
+        compression:
+          algo: gzip
+        name: s3
+        s3:
+          url: http://seaweedfs:8333
+          access_key_id: pgrwl
+          secret_access_key: pgrwl-secret
+          bucket: backups
+          region: us-east-1
+          use_path_style: true
+          disable_ssl: true
+
+  pgrwl-receive-config.yaml:
     content: |
       main:
         listen_port: 7070
         directory: "/mnt/wal-archive"
       receiver:
         slot: pgrwl_v5
+        no_loop: true
+        uploader:
+          sync_interval: 10s
+          max_concurrency: 4
+        retention:
+          enable: false
+          sync_interval: 10s
+          keep_period: "5m"
       log:
-        level: info
+        level: trace
         format: text
-        add_source: false
+        add_source: true
+      metrics:
+        enable: false
+      storage:
+        name: s3
+        compression:
+          algo: gzip
+        encryption:
+          algo: aes-256-gcm
+          pass: qwerty123
+        s3:
+          url: http://seaweedfs:8333
+          access_key_id: pgrwl
+          secret_access_key: pgrwl-secret
+          bucket: backups
+          region: us-east-1
+          use_path_style: true
+          disable_ssl: true
+
+  pgrwl-ui-config.yaml:
+    content: |
+      listen_addr: ":8585"
+      receivers:
+        - label: localhost
+          addr: http://pgrwl-receive:7070
+
+  wal-generator.sh:
+    content: |
+      #!/usr/bin/env sh
+      set -eu
+
+      echo "starting WAL generator"
+
+      wait_for_postgres() {
+        echo "waiting for PostgreSQL to become ready..."
+
+        until pg_isready; do
+          echo "PostgreSQL is not ready yet, sleeping..."
+          sleep 2
+        done
+
+        until psql \
+          -v ON_ERROR_STOP=1 \
+          -c "SELECT 1;"; do
+          echo "PostgreSQL accepts connections, but query failed, sleeping..."
+          sleep 2
+        done
+
+        echo "PostgreSQL is ready"
+      }
+
+      wait_for_postgres
+
+      while true; do
+        echo "generating WAL at $(date -Iseconds)"
+
+        psql \
+          -v ON_ERROR_STOP=1 \
+          -c "DROP TABLE IF EXISTS tmp_test_data_table_gen;" \
+          -c "CREATE TABLE IF NOT EXISTS tmp_test_data_table_gen (id serial, payload text);" \
+          -c "INSERT INTO tmp_test_data_table_gen(payload) SELECT md5(random()::text) FROM generate_series(1, 10000);" \
+          -c "SELECT pg_switch_wal();"
+
+        sleep "${INTERVAL_SECONDS}"
+      done
 ```
+
+</details>
+
+#### Open the dashboards
+
+| Service               | URL                                      | Description                         |
+|-----------------------|------------------------------------------|-------------------------------------|
+| pgrwl dashboard       | <http://localhost:8585/ui>               | Receiver and backup overview        |
+| SeaweedFS admin       | <http://localhost:23646>                 | SeaweedFS cluster/storage dashboard |
+| SeaweedFS filer       | <http://localhost:8888>                  | Browse files stored by SeaweedFS    |
+| SeaweedFS bucket view | <http://localhost:8888/buckets/backups/> | Browse uploaded WALs and backups    |
+| SeaweedFS S3 API      | <http://localhost:8333>                  | S3-compatible API endpoint          |
+| PostgreSQL            | `psql -U postgres -h localhost -p 15432` | PostgreSQL primary instance         |
+
 
 ### Restore Command
 
@@ -321,6 +691,21 @@ PGRWL_STORAGE_S3_BUCKET                  # Target S3 bucket name
 PGRWL_STORAGE_S3_REGION                  # S3 region
 PGRWL_STORAGE_S3_USE_PATH_STYLE          # Use path-style URLs for S3
 PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
+```
+
+Dashboard configuration example:
+
+`PGRWL_UI_CONFIG_PATH` env-var is used to discover config (default: `./pgrwl-ui.yaml`)
+
+```
+listen_addr: ":8080"
+
+receivers:
+  - label: localhost
+    addr: http://127.0.0.1:7070
+
+  - label: prod-db-01
+    addr: http://10.0.0.11:9090
 ```
 
 ---

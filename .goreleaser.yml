@@ -101,7 +101,7 @@ dockers:
     extra_files:
       - go.mod
       - go.sum
-      - cmd/
+      - cmd/pgrwl/
       - config/
       - internal/
       - test/
@@ -117,10 +117,39 @@ dockers:
       - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--platform=linux/amd64"
 
+  - image_templates:
+      - "quay.io/pgrwl/ui:{{ .Version }}-amd64"
+    dockerfile: Dockerfile-ui
+    extra_files:
+      - go.mod
+      - go.sum
+      - cmd/pgrwl-ui/
+      - ui/
+    build_flag_templates:
+      - "--label=io.artifacthub.package.readme-url=https://raw.githubusercontent.com/pgrwl/pgrwl/master/README.md"
+      - '--label=io.artifacthub.package.maintainers=[{"name":"alexey.zh","email":"mailbox.stdio@gmail.com"}]'
+      - "--label=io.artifacthub.package.license=MIT"
+      - "--label=org.opencontainers.image.description=PGRWL Web UI"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name=pgrwl-ui"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/amd64"
+
 docker_manifests:
+  # pgrwl
   - name_template: "quay.io/pgrwl/pgrwl:{{ .Version }}"
     image_templates:
       - "quay.io/pgrwl/pgrwl:{{ .Version }}-amd64"
   - name_template: "quay.io/pgrwl/pgrwl:latest"
     image_templates:
       - "quay.io/pgrwl/pgrwl:{{ .Version }}-amd64"
+
+  # pgrwl-ui
+  - name_template: "quay.io/pgrwl/ui:{{ .Version }}"
+    image_templates:
+      - "quay.io/pgrwl/ui:{{ .Version }}-amd64"
+  - name_template: "quay.io/pgrwl/ui:latest"
+    image_templates:
+      - "quay.io/pgrwl/ui:{{ .Version }}-amd64"
