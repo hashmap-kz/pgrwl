@@ -23,23 +23,23 @@ integration with Kubernetes environments.
 
 - [About](#about)
 - [Usage](#usage)
-  - [Kubernetes Quick Start](#kubernetes-quick-start)
-  - [Docker Compose Quick Start](#docker-compose-quick-start)
-  - [Restore Command](#restore-command)
+    - [Kubernetes Quick Start](#kubernetes-quick-start)
+    - [Docker Compose Quick Start](#docker-compose-quick-start)
+    - [Restore Command](#restore-command)
 - [Configuration Reference](#configuration-reference)
 - [Installation](#installation)
-  - [Docker images](#docker-images)
-  - [Helm Chart](#helm-chart)
-  - [Manual Installation](#manual-installation)
-  - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
-  - [Package-Based installation](#package-based-installation)
-    - [Debian](#debian)
-    - [Alpine Linux](#alpine-linux)
+    - [Docker images](#docker-images)
+    - [Helm Chart](#helm-chart)
+    - [Manual Installation](#manual-installation)
+    - [Installation script for Unix-Based OS](#installation-script-for-unix-based-os)
+    - [Package-Based installation](#package-based-installation)
+        - [Debian](#debian)
+        - [Alpine Linux](#alpine-linux)
 - [Disaster Recovery Use Cases](#disaster-recovery-use-cases)
 - [Architecture](#architecture)
-  - [Design Notes](#design-notes)
-  - [Durability \& `fsync`](#durability--fsync)
-  - [Why Not `archive_command`?](#why-not-archive_command)
+    - [Design Notes](#design-notes)
+    - [Durability \& `fsync`](#durability--fsync)
+    - [Why Not `archive_command`?](#why-not-archive_command)
 - [Contributing](#contributing)
 - [Links](#links)
 - [License](#license)
@@ -86,22 +86,41 @@ See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-sta
 
 ### Docker-Compose Quick Start
 
-Expand `docker-compose.yml` section, copy file content, run: `docker compose up -d`
+#### Start the stack
+
+Expand the `docker-compose.yml` section below, copy the file content into `docker-compose.yml`, 
+then run: `docker compose up -d`
 
 <details>
 
 <summary>docker-compose.yml</summary>
 
 ```yaml
-# This docker-compose file sets up a PostgreSQL primary server,
-# a pgrwl receiver for WAL archiving, and a SeaweedFS cluster for storage.
-
-# Links:
+# docker-compose.yml
 #
-# http://localhost:23646
+# Local end-to-end pgrwl playground.
+#
+# It starts:
+#   - PostgreSQL primary
+#   - WAL traffic generator
+#   - pgrwl receiver
+#   - pgrwl backup worker
+#   - pgrwl dashboard UI
+#   - SeaweedFS S3-compatible storage
+#   - SeaweedFS admin dashboard
+#
+# Useful URLs:
+#   pgrwl dashboard:       http://localhost:8585/ui
+#   SeaweedFS admin:       http://localhost:23646
+#   SeaweedFS filer:       http://localhost:8888
+#   SeaweedFS bucket view: http://localhost:8888/buckets/backups/
+#   SeaweedFS S3 API:      http://localhost:8333
+#   PostgreSQL:            localhost:15432
 
 services:
-  # PostgreSQL
+  # ---------------------------------------------------------------------------
+  # PostgreSQL primary
+  # ---------------------------------------------------------------------------
 
   pg-primary:
     image: postgres:17.9-bookworm
@@ -126,12 +145,17 @@ services:
         target: /etc/postgresql/postgresql.conf
         mode: "0755"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
       interval: 2s
       timeout: 2s
       retries: 10
 
-  # WAL generator (for testing)
+  # ---------------------------------------------------------------------------
+  # WAL generator
+  #
+  # This service continuously writes data into PostgreSQL and forces WAL switches.
+  # It exists only to make local testing visible and active.
+  # ---------------------------------------------------------------------------
 
   wal-generator:
     image: postgres:17.9-bookworm
@@ -158,7 +182,11 @@ services:
       pg-primary:
         condition: service_healthy
 
-  # pgrwl related
+  # ---------------------------------------------------------------------------
+  # pgrwl receiver
+  #
+  # Streams PostgreSQL WAL files and uploads completed WAL segments to S3.
+  # ---------------------------------------------------------------------------
 
   pgrwl-receive:
     container_name: pgrwl-receive
@@ -185,6 +213,12 @@ services:
       seaweedfs-provision:
         condition: service_completed_successfully
 
+  # ---------------------------------------------------------------------------
+  # pgrwl backup worker
+  #
+  # Runs scheduled base backups and stores them in the same S3 bucket.
+  # ---------------------------------------------------------------------------
+
   pgrwl-backup:
     container_name: pgrwl-backup
     image: quay.io/pgrwl/pgrwl:1.0.32
@@ -208,6 +242,13 @@ services:
       seaweedfs-provision:
         condition: service_completed_successfully
 
+  # ---------------------------------------------------------------------------
+  # pgrwl dashboard
+  #
+  # Reads receiver/backup status over the internal Docker Compose network.
+  # Open: http://localhost:8585/ui
+  # ---------------------------------------------------------------------------
+
   pgrwl-ui:
     container_name: pgrwl-ui
     image: quay.io/pgrwl/ui:0.1.0
@@ -222,7 +263,13 @@ services:
         target: /etc/pgrwl-ui-config.yaml
         mode: "0755"
 
-  # seaweedfs (s3)
+  # ---------------------------------------------------------------------------
+  # SeaweedFS
+  #
+  # Runs SeaweedFS in all-in-one mode with S3 support enabled.
+  # This is convenient for local testing and behaves like a lightweight
+  # S3-compatible object storage service.
+  # ---------------------------------------------------------------------------
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.21
@@ -251,10 +298,16 @@ services:
         target: /etc/seaweedfs/s3.json
         mode: "0444"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8888/"]
+      test: [ "CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8888/" ]
       interval: 3s
       timeout: 2s
       retries: 40
+
+  # ---------------------------------------------------------------------------
+  # SeaweedFS admin dashboard
+  #
+  # Open: http://localhost:23646
+  # ---------------------------------------------------------------------------
 
   seaweedfs-admin:
     image: chrislusf/seaweedfs:4.21
@@ -275,6 +328,12 @@ services:
       seaweedfs:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # SeaweedFS bucket provisioning
+  #
+  # Creates the S3 bucket used by pgrwl.
+  # ---------------------------------------------------------------------------
+
   seaweedfs-provision:
     image: chrislusf/seaweedfs:4.21
     container_name: seaweedfs-provision
@@ -284,7 +343,7 @@ services:
         condition: service_healthy
     environment:
       BUCKETS: "backups"
-    entrypoint: ["/bin/sh"]
+    entrypoint: [ "/bin/sh" ]
     command:
       - -ec
       - |
@@ -489,15 +548,19 @@ configs:
       done
 ```
 
-Open [pgrwl-dashboard](http://localhost:8585/ui)
-
-Inspect [S3 Storage](http://localhost:23646)
-
-Examine logs:
-- `docker logs pgrwl-receive -f`
-- `docker logs pgrwl-backup -f`
-
 </details>
+
+#### Open the dashboards
+
+| Service               | URL                                      | Description                         |
+|-----------------------|------------------------------------------|-------------------------------------|
+| pgrwl dashboard       | <http://localhost:8585/ui>               | Receiver and backup overview        |
+| SeaweedFS admin       | <http://localhost:23646>                 | SeaweedFS cluster/storage dashboard |
+| SeaweedFS filer       | <http://localhost:8888>                  | Browse files stored by SeaweedFS    |
+| SeaweedFS bucket view | <http://localhost:8888/buckets/backups/> | Browse uploaded WALs and backups    |
+| SeaweedFS S3 API      | <http://localhost:8333>                  | S3-compatible API endpoint          |
+| PostgreSQL            | `psql -U postgres -h localhost -p 15432` | PostgreSQL primary instance         |
+
 
 ### Restore Command
 
