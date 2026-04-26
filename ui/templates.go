@@ -81,7 +81,7 @@ func parseTemplates() *template.Template {
 		},
 		"yesNo": func(v bool) string {
 			if v {
-				return "yes"
+				return cYes
 			}
 			return "no"
 		},
@@ -110,11 +110,9 @@ func parseTemplates() *template.Template {
 			case "zst":
 				return "blue"
 			case "gz":
-				//nolint:goconst
-				return "amber"
+				return cAmber
 			default:
-				//nolint:goconst
-				return "muted"
+				return cMuted
 			}
 		},
 		"encLabel": func(v bool) string {
@@ -127,7 +125,7 @@ func parseTemplates() *template.Template {
 			if v {
 				return "teal"
 			}
-			return "muted"
+			return cMuted
 		},
 		"backupVariant": backupVariant,
 		"isFilter":      func(got, want string) bool { return got == want },
@@ -219,7 +217,7 @@ func retentionClass(c *BriefConfig) string {
 	if c != nil && c.RetentionEnable {
 		return "green"
 	}
-	return "amber"
+	return cAmber
 }
 
 func backupVariant(status string) string {
@@ -227,11 +225,11 @@ func backupVariant(status string) string {
 	case "done", "ok", "success", "completed", "complete":
 		return "green"
 	case "running", "in_progress", "pending":
-		return "amber"
+		return cAmber
 	case "failed", "error":
 		return "red"
 	default:
-		return "muted"
+		return cMuted
 	}
 }
 
@@ -428,7 +426,7 @@ func restoreReadiness(v View) RestoreReadiness {
 
 	seq := walSequenceStatus(coveringWAL, v.Snapshot.WALFiles)
 	if seq.ok {
-		r.PossibleLabel = "yes"
+		r.PossibleLabel = cYes
 		r.StatusClass = "ok"
 		r.Summary = "chain is complete"
 		r.SequenceLabel = "correct"
