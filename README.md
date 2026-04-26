@@ -22,6 +22,7 @@ integration with Kubernetes environments.
 ## Table of Contents
 
 - [About](#about)
+- [Operating Modes](#operating-modes)
 - [Usage](#usage)
     - [Kubernetes Quick Start](#kubernetes-quick-start)
     - [Docker Compose Quick Start](#docker-compose-quick-start)
@@ -62,6 +63,36 @@ integration with Kubernetes environments.
 
 ![UI](https://raw.githubusercontent.com/hashmap-kz/assets/main/pgrwl/pgrwl-ui-v5.png)
 
+## Operating modes
+
+**[`^        back to top        ^`](#table-of-contents)**
+
+`pgrwl` intentionally uses three separate operating modes:
+
+- `receive`
+- `serve`
+- `backup`
+
+This separation is important.
+
+The WAL receiver should stay focused on one critical job: receiving WAL from PostgreSQL and safely writing it to
+disk/storage. Running base backups alongside the receiver may look convenient, but it can create unnecessary
+contention for network bandwidth, disk I/O, CPU, compression, encryption, and object-storage uploads.
+During heavy backup activity, the receiver must still keep up with WAL streaming, otherwise replication lag can
+grow or WAL retention pressure can increase on PostgreSQL.
+
+The `serve` mode is different from `receive` mode.
+It is used when the `receive` loop is stopped and recovery needs access to the WAL files that are still present in the
+receiver directory. This is especially important in Kubernetes setups where the receiver uses a `ReadWriteOnce` volume.
+Only that pod can access the local files, and the directory may contain completed
+WAL files or `.partial` files that have not been uploaded yet.
+In this situation, `pgrwl` can be switched to `serve` mode to safely expose the available WAL files for recovery.
+The pod becomes a controlled WAL file server for recovery purposes.
+
+The `backup` mode keeps base backup creation isolated from the WAL receive loop. It can be scheduled separately, run as
+a Kubernetes `StatefulSet`, and interact with the receiver through the API when needed. This keeps the architecture
+simpler, safer, and easier to reason about.
+
 **`pgrwl` running in `receive` mode**
 
 ![Receive Mode](docs/assets/svg/loop-v1.svg)
@@ -88,7 +119,7 @@ See [examples](https://github.com/pgrwl/pgrwl/tree/master/examples/k8s-quick-sta
 
 #### Start the stack
 
-Expand the `docker-compose.yml` section below, copy the file content into `docker-compose.yml`, 
+Expand the `docker-compose.yml` section below, copy the file content into `docker-compose.yml`,
 then run: `docker compose up -d`
 
 <details>
@@ -560,7 +591,6 @@ configs:
 | SeaweedFS bucket view | <http://localhost:8888/buckets/backups/> | Browse uploaded WALs and backups    |
 | SeaweedFS S3 API      | <http://localhost:8333>                  | S3-compatible API endpoint          |
 | PostgreSQL            | `psql -U postgres -h localhost -p 15432` | PostgreSQL primary instance         |
-
 
 ### Restore Command
 
