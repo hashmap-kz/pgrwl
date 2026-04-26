@@ -15,6 +15,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify tag commit is on master
+        id: verify
+        run: |
+          set -euo pipefail
+          # Determine master ref (origin/master or master)
+          if git show-ref --verify --quiet refs/remotes/origin/master; then
+            MAIN_REF=refs/remotes/origin/master
+          elif git show-ref --verify --quiet refs/heads/master; then
+            MAIN_REF=refs/heads/master
+          else
+            echo "::error::master branch not found"
+            exit 1
+          fi
+          TAG_SHA="${GITHUB_SHA}"
+          MAIN_SHA=$(git rev-parse "$MAIN_REF")
+          if git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"; then
+            echo "Tag commit is reachable from master"
+          else
+            echo "::error::tag commit is NOT on master; skipping release"
+            exit 1
+          fi
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
