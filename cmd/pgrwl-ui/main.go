@@ -63,7 +63,7 @@ func main() {
 }
 
 func configPath() string {
-	if v := os.Getenv("PGRWL_UI_CONFIG"); v != "" {
+	if v := os.Getenv("PGRWL_UI_CONFIG_PATH"); v != "" {
 		return v
 	}
 	return "pgrwl-ui.yaml"

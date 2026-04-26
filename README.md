@@ -327,6 +327,21 @@ PGRWL_STORAGE_S3_USE_PATH_STYLE          # Use path-style URLs for S3
 PGRWL_STORAGE_S3_DISABLE_SSL             # Disable SSL
 ```
 
+Dashboard configuration example:
+
+`PGRWL_UI_CONFIG_PATH` env-var is used to discover config (default: `./pgrwl-ui.yaml`)
+
+```
+listen_addr: ":8080"
+
+receivers:
+  - label: localhost
+    addr: http://127.0.0.1:7070
+
+  - label: prod-db-01
+    addr: http://10.0.0.11:9090
+```
+
 ---
 
 ## Installation
