@@ -101,7 +101,7 @@ dockers:
     extra_files:
       - go.mod
       - go.sum
-      - cmd/
+      - cmd/pgrwl/
       - config/
       - internal/
       - test/
