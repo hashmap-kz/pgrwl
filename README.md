@@ -162,7 +162,7 @@ services:
 
   pgrwl-receive:
     container_name: pgrwl-receive
-    image: quay.io/pgrwl/pgrwl:1.0.31
+    image: quay.io/pgrwl/pgrwl:1.0.32
     restart: unless-stopped
     environment:
       TZ: "Asia/Aqtau"
@@ -178,7 +178,7 @@ services:
         target: /etc/pgrwl-receive-config.yaml
         mode: "0755"
     volumes:
-      - ./wals:/mnt
+      - pgrwl-wal-archive-data:/mnt
     depends_on:
       pg-primary:
         condition: service_healthy
@@ -187,7 +187,7 @@ services:
 
   pgrwl-backup:
     container_name: pgrwl-backup
-    image: quay.io/pgrwl/pgrwl:1.0.31
+    image: quay.io/pgrwl/pgrwl:1.0.32
     restart: unless-stopped
     environment:
       TZ: "Asia/Aqtau"
@@ -207,6 +207,20 @@ services:
         condition: service_healthy
       seaweedfs-provision:
         condition: service_completed_successfully
+
+  pgrwl-ui:
+    container_name: pgrwl-ui
+    image: quay.io/pgrwl/ui:0.1.0
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Aqtau"
+      PGRWL_UI_CONFIG_PATH: /etc/pgrwl-ui-config.yaml
+    ports:
+      - "8585:8585"
+    configs:
+      - source: pgrwl-ui-config.yaml
+        target: /etc/pgrwl-ui-config.yaml
+        mode: "0755"
 
   # seaweedfs (s3)
 
@@ -295,6 +309,7 @@ services:
           -filer=seaweedfs:8888
 
 volumes:
+  pgrwl-wal-archive-data:
   pg-primary-data:
   seaweedfs-data:
   seaweedfs-admin-data:
@@ -426,17 +441,19 @@ configs:
           use_path_style: true
           disable_ssl: true
 
+  pgrwl-ui-config.yaml:
+    content: |
+      listen_addr: ":8585"
+      receivers:
+        - label: localhost
+          addr: http://pgrwl-receive:7070
+
   wal-generator.sh:
     content: |
       #!/usr/bin/env sh
       set -eu
 
       echo "starting WAL generator"
-      echo "PGHOST=${PGHOST}"
-      echo "PGPORT=${PGPORT}"
-      echo "PGUSER=${PGUSER}"
-      echo "PGDATABASE=${PGDATABASE}"
-      echo "INTERVAL_SECONDS=${INTERVAL_SECONDS}"
 
       wait_for_postgres() {
         echo "waiting for PostgreSQL to become ready..."
@@ -472,7 +489,9 @@ configs:
       done
 ```
 
-Go to the [URL](http://localhost:23646) to open the s3 dashboard.
+Open [pgrwl-dashboard](http://localhost:8585/ui)
+
+Inspect [S3 Storage](http://localhost:23646)
 
 Examine logs:
 - `docker logs pgrwl-receive -f`
