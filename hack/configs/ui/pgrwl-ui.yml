@@ -1,0 +1,8 @@
+listen_addr: ":8080"
+
+receivers:
+  - label: localhost
+    addr: http://127.0.0.1:7070
+
+  - label: prod-db-01
+    addr: http://10.0.0.11:9090
