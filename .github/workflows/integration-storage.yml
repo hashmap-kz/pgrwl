@@ -7,6 +7,8 @@ on:
       - "master"
       - "release/**"
     paths-ignore: &paths-ignore
+      - ".run/**"
+      - ".vscode/**"
       - "docs/**"
       - "examples/**"
       - "charts/**"
