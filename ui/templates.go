@@ -615,8 +615,9 @@ const templates = `
   <meta charset="utf-8">
   <title>{{ pageTitle .Active }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/ui/static/app.css">
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/ui/static/css/app.css">
+  <script src="/ui/static/js/htmx-2.0.4.min.js"></script>
+  <!-- <script src="https://unpkg.com/htmx.org@2.0.4"></script> -->
 </head>
 <body>
   <div class="shell">

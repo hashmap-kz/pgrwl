@@ -8,10 +8,13 @@ on:
       - "release/**"
     paths-ignore: &paths-ignore
       - ".github/**"
+      - ".run/**"
+      - ".vscode/**"
       - "docs/**"
       - "examples/**"
       - "charts/**"
       - "hack/**"
+      - "ui/static/**"
       - "**/*.md"
       - "**/*.gitignore"
       - "**/*.gitattributes"

@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ui" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="pgrwl" />
+    <working_directory value="$PROJECT_DIR$" />
+    <envs>
+      <env name="PGRWL_UI_CONFIG_PATH" value="hack/configs/ui/pgrwl-ui.yml" />
+    </envs>
+    <kind value="FILE" />
+    <package value="github.com/pgrwl/pgrwl" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/pgrwl-ui/main.go" />
+    <method v="2" />
+  </configuration>
+</component>
