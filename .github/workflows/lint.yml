@@ -12,6 +12,7 @@ on:
       - "examples/**"
       - "charts/**"
       - "hack/**"
+      - "ui/static/**"
       - "**/*.md"
       - "**/*.gitignore"
       - "**/*.gitattributes"
