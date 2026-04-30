@@ -7,9 +7,8 @@ import (
 	"log/slog"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
@@ -34,17 +33,45 @@ func RunBackupMode(opts *BackupModeOpts) error {
 		return fmt.Errorf("backup.cron is required")
 	}
 
-	ctx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stopSignals()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer signalCancel()
+
+	fatalErrCh := make(chan error, 1)
+
+	sendFatalErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		select {
+		case fatalErrCh <- err:
+			cancel()
+		default:
+			// Another fatal error was already reported.
+			cancel()
+		}
+	}
 
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	g, ctx := errgroup.WithContext(ctx)
+	var wg sync.WaitGroup
 
-	g.Go(func() (err error) {
+	//////////////////////////////////////////////////////////////////////
+	// Basebackup supervisor.
+	//
+	// Critical component.
+	// If it fails or panics, backup mode should stop and return the real error.
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
 		defer func() {
 			if r := recover(); r != nil {
-				err = fmt.Errorf("basebackup supervisor panicked: %v", r)
+				sendFatalErr(fmt.Errorf("basebackup supervisor panicked: %v", r))
 			}
 		}()
 
@@ -53,25 +80,34 @@ func RunBackupMode(opts *BackupModeOpts) error {
 		})
 
 		if err := u.Run(ctx); err != nil {
-			return fmt.Errorf("run basebackup supervisor: %w", err)
-		}
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 
-		return nil
-	})
+			sendFatalErr(fmt.Errorf("run basebackup supervisor: %w", err))
+			return
+		}
+	}()
+
+	//////////////////////////////////////////////////////////////////////
+	// Metrics HTTP server.
+	//
+	// Non-critical component.
+	// It should not stop scheduled backups.
 
 	if cfg.Metrics.Enable {
 		backupmetrics.InitPromMetrics(ctx)
 
-		g.Go(func() (err error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
 			defer func() {
 				if r := recover(); r != nil {
 					loggr.Error("metrics http server panicked",
 						slog.Any("panic", r),
 						slog.String("goroutine", "metrics-http-server"),
 					)
-
-					// Metrics are non-critical.
-					err = nil
 				}
 			}()
 
@@ -79,31 +115,59 @@ func RunBackupMode(opts *BackupModeOpts) error {
 
 			if err := srv.Run(ctx); err != nil {
 				if errors.Is(err, context.Canceled) {
-					return nil
+					return
 				}
 
 				loggr.Error("metrics http server failed", slog.Any("err", err))
-
-				// Metrics are non-critical.
-				return nil
 			}
-
-			return nil
-		})
+		}()
 	}
 
-	err = g.Wait()
+	//////////////////////////////////////////////////////////////////////
+	// Wait for shutdown reason:
+	//   - signal/context cancellation
+	//   - fatal error from critical component
 
-	if err == nil {
+	var runErr error
+
+	select {
+	case <-ctx.Done():
+		// Could be SIGINT/SIGTERM or cancellation caused by sendFatalErr().
+		// Prefer a real fatal error if one was already sent.
+		select {
+		case runErr = <-fatalErrCh:
+		default:
+			runErr = ctx.Err()
+		}
+
+	case runErr = <-fatalErrCh:
+		cancel()
+	}
+
+	loggr.Info("shutting down, waiting for goroutines...")
+
+	wg.Wait()
+
+	// A fatal error may have appeared while goroutines were shutting down.
+	// Prefer the real component error over context.Canceled.
+	select {
+	case err := <-fatalErrCh:
+		if err != nil {
+			runErr = err
+		}
+	default:
+	}
+
+	if runErr == nil {
 		loggr.Info("all components shut down cleanly")
 		return nil
 	}
 
-	if errors.Is(err, context.Canceled) {
-		loggr.Info("shutdown requested")
+	if errors.Is(runErr, context.Canceled) {
+		loggr.Info("all components shut down cleanly", slog.String("reason", "shutdown requested"))
 		return nil
 	}
 
-	loggr.Error("backup mode stopped with error", slog.Any("err", err))
-	return err
+	loggr.Error("backup mode stopped with error", slog.Any("err", runErr))
+	return runErr
 }
