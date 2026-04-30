@@ -116,6 +116,8 @@ EOF
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
   pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
   diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
+
+  x_search_errors_in_logs
 }
 
 x_backup_restore "${@}"

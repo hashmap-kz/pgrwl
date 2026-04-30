@@ -147,6 +147,18 @@ x_start_serving() {
   SERVE_PID=$!
 }
 
+x_search_errors_in_logs() {
+  log_info "searching for errors in pgrwl logs"
+  if [[ -f "${LOG_FILE}" ]]; then
+    grep -i "error" "${LOG_FILE}" || log_info "no errors found in pgrwl logs"
+  fi
+
+  log_info "searching for errors in pg logs"
+  if [[ -f "/var/log/postgresql/pg.log" ]]; then
+    grep -i "err" "/var/log/postgresql/pg.log" || log_info "no errors found in pg logs"
+  fi
+}
+
 # toxiproxy utils
 
 export TOXIPROXY_API="http://toxiproxy:8474"

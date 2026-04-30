@@ -170,6 +170,8 @@ EOF
   find "${WAL_PATH}" -type f -name "*.json" -delete
   rm -rf "${WAL_PATH}/backups"
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
+
+  x_search_errors_in_logs
 }
 
 x_backup_restore "${@}"
