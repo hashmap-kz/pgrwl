@@ -89,8 +89,8 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) error {
 
 	_, err = c.AddFunc(u.cfg.Backup.Cron, func() {
 		if err := u.runScheduledBackupSafe(ctx, startupInfo); err != nil {
-			if errors.Is(err, context.Canceled) {
-				u.log().Info("scheduled basebackup stopped (context canceled)")
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				u.log().Info("scheduled basebackup stopped", slog.Any("reason", err))
 				return
 			}
 			u.log().Error("scheduled basebackup run failed", slog.Any("err", err))
