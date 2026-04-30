@@ -29,3 +29,11 @@ storage:
 #  encryption:
 #    algo: aes-256-gcm
 #    pass: qwerty123
+
+backup:
+  cron: "* * * * *"
+  retention:
+    enable: true
+    type: count
+    value: "2"
+    keep_last: 1

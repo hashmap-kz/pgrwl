@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os/signal"
 	"strings"
 	"sync"
@@ -14,10 +15,14 @@ import (
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
+	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode/manualbackup"
 	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/jobq"
+	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
+	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsv"
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesv"
 )
 
@@ -47,10 +52,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//
 	// Critical:
 	//   - WAL receiver
-	//   - archive supervisor, when enabled
+	//   - WAL archive supervisor, when enabled
 	//
 	// Non-critical:
 	//   - HTTP API
+	//   - basebackup supervisor
+	//   - manual basebackup service
 	//   - metrics
 	fatalErrCh := make(chan error, 1)
 
@@ -72,7 +79,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
 	//////////////////////////////////////////////////////////////////////
-	// Init WAL-receiver first
+	// Init WAL-receiver first.
+	//
+	// This remains the core component. If it cannot be initialized, receive
+	// mode must not start.
 
 	pgrw, err := initPgrw(ctx, opts)
 	if err != nil {
@@ -80,10 +90,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	}
 
 	//////////////////////////////////////////////////////////////////////
-	// Init OPT components before starting goroutines.
-	//
-	// This is safer than starting pgrw.Run(ctx) first and then failing later
-	// during storage setup.
+	// Init receive/archive dependencies before starting goroutines.
 
 	stor, err := initStorageIfRequired(cfg, loggr, opts, pgrw)
 	if err != nil {
@@ -98,12 +105,33 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	// setup metrics
 	initMetrics(ctx, cfg, loggr)
 
+	//////////////////////////////////////////////////////////////////////
+	// Init optional basebackup components.
+	//
+	// In merged receive+backup mode:
+	//   - basebackup cron supervisor is optional/non-critical
+	//   - manual basebackup API is available through the same HTTP server
+	//   - cron and manual backup share the same backup gate
+	//
+	// If backup.cron is empty, cron scheduling is skipped, but manual
+	// POST /api/v1/basebackup can still work.
+
+	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
+		Directory: opts.ReceiveDirectory,
+	})
+
+	manualBackupSvc := manualbackup.New(manualbackup.Options{
+		Gate:      basebackupSupervisor,
+		Directory: opts.ReceiveDirectory,
+		AppCtx:    ctx,
+	})
+
 	var wg sync.WaitGroup
 
 	//////////////////////////////////////////////////////////////////////
 	// Main WAL receiver loop.
 	//
-	// This is the core component. Any error or panic is fatal.
+	// Critical component. Any error or panic is fatal.
 
 	wg.Add(1)
 	go func() {
@@ -119,6 +147,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 
 		if err := pgrw.Run(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
+				loggr.Info("wal-receiver stopped", slog.String("reason", "context canceled"))
 				return
 			}
 
@@ -130,9 +159,48 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	}()
 
 	//////////////////////////////////////////////////////////////////////
+	// Basebackup supervisor.
+	//
+	// Optional/non-critical component in merged receive mode.
+	//
+	// If it fails, WAL receiving must continue. Errors are logged only.
+	// This starts the cron-based backup daemon only when backup.cron is set.
+
+	if strings.TrimSpace(cfg.Backup.Cron) != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			defer func() {
+				if r := recover(); r != nil {
+					loggr.Error("basebackup supervisor panicked",
+						slog.Any("panic", r),
+						slog.String("goroutine", "basebackup-supervisor"),
+					)
+				}
+			}()
+
+			if err := basebackupSupervisor.Run(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+
+				loggr.Error("basebackup supervisor failed", slog.Any("err", err))
+				return
+			}
+		}()
+	} else {
+		loggr.Info("basebackup scheduler skipped", slog.String("reason", "backup.cron is empty"))
+	}
+
+	//////////////////////////////////////////////////////////////////////
 	// HTTP server.
 	//
-	// Non-critical. It should not cancel the main streaming loop.
+	// Non-critical. It should not cancel the main WAL receiver loop.
+	//
+	// This single server exposes both:
+	//   - receive API
+	//   - basebackup API
 
 	wg.Add(1)
 	go func() {
@@ -147,12 +215,13 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 			}
 		}()
 
-		handlers := receiveAPI.Init(&receiveAPI.Opts{
-			PGRW:     pgrw,
-			BaseDir:  opts.ReceiveDirectory,
-			Storage:  stor,
-			JobQueue: jobQueue,
-			Cfg:      cfg,
+		handlers := initMergedReceiveHTTPHandler(&mergedReceiveHTTPOpts{
+			Cfg:                 cfg,
+			PGRW:                pgrw,
+			BaseDir:             opts.ReceiveDirectory,
+			Storage:             stor,
+			JobQueue:            jobQueue,
+			ManualBackupService: manualBackupSvc,
 		})
 
 		srv := api.NewHTTPServer(opts.ListenPort, handlers)
@@ -171,13 +240,8 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//
 	// Run this goroutine only when storage is required.
 	//
-	// This assumes ArchiveSupervisor has the new single method:
-	//
-	//     Run(ctx context.Context, queue *jobq.JobQueue) error
-	//
-	// Temporary upload/retention errors should be logged inside Run() and
-	// retried on the next tick. Only structural/fatal supervisor errors should
-	// be returned from Run().
+	// This remains critical. If storage/upload/retention supervisor fails
+	// structurally, receive mode stops because this is part of WAL durability.
 
 	if stor != nil {
 		wg.Add(1)
@@ -254,10 +318,64 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	return runErr
 }
 
+type mergedReceiveHTTPOpts struct {
+	Cfg                 *config.Config
+	PGRW                xlog.PgReceiveWal
+	BaseDir             string
+	Storage             *st.VariadicStorage
+	JobQueue            *jobq.JobQueue
+	ManualBackupService backupmode.BackupController
+}
+
+func initMergedReceiveHTTPHandler(opts *mergedReceiveHTTPOpts) http.Handler {
+	receiveHandlers := receiveAPI.Init(&receiveAPI.Opts{
+		PGRW:     opts.PGRW,
+		BaseDir:  opts.BaseDir,
+		Storage:  opts.Storage,
+		JobQueue: opts.JobQueue,
+		Cfg:      opts.Cfg,
+	})
+
+	backupHandlers := backupmode.Init(&backupmode.Opts{
+		Cfg:        opts.Cfg,
+		Controller: opts.ManualBackupService,
+	})
+
+	mux := http.NewServeMux()
+
+	// Exact endpoint:
+	//   POST /api/v1/basebackup
+	//   GET  /api/v1/basebackup
+	mux.Handle("/api/v1/basebackup", backupHandlers)
+
+	// Subtree endpoints:
+	//   GET /api/v1/basebackup/status
+	//   GET /api/v1/basebackup/health
+	mux.Handle("/api/v1/basebackup/", backupHandlers)
+
+	// Everything else remains receive-mode API:
+	//   /healthz
+	//   /api/v1/status
+	//   /api/v1/brief-config
+	//   /api/v1/snapshot
+	//   /api/v1/wals
+	//   /api/v1/backups
+	//   /api/v1/wal-before/{filename}
+	//   /metrics, if enabled by optional handlers
+	mux.Handle("/", receiveHandlers)
+
+	return mux
+}
+
 func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
 	if cfg.Metrics.Enable {
 		loggr.Debug("init prom metrics")
+
 		receivemetrics.InitPromMetrics(ctx)
+
+		// In merged receive+backup mode, expose backup metrics through the same
+		// HTTP server/Prometheus registry as receive metrics.
+		backupmetrics.InitPromMetrics(ctx)
 	}
 }
 

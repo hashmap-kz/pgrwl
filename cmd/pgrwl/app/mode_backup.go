@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode/manualbackup"
 	"log/slog"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode/manualbackup"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
