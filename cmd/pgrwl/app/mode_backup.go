@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode/manualbackup"
 	"log/slog"
 	"os/signal"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
 	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
-	"github.com/pgrwl/pgrwl/internal/opt/basebackup/manualbackup"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsv"
 )
