@@ -74,7 +74,7 @@ func Init(opts *Opts) http.Handler {
 		writeJSON(w, http.StatusOK, opts.Controller.Status())
 	})
 
-	mux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/basebackup/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
 				"status": "method_not_allowed",

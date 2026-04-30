@@ -107,6 +107,7 @@ func RunBackupMode(opts *BackupModeOpts) error {
 	//   POST /api/v1/basebackup
 	//   GET  /api/v1/basebackup
 	//   GET  /api/v1/basebackup/status
+	//   GET  /api/v1/basebackup/healthz
 
 	if cfg.Metrics.Enable {
 		backupmetrics.InitPromMetrics(ctx)
