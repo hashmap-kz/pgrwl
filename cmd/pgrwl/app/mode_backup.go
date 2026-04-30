@@ -2,11 +2,14 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
-	"os"
 	"os/signal"
-	"sync"
+	"strings"
 	"syscall"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
@@ -22,77 +25,85 @@ type BackupModeOpts struct {
 func RunBackupMode(opts *BackupModeOpts) error {
 	cfg, err := config.Cfg()
 	if err != nil {
-		return err
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	loggr := slog.With("component", "backup-mode-runner")
 
-	if cfg.Backup.Cron == "" {
-		loggr.Error("backup.cron is required")
-		os.Exit(1)
+	if strings.TrimSpace(cfg.Backup.Cron) == "" {
+		return fmt.Errorf("backup.cron is required")
 	}
 
-	// setup context
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
+	ctx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
 
-	// print options
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
-	// Use WaitGroup to wait for all goroutines to finish
-	var wg sync.WaitGroup
+	g, ctx := errgroup.WithContext(ctx)
 
-	// BackupSupervisor
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	g.Go(func() (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				loggr.Error("backup loop panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "basebackup"),
-				)
+				err = fmt.Errorf("basebackup supervisor panicked: %v", r)
 			}
 		}()
+
 		u := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
 			Directory: opts.ReceiveDirectory,
 		})
-		u.Run(ctx)
-	}()
 
-	// metrics
+		if err := u.Run(ctx); err != nil {
+			return fmt.Errorf("run basebackup supervisor: %w", err)
+		}
+
+		return nil
+	})
+
 	if cfg.Metrics.Enable {
 		backupmetrics.InitPromMetrics(ctx)
 
-		// HTTP server
-		// It shouldn't cancel() the main streaming loop even on error.
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		g.Go(func() (err error) {
 			defer func() {
 				if r := recover(); r != nil {
-					loggr.Error("http server panicked",
+					loggr.Error("metrics http server panicked",
 						slog.Any("panic", r),
-						slog.String("goroutine", "http-server"),
+						slog.String("goroutine", "metrics-http-server"),
 					)
+
+					// Metrics are non-critical.
+					err = nil
 				}
 			}()
 
 			srv := api.NewHTTPServer(cfg.Main.ListenPort, backupmode.Init(cfg))
+
 			if err := srv.Run(ctx); err != nil {
-				loggr.Error("http server failed", slog.Any("err", err))
+				if errors.Is(err, context.Canceled) {
+					return nil
+				}
+
+				loggr.Error("metrics http server failed", slog.Any("err", err))
+
+				// Metrics are non-critical.
+				return nil
 			}
-		}()
+
+			return nil
+		})
 	}
 
-	// Wait for signal (context cancellation)
-	<-ctx.Done()
-	loggr.Info("shutting down, waiting for goroutines...")
+	err = g.Wait()
 
-	// Wait for all goroutines to finish
-	wg.Wait()
-	loggr.Info("all components shut down cleanly")
+	if err == nil {
+		loggr.Info("all components shut down cleanly")
+		return nil
+	}
 
-	// TODO: errCh
-	return ctx.Err()
+	if errors.Is(err, context.Canceled) {
+		loggr.Info("shutdown requested")
+		return nil
+	}
+
+	loggr.Error("backup mode stopped with error", slog.Any("err", err))
+	return err
 }

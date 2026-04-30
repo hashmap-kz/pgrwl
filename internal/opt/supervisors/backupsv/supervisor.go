@@ -3,32 +3,31 @@ package backupsv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/go-resty/resty/v2"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/robfig/cron/v3"
+
+	"github.com/pgrwl/pgrwl/config"
+	"github.com/pgrwl/pgrwl/internal/core/conv"
+	"github.com/pgrwl/pgrwl/internal/core/logger"
+	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
 	"github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backup"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
-	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
-
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/pgrwl/pgrwl/internal/core/conv"
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
+	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/cmdx"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
-
-	"github.com/go-resty/resty/v2"
-	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/core/logger"
-	"github.com/robfig/cron/v3"
 )
 
 type BaseBackupSupervisorOpts struct {
@@ -41,21 +40,18 @@ type BaseBackupSupervisor struct {
 	opts          *BaseBackupSupervisorOpts
 	restyClient   *resty.Client
 	backupRunning tryMutex
-
-	// opts (for fast-access without traverse the config)
-	storageName string
 }
 
 func NewBaseBackupSupervisor(cfg *config.Config, opts *BaseBackupSupervisorOpts) *BaseBackupSupervisor {
 	client := resty.New()
 	client.SetRetryCount(0)
 	client.SetTimeout(5 * time.Second)
+
 	return &BaseBackupSupervisor{
 		l:           slog.With(slog.String("component", "basebackup-supervisor")),
 		cfg:         cfg,
 		opts:        opts,
 		restyClient: client,
-		storageName: cfg.Storage.Name,
 	}
 }
 
@@ -63,11 +59,66 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 	if u.l != nil {
 		return u.l
 	}
+
 	return slog.With(slog.String("component", "basebackup-supervisor"))
 }
 
-func (u *BaseBackupSupervisor) Run(ctx context.Context) {
-	// get necessary info
+// Run starts the basebackup scheduler and blocks until ctx is canceled.
+//
+// Fatal/setup errors are returned:
+//   - replication connection cannot be established
+//   - startup info cannot be loaded
+//   - cron expression is invalid
+//
+// Per-backup errors are logged and do not stop the scheduler:
+//   - retention failed
+//   - basebackup failed
+//   - WAL cleanup failed
+//   - panic inside a scheduled backup run
+func (u *BaseBackupSupervisor) Run(ctx context.Context) error {
+	startupInfo, err := u.loadStartupInfo(ctx)
+	if err != nil {
+		return err
+	}
+
+	// POSIX compatible cron syntax: "* * * * *".
+	// No seconds field.
+	c := cron.New(cron.WithParser(cron.NewParser(
+		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
+	)))
+
+	_, err = c.AddFunc(u.cfg.Backup.Cron, func() {
+		if err := u.runScheduledBackupSafe(ctx, startupInfo); err != nil {
+			if errors.Is(err, context.Canceled) {
+				u.log().Info("scheduled basebackup stopped (context canceled)")
+				return
+			}
+			u.log().Error("scheduled basebackup run failed", slog.Any("err", err))
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("add basebackup cron job: %w", err)
+	}
+
+	c.Start()
+
+	u.log().Info("basebackup scheduler started",
+		slog.String("cron", u.cfg.Backup.Cron),
+	)
+
+	<-ctx.Done()
+
+	u.log().Info("stopping basebackup scheduler")
+
+	stopCtx := c.Stop()
+	<-stopCtx.Done()
+
+	u.log().Info("basebackup scheduler stopped")
+
+	return ctx.Err()
+}
+
+func (u *BaseBackupSupervisor) loadStartupInfo(ctx context.Context) (*xlog.StartupInfo, error) {
 	conn, err := retry.Do(ctx, retry.Policy{
 		Delay: 5 * time.Second,
 		Logger: u.log().With(
@@ -77,67 +128,103 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) {
 		return pgconn.Connect(ctx, "application_name=pgrwl_basebackup replication=yes")
 	})
 	if err != nil {
-		u.log().Error("basebackup create-conn failed", slog.Any("err", err))
-		return
+		return nil, fmt.Errorf("connect replication: %w", err)
 	}
+	defer func() {
+		_ = conn.Close(context.Background())
+	}()
+
 	startupInfo, err := xlog.GetStartupInfo(conn)
 	if err != nil {
-		u.log().Error("basebackup get-startup-info failed", slog.Any("err", err))
-		return
+		return nil, fmt.Errorf("get startup info: %w", err)
 	}
 
-	// POSIX compatible cron syntax: "* * * * *". Without support of seconds.
-	c := cron.New(cron.WithParser(cron.NewParser(
-		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
-	)))
+	return startupInfo, nil
+}
 
-	_, err = c.AddFunc(u.cfg.Backup.Cron, func() {
-		if !u.backupRunning.TryLock() {
-			u.log().Warn("previous basebackup still running, skipping this run")
-			return
+func (u *BaseBackupSupervisor) runScheduledBackupSafe(
+	ctx context.Context,
+	startupInfo *xlog.StartupInfo,
+) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("scheduled basebackup panicked: %v", r)
 		}
-		defer func() {
-			u.log().Debug("unlocking tryMutex")
-			u.backupRunning.Unlock()
-		}()
+	}()
 
-		u.log().Info("starting scheduled basebackup")
+	return u.runScheduledBackup(ctx, startupInfo)
+}
 
-		// retain previous
-		if u.cfg.Backup.Retention.Enable {
-			if u.cfg.Backup.Retention.Type == config.BackupRetentionTypeTime {
-				u.log().Info("starting retain backups (time-based)")
-				if err := u.retainBackupsTimeBased(ctx, u.cfg); err != nil {
-					u.log().Error("basebackup retain failed", slog.Any("err", err))
-				}
-			}
-			if u.cfg.Backup.Retention.Type == config.BackupRetentionTypeCount {
-				u.log().Info("starting retain backups (count-based)")
-				if err := u.retainBackupsCountBased(ctx, u.cfg); err != nil {
-					u.log().Error("basebackup retain failed", slog.Any("err", err))
-				}
-			}
-		}
-		// create backup
-		_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{Directory: u.opts.Directory})
-		if err != nil {
-			u.log().Error("basebackup failed", slog.Any("err", err))
-		} else {
-			u.log().Info("basebackup completed")
+func (u *BaseBackupSupervisor) runScheduledBackup(
+	ctx context.Context,
+	startupInfo *xlog.StartupInfo,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
-			// cleanup wal-archive (when basebackup is completed without errors)
-			if u.cfg.Backup.WalRetention.Enable {
-				if err := u.cleanupWalArchive(ctx, startupInfo); err != nil {
-					u.log().Error("wal-archive cleanup failed", slog.Any("err", err))
-				}
-			}
-		}
+	if !u.backupRunning.TryLock() {
+		u.log().Warn("previous basebackup still running, skipping this run")
+		return nil
+	}
+	defer func() {
+		u.log().Debug("unlocking tryMutex")
+		u.backupRunning.Unlock()
+	}()
+
+	u.log().Info("starting scheduled basebackup")
+
+	if err := u.runRetention(ctx); err != nil {
+		return fmt.Errorf("retain backups before basebackup: %w", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{
+		Directory: u.opts.Directory,
 	})
 	if err != nil {
-		u.log().Error("failed to add cron", slog.Any("err", err))
-		os.Exit(1)
+		return fmt.Errorf("create basebackup: %w", err)
 	}
-	c.Start()
+
+	u.log().Info("basebackup completed")
+
+	if u.cfg.Backup.WalRetention.Enable {
+		if err := u.cleanupWalArchive(ctx, startupInfo); err != nil {
+			return fmt.Errorf("cleanup wal archive: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (u *BaseBackupSupervisor) runRetention(ctx context.Context) error {
+	if !u.cfg.Backup.Retention.Enable {
+		return nil
+	}
+
+	switch u.cfg.Backup.Retention.Type {
+	case config.BackupRetentionTypeTime:
+		u.log().Info("starting retain backups", slog.String("type", "time-based"))
+
+		if err := u.retainBackupsTimeBased(ctx, u.cfg); err != nil {
+			return fmt.Errorf("time-based retention: %w", err)
+		}
+
+	case config.BackupRetentionTypeCount:
+		u.log().Info("starting retain backups", slog.String("type", "count-based"))
+
+		if err := u.retainBackupsCountBased(ctx, u.cfg); err != nil {
+			return fmt.Errorf("count-based retention: %w", err)
+		}
+
+	default:
+		return fmt.Errorf("unknown backup retention type: %q", u.cfg.Backup.Retention.Type)
+	}
+
+	return nil
 }
 
 func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInfo *xlog.StartupInfo) error {
@@ -151,7 +238,7 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 	}
 
 	if receiverConfig.RetentionEnable {
-		return fmt.Errorf("cannot use both: (receiver.retention.enable && backup.wals.manage_cleanup)")
+		return fmt.Errorf("cannot use both: receiver.retention.enable && backup.wals.manage_cleanup")
 	}
 
 	addr, err := cmdx.Addr(u.cfg.Backup.WalRetention.ReceiverAddr)
@@ -204,18 +291,19 @@ func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInf
 	if resp.IsError() {
 		return fmt.Errorf("cleanupWalArchive() request error: %d", resp.StatusCode())
 	}
+
 	return nil
 }
 
 func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor st.Storage, backupID string) (*backupdto.Result, error) {
 	manifestFilename := filepath.Base(backupID) + ".json"
+
 	manifestRdr, err := stor.Get(ctx, filepath.ToSlash(filepath.Join(filepath.Base(backupID), manifestFilename)))
 	if err != nil {
 		return nil, err
 	}
 	defer manifestRdr.Close()
 
-	// unmarshal
 	var info backupdto.Result
 	if err := json.NewDecoder(manifestRdr).Decode(&info); err != nil {
 		return nil, err
@@ -231,6 +319,7 @@ func (u *BaseBackupSupervisor) getReceiverConfig() (*receivemode.BriefConfig, er
 	}
 
 	var c receivemode.BriefConfig
+
 	resp, err := u.restyClient.R().SetResult(&c).Get(addr + "/api/v1/brief-config")
 	if err != nil {
 		return nil, err
@@ -238,6 +327,7 @@ func (u *BaseBackupSupervisor) getReceiverConfig() (*receivemode.BriefConfig, er
 	if resp.IsError() {
 		return nil, fmt.Errorf("getReceiverConfig() request error: %d", resp.StatusCode())
 	}
+
 	return &c, nil
 }
 
@@ -245,10 +335,14 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 	if !u.cfg.Backup.Retention.Enable {
 		return nil
 	}
+
 	// setup storage, get backup IDs
 	stor, backupTs, err := u.getBackupIDs(ctx, cfg)
 	if err != nil {
 		return err
+	}
+	if stor == nil || len(backupTs) == 0 {
+		return nil
 	}
 
 	// decide which may be pruned
@@ -256,7 +350,12 @@ func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *
 	for k := range backupTs {
 		backupsList = append(backupsList, filepath.Base(k))
 	}
-	backupsToDelete := filterBackupsToDeleteTimeBased(backupsList, cfg.Backup.Retention.KeepDurationParsed, time.Now())
+
+	backupsToDelete := filterBackupsToDeleteTimeBased(
+		backupsList,
+		cfg.Backup.Retention.KeepDurationParsed,
+		time.Now(),
+	)
 	if len(backupsToDelete) == 0 {
 		return nil
 	}
@@ -269,10 +368,14 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 	if !u.cfg.Backup.Retention.Enable {
 		return nil
 	}
+
 	// setup storage, get backup IDs
 	stor, backupTs, err := u.getBackupIDs(ctx, cfg)
 	if err != nil {
 		return err
+	}
+	if stor == nil || len(backupTs) == 0 {
+		return nil
 	}
 
 	// decide which may be pruned
@@ -280,7 +383,11 @@ func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg 
 	for k := range backupTs {
 		backupsList = append(backupsList, filepath.Base(k))
 	}
-	backupsToDelete := filterBackupsToDeleteCountBased(backupsList, int(cfg.Backup.Retention.KeepCountParsed))
+
+	backupsToDelete := filterBackupsToDeleteCountBased(
+		backupsList,
+		int(cfg.Backup.Retention.KeepCountParsed),
+	)
 	if len(backupsToDelete) == 0 {
 		return nil
 	}
@@ -321,22 +428,24 @@ func (u *BaseBackupSupervisor) purgeBackups(
 				continue
 			}
 
-			// ONLY if manifests exists (there may be no manifests for failed backups) -> update metrics
+			// ONLY if manifest exists.
+			// Failed backups may have no manifest, but should still be removable.
 			info, readManifestErr := u.readManifest(ctx, stor, toDelete)
 
-			err := stor.DeleteDir(ctx, b)
-			if err != nil {
+			if err := stor.DeleteDir(ctx, b); err != nil {
 				return err
 			}
+
 			u.log().Info("backup retained", slog.String("path", b))
 
-			// if backup was retained, and manifests was present, update metrics
-			if readManifestErr == nil { // NOTE: == nil
+			// If backup was retained and manifest was present, update metrics.
+			if readManifestErr == nil {
 				u.log().Debug("bytes deleted", slog.Int64("total", info.BytesTotal))
 				backupmetrics.M.AddBasebackupBytesDeleted(float64(info.BytesTotal))
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -365,10 +474,11 @@ func (u *BaseBackupSupervisor) getBackupIDs(ctx context.Context, cfg *config.Con
 			return nil, nil, nil
 		}
 	}
+
 	return stor, backupTs, nil
 }
 
-// locsks
+// locks
 
 type tryMutex struct {
 	locked int32
@@ -379,6 +489,7 @@ func (tm *tryMutex) TryLock() bool {
 	if !atomic.CompareAndSwapInt32(&tm.locked, 0, 1) {
 		return false
 	}
+
 	tm.m.Lock()
 	return true
 }
