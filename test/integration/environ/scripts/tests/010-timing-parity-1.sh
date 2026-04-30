@@ -686,8 +686,6 @@ main() {
   compare_artifact_bytes_up_to_lsn "${FINAL_LSN}"
 
   print_summary
-
-  grep -in "error" "${PGRWL_LOG}"  
 }
 
 main "$@"

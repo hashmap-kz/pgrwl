@@ -114,9 +114,6 @@ EOF
   x_sql "select count(*) from public.tslog where ts = '${MARKER}';" | grep -qx "1"
 
   echo_delim "OK"
-
-  echo_delim "search logs for errors"
-  grep -in "error" "${LOG_FILE}"  
 }
 
 x_backup_restore "$@"

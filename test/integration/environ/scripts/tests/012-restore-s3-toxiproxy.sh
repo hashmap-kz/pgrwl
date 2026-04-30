@@ -112,9 +112,6 @@ EOF
   echo_delim "show latest applied records"
   psql --pset pager=off -c "select * from public.tslog;"
   tail -10 "${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}" || true
-
-  echo_delim "search logs for errors"
-  grep -in "error" "${LOG_FILE}"  
 }
 
 x_backup_restore_with_toxiproxy "$@"
