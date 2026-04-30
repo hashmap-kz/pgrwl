@@ -116,6 +116,9 @@ EOF
   pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
   diff "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"
 
+  echo_delim "run post_restore_check.sql"
+  psql -f /var/lib/postgresql/scripts/pg/post_restore_check.sql -v "ON_ERROR_STOP=1" postgres
+
   x_search_errors_in_logs
 }
 
