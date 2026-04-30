@@ -127,6 +127,9 @@ EOF
   psql --pset pager=off -c "select * from public.tslog;"
   echo "insert log content:"
   tail -10 "${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}"
+
+  echo_delim "search logs for errors"
+  grep -in "error" "${LOG_FILE}"
 }
 
 x_backup_restore "${@}"

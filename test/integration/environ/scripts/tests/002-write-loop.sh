@@ -112,6 +112,9 @@ EOF
   echo_delim "compare wal-archive with pg_receivewal"
   find "${WAL_PATH}" -type f -name "*.json" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
+
+  echo_delim "search logs for errors"
+  grep -in "error" "${LOG_FILE}"
 }
 
 x_backup_restore "${@}"
