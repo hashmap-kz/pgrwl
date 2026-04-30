@@ -13,6 +13,7 @@ import (
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
 	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
+	"github.com/pgrwl/pgrwl/internal/opt/basebackup/manualbackup"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsv"
 )
@@ -57,13 +58,25 @@ func RunBackupMode(opts *BackupModeOpts) error {
 
 	loggr.LogAttrs(ctx, slog.LevelInfo, "opts", slog.Any("opts", opts))
 
+	supervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
+		Directory: opts.ReceiveDirectory,
+	})
+
+	manualSvc := manualbackup.New(manualbackup.Options{
+		Gate:      supervisor,
+		Directory: opts.ReceiveDirectory,
+		AppCtx:    ctx,
+	})
+
 	var wg sync.WaitGroup
 
 	//////////////////////////////////////////////////////////////////////
 	// Basebackup supervisor.
 	//
 	// Critical component.
-	// If it fails or panics, backup mode should stop and return the real error.
+	// It owns cron scheduling and the shared "only one backup at a time" gate.
+	//
+	// Manual backup logic is intentionally separate, but uses the same gate.
 
 	wg.Add(1)
 	go func() {
@@ -75,11 +88,7 @@ func RunBackupMode(opts *BackupModeOpts) error {
 			}
 		}()
 
-		u := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
-			Directory: opts.ReceiveDirectory,
-		})
-
-		if err := u.Run(ctx); err != nil {
+		if err := supervisor.Run(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
 				return
 			}
@@ -90,38 +99,51 @@ func RunBackupMode(opts *BackupModeOpts) error {
 	}()
 
 	//////////////////////////////////////////////////////////////////////
-	// Metrics HTTP server.
+	// Metrics.
 	//
-	// Non-critical component.
-	// It should not stop scheduled backups.
+	// Metrics are optional.
+	// The HTTP API server is not optional because backup mode exposes:
+	//
+	//   POST /api/v1/basebackup
+	//   GET  /api/v1/basebackup
+	//   GET  /api/v1/basebackup/status
 
 	if cfg.Metrics.Enable {
 		backupmetrics.InitPromMetrics(ctx)
+	}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	//////////////////////////////////////////////////////////////////////
+	// Backup HTTP API server.
+	//
+	// Non-critical component.
+	// If the API port is unavailable, scheduled backups can still run.
 
-			defer func() {
-				if r := recover(); r != nil {
-					loggr.Error("metrics http server panicked",
-						slog.Any("panic", r),
-						slog.String("goroutine", "metrics-http-server"),
-					)
-				}
-			}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-			srv := api.NewHTTPServer(cfg.Main.ListenPort, backupmode.Init(cfg))
-
-			if err := srv.Run(ctx); err != nil {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-
-				loggr.Error("metrics http server failed", slog.Any("err", err))
+		defer func() {
+			if r := recover(); r != nil {
+				loggr.Error("backup http server panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "backup-http-server"),
+				)
 			}
 		}()
-	}
+
+		srv := api.NewHTTPServer(cfg.Main.ListenPort, backupmode.Init(&backupmode.Opts{
+			Cfg:        cfg,
+			Controller: manualSvc,
+		}))
+
+		if err := srv.Run(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+
+			loggr.Error("backup http server failed", slog.Any("err", err))
+		}
+	}()
 
 	//////////////////////////////////////////////////////////////////////
 	// Wait for shutdown reason:

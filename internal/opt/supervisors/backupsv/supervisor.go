@@ -30,6 +30,26 @@ import (
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
 )
 
+var ErrBackupAlreadyRunning = errors.New("basebackup is already running")
+
+type BackupRunStatus string
+
+const (
+	BackupRunIdle      BackupRunStatus = "idle"
+	BackupRunRunning   BackupRunStatus = "running"
+	BackupRunSucceeded BackupRunStatus = "succeeded"
+	BackupRunFailed    BackupRunStatus = "failed"
+)
+
+type BackupRunState struct {
+	Running    bool            `json:"running"`
+	Status     BackupRunStatus `json:"status"`
+	Source     string          `json:"source,omitempty"`
+	StartedAt  *time.Time      `json:"started_at,omitempty"`
+	FinishedAt *time.Time      `json:"finished_at,omitempty"`
+	LastError  string          `json:"last_error,omitempty"`
+}
+
 type BaseBackupSupervisorOpts struct {
 	Directory string
 }
@@ -40,6 +60,9 @@ type BaseBackupSupervisor struct {
 	opts          *BaseBackupSupervisorOpts
 	restyClient   *resty.Client
 	backupRunning tryMutex
+
+	stateMu sync.RWMutex
+	state   BackupRunState
 }
 
 func NewBaseBackupSupervisor(cfg *config.Config, opts *BaseBackupSupervisorOpts) *BaseBackupSupervisor {
@@ -52,6 +75,10 @@ func NewBaseBackupSupervisor(cfg *config.Config, opts *BaseBackupSupervisorOpts)
 		cfg:         cfg,
 		opts:        opts,
 		restyClient: client,
+		state: BackupRunState{
+			Running: false,
+			Status:  BackupRunIdle,
+		},
 	}
 }
 
@@ -61,6 +88,69 @@ func (u *BaseBackupSupervisor) log() *slog.Logger {
 	}
 
 	return slog.With(slog.String("component", "basebackup-supervisor"))
+}
+
+// TryBeginBackup atomically reserves the single backup slot.
+//
+// Both cron and manual REST-triggered backups must call this method before
+// doing any backup work. This avoids a check-then-start race.
+func (u *BaseBackupSupervisor) TryBeginBackup(source string) bool {
+	if !u.backupRunning.TryLock() {
+		return false
+	}
+
+	now := time.Now().UTC()
+
+	u.stateMu.Lock()
+	u.state = BackupRunState{
+		Running:    true,
+		Status:     BackupRunRunning,
+		Source:     source,
+		StartedAt:  &now,
+		FinishedAt: nil,
+		LastError:  "",
+	}
+	u.stateMu.Unlock()
+
+	return true
+}
+
+// FinishBackup releases the single backup slot and stores the final state.
+// It must be called exactly once after a successful TryBeginBackup().
+func (u *BaseBackupSupervisor) FinishBackup(status BackupRunStatus, errMsg string) {
+	now := time.Now().UTC()
+
+	u.stateMu.Lock()
+	u.state.Running = false
+	u.state.Status = status
+	u.state.FinishedAt = &now
+	u.state.LastError = errMsg
+	u.stateMu.Unlock()
+
+	u.backupRunning.Unlock()
+}
+
+func (u *BaseBackupSupervisor) BackupStatus() BackupRunState {
+	u.stateMu.RLock()
+	defer u.stateMu.RUnlock()
+
+	return cloneBackupRunState(u.state)
+}
+
+func cloneBackupRunState(in BackupRunState) BackupRunState {
+	out := in
+
+	if in.StartedAt != nil {
+		t := *in.StartedAt
+		out.StartedAt = &t
+	}
+
+	if in.FinishedAt != nil {
+		t := *in.FinishedAt
+		out.FinishedAt = &t
+	}
+
+	return out
 }
 
 // Run starts the basebackup scheduler and blocks until ctx is canceled.
@@ -93,6 +183,12 @@ func (u *BaseBackupSupervisor) Run(ctx context.Context) error {
 				u.log().Info("scheduled basebackup stopped", slog.Any("reason", err))
 				return
 			}
+
+			if errors.Is(err, ErrBackupAlreadyRunning) {
+				u.log().Warn("previous basebackup still running, skipping this run")
+				return
+			}
+
 			u.log().Error("scheduled basebackup run failed", slog.Any("err", err))
 		}
 	})
@@ -158,18 +254,22 @@ func (u *BaseBackupSupervisor) runScheduledBackupSafe(
 func (u *BaseBackupSupervisor) runScheduledBackup(
 	ctx context.Context,
 	startupInfo *xlog.StartupInfo,
-) error {
+) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	if !u.backupRunning.TryLock() {
-		u.log().Warn("previous basebackup still running, skipping this run")
-		return nil
+	if !u.TryBeginBackup("cron") {
+		return ErrBackupAlreadyRunning
 	}
+
 	defer func() {
-		u.log().Debug("unlocking tryMutex")
-		u.backupRunning.Unlock()
+		if err != nil {
+			u.FinishBackup(BackupRunFailed, err.Error())
+			return
+		}
+
+		u.FinishBackup(BackupRunSucceeded, "")
 	}()
 
 	u.log().Info("starting scheduled basebackup")
@@ -182,7 +282,7 @@ func (u *BaseBackupSupervisor) runScheduledBackup(
 		return err
 	}
 
-	_, err := backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{
+	_, err = backup.CreateBaseBackup(&backup.CreateBaseBackupOpts{
 		Directory: u.opts.Directory,
 	})
 	if err != nil {
