@@ -210,7 +210,15 @@ EOF
   find "${WAL_PATH}" -type f -name "*.json" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
 
-  x_search_errors_in_logs
+  # search for errors in logs
+  echo_delim "searching for errors in pgrwl logs"
+  if [[ -f "${LOG_FILE}" ]]; then
+    grep -i "error" "${LOG_FILE}" || echo " > no errors found in pgrwl logs"
+  fi
+  echo_delim "searching for errors in pg logs"
+  if [[ -f "/var/log/postgresql/pg.log" ]]; then
+    grep -i "err" "/var/log/postgresql/pg.log" || echo " > no errors found in pg logs"
+  fi  
 }
 
 x_backup_restore "${@}"
