@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"os/signal"
 	"sync"
@@ -18,7 +17,7 @@ type ServeModeOpts struct {
 	ListenPort int
 }
 
-func RunServeMode(opts *ServeModeOpts) {
+func RunServeMode(opts *ServeModeOpts) error {
 	var err error
 	loggr := slog.With("component", "serve-mode-runner")
 
@@ -32,8 +31,7 @@ func RunServeMode(opts *ServeModeOpts) {
 		SubPath: config.LocalFSStorageSubpath,
 	})
 	if err != nil {
-		//nolint:gocritic
-		log.Fatal(err)
+		return err
 	}
 
 	// Use WaitGroup to wait for all goroutines to finish
@@ -71,4 +69,7 @@ func RunServeMode(opts *ServeModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
+
+	// TODO: errCh
+	return ctx.Err()
 }

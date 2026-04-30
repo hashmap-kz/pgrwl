@@ -24,7 +24,10 @@ type SetupStorageOpts struct {
 }
 
 func SetupStorage(opts *SetupStorageOpts) (*st.VariadicStorage, error) {
-	cfg := config.Cfg()
+	cfg, err := config.Cfg()
+	if err != nil {
+		return nil, err
+	}
 
 	// storage configs
 	alg := st.Algorithms{

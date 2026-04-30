@@ -25,7 +25,10 @@ func (c *ReceiveController) StatusHandler(w http.ResponseWriter, _ *http.Request
 }
 
 func (c *ReceiveController) BriefConfig(w http.ResponseWriter, r *http.Request) {
-	briefConfig := c.Service.BriefConfig(r.Context())
+	briefConfig, err := c.Service.BriefConfig(r.Context())
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusInternalServerError, err)
+	}
 	httpx.WriteJSON(w, http.StatusOK, briefConfig)
 }
 
@@ -35,7 +38,10 @@ func (c *ReceiveController) FullRedactedConfig(w http.ResponseWriter, r *http.Re
 }
 
 func (c *ReceiveController) SnapshotHandler(w http.ResponseWriter, r *http.Request) {
-	snap := c.Service.Snapshot(r.Context())
+	snap, err := c.Service.Snapshot(r.Context())
+	if err != nil {
+		httpx.WriteJSON(w, http.StatusInternalServerError, err)
+	}
 	httpx.WriteJSON(w, http.StatusOK, snap)
 }
 

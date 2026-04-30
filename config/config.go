@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -65,7 +64,8 @@ const (
 
 var (
 	// once ensures config is initialized only once.
-	once sync.Once
+	once   sync.Once
+	cfgErr error
 
 	// config holds the global application configuration.
 	config *Config
@@ -335,58 +335,83 @@ func expand(d []byte) []byte {
 	return []byte(expandEnvsWithPrefix(string(d), "PGRWL_"))
 }
 
-func Cfg() *Config {
+func Cfg() (*Config, error) {
 	if config == nil {
-		log.Fatal("config was not loaded in main")
+		return nil, fmt.Errorf("config was not loaded in main")
 	}
-	return config
+	return config, nil
 }
 
-func MustLoad(path, mode string) *Config {
+func FromFile(path, mode string) (*Config, error) {
 	once.Do(func() {
-		config = mustLoadCfg(path)
-		if err := validate(config, mode); err != nil {
-			log.Fatalf("Invalid config: %v", err)
+		var cfg *Config
+
+		cfg, cfgErr = mustLoadCfg(path)
+		if cfgErr != nil {
+			return
 		}
-		Verbose = strings.EqualFold(config.Log.Level, "trace")
+
+		cfgErr = validate(cfg, mode)
+		if cfgErr != nil {
+			return
+		}
+
+		Verbose = strings.EqualFold(cfg.Log.Level, "trace")
+		config = cfg
 	})
-	return config
+
+	if cfgErr != nil {
+		return nil, cfgErr
+	}
+	return config, nil
 }
 
-func MustEnvconfig(mode string) *Config {
+func FromEnvs(mode string) (*Config, error) {
 	once.Do(func() {
 		config = new(Config)
-		if err := envconfig.Process(context.TODO(), config); err != nil {
-			log.Fatalf("Invalid config: %v", err)
+
+		cfgErr := envconfig.Process(context.TODO(), config)
+		if cfgErr != nil {
+			return
 		}
-		if err := validate(config, mode); err != nil {
-			log.Fatalf("Invalid config: %v", err)
+
+		cfgErr = validate(config, mode)
+		if cfgErr != nil {
+			return
 		}
+
 		Verbose = strings.EqualFold(config.Log.Level, "trace")
 	})
-	return config
+
+	if cfgErr != nil {
+		return nil, cfgErr
+	}
+	return config, nil
 }
 
-func mustLoadCfg(path string) *Config {
+func mustLoadCfg(path string) (*Config, error) {
 	var cfg Config
+
 	configData, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+
 	ext := filepath.Ext(path)
 	switch ext {
 	case ".json":
 		if err := json.Unmarshal(expand(configData), &cfg); err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 	case ".yml", ".yaml":
 		if err := yaml.Unmarshal(expand(configData), &cfg); err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 	default:
-		log.Fatalf("unexpected config-file extension: %s", ext)
+		return nil, fmt.Errorf("unexpected config-file extension: %s", ext)
 	}
-	return &cfg
+
+	return &cfg, nil
 }
 
 // validate checks that all required fields in the config are set appropriately.

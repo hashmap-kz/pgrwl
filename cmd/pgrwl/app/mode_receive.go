@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"os/signal"
 	"strings"
@@ -31,8 +30,12 @@ type ReceiveModeOpts struct {
 	ListenPort       int
 }
 
-func RunReceiveMode(opts *ReceiveModeOpts) {
-	cfg := config.Cfg()
+func RunReceiveMode(opts *ReceiveModeOpts) error {
+	cfg, err := config.Cfg()
+	if err != nil {
+		return err
+	}
+
 	loggr := slog.With("component", "receive-mode-runner")
 
 	// setup context
@@ -47,7 +50,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Init WAL-receiver loop first
 
 	// setup wal-receiver
-	pgrw := mustInitPgrw(ctx, opts)
+	pgrw, err := initPgrw(ctx, opts)
+	if err != nil {
+		return err
+	}
 
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
@@ -84,6 +90,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	//////////////////////////////////////////////////////////////////////
 	// Init OPT components
 
+	// setup storage: it may be nil
+	stor, err := initStorageIfRequired(cfg, loggr, opts, pgrw)
+	if err != nil {
+		return err
+	}
+
 	// setup job queue
 	loggr.Info("running job queue")
 	jobQueue := jobq.NewJobQueue(5)
@@ -91,9 +103,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 
 	// setup metrics
 	initMetrics(ctx, cfg, loggr)
-
-	// setup storage: it may be nil
-	stor := mustInitStorageIfRequired(cfg, loggr, opts, pgrw)
 
 	// HTTP server
 	// It shouldn't cancel() the main streaming loop even on error.
@@ -153,6 +162,9 @@ func RunReceiveMode(opts *ReceiveModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
+
+	// TODO: errCh
+	return ctx.Err()
 }
 
 func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
@@ -180,19 +192,24 @@ func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 	return true
 }
 
-func mustInitPgrw(ctx context.Context, opts *ReceiveModeOpts) xlog.PgReceiveWal {
+func initPgrw(ctx context.Context, opts *ReceiveModeOpts) (xlog.PgReceiveWal, error) {
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
 		Slot:             opts.Slot,
 		NoLoop:           opts.NoLoop,
 	})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return pgrw
+	return pgrw, nil
 }
 
-func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *ReceiveModeOpts, pgrw xlog.PgReceiveWal) *st.VariadicStorage {
+func initStorageIfRequired(
+	cfg *config.Config,
+	loggr *slog.Logger,
+	opts *ReceiveModeOpts,
+	pgrw xlog.PgReceiveWal,
+) (*st.VariadicStorage, error) {
 	loggr.Info("init storage")
 
 	var stor *st.VariadicStorage
@@ -201,7 +218,7 @@ func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *Rec
 
 		walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
 
@@ -211,8 +228,8 @@ func mustInitStorageIfRequired(cfg *config.Config, loggr *slog.Logger, opts *Rec
 			S3PartSizeBytes: walSegSz,
 		})
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 	}
-	return stor
+	return stor, nil
 }

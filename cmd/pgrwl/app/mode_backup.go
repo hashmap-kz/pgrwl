@@ -19,8 +19,12 @@ type BackupModeOpts struct {
 	ReceiveDirectory string
 }
 
-func RunBackupMode(opts *BackupModeOpts) {
-	cfg := config.Cfg()
+func RunBackupMode(opts *BackupModeOpts) error {
+	cfg, err := config.Cfg()
+	if err != nil {
+		return err
+	}
+
 	loggr := slog.With("component", "backup-mode-runner")
 
 	if cfg.Backup.Cron == "" {
@@ -88,4 +92,7 @@ func RunBackupMode(opts *BackupModeOpts) {
 	// Wait for all goroutines to finish
 	wg.Wait()
 	loggr.Info("all components shut down cleanly")
+
+	// TODO: errCh
+	return ctx.Err()
 }
