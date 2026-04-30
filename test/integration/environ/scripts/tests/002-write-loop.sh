@@ -113,8 +113,8 @@ EOF
   find "${WAL_PATH}" -type f -name "*.json" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
 
-  echo_delim "run amcheck"
-  psql -f /var/lib/postgresql/scripts/pg/amcheck.sql -v "ON_ERROR_STOP=1" postgres
+  echo_delim "run post_restore_check.sql"
+  psql -f /var/lib/postgresql/scripts/pg/post_restore_check.sql -v "ON_ERROR_STOP=1" postgres
 
   x_search_errors_in_logs
 }
