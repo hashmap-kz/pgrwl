@@ -1,5 +1,7 @@
 -- https://www.postgresql.org/docs/current/amcheck.html#AMCHECK-FUNCTIONS
 
+CREATE EXTENSION IF NOT EXISTS amcheck;
+
 SELECT bt_index_check(index => c.oid, heapallindexed => i.indisunique),
                c.relname,
                c.relpages
