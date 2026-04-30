@@ -40,6 +40,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
