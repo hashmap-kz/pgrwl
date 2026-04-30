@@ -231,6 +231,15 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 
 	wg.Wait()
 
+	// A fatal error may have appeared while goroutines were shutting down.
+	select {
+	case err := <-fatalErrCh:
+		if err != nil {
+			runErr = err
+		}
+	default:
+	}
+
 	if runErr == nil {
 		loggr.Info("all components shut down cleanly")
 		return nil
