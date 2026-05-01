@@ -65,15 +65,11 @@ It implements the streaming replication protocol directly (not `archive_command`
 it supports replication slots, `*.partial` WAL files, and synchronous replication acknowledgment -
 enabling **RPO=0** in high-durability setups.
 
-**basic dashboard**
+**Basic dashboard**
 
 ![UI](https://raw.githubusercontent.com/hashmap-kz/assets/main/pgrwl/pgrwl-ui-v5.png)
 
-## Operating modes
-
-**[`^        back to top        ^`](#table-of-contents)**
-
-**`pgrwl` components**
+**Architecture**
 
 ![Receive Mode](docs/assets/svg/stream-mode.svg)
 
