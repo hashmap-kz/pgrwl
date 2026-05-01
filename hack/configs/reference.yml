@@ -9,25 +9,19 @@ receiver:                                # Required for 'receive' mode
   uploader:                              # Required for non-local storage type
     sync_interval: 10s                   # Interval for the upload worker to check for new files
     max_concurrency: 4                   # Maximum number of files to upload concurrently
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-    keep_period: "1m"                    # Remove WAL files older than given period
 
-backup:                                  # Required for 'backup' mode
-  cron: "0 0 */3 * *"                    # Basebackup cron schedule
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    type: time                           # One of: (time / count)
-    value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
-    keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
-  walretention:                          # Optional (WAL archive cleanup settings)
-    enable: true                         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-    receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+backup:                                  # Required for stream mode
+  cron: "0 0 */3 * *"                    # Basebackup cron schedule, POSIX format: minute hour day-of-month month day-of-week
+
+retention:                               # Optional
+  enable: true                           # Enable recovery-window retention
+  type: recovery_window                  # Only supported retention policy
+  value: 72h                             # Recovery window; keep enough backups/WALs to recover to any point in the last 72h
+  keep_last: 1                           # Minimum number of successful backups to keep, even if outside/inside the recovery window
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)
-  format: text                           # One of: (text / json)
+  format: text                           # One of: (text / pretty / json)
   add_source: true                       # Include file:line in log messages (for local development)
 
 metrics:                                 # Optional

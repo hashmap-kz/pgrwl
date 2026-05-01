@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,8 +57,7 @@ const (
 	// RepoCompressorZstd is the Zstandard compression algorithm identifier.
 	RepoCompressorZstd = "zstd"
 
-	BackupRetentionTypeTime  = "time"
-	BackupRetentionTypeCount = "count"
+	RetentionTypeRecoveryWindow = "recovery_window"
 )
 
 var (
@@ -88,13 +86,14 @@ var (
 // Config is the root configuration for the WAL receiver application.
 // Supports `${PGRWL_*}` environment variable placeholders for sensitive values.
 type Config struct {
-	Main      MainConfig    `json:"main,omitzero"`      // Main application settings.
-	Receiver  ReceiveConfig `json:"receiver,omitzero"`  // WAL receiver configuration.
-	Metrics   MetricsConfig `json:"metrics,omitzero"`   // Prometheus metrics configuration.
-	Log       LogConfig     `json:"log,omitzero"`       // Logging configuration.
-	Storage   StorageConfig `json:"storage,omitzero"`   // Storage backend configuration.
-	DevConfig DevConfig     `json:"devconfig,omitzero"` // Various dev options.
-	Backup    BackupConfig  `json:"backup,omitzero"`    // Streaming basebackup options.
+	Main      MainConfig      `json:"main,omitzero"`      // Main application settings.
+	Receiver  ReceiveConfig   `json:"receiver,omitzero"`  // WAL receiver configuration.
+	Metrics   MetricsConfig   `json:"metrics,omitzero"`   // Prometheus metrics configuration.
+	Log       LogConfig       `json:"log,omitzero"`       // Logging configuration.
+	Storage   StorageConfig   `json:"storage,omitzero"`   // Storage backend configuration.
+	DevConfig DevConfig       `json:"devconfig,omitzero"` // Various dev options.
+	Backup    BackupConfig    `json:"backup,omitzero"`    // Streaming basebackup options.
+	Retention RetentionConfig `json:"retention,omitzero"` // Retention worker (recovery-window)
 }
 
 // MainConfig holds top-level application settings.
@@ -118,13 +117,11 @@ type DevConfigPprof struct {
 
 // BackupConfig configures streaming basebackup properties.
 type BackupConfig struct {
-	Cron         string                   `json:"cron" env:"PGRWL_BACKUP_CRON"`
-	Retention    BackupRetentionConfig    `json:"retention,omitzero"`
-	WalRetention BackupWalRetentionConfig `json:"walretention,omitzero"`
+	Cron string `json:"cron" env:"PGRWL_BACKUP_CRON"`
 }
 
-// BackupRetentionConfig configures retention for basebackups.
-type BackupRetentionConfig struct {
+// RetentionConfig configures retention for basebackups.
+type RetentionConfig struct {
 	// Enable determines whether retention logic is active.
 	Enable bool `json:"enable,omitzero" env:"PGRWL_BACKUP_RETENTION_ENABLE"`
 
@@ -137,12 +134,6 @@ type BackupRetentionConfig struct {
 	KeepLast *int `json:"keep_last,omitzero" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
 }
 
-// BackupWalRetentionConfig configures related setting for WAL-archive.
-type BackupWalRetentionConfig struct {
-	Enable       bool   `json:"enable,omitzero" env:"PGRWL_BACKUP_WALRETENTION_ENABLE"`
-	ReceiverAddr string `json:"receiver_addr,omitzero" env:"PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR"`
-}
-
 // ReceiveConfig configures the WAL receiving logic.
 type ReceiveConfig struct {
 	// Slot is the replication slot name used to stream WAL from PostgreSQL.
@@ -153,9 +144,6 @@ type ReceiveConfig struct {
 
 	// Uploader worker configuration.
 	Uploader UploadConfig `json:"uploader,omitzero"`
-
-	// Retention policy configuration.
-	Retention RetentionConfig `json:"retention,omitzero"`
 }
 
 // UploadConfig configures the uploader worker.
@@ -167,21 +155,6 @@ type UploadConfig struct {
 
 	// MaxConcurrency is the maximum number of concurrent upload tasks.
 	MaxConcurrency int `json:"max_concurrency" env:"PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY"`
-}
-
-// RetentionConfig configures the WAL file retention worker.
-type RetentionConfig struct {
-	// Enable determines whether retention logic is active.
-	Enable bool `json:"enable,omitzero" env:"PGRWL_RECEIVER_RETENTION_ENABLE"`
-
-	// SyncInterval is the interval between retention scans (e.g., "12h").
-	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	SyncInterval       string        `json:"sync_interval" env:"PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL"`
-	SyncIntervalParsed time.Duration `json:"-"`
-
-	// KeepPeriod defines how long to keep old WAL files (e.g., "72h").
-	KeepPeriod       string        `json:"keep_period,omitzero" env:"PGRWL_RECEIVER_RETENTION_KEEP_PERIOD"`
-	KeepPeriodParsed time.Duration `json:"-"`
 }
 
 // MetricsConfig enables or disables Prometheus metrics exposure.
@@ -425,10 +398,11 @@ func validate(c *Config, mode string) error {
 	errs = checkMode(mode, errs)
 	errs = checkMainConfig(c, errs)
 	errs = checkReceiverConfig(c, mode, errs)
-	errs = checkBackupConfig(c, mode, errs)
+	errs = checkRetentionConfig(c, errs)
 	errs = checkLogConfig(c, errs)
 	errs = checkStorageConfig(c, errs)
 	errs = checkStorageModifiersConfig(c, errs)
+	errs = checkBackupConfig(c, errs)
 
 	if len(errs) > 0 {
 		return errors.New("invalid config:\n  - " + strings.Join(errs, "\n  - "))
@@ -484,21 +458,6 @@ func checkReceiverConfig(c *Config, mode string, errs []string) []string {
 				errs = append(errs, "receiver.uploader.max_concurrency must be > 0 if uploader is configured")
 			}
 		}
-		// retention
-		if c.Receiver.Retention.Enable {
-			syncIntervalRetention := c.Receiver.Retention.SyncInterval
-			if duration, err := time.ParseDuration(syncIntervalRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.retention.sync_interval cannot parse: %s, %v", syncIntervalRetention, err))
-			} else {
-				c.Receiver.Retention.SyncIntervalParsed = duration
-			}
-			keepPeriodRetention := c.Receiver.Retention.KeepPeriod
-			if duration, err := time.ParseDuration(keepPeriodRetention); err != nil {
-				errs = append(errs, fmt.Sprintf("receiver.retention.keep_period cannot parse: %s, %v", keepPeriodRetention, err))
-			} else {
-				c.Receiver.Retention.KeepPeriodParsed = duration
-			}
-		}
 	}
 	return errs
 }
@@ -519,6 +478,13 @@ func checkStorageModifiersConfig(c *Config, errs []string) []string {
 		if c.Storage.Encryption.Pass == "" {
 			errs = append(errs, "storage.encryption.pass is required if encryption is enabled")
 		}
+	}
+	return errs
+}
+
+func checkBackupConfig(c *Config, errs []string) []string {
+	if strings.TrimSpace(c.Backup.Cron) == "" {
+		errs = append(errs, "backup.cron is required")
 	}
 	return errs
 }
@@ -568,44 +534,39 @@ func checkStorageConfig(c *Config, errs []string) []string {
 	return errs
 }
 
-func checkBackupConfig(c *Config, mode string, errs []string) []string {
-	// Backup
-	if mode == ModeBackup {
-		if c.Backup.Cron == "" {
-			errs = append(errs, "backup.cron is required in backup mode")
-		}
-		if c.Backup.Retention.Enable {
-			if c.Backup.Retention.Type == BackupRetentionTypeTime || c.Backup.Retention.Type == BackupRetentionTypeCount {
-				// time-based retention
-				if c.Backup.Retention.Type == BackupRetentionTypeTime {
-					basebackupKeepPeriodParsed, err := time.ParseDuration(c.Backup.Retention.Value)
-					if err != nil {
-						errs = append(errs, fmt.Sprintf(
-							"backup.retention.value cannot parse duration: %s, %v",
-							c.Backup.Retention.Value, err),
-						)
-					} else {
-						c.Backup.Retention.KeepDurationParsed = basebackupKeepPeriodParsed
-					}
-				}
-
-				// count-based retention
-				if c.Backup.Retention.Type == BackupRetentionTypeCount {
-					backupCountParsed, err := strconv.ParseInt(c.Backup.Retention.Value, 10, 32)
-					if err != nil || backupCountParsed <= 0 {
-						errs = append(errs, fmt.Sprintf(
-							"backup.retention.value cannot parse count: %s, %v",
-							c.Backup.Retention.Value, err),
-						)
-					} else {
-						c.Backup.Retention.KeepCountParsed = backupCountParsed
-					}
-				}
-			} else {
-				errs = append(errs, "backup.retention.type: must be one of: time/count (got: %q)", c.Backup.Retention.Type)
-			}
-		}
+func checkRetentionConfig(c *Config, errs []string) []string {
+	if !c.Retention.Enable {
+		return errs
 	}
+
+	if c.Retention.Type == "" {
+		c.Retention.Type = RetentionTypeRecoveryWindow
+	}
+
+	if c.Retention.Type != RetentionTypeRecoveryWindow {
+		errs = append(errs, fmt.Sprintf(
+			"backup.retention.type: only %q is supported now (got: %q)",
+			RetentionTypeRecoveryWindow,
+			c.Retention.Type,
+		))
+		return errs
+	}
+
+	recoveryWindow, err := time.ParseDuration(c.Retention.Value)
+	if err != nil || recoveryWindow <= 0 {
+		errs = append(errs, fmt.Sprintf(
+			"backup.retention.value cannot parse recovery window duration: %s, %v",
+			c.Retention.Value,
+			err,
+		))
+	} else {
+		c.Retention.KeepDurationParsed = recoveryWindow
+	}
+
+	if c.Retention.KeepLast != nil && *c.Retention.KeepLast <= 0 {
+		errs = append(errs, "backup.retention.keep_last must be greater than zero")
+	}
+
 	return errs
 }
 

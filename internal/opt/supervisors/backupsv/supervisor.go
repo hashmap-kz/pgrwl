@@ -11,7 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-resty/resty/v2"
+	"github.com/jackc/pglogrepl"
+
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/robfig/cron/v3"
 
@@ -20,14 +21,11 @@ import (
 	"github.com/pgrwl/pgrwl/internal/core/logger"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
-	"github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backup"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/retry"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
-	"github.com/pgrwl/pgrwl/internal/opt/shared/x/cmdx"
-	"github.com/pgrwl/pgrwl/internal/opt/shared/x/strx"
 )
 
 var ErrBackupAlreadyRunning = errors.New("basebackup is already running")
@@ -58,7 +56,6 @@ type BaseBackupSupervisor struct {
 	l             *slog.Logger
 	cfg           *config.Config
 	opts          *BaseBackupSupervisorOpts
-	restyClient   *resty.Client
 	backupRunning tryMutex
 
 	stateMu sync.RWMutex
@@ -66,15 +63,10 @@ type BaseBackupSupervisor struct {
 }
 
 func NewBaseBackupSupervisor(cfg *config.Config, opts *BaseBackupSupervisorOpts) *BaseBackupSupervisor {
-	client := resty.New()
-	client.SetRetryCount(0)
-	client.SetTimeout(5 * time.Second)
-
 	return &BaseBackupSupervisor{
-		l:           slog.With(slog.String("component", "basebackup-supervisor")),
-		cfg:         cfg,
-		opts:        opts,
-		restyClient: client,
+		l:    slog.With(slog.String("component", "basebackup-supervisor")),
+		cfg:  cfg,
+		opts: opts,
 		state: BackupRunState{
 			Running: false,
 			Status:  BackupRunIdle,
@@ -274,8 +266,8 @@ func (u *BaseBackupSupervisor) runScheduledBackup(
 
 	u.log().Info("starting scheduled basebackup")
 
-	if err := u.runRetention(ctx); err != nil {
-		return fmt.Errorf("retain backups before basebackup: %w", err)
+	if err := u.runRetention(ctx, startupInfo); err != nil {
+		return fmt.Errorf("retention before basebackup: %w", err)
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -291,108 +283,31 @@ func (u *BaseBackupSupervisor) runScheduledBackup(
 
 	u.log().Info("basebackup completed")
 
-	if u.cfg.Backup.WalRetention.Enable {
-		if err := u.cleanupWalArchive(ctx, startupInfo); err != nil {
-			return fmt.Errorf("cleanup wal archive: %w", err)
-		}
-	}
-
 	return nil
 }
 
-func (u *BaseBackupSupervisor) runRetention(ctx context.Context) error {
-	if !u.cfg.Backup.Retention.Enable {
+func (u *BaseBackupSupervisor) runRetention(
+	ctx context.Context,
+	startupInfo *xlog.StartupInfo,
+) error {
+	if !u.cfg.Retention.Enable {
 		return nil
 	}
 
-	switch u.cfg.Backup.Retention.Type {
-	case config.BackupRetentionTypeTime:
-		u.log().Info("starting retain backups", slog.String("type", "time-based"))
-
-		if err := u.retainBackupsTimeBased(ctx, u.cfg); err != nil {
-			return fmt.Errorf("time-based retention: %w", err)
-		}
-
-	case config.BackupRetentionTypeCount:
-		u.log().Info("starting retain backups", slog.String("type", "count-based"))
-
-		if err := u.retainBackupsCountBased(ctx, u.cfg); err != nil {
-			return fmt.Errorf("count-based retention: %w", err)
-		}
-
-	default:
-		return fmt.Errorf("unknown backup retention type: %q", u.cfg.Backup.Retention.Type)
+	if u.cfg.Retention.Type != config.RetentionTypeRecoveryWindow {
+		return fmt.Errorf(
+			"unsupported backup retention type %q: only %q is supported",
+			u.cfg.Retention.Type,
+			config.RetentionTypeRecoveryWindow,
+		)
 	}
 
-	return nil
-}
-
-func (u *BaseBackupSupervisor) cleanupWalArchive(ctx context.Context, startupInfo *xlog.StartupInfo) error {
-	u.log().Info("begin to cleanup wal-archive")
-
-	// check receiver.config by API call
-	// if receiver.retain.enabled we cannot cleanup archive here
-	receiverConfig, err := u.getReceiverConfig()
-	if err != nil {
-		return err
-	}
-
-	if receiverConfig.RetentionEnable {
-		return fmt.Errorf("cannot use both: receiver.retention.enable && backup.wals.manage_cleanup")
-	}
-
-	addr, err := cmdx.Addr(u.cfg.Backup.WalRetention.ReceiverAddr)
-	if err != nil {
-		return err
-	}
-
-	// setup storage
-	stor, err := api.SetupStorage(&api.SetupStorageOpts{
-		BaseDir: filepath.ToSlash(u.cfg.Main.Directory),
-		SubPath: config.BaseBackupSubpath,
-	})
-	if err != nil {
-		return err
-	}
-
-	// get all backups available
-	backupTs, err := stor.ListTopLevelDirs(ctx, "")
-	if err != nil {
-		return err
-	}
-	if len(backupTs) == 0 {
-		return nil
-	}
-
-	// sort desc
-	backupsSorted := strx.SortDesc(backupTs)
-	oldest := backupsSorted[len(backupsSorted)-1]
-
-	// get manifest
-	info, err := u.readManifest(ctx, stor, oldest)
-	if err != nil {
-		return err
-	}
-
-	// get WAL filename as a starting point (to clean everything before that name)
-	filename := xlog.XLogFileName(conv.ToUint32(info.TimelineID), uint64(info.StopLSN), startupInfo.WalSegSz)
-	url := fmt.Sprintf("%s/api/v1/wal-before/%s", addr, filename)
-
-	u.log().Info("cleanup data",
-		slog.String("receiver-addr", addr),
-		slog.String("url", url),
-		slog.String("filename", filename),
+	u.log().Info("starting retention",
+		slog.String("type", "recovery-window"),
+		slog.Duration("recovery_window", u.cfg.Retention.KeepDurationParsed),
 	)
 
-	resp, err := u.restyClient.R().Delete(url)
-	if err != nil {
-		return err
-	}
-	if resp.IsError() {
-		return fmt.Errorf("cleanupWalArchive() request error: %d", resp.StatusCode())
-	}
-
-	return nil
+	return u.retainRecoveryWindow(ctx, startupInfo, u.cfg)
 }
 
 func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor st.Storage, backupID string) (*backupdto.Result, error) {
@@ -412,88 +327,210 @@ func (u *BaseBackupSupervisor) readManifest(ctx context.Context, stor st.Storage
 	return &info, nil
 }
 
-func (u *BaseBackupSupervisor) getReceiverConfig() (*receivemode.BriefConfig, error) {
-	addr, err := cmdx.Addr(u.cfg.Backup.WalRetention.ReceiverAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	var c receivemode.BriefConfig
-
-	resp, err := u.restyClient.R().SetResult(&c).Get(addr + "/api/v1/brief-config")
-	if err != nil {
-		return nil, err
-	}
-	if resp.IsError() {
-		return nil, fmt.Errorf("getReceiverConfig() request error: %d", resp.StatusCode())
-	}
-
-	return &c, nil
-}
-
-func (u *BaseBackupSupervisor) retainBackupsTimeBased(ctx context.Context, cfg *config.Config) error {
-	if !u.cfg.Backup.Retention.Enable {
-		return nil
-	}
-
-	// setup storage, get backup IDs
-	stor, backupTs, err := u.getBackupIDs(ctx, cfg)
+func (u *BaseBackupSupervisor) retainRecoveryWindow(
+	ctx context.Context,
+	startupInfo *xlog.StartupInfo,
+	cfg *config.Config,
+) error {
+	backupStore, backupDirs, err := u.getBackupIDs(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	if stor == nil || len(backupTs) == 0 {
+	if backupStore == nil || len(backupDirs) == 0 {
 		return nil
 	}
 
-	// decide which may be pruned
-	backupsList := []string{}
-	for k := range backupTs {
-		backupsList = append(backupsList, filepath.Base(k))
+	successful := make([]recoveryWindowBackup, 0, len(backupDirs))
+
+	for backupPath := range backupDirs {
+		backupID := filepath.Base(backupPath)
+
+		info, err := u.readManifest(ctx, backupStore, backupID)
+		if err != nil {
+			u.log().Warn("backup skipped by retention because manifest cannot be read",
+				slog.String("backup_id", backupID),
+				slog.Any("err", err),
+			)
+			continue
+		}
+
+		if info.StartedAt.IsZero() {
+			u.log().Warn("backup skipped by retention because started_at is empty",
+				slog.String("backup_id", backupID),
+			)
+			continue
+		}
+
+		beginWAL := u.backupBeginWAL(info, startupInfo)
+		if beginWAL == "" {
+			u.log().Warn("backup skipped by retention because begin WAL cannot be determined",
+				slog.String("backup_id", backupID),
+				slog.String("start_lsn", info.StartLSN.String()),
+				slog.Int("timeline_id", int(info.TimelineID)),
+			)
+			continue
+		}
+
+		successful = append(successful, recoveryWindowBackup{
+			name:      backupID,
+			path:      backupPath,
+			startedAt: info.StartedAt,
+			beginWAL:  beginWAL,
+		})
 	}
 
-	backupsToDelete := filterBackupsToDeleteTimeBased(
-		backupsList,
-		cfg.Backup.Retention.KeepDurationParsed,
-		time.Now(),
+	if len(successful) == 0 {
+		u.log().Warn("recovery-window retention skipped: no successful backups with readable manifests")
+		return nil
+	}
+
+	minimumBackups := 1
+	if cfg.Retention.KeepLast != nil {
+		minimumBackups = *cfg.Retention.KeepLast
+	}
+
+	anchor := chooseRecoveryWindowAnchor(
+		successful,
+		cfg.Retention.KeepDurationParsed,
+		minimumBackups,
+		time.Now().UTC(),
 	)
-	if len(backupsToDelete) == 0 {
+	if anchor == nil {
 		return nil
 	}
 
-	// purge
-	return u.purgeBackups(ctx, backupTs, backupsToDelete, stor)
+	backupsToDelete := backupsOlderThanAnchor(successful, anchor)
+
+	u.log().Info("recovery-window retention plan",
+		slog.String("anchor_backup", anchor.name),
+		slog.String("keep_wal_from", anchor.beginWAL),
+		slog.Duration("recovery_window", cfg.Retention.KeepDurationParsed),
+		slog.Int("minimum_backups", minimumBackups),
+		slog.Int("successful_backups", len(successful)),
+		slog.Int("delete_backups", len(backupsToDelete)),
+	)
+
+	if len(backupsToDelete) > 0 {
+		if err := u.purgeBackups(ctx, backupDirs, backupsToDelete, backupStore); err != nil {
+			return fmt.Errorf("purge old backups: %w", err)
+		}
+	}
+
+	if err := u.purgeWALsBefore(ctx, anchor.beginWAL); err != nil {
+		return fmt.Errorf("purge old WALs before %s: %w", anchor.beginWAL, err)
+	}
+
+	return nil
 }
 
-func (u *BaseBackupSupervisor) retainBackupsCountBased(ctx context.Context, cfg *config.Config) error {
-	if !u.cfg.Backup.Retention.Enable {
-		return nil
+func (u *BaseBackupSupervisor) backupBeginWAL(
+	info *backupdto.Result,
+	startupInfo *xlog.StartupInfo,
+) string {
+	if info == nil || startupInfo == nil {
+		return ""
 	}
 
-	// setup storage, get backup IDs
-	stor, backupTs, err := u.getBackupIDs(ctx, cfg)
+	timelineID := info.TimelineID
+	startLSN := info.StartLSN
+
+	if info.Manifest != nil && len(info.Manifest.WALRanges) > 0 {
+		firstRange := info.Manifest.WALRanges[0]
+
+		if firstRange.Timeline != 0 {
+			timelineID = firstRange.Timeline
+		}
+
+		if firstRange.StartLSN != "" {
+			lsn, err := pglogrepl.ParseLSN(firstRange.StartLSN)
+			if err == nil {
+				startLSN = lsn
+			}
+		}
+	}
+
+	if timelineID == 0 || startLSN == 0 {
+		return ""
+	}
+
+	return xlog.XLogFileName(
+		conv.ToUint32(timelineID),
+		uint64(startLSN),
+		startupInfo.WalSegSz,
+	)
+}
+
+func (u *BaseBackupSupervisor) purgeWALsBefore(ctx context.Context, keepFromWAL string) error {
+	if keepFromWAL == "" {
+		return fmt.Errorf("keepFromWAL is empty")
+	}
+
+	walStore, err := u.setupWALArchiveStorage()
 	if err != nil {
 		return err
 	}
-	if stor == nil || len(backupTs) == 0 {
-		return nil
+
+	wals, err := walStore.ListInfoRaw(ctx, "")
+	if err != nil {
+		return fmt.Errorf("list WAL archive: %w", err)
 	}
 
-	// decide which may be pruned
-	backupsList := []string{}
-	for k := range backupTs {
-		backupsList = append(backupsList, filepath.Base(k))
+	deleted := 0
+	kept := 0
+
+	for _, wal := range wals {
+		name, history, ok := normalizeWALFilename(wal.Path)
+		if !ok {
+			kept++
+			continue
+		}
+
+		// Timeline history files are tiny and important for timeline switching.
+		// Keep them for now.
+		if history {
+			kept++
+			continue
+		}
+
+		if !walBefore(name, keepFromWAL) {
+			kept++
+			continue
+		}
+
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		u.log().Info("deleting old WAL",
+			slog.String("wal", name),
+			slog.String("path", wal.Path),
+			slog.String("keep_from", keepFromWAL),
+		)
+
+		if err := walStore.Delete(ctx, wal.Path); err != nil {
+			return fmt.Errorf("delete WAL %s: %w", wal.Path, err)
+		}
+
+		deleted++
 	}
 
-	backupsToDelete := filterBackupsToDeleteCountBased(
-		backupsList,
-		int(cfg.Backup.Retention.KeepCountParsed),
+	u.log().Info("WAL retention completed",
+		slog.String("keep_from", keepFromWAL),
+		slog.Int("deleted_wals", deleted),
+		slog.Int("kept_wals", kept),
 	)
-	if len(backupsToDelete) == 0 {
-		return nil
-	}
 
-	// purge
-	return u.purgeBackups(ctx, backupTs, backupsToDelete, stor)
+	return nil
+}
+
+func (u *BaseBackupSupervisor) setupWALArchiveStorage() (*st.VariadicStorage, error) {
+	// This storage points to the WAL archive, not basebackup storage.
+	// Do not use basebackup storage here.
+	// Do not pass S3PartSizeBytes here; retention only lists/deletes.
+	return api.SetupStorage(&api.SetupStorageOpts{
+		BaseDir: filepath.ToSlash(u.opts.Directory),
+		SubPath: config.LocalFSStorageSubpath,
+	})
 }
 
 // internal helpers
@@ -566,13 +603,6 @@ func (u *BaseBackupSupervisor) getBackupIDs(ctx context.Context, cfg *config.Con
 	}
 	if len(backupTs) == 0 {
 		return nil, nil, nil
-	}
-
-	if cfg.Backup.Retention.KeepLast != nil {
-		if len(backupTs) <= *cfg.Backup.Retention.KeepLast {
-			u.log().Debug("backup counts <= keep_last. nothing to purge")
-			return nil, nil, nil
-		}
 	}
 
 	return stor, backupTs, nil

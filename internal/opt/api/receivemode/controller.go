@@ -1,12 +1,9 @@
 package receivemode
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/httpx"
-
-	"github.com/pgrwl/pgrwl/internal/opt/jobq"
 )
 
 type ReceiveController struct {
@@ -63,23 +60,4 @@ func (c *ReceiveController) BackupsHandler(w http.ResponseWriter, r *http.Reques
 		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, snap)
-}
-
-func (c *ReceiveController) DeleteWALsBeforeHandler(w http.ResponseWriter, r *http.Request) {
-	filename, err := httpx.PathValueString(r, "filename")
-	if err != nil {
-		http.Error(w, "expect filename path-param", http.StatusBadRequest)
-		return
-	}
-
-	if err := c.Service.DeleteWALsBefore(r.Context(), filename); err != nil {
-		if errors.Is(err, jobq.ErrJobQueueFull) {
-			httpx.WriteJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
-			return
-		}
-		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "scheduled"})
 }

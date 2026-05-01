@@ -8,16 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
-
 	"github.com/pgrwl/pgrwl/config"
 
 	"github.com/pgrwl/pgrwl/internal/opt/api"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
-	"github.com/pgrwl/pgrwl/internal/opt/jobq"
-
-	"github.com/pgrwl/pgrwl/internal/core/logger"
-
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
@@ -25,7 +19,6 @@ import (
 
 type Service interface {
 	Status() *PgrwlStatus
-	DeleteWALsBefore(ctx context.Context, walFileName string) error
 	BriefConfig(ctx context.Context) (*BriefConfig, error)
 	FullRedactedConfig(ctx context.Context) *config.Config
 	ListWALFiles(ctx context.Context) ([]WALFile, error)
@@ -34,29 +27,26 @@ type Service interface {
 }
 
 type receiveModeSvc struct {
-	l        *slog.Logger
-	pgrw     xlog.PgReceiveWal // direct access to running state
-	baseDir  string
-	storage  *st.VariadicStorage
-	jobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	l       *slog.Logger
+	pgrw    xlog.PgReceiveWal // direct access to running state
+	baseDir string
+	storage *st.VariadicStorage
 }
 
 var _ Service = &receiveModeSvc{}
 
 type ReceiveServiceOpts struct {
-	PGRW     xlog.PgReceiveWal
-	BaseDir  string
-	Storage  *st.VariadicStorage
-	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	PGRW    xlog.PgReceiveWal
+	BaseDir string
+	Storage *st.VariadicStorage
 }
 
 func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
 	return &receiveModeSvc{
-		l:        slog.With("component", "receive-service"),
-		pgrw:     opts.PGRW,
-		baseDir:  opts.BaseDir,
-		storage:  opts.Storage,
-		jobQueue: opts.JobQueue,
+		l:       slog.With("component", "receive-service"),
+		pgrw:    opts.PGRW,
+		baseDir: opts.BaseDir,
+		storage: opts.Storage,
 	}
 }
 
@@ -106,57 +96,12 @@ func filterWalBefore(walFiles []string, cutoff string) []string {
 	return toDelete
 }
 
-func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string) error {
-	if s.jobQueue != nil {
-		err := s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
-			s.log().Info("deleting WAL files")
-			walFilesInStorage, err := s.storage.List(context.Background(), "")
-			if err != nil {
-				s.log().Error("cannot delete WAL files",
-					slog.String("before", walFileName),
-					slog.Any("err", err),
-				)
-				return
-			}
-			walFilesToDelete := filterWalBefore(walFilesInStorage, walFileName)
-			if len(walFilesToDelete) == 0 {
-				return
-			}
-
-			if config.Verbose {
-				s.log().LogAttrs(context.Background(), logger.LevelTrace, "begin to delete wal files")
-				for _, w := range walFilesToDelete {
-					s.log().LogAttrs(context.Background(), logger.LevelTrace, "wal file to delete",
-						slog.String("name", w),
-					)
-				}
-			}
-
-			err = s.storage.DeleteAllBulk(context.Background(), walFilesToDelete)
-			if err != nil {
-				s.log().Error("cannot delete WAL files",
-					slog.String("before", walFileName),
-					slog.Any("err", err),
-				)
-				return
-			}
-
-			// update metrics
-			receivemetrics.M.AddWALFilesDeleted(float64(len(walFilesToDelete)))
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *receiveModeSvc) BriefConfig(_ context.Context) (*BriefConfig, error) {
 	cfg, err := config.Cfg()
 	if err != nil {
 		return nil, err
 	}
-	return &BriefConfig{RetentionEnable: cfg.Receiver.Retention.Enable}, nil
+	return &BriefConfig{RetentionEnable: cfg.Retention.Enable}, nil
 }
 
 func (s *receiveModeSvc) FullRedactedConfig(_ context.Context) *config.Config {

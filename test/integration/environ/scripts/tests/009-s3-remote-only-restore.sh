@@ -23,7 +23,10 @@ x_remake_config() {
     "level": "${LOG_LEVEL_DEFAULT}",
     "format": "${LOG_FORMAT_DEFAULT}",
     "add_source": true
-  },  
+  },
+  "backup": {
+    "cron": "*/50 * * * *"
+  },
   "storage": {
     "name": "s3",
     "compression": { "algo": "gzip" },

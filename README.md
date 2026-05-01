@@ -615,6 +615,7 @@ You may either use `pgrwl daemon -c config.yml -m receive` or provide the corres
 `pgrwl daemon`.
 
 ```
+---
 main:                                    # Required for both modes: receive/serve
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
@@ -625,21 +626,15 @@ receiver:                                # Required for 'receive' mode
   uploader:                              # Required for non-local storage type
     sync_interval: 10s                   # Interval for the upload worker to check for new files
     max_concurrency: 4                   # Maximum number of files to upload concurrently
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-    keep_period: "1m"                    # Remove WAL files older than given period
 
-backup:                                  # Required for 'backup' mode
-  cron: "0 0 */3 * *"                    # Basebackup cron schedule
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    type: time                           # One of: (time / count)
-    value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
-    keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
-  walretention:                          # Optional (WAL archive cleanup settings)
-    enable: true                         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-    receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+backup:                                  # Required for stream mode
+  cron: "0 0 */3 * *"                    # Basebackup cron schedule, POSIX format: minute hour day-of-month month day-of-week
+
+retention:                               # Optional
+  enable: true                           # Enable recovery-window retention
+  type: recovery_window                  # Only supported retention policy
+  value: 72h                             # Recovery window; keep enough backups/WALs to recover to any point in the last 72h
+  keep_last: 1                           # Minimum number of successful backups to keep, even if outside/inside the recovery window
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)
@@ -681,23 +676,17 @@ storage:                                 # Optional
 Corresponding env-vars.
 
 ```
-PGRWL_DAEMON_MODE                        # receive/serve/backup
 PGRWL_MAIN_LISTEN_PORT                   # HTTP server port (used for management)
 PGRWL_MAIN_DIRECTORY                     # Base directory for storing WAL files
 PGRWL_RECEIVER_SLOT                      # Replication slot to use
 PGRWL_RECEIVER_NO_LOOP                   # If true, do not loop on connection loss
 PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL    # Interval for the upload worker to check for new files
 PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY  # Maximum number of files to upload concurrently
-PGRWL_RECEIVER_RETENTION_ENABLE          # Perform retention rules
-PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-PGRWL_RECEIVER_RETENTION_KEEP_PERIOD     # Remove WAL files older than given period
-PGRWL_BACKUP_CRON                        # Basebackup cron schedule
-PGRWL_BACKUP_RETENTION_ENABLE            # Perform retention rules
-PGRWL_BACKUP_RETENTION_TYPE              # One of: (time / count)
-PGRWL_BACKUP_RETENTION_VALUE             # Remove backups older than given period (if time), keep last N backups (if count)
-PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable when 'retention.type = time')
-PGRWL_BACKUP_WALRETENTION_ENABLE         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+PGRWL_BACKUP_CRON                        # Basebackup cron schedule, POSIX format: minute hour day-of-month month day-of-week
+PGRWL_RETENTION_ENABLE                   # Enable recovery-window retention
+PGRWL_RETENTION_TYPE                     # Only supported retention policy
+PGRWL_RETENTION_VALUE                    # Recovery window; keep enough backups/WALs to recover to any point in the last 72h
+PGRWL_RETENTION_KEEP_LAST                # Minimum number of successful backups to keep, even if outside/inside the recovery window
 PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
 PGRWL_LOG_FORMAT                         # One of: (text / pretty / json)
 PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)

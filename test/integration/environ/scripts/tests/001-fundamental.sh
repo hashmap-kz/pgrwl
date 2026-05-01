@@ -77,6 +77,9 @@ x_remake_dirs() {
     "level": "trace",
     "format": "text",
     "add_source": true
+  },
+  "backup": {
+    "cron": "*/50 * * * *"
   }
 }
 EOF

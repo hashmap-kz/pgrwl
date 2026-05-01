@@ -23,6 +23,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 storage:
   name: "local"
   compression:
@@ -42,6 +44,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 storage:
   name: "local"
   compression:
@@ -64,6 +68,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 storage:
   name: "local"
   encryption:
@@ -84,6 +90,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 EOF
 
 }

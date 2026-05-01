@@ -8,10 +8,6 @@ receiver:
   uploader:
     sync_interval: 10s
     max_concurrency: 4
-  retention:
-    enable: false
-    sync_interval: 10s
-    keep_period: "30s"
 
 devconfig:
   pprof:
@@ -32,8 +28,9 @@ storage:
 
 backup:
   cron: "* * * * *"
-  retention:
-    enable: true
-    type: count
-    value: "2"
-    keep_last: 1
+
+retention:
+  enable: true
+  type: recovery_window
+  value: "5m"
+  keep_last: 1

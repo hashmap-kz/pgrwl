@@ -166,32 +166,28 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	// If it fails, WAL receiving must continue. Errors are logged only.
 	// This starts the cron-based backup daemon only when backup.cron is set.
 
-	if strings.TrimSpace(cfg.Backup.Cron) != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-			defer func() {
-				if r := recover(); r != nil {
-					loggr.Error("basebackup supervisor panicked",
-						slog.Any("panic", r),
-						slog.String("goroutine", "basebackup-supervisor"),
-					)
-				}
-			}()
-
-			if err := basebackupSupervisor.Run(ctx); err != nil {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-
-				loggr.Error("basebackup supervisor failed", slog.Any("err", err))
-				return
+		defer func() {
+			if r := recover(); r != nil {
+				loggr.Error("basebackup supervisor panicked",
+					slog.Any("panic", r),
+					slog.String("goroutine", "basebackup-supervisor"),
+				)
 			}
 		}()
-	} else {
-		loggr.Info("basebackup scheduler skipped", slog.String("reason", "backup.cron is empty"))
-	}
+
+		if err := basebackupSupervisor.Run(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+
+			loggr.Error("basebackup supervisor failed", slog.Any("err", err))
+			return
+		}
+	}()
 
 	//////////////////////////////////////////////////////////////////////
 	// HTTP server.
@@ -220,7 +216,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 			PGRW:                pgrw,
 			BaseDir:             opts.ReceiveDirectory,
 			Storage:             stor,
-			JobQueue:            jobQueue,
 			ManualBackupService: manualBackupSvc,
 		})
 
@@ -323,17 +318,15 @@ type mergedReceiveHTTPOpts struct {
 	PGRW                xlog.PgReceiveWal
 	BaseDir             string
 	Storage             *st.VariadicStorage
-	JobQueue            *jobq.JobQueue
 	ManualBackupService backupmode.BackupController
 }
 
 func initMergedReceiveHTTPHandler(opts *mergedReceiveHTTPOpts) http.Handler {
 	receiveHandlers := receiveAPI.Init(&receiveAPI.Opts{
-		PGRW:     opts.PGRW,
-		BaseDir:  opts.BaseDir,
-		Storage:  opts.Storage,
-		JobQueue: opts.JobQueue,
-		Cfg:      opts.Cfg,
+		PGRW:    opts.PGRW,
+		BaseDir: opts.BaseDir,
+		Storage: opts.Storage,
+		Cfg:     opts.Cfg,
 	})
 
 	backupHandlers := backupmode.Init(&backupmode.Opts{
@@ -385,12 +378,10 @@ func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
 //   - storage is localfs
 //   - no compression is configured
 //   - no encryption is configured
-//   - receiver retention is disabled
 func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 	if cfg.IsLocalStor() {
 		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
-			strings.TrimSpace(cfg.Storage.Encryption.Algo) != "" ||
-			cfg.Receiver.Retention.Enable
+			strings.TrimSpace(cfg.Storage.Encryption.Algo) != ""
 
 		if !hasCfg {
 			l.Info("supervisor loop is skipped",

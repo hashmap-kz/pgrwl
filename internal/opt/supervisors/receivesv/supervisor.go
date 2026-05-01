@@ -71,24 +71,8 @@ func (u *ArchiveSupervisor) Run(ctx context.Context, queue *jobq.JobQueue) error
 	uploadTicker := time.NewTicker(uploadInterval)
 	defer uploadTicker.Stop()
 
-	var retentionTicker *time.Ticker
-	var retentionC <-chan time.Time
-
-	if u.cfg.Receiver.Retention.Enable {
-		retentionInterval := u.cfg.Receiver.Retention.SyncIntervalParsed
-		if retentionInterval <= 0 {
-			return fmt.Errorf("invalid retention sync interval: %s", retentionInterval)
-		}
-
-		retentionTicker = time.NewTicker(retentionInterval)
-		defer retentionTicker.Stop()
-
-		retentionC = retentionTicker.C
-	}
-
 	u.log().Info("archive supervisor started",
 		slog.Duration("upload_interval", uploadInterval),
-		slog.Bool("retention_enabled", u.cfg.Receiver.Retention.Enable),
 	)
 
 	for {
@@ -112,24 +96,6 @@ func (u *ArchiveSupervisor) Run(ctx context.Context, queue *jobq.JobQueue) error
 				}
 			}); err != nil {
 				u.log().Warn("upload job was not submitted", slog.Any("err", err))
-				continue
-			}
-
-		case <-retentionC:
-			if err := queue.Submit("retain", func(ctx context.Context) {
-				u.log().Debug("retention worker is running")
-				defer u.log().Debug("retention worker is done")
-
-				if err := u.performRetention(ctx, u.cfg.Receiver.Retention.KeepPeriodParsed); err != nil {
-					if errors.Is(err, context.Canceled) {
-						u.log().Info("retention worker stopped", slog.Any("reason", err))
-						return
-					}
-
-					u.log().Error("error retaining files", slog.Any("err", err))
-				}
-			}); err != nil {
-				u.log().Warn("retention job was not submitted", slog.Any("err", err))
 				continue
 			}
 		}

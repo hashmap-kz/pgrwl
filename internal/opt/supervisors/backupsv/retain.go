@@ -1,69 +1,133 @@
 package backupsv
 
 import (
+	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 )
 
-// filterBackupsToDeleteTimeBased returns a list of backup dir names to delete.
-// backupDirs: list of dir names in "YYYYMMDDHHMMSS" format.
-// keepPeriod: how long to retain backups.
-// now: optional, if zero, uses time.Now().
-func filterBackupsToDeleteTimeBased(backupDirs []string, keepPeriod time.Duration, now time.Time) []string {
+type recoveryWindowBackup struct {
+	name      string
+	path      string
+	startedAt time.Time
+	beginWAL  string
+}
+
+func chooseRecoveryWindowAnchor(
+	backups []recoveryWindowBackup,
+	recoveryWindow time.Duration,
+	minimumBackups int,
+	now time.Time,
+) *recoveryWindowBackup {
 	if now.IsZero() {
 		now = time.Now()
 	}
-	cutoff := now.Add(-keepPeriod)
 
-	toDelete := []string{}
-	for _, dir := range backupDirs {
-		t, err := time.Parse("20060102150405", dir)
-		if err != nil {
-			// Skip invalid dir names
+	if len(backups) == 0 {
+		return nil
+	}
+
+	if minimumBackups <= 0 {
+		minimumBackups = 1
+	}
+
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].startedAt.Before(backups[j].startedAt)
+	})
+
+	windowStart := now.Add(-recoveryWindow)
+
+	anchorIdx := -1
+
+	// Barman-like recovery window:
+	// choose newest backup that started before or at window start.
+	for i := range backups {
+		if backups[i].startedAt.After(windowStart) {
 			continue
 		}
-		if t.Before(cutoff) {
-			toDelete = append(toDelete, dir)
+
+		anchorIdx = i
+	}
+
+	// If all backups are newer than the window start,
+	// keep the oldest backup as the safest available anchor.
+	if anchorIdx == -1 {
+		anchorIdx = 0
+	}
+
+	// Safety: keep at least minimumBackups newest backups.
+	keptCount := len(backups) - anchorIdx
+	if keptCount < minimumBackups {
+		anchorIdx = len(backups) - minimumBackups
+		if anchorIdx < 0 {
+			anchorIdx = 0
 		}
 	}
+
+	return &backups[anchorIdx]
+}
+
+func backupsOlderThanAnchor(backups []recoveryWindowBackup, anchor *recoveryWindowBackup) []string {
+	if anchor == nil {
+		return nil
+	}
+
+	toDelete := make([]string, 0)
+
+	for _, b := range backups {
+		if b.startedAt.Before(anchor.startedAt) {
+			toDelete = append(toDelete, b.name)
+		}
+	}
+
 	slices.Sort(toDelete)
 	return toDelete
 }
 
-// filterBackupsToDeleteCountBased returns a list of backup dir names to delete.
-// backupDirs: list of dir names in "YYYYMMDDHHMMSS" format.
-// keepCnt: how many backups to keep
-func filterBackupsToDeleteCountBased(backupDirs []string, keepLast int) []string {
-	const layout = "20060102150405"
+func normalizeWALFilename(path string) (name string, history, ok bool) {
+	base := filepath.Base(path)
 
-	type dirWithTime struct {
-		name string
-		t    time.Time
-	}
+	// ListInfoRaw returns backend/raw paths, so compression/encryption suffixes
+	// may still be present. Strip known transformation suffixes to get the
+	// underlying PostgreSQL WAL filename.
+	for {
+		old := base
 
-	parsed := make([]dirWithTime, 0, len(backupDirs))
-	for _, name := range backupDirs {
-		t, err := time.Parse(layout, name)
-		if err != nil {
-			// Skip invalid format
-			continue
+		base = strings.TrimSuffix(base, ".gz")
+		base = strings.TrimSuffix(base, ".zst")
+		base = strings.TrimSuffix(base, ".lz4")
+		base = strings.TrimSuffix(base, ".aes")
+
+		if old == base {
+			break
 		}
-		parsed = append(parsed, dirWithTime{name, t})
 	}
 
-	sort.Slice(parsed, func(i, j int) bool {
-		return parsed[i].t.After(parsed[j].t) // newest first
-	})
-
-	if keepLast >= len(parsed) {
-		return nil
+	if strings.HasSuffix(base, ".history") {
+		return base, true, true
 	}
 
-	toDelete := make([]string, 0, len(parsed))
-	for _, entry := range parsed[keepLast:] {
-		toDelete = append(toDelete, entry.name)
+	if len(base) != 24 {
+		return "", false, false
 	}
 
-	return toDelete
+	for _, ch := range base {
+		isOk := (ch >= '0' && ch <= '9') ||
+			(ch >= 'A' && ch <= 'F') ||
+			(ch >= 'a' && ch <= 'f')
+		if !isOk {
+			return "", false, false
+		}
+	}
+
+	return strings.ToUpper(base), false, true
+}
+
+func walBefore(name, boundary string) bool {
+	name = strings.ToUpper(strings.TrimSpace(name))
+	boundary = strings.ToUpper(strings.TrimSpace(boundary))
+
+	return name != "" && boundary != "" && name < boundary
 }
