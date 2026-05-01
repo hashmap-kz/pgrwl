@@ -198,7 +198,7 @@ services:
 
   pgrwl-receive:
     container_name: pgrwl-receive
-    image: quay.io/pgrwl/pgrwl:1.0.33
+    image: quay.io/pgrwl/pgrwl:1.0.34
     restart: unless-stopped
     environment:
       TZ: "Asia/Aqtau"
@@ -230,7 +230,7 @@ services:
 
   pgrwl-ui:
     container_name: pgrwl-ui
-    image: quay.io/pgrwl/ui:1.0.33
+    image: quay.io/pgrwl/ui:1.0.34
     restart: unless-stopped
     environment:
       TZ: "Asia/Aqtau"
