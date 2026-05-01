@@ -18,7 +18,6 @@ import (
 	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
 	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode/manualbackup"
 	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
-	"github.com/pgrwl/pgrwl/internal/opt/jobq"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
@@ -96,11 +95,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	if err != nil {
 		return fmt.Errorf("init storage: %w", err)
 	}
-
-	// setup job queue
-	loggr.Info("running job queue")
-	jobQueue := jobq.NewJobQueue(5)
-	jobQueue.Start(ctx)
 
 	// setup metrics
 	initMetrics(ctx, cfg, loggr)
@@ -251,7 +245,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 				PGRW:             pgrw,
 			})
 
-			if err := u.Run(ctx, jobQueue); err != nil {
+			if err := u.Run(ctx); err != nil {
 				if errors.Is(err, context.Canceled) {
 					return
 				}
