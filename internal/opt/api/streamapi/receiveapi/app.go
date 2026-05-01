@@ -1,4 +1,4 @@
-package receivemode
+package receiveapi
 
 import (
 	"github.com/pgrwl/pgrwl/config"

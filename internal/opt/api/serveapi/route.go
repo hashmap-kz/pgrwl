@@ -1,4 +1,4 @@
-package servemode
+package serveapi
 
 import (
 	"log/slog"

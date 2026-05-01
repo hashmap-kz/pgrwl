@@ -11,7 +11,7 @@ import (
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
-	serveAPI "github.com/pgrwl/pgrwl/internal/opt/api/servemode"
+	"github.com/pgrwl/pgrwl/internal/opt/api/serveapi"
 )
 
 type ServeModeOpts struct {
@@ -66,7 +66,7 @@ func RunServeMode(opts *ServeModeOpts) error {
 			}
 		}()
 
-		handlers := serveAPI.Init(&serveAPI.Opts{
+		handlers := serveapi.Init(&serveapi.Opts{
 			BaseDir: opts.Directory,
 			Storage: stor,
 		})

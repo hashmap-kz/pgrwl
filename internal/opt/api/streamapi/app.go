@@ -1,41 +1,43 @@
-package app
+package streamapi
 
 import (
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log/slog"
 	"net/http"
+	"net/http/pprof"
+
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/backupapi"
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/receiveapi"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/opt/api"
-	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
 	"github.com/pgrwl/pgrwl/internal/opt/api/middleware"
-	"github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"golang.org/x/time/rate"
 )
 
 type Opts struct {
-	Receive *receivemode.Opts
-	Backup  *backupmode.Opts
+	Receive *receiveapi.Opts
+	Backup  *backupapi.Opts
 	Cfg     *config.Config
 }
 
 type HandlerV1 struct {
-	Receive receivemode.Handler
-	Backup  backupmode.Handler
+	Receive receiveapi.Handler
+	Backup  backupapi.Handler
 }
 
 type Service struct {
-	Receive receivemode.Service
-	Backup  backupmode.Service
+	Receive receiveapi.Service
+	Backup  backupapi.Service
 }
 
 func Init(o *Opts) http.Handler {
-	// init services/handlers
-	backupSvc := backupmode.NewBackupService(o.Backup)
-	backupHdl := backupmode.NewBackupHandler(backupSvc)
-	receiveSvc := receivemode.NewService(o.Receive)
-	receiveHld := receivemode.NewHandler(receiveSvc)
+	l := slog.With("component", "stream-api")
 
-	l := slog.With("component", "receive-api")
+	// init services/handlers
+	backupSvc := backupapi.NewBackupService(o.Backup)
+	backupHdl := backupapi.NewBackupHandler(backupSvc)
+	receiveSvc := receiveapi.NewService(o.Receive)
+	receiveHld := receiveapi.NewHandler(receiveSvc)
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -67,6 +69,22 @@ func Init(o *Opts) http.Handler {
 	mux.Handle("GET /api/v1/wals", secureChain(http.HandlerFunc(receiveHld.WalsHandler)))
 	mux.Handle("GET /api/v1/backups", secureChain(http.HandlerFunc(receiveHld.BackupsHandler)))
 
-	api.InitOptionalHandlers(o.Cfg, mux, l)
+	initOptionalHandlers(o.Cfg, mux, l)
 	return mux
+}
+
+func initOptionalHandlers(cfg *config.Config, mux *http.ServeMux, l *slog.Logger) {
+	if cfg.Metrics.Enable {
+		l.Debug("enable metric endpoints")
+		mux.Handle("/metrics", promhttp.Handler())
+	}
+
+	if cfg.DevConfig.Pprof.Enable {
+		l.Debug("enable pprof endpoints")
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
 }

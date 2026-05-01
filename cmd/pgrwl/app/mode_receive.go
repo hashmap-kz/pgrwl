@@ -10,14 +10,15 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/pgrwl/pgrwl/internal/opt/api/app"
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/backupapi"
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/receiveapi"
+
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
-	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
-	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
@@ -188,14 +189,14 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 			}
 		}()
 
-		handlers := app.Init(&app.Opts{
-			Receive: &receiveAPI.Opts{
+		handlers := streamapi.Init(&streamapi.Opts{
+			Receive: &receiveapi.Opts{
 				PGRW:    pgrw,
 				BaseDir: opts.ReceiveDirectory,
 				Storage: stor,
 				Cfg:     cfg,
 			},
-			Backup: &backupmode.Opts{
+			Backup: &backupapi.Opts{
 				Gate:      basebackupSupervisor,
 				Directory: opts.ReceiveDirectory,
 				AppCtx:    ctx,
