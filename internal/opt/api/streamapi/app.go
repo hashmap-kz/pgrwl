@@ -1,10 +1,11 @@
 package streamapi
 
 import (
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/backupapi"
 	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/receiveapi"

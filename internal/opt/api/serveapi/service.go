@@ -27,7 +27,7 @@ type svc struct {
 
 var _ Service = &svc{}
 
-func NewServeModeService(opts *Opts) Service {
+func NewService(opts *Opts) Service {
 	return &svc{
 		l:       slog.With("component", "serve-service"),
 		baseDir: opts.BaseDir,
