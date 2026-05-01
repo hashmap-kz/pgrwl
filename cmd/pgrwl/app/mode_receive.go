@@ -112,9 +112,6 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//   - basebackup cron supervisor is optional/non-critical
 	//   - manual basebackup API is available through the same HTTP server
 	//   - cron and manual backup share the same backup gate
-	//
-	// If backup.cron is empty, cron scheduling is skipped, but manual
-	// POST /api/v1/basebackup can still work.
 
 	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
 		Directory: opts.ReceiveDirectory,

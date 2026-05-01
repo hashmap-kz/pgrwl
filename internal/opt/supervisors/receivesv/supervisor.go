@@ -50,12 +50,14 @@ func (u *ArchiveSupervisor) log() *slog.Logger {
 	return slog.With(slog.String("component", "archive-supervisor"))
 }
 
+// TODO: all-in-one - not needed after merging receive+backup (no wal-retention)
+
 // Run schedules archive maintenance jobs until ctx is cancelled.
 //
 // The queue is intentionally single-worker. upload and retain jobs must not run
 // at the same time because both can inspect or mutate WAL archive state.
 //
-// SubmitUnique is used so slow periodic jobs do not pile up behind themselves.
+// Submit is used so slow periodic jobs do not pile up behind themselves.
 // For example, if an upload takes longer than one upload interval, the next
 // upload tick is dropped instead of queueing stale duplicate upload work.
 func (u *ArchiveSupervisor) Run(ctx context.Context, queue *jobq.JobQueue) error {
