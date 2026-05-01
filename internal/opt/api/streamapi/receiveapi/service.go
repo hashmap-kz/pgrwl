@@ -23,7 +23,6 @@ type Service interface {
 	FullRedactedConfig(ctx context.Context) *config.Config
 	ListWALFiles(ctx context.Context) ([]WALFile, error)
 	ListBackups(ctx context.Context) ([]Backup, error)
-	Snapshot(ctx context.Context) (*Snapshot, error)
 }
 
 type svc struct {
@@ -68,26 +67,6 @@ func (s *svc) Status() *PgrwlStatus {
 	return &PgrwlStatus{
 		StreamStatus: streamStatusResp,
 	}
-}
-
-// filterWalBefore returns a list of WAL file paths where the file name is lexically less than the cutoff WAL name.
-func filterWalBefore(walFiles []string, cutoff string) []string {
-	slices.Sort(walFiles)
-
-	toDelete := []string{}
-	for _, walPath := range walFiles {
-		filename := filepath.Base(walPath)
-		if len(filename) < xlog.XLogFileNameLen {
-			continue
-		}
-		if !xlog.IsXLogFileName(filename[:24]) {
-			continue
-		}
-		if filename < cutoff {
-			toDelete = append(toDelete, walPath)
-		}
-	}
-	return toDelete
 }
 
 func (s *svc) BriefConfig(_ context.Context) (*BriefConfig, error) {
@@ -206,57 +185,4 @@ func (s *svc) ListBackups(ctx context.Context) ([]Backup, error) {
 	})
 
 	return backups, nil
-}
-
-// Snapshot assembles the full dashboard payload in a single call.
-// Errors from the storage sub-queries are collected into Snapshot.Error so the
-// UI always receives a partial response rather than a hard failure.
-func (s *svc) Snapshot(ctx context.Context) (*Snapshot, error) {
-	briefConfig, err := s.BriefConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	snap := &Snapshot{
-		Status: s.Status(),
-		Config: briefConfig,
-	}
-
-	// Populate Receiver from the stream status.
-	if snap.Status != nil && snap.Status.StreamStatus != nil {
-		ss := snap.Status.StreamStatus
-		snap.Receiver = Receiver{
-			Slot:         ss.Slot,
-			Timeline:     ss.Timeline,
-			LastFlushLSN: ss.LastFlushLSN,
-			Uptime:       ss.Uptime,
-			Running:      ss.Running,
-		}
-	}
-
-	var errs []string
-
-	walFiles, err := s.ListWALFiles(ctx)
-	if err != nil {
-		s.log().Error("snapshot: cannot list WAL files", slog.Any("err", err))
-		errs = append(errs, "wal_files: "+err.Error())
-		snap.WALFiles = []WALFile{}
-	} else {
-		snap.WALFiles = walFiles
-	}
-
-	backups, err := s.ListBackups(ctx)
-	if err != nil {
-		s.log().Error("snapshot: cannot list backups", slog.Any("err", err))
-		errs = append(errs, "backups: "+err.Error())
-		snap.Backups = []Backup{}
-	} else {
-		snap.Backups = backups
-	}
-
-	if len(errs) > 0 {
-		snap.Error = strings.Join(errs, "; ")
-	}
-
-	return snap, nil
 }

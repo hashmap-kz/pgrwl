@@ -34,14 +34,6 @@ func (c *Handler) FullRedactedConfig(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, briefConfig)
 }
 
-func (c *Handler) SnapshotHandler(w http.ResponseWriter, r *http.Request) {
-	snap, err := c.Service.Snapshot(r.Context())
-	if err != nil {
-		httpx.WriteJSON(w, http.StatusInternalServerError, err)
-	}
-	httpx.WriteJSON(w, http.StatusOK, snap)
-}
-
 func (c *Handler) WalsHandler(w http.ResponseWriter, r *http.Request) {
 	snap, err := c.Service.ListWALFiles(r.Context())
 	if err != nil {

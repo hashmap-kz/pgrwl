@@ -54,7 +54,6 @@ func Init(o *Opts) http.Handler {
 	mux.Handle("GET /api/v1/status", secureChain(http.HandlerFunc(receiveHandler.StatusHandler)))
 	mux.Handle("GET /api/v1/brief-config", secureChain(http.HandlerFunc(receiveHandler.BriefConfig)))
 	mux.Handle("GET /api/v1/redacted-config", secureChain(http.HandlerFunc(receiveHandler.FullRedactedConfig)))
-	mux.Handle("GET /api/v1/snapshot", secureChain(http.HandlerFunc(receiveHandler.SnapshotHandler)))
 	mux.Handle("GET /api/v1/wals", secureChain(http.HandlerFunc(receiveHandler.WalsHandler)))
 	mux.Handle("GET /api/v1/backups", secureChain(http.HandlerFunc(receiveHandler.BackupsHandler)))
 
