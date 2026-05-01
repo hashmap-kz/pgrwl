@@ -43,7 +43,7 @@
       "program": "${workspaceFolder}/cmd/pgrwl/main.go",
       "buildFlags": "-tags=debug",
       "args": [
-        "backup",
+        "backup"
       ],
       "envFile": "${workspaceFolder}/.vscode/pg.env",
       "env": {
