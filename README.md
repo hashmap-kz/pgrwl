@@ -54,21 +54,16 @@ replication, automatic reconnects, partial WAL files, archive upload, retention,
 
 ## About
 
-- **Continuous PostgreSQL protection**: combine WAL archiving and base backups to support point-in-time recovery
-  workflows.
+Reliable PostgreSQL backups come with moving parts: WAL handling, scheduled jobs, compression, remote storage, 
+and retention - each one more thing to configure, monitor, and debug.
 
-- **Single-binary operation**: run receiving, scheduled backups, upload, retention, monitoring, and restore helpers
-  without external backup tools or schedulers.
+`pgrwl` replaces that entire stack with a single process: WAL streaming, scheduled base backups,
+compression, encryption, S3/SFTP upload, retention management, and a restore helper - all driven
+by one config file. No external schedulers, no backup tool chains, no extra services to operate.
 
-- **Local or remote storage**: write backups and WAL archives to local storage or remote backends such as S3 and SFTP.
-
-- **Container-friendly by design**: works well in Docker, Kubernetes, and object-storage based backup layouts.
-
-- **`pg_receivewal` style WAL streaming**: automatic reconnects, partial WAL files, segment rotation, timeline handling,
-  and extensive error checking.
-
-- Debug with your favorite editor and a local PostgreSQL container
-  ([local-dev-infra](test/integration/environ/)).
+It implements the streaming replication protocol directly (not `archive_command`), which means
+it supports replication slots, `*.partial` WAL files, and synchronous replication acknowledgment -
+enabling **RPO=0** in high-durability setups.
 
 **basic dashboard**
 
@@ -831,6 +826,8 @@ Contributions are welcomed and greatly appreciated. See [CONTRIBUTING.md](./CONT
 for details on submitting patches and the contribution workflow.
 
 Check also the [Developer Notes](docs/developer_notes.md) for additional information and guidelines.
+
+Debug with your favorite editor and a local PostgreSQL container ([local-dev-infra](test/integration/environ/)).
 
 ---
 
