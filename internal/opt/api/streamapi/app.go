@@ -20,16 +20,6 @@ type Opts struct {
 	Cfg     *config.Config
 }
 
-type HandlerV1 struct {
-	Receive receiveapi.Handler
-	Backup  backupapi.Handler
-}
-
-type Service struct {
-	Receive receiveapi.Service
-	Backup  backupapi.Service
-}
-
 func Init(o *Opts) http.Handler {
 	l := slog.With("component", "stream-api")
 
