@@ -12,10 +12,7 @@ type Opts struct {
 }
 
 func Init(opts *Opts) http.Handler {
-	service := NewServeModeService(&ServeServiceOpts{
-		BaseDir: opts.BaseDir,
-		Storage: opts.Storage,
-	})
-	controller := NewServeController(service)
-	return initHandlers(controller)
+	service := NewServeModeService(opts)
+	handler := NewHandler(service)
+	return initHandlers(handler)
 }

@@ -12,7 +12,7 @@ import (
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
-type ArchiveSupervisorOpts struct {
+type Opts struct {
 	ReceiveDirectory string
 	PGRW             xlog.PgReceiveWal
 }
@@ -25,10 +25,10 @@ type ArchiveSupervisor struct {
 	l    *slog.Logger
 	cfg  *config.Config
 	stor st.Storage
-	opts *ArchiveSupervisorOpts
+	opts *Opts
 }
 
-func NewArchiveSupervisor(cfg *config.Config, stor st.Storage, opts *ArchiveSupervisorOpts) *ArchiveSupervisor {
+func NewArchiveSupervisor(cfg *config.Config, stor st.Storage, opts *Opts) *ArchiveSupervisor {
 	return &ArchiveSupervisor{
 		l:    slog.With(slog.String("component", "archive-supervisor")),
 		cfg:  cfg,

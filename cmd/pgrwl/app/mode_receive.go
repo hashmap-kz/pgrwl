@@ -5,18 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/pgrwl/pgrwl/internal/opt/api/app"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
 	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
-	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode/manualbackup"
 	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
@@ -96,26 +96,12 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 		return fmt.Errorf("init storage: %w", err)
 	}
 
+	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.Opts{
+		Directory: opts.ReceiveDirectory,
+	})
+
 	// setup metrics
 	initMetrics(ctx, cfg, loggr)
-
-	//////////////////////////////////////////////////////////////////////
-	// Init optional basebackup components.
-	//
-	// In merged receive+backup mode:
-	//   - basebackup cron supervisor is optional/non-critical
-	//   - manual basebackup API is available through the same HTTP server
-	//   - cron and manual backup share the same backup gate
-
-	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
-		Directory: opts.ReceiveDirectory,
-	})
-
-	manualBackupSvc := manualbackup.New(manualbackup.Options{
-		Gate:      basebackupSupervisor,
-		Directory: opts.ReceiveDirectory,
-		AppCtx:    ctx,
-	})
 
 	var wg sync.WaitGroup
 
@@ -202,12 +188,19 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 			}
 		}()
 
-		handlers := initMergedReceiveHTTPHandler(&mergedReceiveHTTPOpts{
-			Cfg:                 cfg,
-			PGRW:                pgrw,
-			BaseDir:             opts.ReceiveDirectory,
-			Storage:             stor,
-			ManualBackupService: manualBackupSvc,
+		handlers := app.Init(&app.Opts{
+			Receive: &receiveAPI.Opts{
+				PGRW:    pgrw,
+				BaseDir: opts.ReceiveDirectory,
+				Storage: stor,
+				Cfg:     cfg,
+			},
+			Backup: &backupmode.Opts{
+				Gate:      basebackupSupervisor,
+				Directory: opts.ReceiveDirectory,
+				AppCtx:    ctx,
+			},
+			Cfg: cfg,
 		})
 
 		srv := api.NewHTTPServer(opts.ListenPort, handlers)
@@ -240,7 +233,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 				}
 			}()
 
-			u := receivesv.NewArchiveSupervisor(cfg, stor, &receivesv.ArchiveSupervisorOpts{
+			u := receivesv.NewArchiveSupervisor(cfg, stor, &receivesv.Opts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
@@ -304,61 +297,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	return runErr
 }
 
-type mergedReceiveHTTPOpts struct {
-	Cfg                 *config.Config
-	PGRW                xlog.PgReceiveWal
-	BaseDir             string
-	Storage             *st.VariadicStorage
-	ManualBackupService backupmode.BackupController
-}
-
-func initMergedReceiveHTTPHandler(opts *mergedReceiveHTTPOpts) http.Handler {
-	receiveHandlers := receiveAPI.Init(&receiveAPI.Opts{
-		PGRW:    opts.PGRW,
-		BaseDir: opts.BaseDir,
-		Storage: opts.Storage,
-		Cfg:     opts.Cfg,
-	})
-
-	backupHandlers := backupmode.Init(&backupmode.Opts{
-		Cfg:        opts.Cfg,
-		Controller: opts.ManualBackupService,
-	})
-
-	mux := http.NewServeMux()
-
-	// Exact endpoint:
-	//   POST /api/v1/basebackup
-	//   GET  /api/v1/basebackup
-	mux.Handle("/api/v1/basebackup", backupHandlers)
-
-	// Subtree endpoints:
-	//   GET /api/v1/basebackup/status
-	//   GET /api/v1/basebackup/health
-	mux.Handle("/api/v1/basebackup/", backupHandlers)
-
-	// Everything else remains receive-mode API:
-	//   /healthz
-	//   /api/v1/status
-	//   /api/v1/brief-config
-	//   /api/v1/snapshot
-	//   /api/v1/wals
-	//   /api/v1/backups
-	//   /api/v1/wal-before/{filename}
-	//   /metrics, if enabled by optional handlers
-	mux.Handle("/", receiveHandlers)
-
-	return mux
-}
-
 func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
 	if cfg.Metrics.Enable {
 		loggr.Debug("init prom metrics")
-
 		receivemetrics.InitPromMetrics(ctx)
-
-		// In merged receive+backup mode, expose backup metrics through the same
-		// HTTP server/Prometheus registry as receive metrics.
 		backupmetrics.InitPromMetrics(ctx)
 	}
 }

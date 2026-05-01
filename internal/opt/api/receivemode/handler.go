@@ -6,22 +6,22 @@ import (
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/httpx"
 )
 
-type ReceiveController struct {
+type Handler struct {
 	Service Service
 }
 
-func NewReceiveController(s Service) *ReceiveController {
-	return &ReceiveController{
+func NewHandler(s Service) *Handler {
+	return &Handler{
 		Service: s,
 	}
 }
 
-func (c *ReceiveController) StatusHandler(w http.ResponseWriter, _ *http.Request) {
+func (c *Handler) StatusHandler(w http.ResponseWriter, _ *http.Request) {
 	status := c.Service.Status()
 	httpx.WriteJSON(w, http.StatusOK, status)
 }
 
-func (c *ReceiveController) BriefConfig(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) BriefConfig(w http.ResponseWriter, r *http.Request) {
 	briefConfig, err := c.Service.BriefConfig(r.Context())
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, err)
@@ -29,12 +29,12 @@ func (c *ReceiveController) BriefConfig(w http.ResponseWriter, r *http.Request) 
 	httpx.WriteJSON(w, http.StatusOK, briefConfig)
 }
 
-func (c *ReceiveController) FullRedactedConfig(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) FullRedactedConfig(w http.ResponseWriter, r *http.Request) {
 	briefConfig := c.Service.FullRedactedConfig(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, briefConfig)
 }
 
-func (c *ReceiveController) SnapshotHandler(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) SnapshotHandler(w http.ResponseWriter, r *http.Request) {
 	snap, err := c.Service.Snapshot(r.Context())
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, err)
@@ -42,7 +42,7 @@ func (c *ReceiveController) SnapshotHandler(w http.ResponseWriter, r *http.Reque
 	httpx.WriteJSON(w, http.StatusOK, snap)
 }
 
-func (c *ReceiveController) WalsHandler(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) WalsHandler(w http.ResponseWriter, r *http.Request) {
 	snap, err := c.Service.ListWALFiles(r.Context())
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{
@@ -52,7 +52,7 @@ func (c *ReceiveController) WalsHandler(w http.ResponseWriter, r *http.Request) 
 	httpx.WriteJSON(w, http.StatusOK, snap)
 }
 
-func (c *ReceiveController) BackupsHandler(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) BackupsHandler(w http.ResponseWriter, r *http.Request) {
 	snap, err := c.Service.ListBackups(r.Context())
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusInternalServerError, map[string]string{

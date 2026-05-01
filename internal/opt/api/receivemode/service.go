@@ -26,23 +26,17 @@ type Service interface {
 	Snapshot(ctx context.Context) (*Snapshot, error)
 }
 
-type receiveModeSvc struct {
+type svc struct {
 	l       *slog.Logger
 	pgrw    xlog.PgReceiveWal // direct access to running state
 	baseDir string
 	storage *st.VariadicStorage
 }
 
-var _ Service = &receiveModeSvc{}
+var _ Service = &svc{}
 
-type ReceiveServiceOpts struct {
-	PGRW    xlog.PgReceiveWal
-	BaseDir string
-	Storage *st.VariadicStorage
-}
-
-func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
-	return &receiveModeSvc{
+func NewService(opts *Opts) Service {
+	return &svc{
 		l:       slog.With("component", "receive-service"),
 		pgrw:    opts.PGRW,
 		baseDir: opts.BaseDir,
@@ -50,14 +44,14 @@ func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
 	}
 }
 
-func (s *receiveModeSvc) log() *slog.Logger {
+func (s *svc) log() *slog.Logger {
 	if s.l != nil {
 		return s.l
 	}
 	return slog.With("component", "receive-service")
 }
 
-func (s *receiveModeSvc) Status() *PgrwlStatus {
+func (s *svc) Status() *PgrwlStatus {
 	s.log().Debug("querying status")
 
 	var streamStatusResp *StreamStatus
@@ -96,7 +90,7 @@ func filterWalBefore(walFiles []string, cutoff string) []string {
 	return toDelete
 }
 
-func (s *receiveModeSvc) BriefConfig(_ context.Context) (*BriefConfig, error) {
+func (s *svc) BriefConfig(_ context.Context) (*BriefConfig, error) {
 	cfg, err := config.Cfg()
 	if err != nil {
 		return nil, err
@@ -104,13 +98,13 @@ func (s *receiveModeSvc) BriefConfig(_ context.Context) (*BriefConfig, error) {
 	return &BriefConfig{RetentionEnable: cfg.Retention.Enable}, nil
 }
 
-func (s *receiveModeSvc) FullRedactedConfig(_ context.Context) *config.Config {
+func (s *svc) FullRedactedConfig(_ context.Context) *config.Config {
 	c := config.RedactedCopy()
 	return &c
 }
 
 // ListWALFiles returns metadata for every WAL file currently held in storage.
-func (s *receiveModeSvc) ListWALFiles(ctx context.Context) ([]WALFile, error) {
+func (s *svc) ListWALFiles(ctx context.Context) ([]WALFile, error) {
 	cfg, err := config.Cfg()
 	if err != nil {
 		return nil, err
@@ -154,7 +148,7 @@ func (s *receiveModeSvc) ListWALFiles(ctx context.Context) ([]WALFile, error) {
 
 // ListBackups returns metadata for every base backup stored in the backup subpath.
 // It reads the per-backup manifest JSON to populate size and LSN fields.
-func (s *receiveModeSvc) ListBackups(ctx context.Context) ([]Backup, error) {
+func (s *svc) ListBackups(ctx context.Context) ([]Backup, error) {
 	backupStor, err := api.SetupStorage(&api.SetupStorageOpts{
 		BaseDir: filepath.ToSlash(s.baseDir),
 		SubPath: config.BaseBackupSubpath,
@@ -217,7 +211,7 @@ func (s *receiveModeSvc) ListBackups(ctx context.Context) ([]Backup, error) {
 // Snapshot assembles the full dashboard payload in a single call.
 // Errors from the storage sub-queries are collected into Snapshot.Error so the
 // UI always receives a partial response rather than a hard failure.
-func (s *receiveModeSvc) Snapshot(ctx context.Context) (*Snapshot, error) {
+func (s *svc) Snapshot(ctx context.Context) (*Snapshot, error) {
 	briefConfig, err := s.BriefConfig(ctx)
 	if err != nil {
 		return nil, err

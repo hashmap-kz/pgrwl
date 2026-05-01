@@ -1,4 +1,4 @@
-package manualbackup
+package backupmode
 
 import (
 	"context"
@@ -16,21 +16,22 @@ type Gate interface {
 	BackupStatus() backupsv.BackupRunState
 }
 
-type Service struct {
+type Service interface {
+	Start() (*backupsv.BackupRunState, error)
+	Status() backupsv.BackupRunState
+}
+
+var _ Service = &svc{}
+
+type svc struct {
 	l         *slog.Logger
 	gate      Gate
 	directory string
 	appCtx    context.Context
 }
 
-type Options struct {
-	Gate      Gate
-	Directory string
-	AppCtx    context.Context
-}
-
-func New(opts Options) *Service {
-	return &Service{
+func NewBackupService(opts *Opts) Service {
+	return &svc{
 		l:         slog.With("component", "manual-basebackup"),
 		gate:      opts.Gate,
 		directory: opts.Directory,
@@ -38,14 +39,9 @@ func New(opts Options) *Service {
 	}
 }
 
-func (s *Service) Start(ctx context.Context) (*backupsv.BackupRunState, error) {
+func (s *svc) Start() (*backupsv.BackupRunState, error) {
 	if s.gate == nil {
 		return nil, fmt.Errorf("backup gate is nil")
-	}
-
-	// Request already canceled before we accepted the trigger.
-	if err := ctx.Err(); err != nil {
-		return nil, err
 	}
 
 	// App is shutting down.
@@ -64,7 +60,7 @@ func (s *Service) Start(ctx context.Context) (*backupsv.BackupRunState, error) {
 	return &state, nil
 }
 
-func (s *Service) Status() backupsv.BackupRunState {
+func (s *svc) Status() backupsv.BackupRunState {
 	if s.gate == nil {
 		return backupsv.BackupRunState{
 			Running:   false,
@@ -77,7 +73,7 @@ func (s *Service) Status() backupsv.BackupRunState {
 }
 
 // TODO: apply context
-func (s *Service) run(_ context.Context) {
+func (s *svc) run(_ context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			msg := fmt.Sprintf("panic: %v", r)
