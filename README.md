@@ -101,8 +101,7 @@ then run: `docker compose up -d`
 # It starts:
 #   - PostgreSQL primary
 #   - WAL traffic generator
-#   - pgrwl receiver
-#   - pgrwl backup worker
+#   - pgrwl streaming (WAL + basebackup)
 #   - pgrwl dashboard UI
 #   - SeaweedFS S3-compatible storage
 #   - SeaweedFS admin dashboard
@@ -204,7 +203,7 @@ services:
         target: /etc/pgrwl-config.yaml
         mode: "0755"
     volumes:
-      - pgrwl-wal-archive-data:/mnt
+      - pgrwl-data:/mnt
     depends_on:
       pg-primary:
         condition: service_healthy
@@ -337,7 +336,7 @@ services:
           -filer=seaweedfs:8888
 
 volumes:
-  pgrwl-wal-archive-data:
+  pgrwl-data:
   pg-primary-data:
   seaweedfs-data:
   seaweedfs-admin-data:
