@@ -1,6 +1,6 @@
 # pgrwl
 
-> Stream PostgreSQL WALs with Zero Data Loss
+> Cloud-native continuous backup for PostgreSQL in a single binary.
 
 [![License](https://img.shields.io/github/license/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/pgrwl/pgrwl)](https://goreportcard.com/report/github.com/pgrwl/pgrwl)
@@ -11,11 +11,16 @@
 [![Latest Release](https://img.shields.io/github/v/release/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/releases/latest)
 [![Start contributing](https://img.shields.io/github/issues/pgrwl/pgrwl/good%20first%20issue?color=7057ff&label=Contribute)](https://github.com/pgrwl/pgrwl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22)
 
-**pgrwl** is a PostgreSQL write-ahead log (WAL) receiver written in Go. It’s a drop-in, container-friendly alternative
-to `pg_receivewal`, supporting streaming replication, encryption, compression, and remote storage (S3, SFTP).
+**pgrwl** is a Go-based PostgreSQL backup tool for continuous WAL archiving and scheduled base backups. It streams
+PostgreSQL WALs and base backups into local or remote storage, with optional compression, encryption, retention, and
+monitoring built in.
 
-Designed for disaster recovery and PITR (Point-in-Time Recovery), `pgrwl` ensures zero data loss (RPO=0) and seamless
-integration with Kubernetes environments.
+It is designed for disaster recovery and PITR (Point-in-Time Recovery), with a focus on low operational complexity:
+no extra backup tools, no external schedulers, and no dependency chain to operate - just one binary, PostgreSQL, and
+your chosen storage backend.
+
+For WAL streaming, `pgrwl` behaves as a container-friendly alternative to `pg_receivewal`, supporting streaming
+replication, automatic reconnects, partial WAL files, archive upload, retention, and restore integration.
 
 ---
 
@@ -49,15 +54,21 @@ integration with Kubernetes environments.
 
 ## About
 
-- The project is a production-ready tool for streaming WAL archiving, designed to achieve an RPO of 0 during recovery.
+- **Continuous PostgreSQL protection**: combine WAL archiving and base backups to support point-in-time recovery
+  workflows.
 
-- _It's primarily designed for use in containerized environments._
+- **Single-binary operation**: run receiving, scheduled backups, upload, retention, monitoring, and restore helpers
+  without external backup tools or schedulers.
 
-- The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
-  streaming into partial files, extensive error checking and more.
+- **Local or remote storage**: write backups and WAL archives to local storage or remote backends such as S3 and SFTP.
 
-- Install as a single binary. Debug with your favorite editor and a local PostgreSQL
-  container ([local-dev-infra](test/integration/environ/)).
+- **Container-friendly by design**: works well in Docker, Kubernetes, and object-storage based backup layouts.
+
+- **`pg_receivewal` style WAL streaming**: automatic reconnects, partial WAL files, segment rotation, timeline handling,
+  and extensive error checking.
+
+- Debug with your favorite editor and a local PostgreSQL container
+  ([local-dev-infra](test/integration/environ/)).
 
 **basic dashboard**
 
