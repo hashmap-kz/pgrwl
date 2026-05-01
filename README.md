@@ -27,7 +27,6 @@ replication, automatic reconnects, partial WAL files, archive upload, retention,
 ## Table of Contents
 
 - [About](#about)
-- [Operating Modes](#operating-modes)
 - [Usage](#usage)
     - [Kubernetes Quick Start](#kubernetes-quick-start)
     - [Docker Compose Quick Start](#docker-compose-quick-start)
