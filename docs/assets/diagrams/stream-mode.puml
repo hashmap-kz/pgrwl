@@ -1,0 +1,95 @@
+@startuml flow
+
+title "PGRWL — Stream Mode (WAL, Basebackup, Retention)"
+footer Cloud-Native PostgreSQL WAL Receiver - pgrwl
+header "stream mode"
+scale max 980 height
+
+skinparam TitleFontSize 28
+
+box "PostgreSQL Server" #LightBlue
+  database "PostgreSQL" as PG #DeepSkyBlue
+end box
+
+box "PGRWL Stream Mode" #HoneyDew
+  participant "WAL Receiver" as Receiver #LightYellow
+  participant "Archive Supervisor" as ArchiveSupervisor #Thistle
+  participant "WAL Uploader" as Uploader #Lavender
+  participant "Basebackup Supervisor" as BackupSupervisor #Wheat
+  participant "Retention Manager" as Retention #MistyRose
+  participant "HTTP API" as API #LightGreen
+end box
+
+box "Storage" #AliceBlue
+  database "Object Storage / SFTP / Local Storage\n(WAL archive + basebackups)" as Storage #LightCyan
+end box
+
+group #LightYellow WAL Reception
+  Receiver -> PG: Stream WAL records
+  Receiver -> Receiver: Write to *.partial WAL file
+  Receiver -> Receiver: When segment completes\nrename to final WAL file
+end
+
+group #Thistle Archive Control Loop
+  ArchiveSupervisor -> ArchiveSupervisor: Run(ctx)
+  note right of ArchiveSupervisor
+    Periodically triggers upload work.
+    Upload errors are logged and retried later.
+    Upload logic must not interfere with WAL receiver.
+  end note
+
+  ArchiveSupervisor --> Uploader: Every SyncInterval\ntrigger performUploads()
+end
+
+group #Lavender WAL Upload
+  note right of Uploader
+    Scans completed local WAL files.
+    Skips incomplete/temporary files.
+    Uploads WALs into WAL archive paths in storage.
+  end note
+
+  Uploader -> Receiver: Scan local WAL directory
+  Uploader -> Storage: Compress -> Encrypt -> Upload WAL file
+  Uploader -> Receiver: On success -> delete local uploaded WAL file
+end
+
+group #Wheat Basebackup Scheduling / Manual Trigger
+  BackupSupervisor -> BackupSupervisor: Run(ctx)
+  note right of BackupSupervisor
+    Responsible for scheduled basebackups.
+    Manual backups may also be triggered via HTTP API.
+    Basebackup failures must not stop WAL receiver.
+    Stores basebackups under backup paths in the same storage.
+  end note
+
+  BackupSupervisor -> PG: On cron schedule\ncreate basebackup
+  BackupSupervisor -> Storage: Store/upload backup files + manifest
+
+  API --> BackupSupervisor: POST /api/v1/basebackup\n(optional manual trigger)
+end
+
+group #MistyRose Unified Recovery-Window Retention
+  Retention -> Retention: Run(ctx)
+  note right of Retention
+    Single retention authority.
+    Uses recovery_window policy.
+    Reads successful backup manifests,
+    chooses an anchor backup,
+    deletes old backups,
+    deletes WALs older than anchor start WAL.
+  end note
+
+  Retention -> Storage: List successful backups + manifests
+  Retention -> Retention: Choose anchor backup\n(newest backup <= window start)
+  Retention -> Storage: Delete backups older than anchor
+  Retention -> Storage: List archived WAL files
+  Retention -> Storage: Delete WALs older than\nanchor backup start WAL
+end
+
+group #LightGreen API / Status
+  API -> BackupSupervisor: GET /api/v1/basebackup/status
+  API -> Receiver: GET /healthz
+  API -> Receiver: GET /api/v1/status
+end
+
+@enduml
