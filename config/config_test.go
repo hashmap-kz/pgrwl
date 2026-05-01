@@ -99,12 +99,8 @@ func TestValidate_Config(t *testing.T) {
 						SyncInterval:   "10s",
 						MaxConcurrency: 2,
 					},
-					Retention: RetentionConfig{
-						Enable:       true,
-						SyncInterval: "12h",
-						KeepPeriod:   "24h",
-					},
 				},
+				Backup: BackupConfig{Cron: "* * * * *"},
 				Storage: StorageConfig{
 					Name: StorageNameS3,
 					S3: S3Config{
@@ -145,11 +141,6 @@ func TestValidate_Config(t *testing.T) {
 						SyncInterval:   "bad",
 						MaxConcurrency: 0,
 					},
-					Retention: RetentionConfig{
-						Enable:       true,
-						SyncInterval: "nope",
-						KeepPeriod:   "never",
-					},
 				},
 				Storage: StorageConfig{
 					Name: StorageNameS3,
@@ -166,8 +157,6 @@ func TestValidate_Config(t *testing.T) {
 			wantMsgs: []string{
 				"uploader.sync_interval cannot parse",
 				"uploader.max_concurrency must be > 0",
-				"retention.sync_interval cannot parse",
-				"retention.keep_period cannot parse",
 			},
 		},
 		{

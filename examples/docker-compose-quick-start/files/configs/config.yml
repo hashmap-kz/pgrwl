@@ -10,3 +10,6 @@ log:
   level: trace
   format: text
   add_source: true
+
+backup:
+  cron: "*/10 * * * *"

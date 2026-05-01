@@ -29,7 +29,6 @@ kubectl apply -f manifests/
 kubectl -n pgrwl-test rollout restart sts postgres
 kubectl -n pgrwl-test rollout restart sts minio
 kubectl -n pgrwl-test rollout restart sts pgrwl-receive
-kubectl -n pgrwl-test rollout restart sts pgrwl-backup
 kubectl -n mon rollout restart sts prometheus
 kubectl -n mon rollout restart deploy grafana
 kubectl -n mon rollout restart sts loki

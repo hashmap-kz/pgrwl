@@ -2,7 +2,8 @@ package app
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os/signal"
 	"sync"
@@ -18,12 +19,13 @@ type ServeModeOpts struct {
 	ListenPort int
 }
 
-func RunServeMode(opts *ServeModeOpts) {
-	var err error
+func RunServeMode(opts *ServeModeOpts) error {
 	loggr := slog.With("component", "serve-mode-runner")
 
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	ctx, signalCancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer signalCancel()
 
@@ -32,12 +34,26 @@ func RunServeMode(opts *ServeModeOpts) {
 		SubPath: config.LocalFSStorageSubpath,
 	})
 	if err != nil {
-		//nolint:gocritic
-		log.Fatal(err)
+		return fmt.Errorf("setup storage: %w", err)
 	}
 
-	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
+
+	errCh := make(chan error, 1)
+
+	sendErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		select {
+		case errCh <- err:
+			cancel()
+		default:
+			// Another error was already reported.
+			cancel()
+		}
+	}
 
 	// HTTP server
 	wg.Add(1)
@@ -46,10 +62,7 @@ func RunServeMode(opts *ServeModeOpts) {
 
 		defer func() {
 			if r := recover(); r != nil {
-				loggr.Info("http server panicked",
-					slog.Any("panic", r),
-					slog.String("goroutine", "http-server"),
-				)
+				sendErr(fmt.Errorf("http server panicked: %v", r))
 			}
 		}()
 
@@ -57,18 +70,57 @@ func RunServeMode(opts *ServeModeOpts) {
 			BaseDir: opts.Directory,
 			Storage: stor,
 		})
+
 		srv := api.NewHTTPServer(opts.ListenPort, handlers)
+
 		if err := srv.Run(ctx); err != nil {
-			loggr.Info("http server failed", slog.Any("err", err))
-			cancel()
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+
+			sendErr(fmt.Errorf("run http server: %w", err))
+			return
 		}
 	}()
 
-	// Wait for signal (context cancellation)
-	<-ctx.Done()
+	var runErr error
+
+	select {
+	case <-ctx.Done():
+		// Could be SIGINT/SIGTERM or cancellation caused by sendErr().
+		select {
+		case runErr = <-errCh:
+		default:
+			runErr = ctx.Err()
+		}
+
+	case runErr = <-errCh:
+		cancel()
+	}
+
 	loggr.Info("shutting down, waiting for goroutines...")
 
-	// Wait for all goroutines to finish
 	wg.Wait()
-	loggr.Info("all components shut down cleanly")
+
+	// A real server error may have been reported during shutdown.
+	select {
+	case err := <-errCh:
+		if err != nil {
+			runErr = err
+		}
+	default:
+	}
+
+	if runErr == nil {
+		loggr.Info("all components shut down cleanly")
+		return nil
+	}
+
+	if errors.Is(runErr, context.Canceled) {
+		loggr.Info("all components shut down cleanly", slog.String("reason", "shutdown requested"))
+		return nil
+	}
+
+	loggr.Error("serve mode stopped with error", slog.Any("err", runErr))
+	return runErr
 }

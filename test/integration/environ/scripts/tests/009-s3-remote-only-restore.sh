@@ -23,7 +23,10 @@ x_remake_config() {
     "level": "${LOG_LEVEL_DEFAULT}",
     "format": "${LOG_FORMAT_DEFAULT}",
     "add_source": true
-  },  
+  },
+  "backup": {
+    "cron": "*/50 * * * *"
+  },
   "storage": {
     "name": "s3",
     "compression": { "algo": "gzip" },
@@ -113,6 +116,11 @@ EOF
   echo_delim "check marker exists"
   x_sql "select count(*) from public.tslog where ts = '${MARKER}';" | grep -qx "1"
 
+  echo_delim "run post_restore_check.sql"
+  psql -f /var/lib/postgresql/scripts/pg/post_restore_check.sql -v "ON_ERROR_STOP=1" postgres
+
+  x_search_errors_in_logs
+  
   echo_delim "OK"
 }
 

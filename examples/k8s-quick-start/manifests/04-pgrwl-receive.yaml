@@ -49,16 +49,19 @@ data:
       uploader:
         sync_interval: 10s
         max_concurrency: 4
-      retention:
-        enable: true
-        sync_interval: 10s
-        keep_period: "5m"
+    backup:
+      cron: "* * * * *"
     log:
       level: trace
       format: text
       add_source: true
     metrics:
       enable: true
+    retention:
+      enable: true
+      type: recovery_window
+      value: 1h
+      keep_last: 1      
     storage:
       name: s3
       compression:
@@ -86,16 +89,19 @@ data:
       uploader:
         sync_interval: 10s
         max_concurrency: 4
-      retention:
-        enable: true
-        sync_interval: 10s
-        keep_period: "1m"
+    backup:
+      cron: "* * * * *"
     log:
       level: info
       format: text
       add_source: true
     metrics:
       enable: true
+    retention:
+      enable: true
+      type: recovery_window
+      value: 1h
+      keep_last: 1
     storage:
       name: local
       compression:

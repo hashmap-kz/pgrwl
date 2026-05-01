@@ -1,6 +1,6 @@
 # pgrwl
 
-> Stream PostgreSQL WALs with Zero Data Loss
+> Cloud-native continuous backup for PostgreSQL in a single binary.
 
 [![License](https://img.shields.io/github/license/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/pgrwl/pgrwl)](https://goreportcard.com/report/github.com/pgrwl/pgrwl)
@@ -11,11 +11,16 @@
 [![Latest Release](https://img.shields.io/github/v/release/pgrwl/pgrwl)](https://github.com/pgrwl/pgrwl/releases/latest)
 [![Start contributing](https://img.shields.io/github/issues/pgrwl/pgrwl/good%20first%20issue?color=7057ff&label=Contribute)](https://github.com/pgrwl/pgrwl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22)
 
-**pgrwl** is a PostgreSQL write-ahead log (WAL) receiver written in Go. It’s a drop-in, container-friendly alternative
-to `pg_receivewal`, supporting streaming replication, encryption, compression, and remote storage (S3, SFTP).
+**pgrwl** is a Go-based PostgreSQL backup tool for continuous WAL archiving and scheduled base backups. It streams
+PostgreSQL WALs and base backups into local or remote storage, with optional compression, encryption, retention, and
+monitoring built in.
 
-Designed for disaster recovery and PITR (Point-in-Time Recovery), `pgrwl` ensures zero data loss (RPO=0) and seamless
-integration with Kubernetes environments.
+It is designed for disaster recovery and PITR (Point-in-Time Recovery), with a focus on low operational complexity:
+no extra backup tools, no external schedulers, and no dependency chain to operate - just one binary, PostgreSQL, and
+your chosen storage backend.
+
+For WAL streaming, `pgrwl` behaves as a container-friendly alternative to `pg_receivewal`, supporting streaming
+replication, automatic reconnects, partial WAL files, archive upload, retention, and restore integration.
 
 ---
 
@@ -49,15 +54,21 @@ integration with Kubernetes environments.
 
 ## About
 
-- The project is a production-ready tool for streaming WAL archiving, designed to achieve an RPO of 0 during recovery.
+- **Continuous PostgreSQL protection**: combine WAL archiving and base backups to support point-in-time recovery
+  workflows.
 
-- _It's primarily designed for use in containerized environments._
+- **Single-binary operation**: run receiving, scheduled backups, upload, retention, monitoring, and restore helpers
+  without external backup tools or schedulers.
 
-- The utility replicates all key features of `pg_receivewal`, including automatic reconnection on connection loss,
-  streaming into partial files, extensive error checking and more.
+- **Local or remote storage**: write backups and WAL archives to local storage or remote backends such as S3 and SFTP.
 
-- Install as a single binary. Debug with your favorite editor and a local PostgreSQL
-  container ([local-dev-infra](test/integration/environ/)).
+- **Container-friendly by design**: works well in Docker, Kubernetes, and object-storage based backup layouts.
+
+- **`pg_receivewal` style WAL streaming**: automatic reconnects, partial WAL files, segment rotation, timeline handling,
+  and extensive error checking.
+
+- Debug with your favorite editor and a local PostgreSQL container
+  ([local-dev-infra](test/integration/environ/)).
 
 **basic dashboard**
 
@@ -67,43 +78,9 @@ integration with Kubernetes environments.
 
 **[`^        back to top        ^`](#table-of-contents)**
 
-`pgrwl` intentionally uses three separate operating modes:
+**`pgrwl` components**
 
-- `receive`
-- `serve`
-- `backup`
-
-This separation is important.
-
-The WAL receiver should stay focused on one critical job: receiving WAL from PostgreSQL and safely writing it to
-disk/storage. Running base backups alongside the receiver may look convenient, but it can create unnecessary
-contention for network bandwidth, disk I/O, CPU, compression, encryption, and object-storage uploads.
-During heavy backup activity, the receiver must still keep up with WAL streaming, otherwise replication lag can
-grow or WAL retention pressure can increase on PostgreSQL.
-
-The `serve` mode is different from `receive` mode.
-It is used when the `receive` loop is stopped and recovery needs access to the WAL files that are still present in the
-receiver directory. This is especially important in Kubernetes setups where the receiver uses a `ReadWriteOnce` volume.
-Only that pod can access the local files, and the directory may contain completed
-WAL files or `.partial` files that have not been uploaded yet.
-In this situation, `pgrwl` can be switched to `serve` mode to safely expose the available WAL files for recovery.
-The pod becomes a controlled WAL file server for recovery purposes.
-
-The `backup` mode keeps base backup creation isolated from the WAL receive loop. It can be scheduled separately, run as
-a Kubernetes `StatefulSet`, and interact with the receiver through the API when needed. This keeps the architecture
-simpler, safer, and easier to reason about.
-
-**`pgrwl` running in `receive` mode**
-
-![Receive Mode](docs/assets/svg/loop-v1.svg)
-
-**`pgrwl` running in `serve` mode**
-
-![Serve Mode](docs/assets/svg/serve-mode.svg)
-
-**`pgrwl` running in `backup` mode**
-
-![Backup Mode](docs/assets/svg/backup-mode.svg)
+![Receive Mode](docs/assets/svg/stream-mode.svg)
 
 ---
 
@@ -231,42 +208,13 @@ services:
       PGPASSWORD: postgres
     ports:
       - "7070:7070"
-    command: daemon -c /etc/pgrwl-receive-config.yaml -m receive
+    command: daemon -c /etc/pgrwl-config.yaml -m receive
     configs:
-      - source: pgrwl-receive-config.yaml
-        target: /etc/pgrwl-receive-config.yaml
+      - source: pgrwl-config.yaml
+        target: /etc/pgrwl-config.yaml
         mode: "0755"
     volumes:
       - pgrwl-wal-archive-data:/mnt
-    depends_on:
-      pg-primary:
-        condition: service_healthy
-      seaweedfs-provision:
-        condition: service_completed_successfully
-
-  # ---------------------------------------------------------------------------
-  # pgrwl backup worker
-  #
-  # Runs scheduled base backups and stores them in the same S3 bucket.
-  # ---------------------------------------------------------------------------
-
-  pgrwl-backup:
-    container_name: pgrwl-backup
-    image: quay.io/pgrwl/pgrwl:1.0.33
-    restart: unless-stopped
-    environment:
-      TZ: "Asia/Aqtau"
-      PGHOST: pg-primary
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-    ports:
-      - "7071:7070"
-    command: daemon -c /etc/pgrwl-backup-config.yaml -m backup
-    configs:
-      - source: pgrwl-backup-config.yaml
-        target: /etc/pgrwl-backup-config.yaml
-        mode: "0755"
     depends_on:
       pg-primary:
         condition: service_healthy
@@ -467,34 +415,7 @@ configs:
         ]
       }
 
-  pgrwl-backup-config.yaml:
-    content: |
-      backup:
-        cron: '* * * * *'
-        retention:
-          enable: true
-          type: time
-          value: 10m
-      log:
-        format: text
-        level: info
-      main:
-        directory: "/mnt/wal-archive"
-        listen_port: 7070
-      storage:
-        compression:
-          algo: gzip
-        name: s3
-        s3:
-          url: http://seaweedfs:8333
-          access_key_id: pgrwl
-          secret_access_key: pgrwl-secret
-          bucket: backups
-          region: us-east-1
-          use_path_style: true
-          disable_ssl: true
-
-  pgrwl-receive-config.yaml:
+  pgrwl-config.yaml:
     content: |
       main:
         listen_port: 7070
@@ -513,6 +434,8 @@ configs:
         level: trace
         format: text
         add_source: true
+      backup:
+        cron: "*/5 * * * *"
       metrics:
         enable: false
       storage:
@@ -615,6 +538,7 @@ You may either use `pgrwl daemon -c config.yml -m receive` or provide the corres
 `pgrwl daemon`.
 
 ```
+---
 main:                                    # Required for both modes: receive/serve
   listen_port: 7070                      # HTTP server port (used for management)
   directory: "/var/lib/pgwal"            # Base directory for storing WAL files
@@ -625,21 +549,15 @@ receiver:                                # Required for 'receive' mode
   uploader:                              # Required for non-local storage type
     sync_interval: 10s                   # Interval for the upload worker to check for new files
     max_concurrency: 4                   # Maximum number of files to upload concurrently
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    sync_interval: 10s                   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-    keep_period: "1m"                    # Remove WAL files older than given period
 
-backup:                                  # Required for 'backup' mode
-  cron: "0 0 */3 * *"                    # Basebackup cron schedule
-  retention:                             # Optional
-    enable: true                         # Perform retention rules
-    type: time                           # One of: (time / count)
-    value: "48h"                         # Remove backups older than given period (if time), keep last N backups (if count)
-    keep_last: 1                         # Always keep last N backups (suitable when 'retention.type = time')
-  walretention:                          # Optional (WAL archive cleanup settings)
-    enable: true                         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-    receiver_addr: "pgrwl-receive:7070"  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+backup:                                  # Required for stream mode
+  cron: "0 0 */3 * *"                    # Basebackup cron schedule, POSIX format: minute hour day-of-month month day-of-week
+
+retention:                               # Optional
+  enable: true                           # Enable recovery-window retention
+  type: recovery_window                  # Only supported retention policy
+  value: 72h                             # Recovery window; keep enough backups/WALs to recover to any point in the last 72h
+  keep_last: 1                           # Minimum number of successful backups to keep, even if outside/inside the recovery window
 
 log:                                     # Optional
   level: info                            # One of: (trace / debug / info / warn / error)
@@ -681,23 +599,17 @@ storage:                                 # Optional
 Corresponding env-vars.
 
 ```
-PGRWL_DAEMON_MODE                        # receive/serve/backup
 PGRWL_MAIN_LISTEN_PORT                   # HTTP server port (used for management)
 PGRWL_MAIN_DIRECTORY                     # Base directory for storing WAL files
 PGRWL_RECEIVER_SLOT                      # Replication slot to use
 PGRWL_RECEIVER_NO_LOOP                   # If true, do not loop on connection loss
 PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL    # Interval for the upload worker to check for new files
 PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY  # Maximum number of files to upload concurrently
-PGRWL_RECEIVER_RETENTION_ENABLE          # Perform retention rules
-PGRWL_RECEIVER_RETENTION_SYNC_INTERVAL   # Interval for the retention worker (shouldn't run frequently - 12h is typically sufficient)
-PGRWL_RECEIVER_RETENTION_KEEP_PERIOD     # Remove WAL files older than given period
-PGRWL_BACKUP_CRON                        # Basebackup cron schedule
-PGRWL_BACKUP_RETENTION_ENABLE            # Perform retention rules
-PGRWL_BACKUP_RETENTION_TYPE              # One of: (time / count)
-PGRWL_BACKUP_RETENTION_VALUE             # Remove backups older than given period (if time), keep last N backups (if count)
-PGRWL_BACKUP_RETENTION_KEEP_LAST         # Always keep last N backups (suitable when 'retention.type = time')
-PGRWL_BACKUP_WALRETENTION_ENABLE         # After basebackup is done, cleanup WAL-archive by oldest backup stop-LSN
-PGRWL_BACKUP_WALRETENTION_RECEIVER_ADDR  # Address or WAL-receiver instance (required when manage_cleanup is set to true)
+PGRWL_BACKUP_CRON                        # Basebackup cron schedule, POSIX format: minute hour day-of-month month day-of-week
+PGRWL_RETENTION_ENABLE                   # Enable recovery-window retention
+PGRWL_RETENTION_TYPE                     # Only supported retention policy
+PGRWL_RETENTION_VALUE                    # Recovery window; keep enough backups/WALs to recover to any point in the last 72h
+PGRWL_RETENTION_KEEP_LAST                # Minimum number of successful backups to keep, even if outside/inside the recovery window
 PGRWL_LOG_LEVEL                          # One of: (trace / debug / info / warn / error)
 PGRWL_LOG_FORMAT                         # One of: (text / pretty / json)
 PGRWL_LOG_ADD_SOURCE                     # Include file:line in log messages (for local development)
@@ -820,24 +732,42 @@ apk add pgrwl_linux_amd64.apk --allow-untrusted
 
 _The full process may look like this (a typical, rough, and simplified example):_
 
-- A typical production setup runs **two `pgrwl` StatefulSets** in the cluster:
-  one in `receive` mode for **continuous WAL streaming**, and another in `backup` mode for scheduled **base backups**.
+- A typical production setup runs `pgrwl` in **stream mode** as the main backup/archiving daemon.
+  In this mode, one process is responsible for **continuous WAL streaming**, **WAL archiving**, scheduled
+  **base backups**, optional manual basebackup triggers, metrics, and the HTTP API.
 
-- In `receive` mode, `pgrwl` continuously **streams WAL files**, applies optional **compression** and **encryption**,
-  uploads them to **remote storage** (such as S3 or SFTP), and enforces **retention policies** - for example, keeping
-  WAL files for **four days**.
+- In stream mode, `pgrwl` continuously **streams WAL files** from PostgreSQL, writes them locally as
+  `*.partial` files while they are still being received, and renames them to final WAL segment names once
+  the segment is complete.
 
-- In `backup` mode, it performs a **full base backup** of your PostgreSQL cluster on a configured schedule -
-  for instance, **once every three days** - using **streaming basebackup**, with optional **compression**
-  and **encryption**. The resulting backup is also uploaded to the configured **remote storage**,
-  and subject to **retention policies** for cleanup. The built-in cron scheduler enables fully automated backups without
-  requiring external orchestration.
+- The archive supervisor periodically scans completed WAL files, applies optional **compression** and
+  **encryption**, uploads them to the configured storage backend, such as **S3**, **SFTP**, or local storage,
+  and removes the local copy after a successful upload.
 
-- During recovery, the same `receive` StatefulSet can be reconfigured to run in `serve` mode,
-  exposing previously archived WALs via HTTP to support **Point-in-Time Recovery (PITR)** through `restore_command`.
+- The basebackup supervisor performs full base backups on a configured schedule, for example **once every
+  three days**, using streaming basebackup. A basebackup can also be triggered manually through the HTTP API.
+  Basebackup failures are reported and logged, but they do not stop the WAL receiver, because WAL streaming
+  is the critical part of the system.
 
-- With this setup, you're able to restore your cluster - in the event of a crash -
-  to **any second within the past three days**, using the most recent base backup and available WAL segments.
+- WAL files and basebackups are stored in the same configured storage backend, but under different logical
+  paths or prefixes. For example, WAL files may be stored under a WAL archive path, while basebackup files
+  and manifests are stored under a backups path.
+
+- Retention is handled by a single **recovery-window retention manager**. Instead of deleting WALs and
+  backups independently, it chooses an **anchor backup**: the newest successful basebackup that started
+  before the beginning of the configured recovery window. It then keeps that backup, all newer successful
+  backups, and all WAL files required to restore forward from the anchor backup.
+
+- For example, with a recovery window of **72 hours**, `pgrwl` keeps enough backup and WAL history to recover
+  to any point within the last three days. WAL files older than the anchor backup’s start WAL can be removed,
+  while WAL files from the anchor backup onward are kept.
+
+- During recovery, `pgrwl` can run in **restore mode** as a restore daemon. PostgreSQL’s `restore_command`
+  invokes the lightweight `pgrwl restore-command` helper, which asks the restore daemon for the requested WAL
+  file and writes it to the path expected by PostgreSQL.
+
+- With this setup, you're able to restore your cluster after a crash to **any point covered by the configured
+  recovery window**, using the retained basebackup and the WAL files kept from that backup onward.
 
 ---
 

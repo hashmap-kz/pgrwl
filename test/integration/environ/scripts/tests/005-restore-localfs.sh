@@ -17,6 +17,9 @@ x_remake_config() {
     "level": "${LOG_LEVEL_DEFAULT}",
     "format": "${LOG_FORMAT_DEFAULT}",
     "add_source": true
+  },
+  "backup": {
+    "cron": "*/50 * * * *"
   }
 }
 EOF
@@ -115,6 +118,11 @@ EOF
   find "${WAL_PATH}" -type f -name "*.json" -delete
   rm -rf "${WAL_PATH}/backups"
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
+
+  echo_delim "run post_restore_check.sql"
+  psql -f /var/lib/postgresql/scripts/pg/post_restore_check.sql -v "ON_ERROR_STOP=1" postgres
+
+  x_search_errors_in_logs
 }
 
 x_backup_restore "${@}"

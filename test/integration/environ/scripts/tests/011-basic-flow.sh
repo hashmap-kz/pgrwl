@@ -190,6 +190,9 @@ cat >"$PGRWL_CONFIG" <<EOF
     "level": "debug",
     "format": "text",
     "add_source": false
+  },
+  "backup": {
+    "cron": "*/50 * * * *"
   }
 }
 EOF

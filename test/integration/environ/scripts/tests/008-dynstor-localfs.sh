@@ -23,6 +23,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 storage:
   name: "local"
   compression:
@@ -42,6 +44,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 storage:
   name: "local"
   compression:
@@ -64,6 +68,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 storage:
   name: "local"
   encryption:
@@ -84,6 +90,8 @@ log:
   level: ${LOG_LEVEL_DEFAULT}
   format: ${LOG_FORMAT_DEFAULT}
   add_source: true
+backup:
+  cron: "*/50 * * * *"
 EOF
 
 }
@@ -172,6 +180,11 @@ EOF
   echo_delim "running diff on pg_dumpall dumps (before vs after)"
   pg_dumpall -f "/tmp/pgdumpall-after" --restrict-key=0
   diff -u "/tmp/pgdumpall-before" "/tmp/pgdumpall-after"  
+
+  echo_delim "run post_restore_check.sql"
+  psql -f /var/lib/postgresql/scripts/pg/post_restore_check.sql -v "ON_ERROR_STOP=1" postgres
+
+  x_search_errors_in_logs
 }
 
 x_backup_restore "${@}"

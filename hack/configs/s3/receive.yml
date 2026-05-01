@@ -8,10 +8,6 @@ receiver:
   uploader:
     sync_interval: 10s
     max_concurrency: 4
-  #retention:
-  #  enable: true
-  #  sync_interval: 10s
-  #  keep_period: "30s"
 
 metrics:
   enable: true
@@ -26,8 +22,8 @@ log:
 
 storage:
   name: s3
-  #compression:
-  #  algo: gzip
+  compression:
+    algo: gzip
   #encryption:
   #  algo: aes-256-gcm
   #  pass: qwerty123
@@ -39,3 +35,12 @@ storage:
     region: main
     use_path_style: true
     disable_ssl: true
+
+backup:
+  cron: "* * * * *"
+
+retention:
+  enable: true
+  type: recovery_window
+  value: "5m"
+  keep_last: 1

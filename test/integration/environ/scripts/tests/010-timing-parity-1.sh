@@ -343,6 +343,9 @@ write_pgrwl_config() {
     "level": "trace",
     "format": "text",
     "add_source": true
+  },
+  "backup": {
+    "cron": "*/50 * * * *"
   }
 }
 EOF

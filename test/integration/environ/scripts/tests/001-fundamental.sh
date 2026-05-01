@@ -77,6 +77,9 @@ x_remake_dirs() {
     "level": "trace",
     "format": "text",
     "add_source": true
+  },
+  "backup": {
+    "cron": "*/50 * * * *"
   }
 }
 EOF
@@ -209,6 +212,19 @@ EOF
   echo_delim "compare wal-archive with pg_receivewal with a new timeline stream"
   find "${WAL_PATH}" -type f -name "*.json" -delete
   bash "/var/lib/postgresql/scripts/utils/dircmp.sh" "${WAL_PATH}" "${PG_RECEIVEWAL_WAL_PATH}"
+
+  echo_delim "run post_restore_check.sql"
+  psql -f /var/lib/postgresql/scripts/pg/post_restore_check.sql -v "ON_ERROR_STOP=1" postgres
+
+  # search for errors in logs
+  echo_delim "searching for errors in pgrwl logs"
+  if [[ -f "${LOG_FILE}" ]]; then
+    grep -i "error" "${LOG_FILE}" || echo " > no errors found in pgrwl logs"
+  fi
+  echo_delim "searching for errors in pg logs"
+  if [[ -f "/var/log/postgresql/pg.log" ]]; then
+    grep -i "err" "/var/log/postgresql/pg.log" || echo " > no errors found in pg logs"
+  fi  
 }
 
 x_backup_restore "${@}"

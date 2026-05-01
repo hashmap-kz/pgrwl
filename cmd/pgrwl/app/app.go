@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +25,7 @@ func App() *cli.Command {
 	}
 	modeFlag := &cli.StringFlag{
 		Name:     "mode",
-		Usage:    "Daemon mode: receive/serve/backup",
+		Usage:    "Daemon mode: receive/serve",
 		Aliases:  []string{"m"},
 		Required: true,
 		Sources:  cli.EnvVars("PGRWL_DAEMON_MODE"),
@@ -40,36 +39,47 @@ func App() *cli.Command {
 			// server modes
 			{
 				Name:  "daemon",
-				Usage: "Running in a daemon mode: receive/serve/backup",
+				Usage: "Running in a daemon mode: receive/serve",
 				Flags: []cli.Flag{
 					configFlag,
 					modeFlag,
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					mode := c.String("mode")
-					cfg := loadConfig(c, mode)
+
+					cfg, err := loadConfig(c, mode)
+					if err != nil {
+						return err
+					}
 
 					//nolint:staticcheck
 					if mode == config.ModeReceive {
-						checkPgEnvsAreSet()
-						RunReceiveMode(&ReceiveModeOpts{
+						var err error
+
+						err = checkPgEnvsAreSet()
+						if err != nil {
+							return err
+						}
+
+						err = RunReceiveMode(&ReceiveModeOpts{
 							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
 							ListenPort:       cfg.Main.ListenPort,
 							Slot:             cfg.Receiver.Slot,
 							NoLoop:           cfg.Receiver.NoLoop,
 						})
+						if err != nil {
+							return err
+						}
 					} else if mode == config.ModeServe {
-						RunServeMode(&ServeModeOpts{
+						err := RunServeMode(&ServeModeOpts{
 							Directory:  filepath.ToSlash(cfg.Main.Directory),
 							ListenPort: cfg.Main.ListenPort,
 						})
-					} else if mode == config.ModeBackup {
-						checkPgEnvsAreSet()
-						RunBackupMode(&BackupModeOpts{
-							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
-						})
+						if err != nil {
+							return err
+						}
 					} else {
-						log.Fatalf("unknown mode: %s", mode)
+						return fmt.Errorf("unknown mode: %s", mode)
 					}
 
 					return nil
@@ -84,10 +94,18 @@ func App() *cli.Command {
 					configFlag,
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
-					checkPgEnvsAreSet()
-					cfg := loadConfig(c, config.ModeBackupCMD)
-					err := RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
-					return err
+					var err error
+
+					err = checkPgEnvsAreSet()
+					if err != nil {
+						return err
+					}
+
+					cfg, err := loadConfig(c, config.ModeBackupCMD)
+					if err != nil {
+						return err
+					}
+					return RunBaseBackup(&BaseBackupCmdOpts{Directory: cfg.Main.Directory})
 				},
 			},
 
@@ -108,12 +126,14 @@ func App() *cli.Command {
 					},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
-					cfg := loadConfig(c, config.ModeRestoreCMD)
-					err := RestoreBaseBackup(context.Background(), cfg,
+					cfg, err := loadConfig(c, config.ModeRestoreCMD)
+					if err != nil {
+						return err
+					}
+					return RestoreBaseBackup(context.Background(), cfg,
 						c.String("id"),
 						c.String("dest"),
 					)
-					return err
 				},
 			},
 
@@ -165,10 +185,13 @@ func App() *cli.Command {
 				Action: func(_ context.Context, c *cli.Command) error {
 					mode := c.String("mode")
 					if mode == "" {
-						log.Fatal("required flag 'mode' is empty")
+						return fmt.Errorf("required flag 'mode' is empty")
 					}
-					_ = loadConfig(c, mode)
-					fmt.Println("Configuration is valid.")
+					_, err := loadConfig(c, mode)
+					if err != nil {
+						fmt.Printf("configuration error: %v\n", err)
+						return err
+					}
 					return nil
 				},
 			},
@@ -178,17 +201,24 @@ func App() *cli.Command {
 	return app
 }
 
-func loadConfig(c *cli.Command, mode string) *config.Config {
+func loadConfig(c *cli.Command, mode string) (*config.Config, error) {
 	configPath := c.String("config")
 
 	// 1) if -c flag is set -> must read config from file
 	// 2) if $PGRWL_CONFIG_PATH is set -> must read config from file
 	// 3) read config with go-envconfig otherwise
 	var cfg *config.Config
+	var err error
 	if configPath != "" {
-		cfg = config.MustLoad(configPath, mode)
+		cfg, err = config.FromFile(configPath, mode)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		cfg = config.MustEnvconfig(mode)
+		cfg, err = config.FromEnvs(mode)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// debug config (NOTE: sensitive fields are hidden)
@@ -202,15 +232,15 @@ func loadConfig(c *cli.Command, mode string) *config.Config {
 		Format:    cfg.Log.Format,
 		AddSource: cfg.Log.AddSource,
 	})
-	return cfg
+	return cfg, nil
 }
 
-func checkPgEnvsAreSet() {
+func checkPgEnvsAreSet() error {
 	var emptyEnvs []string
 
 	pgPassFile := os.Getenv("PGPASSFILE")
 
-	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER"} { // you can add additional fields if needed
+	for _, name := range []string{"PGHOST", "PGPORT", "PGUSER"} {
 		if os.Getenv(name) == "" {
 			emptyEnvs = append(emptyEnvs, name)
 		}
@@ -221,13 +251,14 @@ func checkPgEnvsAreSet() {
 	}
 
 	if len(emptyEnvs) > 0 {
-		log.Fatalf("[FATAL] receive: required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
+		return fmt.Errorf("[FATAL] receive: required env vars are empty: [%s]", strings.Join(emptyEnvs, " "))
 	}
 
 	if pgPassFile != "" {
 		if _, err := os.Stat(filepath.Clean(pgPassFile)); os.IsNotExist(err) {
-			//nolint:gosec
-			log.Fatalf("[FATAL] PGPASSFILE does not exist: %s", pgPassFile)
+			return fmt.Errorf("[FATAL] PGPASSFILE does not exist: %s", pgPassFile)
 		}
 	}
+
+	return nil
 }

@@ -8,16 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
-
 	"github.com/pgrwl/pgrwl/config"
 
 	"github.com/pgrwl/pgrwl/internal/opt/api"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
-	"github.com/pgrwl/pgrwl/internal/opt/jobq"
-
-	"github.com/pgrwl/pgrwl/internal/core/logger"
-
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
@@ -25,38 +19,34 @@ import (
 
 type Service interface {
 	Status() *PgrwlStatus
-	DeleteWALsBefore(ctx context.Context, walFileName string) error
-	BriefConfig(ctx context.Context) *BriefConfig
+	BriefConfig(ctx context.Context) (*BriefConfig, error)
 	FullRedactedConfig(ctx context.Context) *config.Config
 	ListWALFiles(ctx context.Context) ([]WALFile, error)
 	ListBackups(ctx context.Context) ([]Backup, error)
-	Snapshot(ctx context.Context) *Snapshot
+	Snapshot(ctx context.Context) (*Snapshot, error)
 }
 
 type receiveModeSvc struct {
-	l        *slog.Logger
-	pgrw     xlog.PgReceiveWal // direct access to running state
-	baseDir  string
-	storage  *st.VariadicStorage
-	jobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	l       *slog.Logger
+	pgrw    xlog.PgReceiveWal // direct access to running state
+	baseDir string
+	storage *st.VariadicStorage
 }
 
 var _ Service = &receiveModeSvc{}
 
 type ReceiveServiceOpts struct {
-	PGRW     xlog.PgReceiveWal
-	BaseDir  string
-	Storage  *st.VariadicStorage
-	JobQueue *jobq.JobQueue // optional, nil in 'serve' mode
+	PGRW    xlog.PgReceiveWal
+	BaseDir string
+	Storage *st.VariadicStorage
 }
 
 func NewReceiveModeService(opts *ReceiveServiceOpts) Service {
 	return &receiveModeSvc{
-		l:        slog.With("component", "receive-service"),
-		pgrw:     opts.PGRW,
-		baseDir:  opts.BaseDir,
-		storage:  opts.Storage,
-		jobQueue: opts.JobQueue,
+		l:       slog.With("component", "receive-service"),
+		pgrw:    opts.PGRW,
+		baseDir: opts.BaseDir,
+		storage: opts.Storage,
 	}
 }
 
@@ -106,54 +96,12 @@ func filterWalBefore(walFiles []string, cutoff string) []string {
 	return toDelete
 }
 
-func (s *receiveModeSvc) DeleteWALsBefore(_ context.Context, walFileName string) error {
-	if s.jobQueue != nil {
-		err := s.jobQueue.Submit("delete-wal-before-"+walFileName, func(_ context.Context) {
-			s.log().Info("deleting WAL files")
-			walFilesInStorage, err := s.storage.List(context.Background(), "")
-			if err != nil {
-				s.log().Error("cannot delete WAL files",
-					slog.String("before", walFileName),
-					slog.Any("err", err),
-				)
-				return
-			}
-			walFilesToDelete := filterWalBefore(walFilesInStorage, walFileName)
-			if len(walFilesToDelete) == 0 {
-				return
-			}
-
-			if config.Verbose {
-				s.log().LogAttrs(context.Background(), logger.LevelTrace, "begin to delete wal files")
-				for _, w := range walFilesToDelete {
-					s.log().LogAttrs(context.Background(), logger.LevelTrace, "wal file to delete",
-						slog.String("name", w),
-					)
-				}
-			}
-
-			err = s.storage.DeleteAllBulk(context.Background(), walFilesToDelete)
-			if err != nil {
-				s.log().Error("cannot delete WAL files",
-					slog.String("before", walFileName),
-					slog.Any("err", err),
-				)
-				return
-			}
-
-			// update metrics
-			receivemetrics.M.AddWALFilesDeleted(float64(len(walFilesToDelete)))
-		})
-		if err != nil {
-			return err
-		}
+func (s *receiveModeSvc) BriefConfig(_ context.Context) (*BriefConfig, error) {
+	cfg, err := config.Cfg()
+	if err != nil {
+		return nil, err
 	}
-	return nil
-}
-
-func (s *receiveModeSvc) BriefConfig(_ context.Context) *BriefConfig {
-	cfg := config.Cfg()
-	return &BriefConfig{RetentionEnable: cfg.Receiver.Retention.Enable}
+	return &BriefConfig{RetentionEnable: cfg.Retention.Enable}, nil
 }
 
 func (s *receiveModeSvc) FullRedactedConfig(_ context.Context) *config.Config {
@@ -163,7 +111,12 @@ func (s *receiveModeSvc) FullRedactedConfig(_ context.Context) *config.Config {
 
 // ListWALFiles returns metadata for every WAL file currently held in storage.
 func (s *receiveModeSvc) ListWALFiles(ctx context.Context) ([]WALFile, error) {
-	encrypted := config.Cfg().Storage.Encryption.Algo != ""
+	cfg, err := config.Cfg()
+	if err != nil {
+		return nil, err
+	}
+
+	encrypted := cfg.Storage.Encryption.Algo != ""
 
 	infos, err := s.storage.ListInfoRaw(ctx, "")
 	if err != nil {
@@ -264,10 +217,15 @@ func (s *receiveModeSvc) ListBackups(ctx context.Context) ([]Backup, error) {
 // Snapshot assembles the full dashboard payload in a single call.
 // Errors from the storage sub-queries are collected into Snapshot.Error so the
 // UI always receives a partial response rather than a hard failure.
-func (s *receiveModeSvc) Snapshot(ctx context.Context) *Snapshot {
+func (s *receiveModeSvc) Snapshot(ctx context.Context) (*Snapshot, error) {
+	briefConfig, err := s.BriefConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	snap := &Snapshot{
 		Status: s.Status(),
-		Config: s.BriefConfig(ctx),
+		Config: briefConfig,
 	}
 
 	// Populate Receiver from the stream status.
@@ -306,5 +264,5 @@ func (s *receiveModeSvc) Snapshot(ctx context.Context) *Snapshot {
 		snap.Error = strings.Join(errs, "; ")
 	}
 
-	return snap
+	return snap, nil
 }

@@ -22,6 +22,9 @@ x_remake_config() {
     "format": "${LOG_FORMAT_DEFAULT}",
     "add_source": true
   },
+  "backup": {
+    "cron": "*/50 * * * *"
+  },
   "storage": {
     "name": "s3",
     "compression": {
@@ -127,6 +130,11 @@ EOF
   psql --pset pager=off -c "select * from public.tslog;"
   echo "insert log content:"
   tail -10 "${BACKGROUND_INSERTS_SCRIPT_LOG_FILE}"
+
+  echo_delim "run post_restore_check.sql"
+  psql -f /var/lib/postgresql/scripts/pg/post_restore_check.sql -v "ON_ERROR_STOP=1" postgres
+
+  x_search_errors_in_logs
 }
 
 x_backup_restore "${@}"
