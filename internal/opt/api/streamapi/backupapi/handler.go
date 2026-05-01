@@ -15,7 +15,7 @@ type Handler struct {
 	Service Service
 }
 
-func NewBackupHandler(s Service) *Handler {
+func NewHandler(s Service) *Handler {
 	return &Handler{
 		Service: s,
 	}

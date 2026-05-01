@@ -30,7 +30,7 @@ type svc struct {
 	appCtx    context.Context
 }
 
-func NewBackupService(opts *Opts) Service {
+func NewService(opts *Opts) Service {
 	return &svc{
 		l:         slog.With("component", "manual-basebackup"),
 		gate:      opts.Gate,

@@ -24,10 +24,8 @@ func Init(o *Opts) http.Handler {
 	l := slog.With("component", "stream-api")
 
 	// init services/handlers
-	backupSvc := backupapi.NewBackupService(o.Backup)
-	backupHdl := backupapi.NewBackupHandler(backupSvc)
-	receiveSvc := receiveapi.NewService(o.Receive)
-	receiveHld := receiveapi.NewHandler(receiveSvc)
+	backupHandler := backupapi.NewHandler(backupapi.NewService(o.Backup))
+	receiveHandler := receiveapi.NewHandler(receiveapi.NewService(o.Receive))
 
 	// init middlewares
 	loggingMiddleware := middleware.LoggingMiddleware{
@@ -50,14 +48,14 @@ func Init(o *Opts) http.Handler {
 	})
 
 	// mount routes
-	mux.Handle("POST /api/v1/basebackup", secureChain(http.HandlerFunc(backupHdl.Start)))
-	mux.Handle("GET /api/v1/basebackup/status", secureChain(http.HandlerFunc(backupHdl.Status)))
-	mux.Handle("GET /api/v1/status", secureChain(http.HandlerFunc(receiveHld.StatusHandler)))
-	mux.Handle("GET /api/v1/brief-config", secureChain(http.HandlerFunc(receiveHld.BriefConfig)))
-	mux.Handle("GET /api/v1/redacted-config", secureChain(http.HandlerFunc(receiveHld.FullRedactedConfig)))
-	mux.Handle("GET /api/v1/snapshot", secureChain(http.HandlerFunc(receiveHld.SnapshotHandler)))
-	mux.Handle("GET /api/v1/wals", secureChain(http.HandlerFunc(receiveHld.WalsHandler)))
-	mux.Handle("GET /api/v1/backups", secureChain(http.HandlerFunc(receiveHld.BackupsHandler)))
+	mux.Handle("POST /api/v1/basebackup", secureChain(http.HandlerFunc(backupHandler.Start)))
+	mux.Handle("GET /api/v1/basebackup/status", secureChain(http.HandlerFunc(backupHandler.Status)))
+	mux.Handle("GET /api/v1/status", secureChain(http.HandlerFunc(receiveHandler.StatusHandler)))
+	mux.Handle("GET /api/v1/brief-config", secureChain(http.HandlerFunc(receiveHandler.BriefConfig)))
+	mux.Handle("GET /api/v1/redacted-config", secureChain(http.HandlerFunc(receiveHandler.FullRedactedConfig)))
+	mux.Handle("GET /api/v1/snapshot", secureChain(http.HandlerFunc(receiveHandler.SnapshotHandler)))
+	mux.Handle("GET /api/v1/wals", secureChain(http.HandlerFunc(receiveHandler.WalsHandler)))
+	mux.Handle("GET /api/v1/backups", secureChain(http.HandlerFunc(receiveHandler.BackupsHandler)))
 
 	initOptionalHandlers(o.Cfg, mux, l)
 	return mux
