@@ -24,9 +24,6 @@ const (
 	// ModeServe represents the HTTP API serving mode.
 	ModeServe = "serve"
 
-	// ModeBackup used in pgrwl streaming basebackup mode.
-	ModeBackup = "backup"
-
 	// ModeBackupCMD used in pgrwl backup CLI command.
 	ModeBackupCMD = "backup-cmd"
 
@@ -76,8 +73,7 @@ var (
 		// CMD
 		ModeBackupCMD,
 		ModeRestoreCMD,
-		// serving
-		ModeBackup,
+		// daemons
 		ModeReceive,
 		ModeServe,
 	}

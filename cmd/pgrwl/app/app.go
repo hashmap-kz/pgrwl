@@ -78,20 +78,6 @@ func App() *cli.Command {
 						if err != nil {
 							return err
 						}
-					} else if mode == config.ModeBackup {
-						var err error
-
-						err = checkPgEnvsAreSet()
-						if err != nil {
-							return err
-						}
-
-						err = RunBackupMode(&BackupModeOpts{
-							ReceiveDirectory: filepath.ToSlash(cfg.Main.Directory),
-						})
-						if err != nil {
-							return err
-						}
 					} else {
 						return fmt.Errorf("unknown mode: %s", mode)
 					}
