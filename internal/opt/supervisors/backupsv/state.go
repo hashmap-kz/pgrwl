@@ -2,7 +2,6 @@ package backupsv
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -31,9 +30,8 @@ type BackupState interface {
 }
 
 type backupState struct {
-	mu      sync.RWMutex
-	running int32
-	state   BackupRunState
+	mu    sync.RWMutex
+	state BackupRunState
 }
 
 var _ BackupState = &backupState{}
@@ -52,13 +50,15 @@ func NewBackupState() BackupState {
 // Both cron and manual REST-triggered backups must call this before doing
 // any backup work. This avoids a check-then-start race.
 func (s *backupState) Begin(source string) bool {
-	if !atomic.CompareAndSwapInt32(&s.running, 0, 1) {
-		return false
-	}
-
 	now := time.Now().UTC()
 
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.state.Running {
+		return false
+	}
+
 	s.state = BackupRunState{
 		Running:    true,
 		Status:     BackupRunRunning,
@@ -67,7 +67,6 @@ func (s *backupState) Begin(source string) bool {
 		FinishedAt: nil,
 		LastError:  "",
 	}
-	s.mu.Unlock()
 
 	return true
 }
@@ -78,13 +77,12 @@ func (s *backupState) Finish(status BackupRunStatus, errMsg string) {
 	now := time.Now().UTC()
 
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.state.Running = false
 	s.state.Status = status
 	s.state.FinishedAt = &now
 	s.state.LastError = errMsg
-	s.mu.Unlock()
-
-	atomic.StoreInt32(&s.running, 0)
 }
 
 func (s *backupState) Snapshot() BackupRunState {

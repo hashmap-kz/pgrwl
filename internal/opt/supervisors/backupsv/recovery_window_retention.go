@@ -161,25 +161,31 @@ func (r *recoveryWindowRetention) backupBeginWAL(
 	info *backupdto.Result,
 	startupInfo *xlog.StartupInfo,
 ) string {
-	if info == nil || startupInfo == nil {
+	if info == nil || startupInfo == nil || startupInfo.WalSegSz <= 0 {
 		return ""
 	}
 
 	timelineID := info.TimelineID
 	startLSN := info.StartLSN
 
-	if info.Manifest != nil && len(info.Manifest.WALRanges) > 0 {
-		firstRange := info.Manifest.WALRanges[0]
-
-		if firstRange.Timeline != 0 {
-			timelineID = firstRange.Timeline
-		}
-
-		if firstRange.StartLSN != "" {
-			lsn, err := pglogrepl.ParseLSN(firstRange.StartLSN)
-			if err == nil {
-				startLSN = lsn
+	if info.Manifest != nil {
+		for _, walRange := range info.Manifest.WALRanges {
+			if walRange.StartLSN == "" {
+				continue
 			}
+
+			lsn, err := pglogrepl.ParseLSN(walRange.StartLSN)
+			if err != nil || lsn == 0 {
+				continue
+			}
+
+			startLSN = lsn
+
+			if walRange.Timeline != 0 {
+				timelineID = walRange.Timeline
+			}
+
+			break
 		}
 	}
 

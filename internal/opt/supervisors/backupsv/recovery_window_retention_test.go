@@ -141,6 +141,74 @@ func manifestResultWithWALRange(t *testing.T, startedAt string, topTimeline int3
 	return info
 }
 
+func TestRecoveryWindowRetentionBackupBeginWALDoesNotMixManifestTimelineWithInvalidManifestLSN(t *testing.T) {
+	retention := &recoveryWindowRetention{}
+
+	topLevelLSN, err := pglogrepl.ParseLSN("0/1000000")
+	require.NoError(t, err)
+
+	info := &backupdto.Result{
+		TimelineID: 1,
+		StartLSN:   topLevelLSN,
+		Manifest: &backupdto.BackupManifest{
+			WALRanges: []backupdto.ManifestWALRange{
+				{
+					Timeline: 2,
+					StartLSN: "not-a-lsn",
+				},
+			},
+		},
+	}
+
+	got := retention.backupBeginWAL(info, testStartupInfo())
+
+	assert.Equal(t, "000000010000000000000001", got)
+}
+
+func TestRecoveryWindowRetentionBackupBeginWALUsesFirstValidManifestWALRange(t *testing.T) {
+	retention := &recoveryWindowRetention{}
+
+	topLevelLSN, err := pglogrepl.ParseLSN("0/1000000")
+	require.NoError(t, err)
+
+	info := &backupdto.Result{
+		TimelineID: 1,
+		StartLSN:   topLevelLSN,
+		Manifest: &backupdto.BackupManifest{
+			WALRanges: []backupdto.ManifestWALRange{
+				{
+					Timeline: 2,
+					StartLSN: "invalid",
+				},
+				{
+					Timeline: 3,
+					StartLSN: "0/3000000",
+				},
+			},
+		},
+	}
+
+	got := retention.backupBeginWAL(info, testStartupInfo())
+
+	assert.Equal(t, "000000030000000000000003", got)
+}
+
+func TestRecoveryWindowRetentionBackupBeginWALReturnsEmptyWhenWalSegmentSizeIsZero(t *testing.T) {
+	retention := &recoveryWindowRetention{}
+
+	lsn, err := pglogrepl.ParseLSN("0/1000000")
+	require.NoError(t, err)
+
+	info := &backupdto.Result{
+		TimelineID: 1,
+		StartLSN:   lsn,
+	}
+
+	got := retention.backupBeginWAL(info, &xlog.StartupInfo{})
+
+	assert.Empty(t, got)
+}
+
 func TestRecoveryWindowRetentionLoadSuccessfulBackupsSkipsUnreadableAndInvalidBackups(t *testing.T) {
 	store := newFakeBackupStore()
 	store.dirs = map[string]bool{
