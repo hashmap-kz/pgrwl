@@ -53,7 +53,7 @@ func (s *InMemoryStorage) List(_ context.Context, path string) ([]string, error)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	prefix := strings.TrimSuffix(path, "/") + "/"
+	prefix := storagePrefix(path)
 
 	keys := make([]string, 0)
 	for k := range s.Files {
@@ -69,7 +69,7 @@ func (s *InMemoryStorage) ListInfo(_ context.Context, path string) ([]FileInfo, 
 	defer s.mu.RUnlock()
 
 	var infos []FileInfo
-	prefix := strings.TrimSuffix(path, "/") + "/"
+	prefix := storagePrefix(path)
 
 	for name, data := range s.Files {
 		if strings.HasPrefix(name, prefix) {
@@ -98,7 +98,7 @@ func (s *InMemoryStorage) DeleteAll(ctx context.Context, path string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	prefix := strings.TrimSuffix(path, "/") + "/"
+	prefix := storagePrefix(path)
 
 	for key := range s.Files {
 		select {
@@ -142,7 +142,7 @@ func (s *InMemoryStorage) ListTopLevelDirs(ctx context.Context, prefix string) (
 	defer s.mu.RUnlock()
 
 	result := make(map[string]bool)
-	normalizedPrefix := strings.TrimSuffix(prefix, "/") + "/"
+	normalizedPrefix := storagePrefix(prefix)
 
 	for filePath := range s.Files {
 		select {
@@ -163,6 +163,14 @@ func (s *InMemoryStorage) ListTopLevelDirs(ctx context.Context, prefix string) (
 	}
 
 	return result, nil
+}
+
+func storagePrefix(path string) string {
+	path = strings.TrimSuffix(path, "/")
+	if path == "" {
+		return ""
+	}
+	return path + "/"
 }
 
 func (s *InMemoryStorage) Rename(ctx context.Context, oldRemotePath, newRemotePath string) error {

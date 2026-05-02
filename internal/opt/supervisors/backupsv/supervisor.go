@@ -152,6 +152,7 @@ func (s *baseBackupSupervisor) BackupStatus() BackupRunState {
 	return s.state.Snapshot()
 }
 
+//nolint:unparam
 func (s *baseBackupSupervisor) handleRunError(kind string, err error) {
 	switch {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
