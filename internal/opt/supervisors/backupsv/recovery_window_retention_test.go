@@ -144,17 +144,17 @@ func manifestResultWithWALRange(t *testing.T, startedAt string, topTimeline int3
 func TestRecoveryWindowRetentionLoadSuccessfulBackupsSkipsUnreadableAndInvalidBackups(t *testing.T) {
 	store := newFakeBackupStore()
 	store.dirs = map[string]bool{
-		"valid":         true,
-		"unreadable":    true,
-		"zero-started":  true,
-		"zero-timeline": true,
-		"zero-lsn":      true,
+		"20260502065500": true,
+		"20260502070500": true,
+		"20260502071500": true,
+		"20260502072500": true,
+		"20260502073500": true,
 	}
-	store.manifests["valid"] = manifestResult(t, "2026-04-29T12:00:00Z", 1, "0/1000000")
-	store.manifests["zero-started"] = &backupdto.Result{TimelineID: 1, StartLSN: pglogrepl.LSN(0x1000000)}
-	store.manifests["zero-timeline"] = manifestResult(t, "2026-04-29T13:00:00Z", 0, "0/1000000")
-	store.manifests["zero-lsn"] = &backupdto.Result{StartedAt: mustTime(t, "2026-04-29T14:00:00Z"), TimelineID: 1}
-	store.readErrs["unreadable"] = errors.New("read failed")
+	store.manifests["20260502065500"] = manifestResult(t, "2026-04-29T12:00:00Z", 1, "0/1000000")
+	store.manifests["20260502071500"] = &backupdto.Result{TimelineID: 1, StartLSN: pglogrepl.LSN(0x1000000)}
+	store.manifests["20260502072500"] = manifestResult(t, "2026-04-29T13:00:00Z", 0, "0/1000000")
+	store.manifests["20260502073500"] = &backupdto.Result{StartedAt: mustTime(t, "2026-04-29T14:00:00Z"), TimelineID: 1}
+	store.readErrs["20260502070500"] = errors.New("read failed")
 
 	retention := newRetentionForTest(retentionConfigForTest(), store, &fakeWALCleaner{})
 
@@ -162,7 +162,7 @@ func TestRecoveryWindowRetentionLoadSuccessfulBackupsSkipsUnreadableAndInvalidBa
 
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, "valid", got[0].name)
+	assert.Equal(t, "20260502065500", got[0].name)
 	assert.NotEmpty(t, got[0].beginWAL)
 }
 
@@ -185,14 +185,14 @@ func TestRecoveryWindowRetentionBackupBeginWALUsesManifestWALRangeWhenPresent(t 
 func TestRecoveryWindowRetentionRunBeforeBackupDeletesOldBackupsThenCleansWAL(t *testing.T) {
 	store := newFakeBackupStore()
 	store.dirs = map[string]bool{
-		"old":    true,
-		"anchor": true,
-		"new":    true,
+		"20260422065500": true,
+		"20260428065500": true,
+		"20260501065500": true,
 	}
 	now := time.Now().UTC()
-	store.manifests["old"] = manifestResultAt(t, now.Add(-10*24*time.Hour), 1, "0/1000000")
-	store.manifests["anchor"] = manifestResultAt(t, now.Add(-4*24*time.Hour), 1, "0/2000000")
-	store.manifests["new"] = manifestResultAt(t, now.Add(-24*time.Hour), 1, "0/3000000")
+	store.manifests["20260422065500"] = manifestResultAt(t, now.Add(-10*24*time.Hour), 1, "0/1000000")
+	store.manifests["20260428065500"] = manifestResultAt(t, now.Add(-4*24*time.Hour), 1, "0/2000000")
+	store.manifests["20260501065500"] = manifestResultAt(t, now.Add(-24*time.Hour), 1, "0/3000000")
 
 	cleaner := &fakeWALCleaner{}
 	cfg := retentionConfigForTest()
@@ -202,7 +202,7 @@ func TestRecoveryWindowRetentionRunBeforeBackupDeletesOldBackupsThenCleansWAL(t 
 	err := retention.RunBeforeBackup(context.Background(), testStartupInfo())
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"old"}, store.deleted)
+	assert.Equal(t, []string{"20260422065500"}, store.deleted)
 	assert.Equal(t, 1, cleaner.calls)
 	assert.NotEmpty(t, cleaner.keepFromWAL)
 }
@@ -211,12 +211,12 @@ func TestRecoveryWindowRetentionRunBeforeBackupDoesNotCleanWALIfBackupDeleteFail
 	store := newFakeBackupStore()
 	store.deleteErr = errors.New("delete backups failed")
 	store.dirs = map[string]bool{
-		"old":    true,
-		"anchor": true,
+		"20260422065500": true,
+		"20260428065500": true,
 	}
 	now := time.Now().UTC()
-	store.manifests["old"] = manifestResultAt(t, now.Add(-10*24*time.Hour), 1, "0/1000000")
-	store.manifests["anchor"] = manifestResultAt(t, now.Add(-4*24*time.Hour), 1, "0/2000000")
+	store.manifests["20260422065500"] = manifestResultAt(t, now.Add(-10*24*time.Hour), 1, "0/1000000")
+	store.manifests["20260428065500"] = manifestResultAt(t, now.Add(-4*24*time.Hour), 1, "0/2000000")
 
 	cleaner := &fakeWALCleaner{}
 	retention := newRetentionForTest(retentionConfigForTest(), store, cleaner)
@@ -230,8 +230,8 @@ func TestRecoveryWindowRetentionRunBeforeBackupDoesNotCleanWALIfBackupDeleteFail
 
 func TestRecoveryWindowRetentionRunBeforeBackupReturnsWALCleanerError(t *testing.T) {
 	store := newFakeBackupStore()
-	store.dirs = map[string]bool{"only": true}
-	store.manifests["only"] = manifestResultAt(t, time.Now().UTC().Add(-24*time.Hour), 1, "0/3000000")
+	store.dirs = map[string]bool{"20260502065500": true}
+	store.manifests["20260502065500"] = manifestResultAt(t, time.Now().UTC().Add(-24*time.Hour), 1, "0/3000000")
 
 	cleaner := &fakeWALCleaner{err: errors.New("wal cleanup failed")}
 	retention := newRetentionForTest(retentionConfigForTest(), store, cleaner)

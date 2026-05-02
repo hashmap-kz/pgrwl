@@ -40,23 +40,23 @@ func TestWALCleanerDeleteBeforeDeletesOnlyWalBeforeBoundary(t *testing.T) {
 	ctx := context.Background()
 	backend := st.NewInMemoryStorage()
 
-	putRawObject(t, backend, "000000010000000000000001")
-	putRawObject(t, backend, "000000010000000000000002")
-	putRawObject(t, backend, "000000010000000000000003")
-	putRawObject(t, backend, "000000010000000000000004.gz")
-	putRawObject(t, backend, "000000010000000000000005.gz.aes")
+	putRawObject(t, backend, "000000010000003C000000D8")
+	putRawObject(t, backend, "000000010000003C000000D9")
+	putRawObject(t, backend, "000000010000003C000000DA")
+	putRawObject(t, backend, "000000010000003C000000DB.gz")
+	putRawObject(t, backend, "000000010000003C000000DC.gz.aes")
 	putRawObject(t, backend, "00000002.history")
 	putRawObject(t, backend, "README.txt")
 
 	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
 
-	err := cleaner.DeleteBefore(ctx, "000000010000000000000003")
+	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
 
 	require.NoError(t, err)
 
 	for _, deleted := range []string{
-		"000000010000000000000001",
-		"000000010000000000000002",
+		"000000010000003C000000D8",
+		"000000010000003C000000D9",
 	} {
 		exists, err := backend.Exists(ctx, deleted)
 		require.NoError(t, err)
@@ -64,9 +64,9 @@ func TestWALCleanerDeleteBeforeDeletesOnlyWalBeforeBoundary(t *testing.T) {
 	}
 
 	for _, kept := range []string{
-		"000000010000000000000003",
-		"000000010000000000000004.gz",
-		"000000010000000000000005.gz.aes",
+		"000000010000003C000000DA",
+		"000000010000003C000000DB.gz",
+		"000000010000003C000000DC.gz.aes",
 		"00000002.history",
 		"README.txt",
 	} {
@@ -80,40 +80,40 @@ func TestWALCleanerDeleteBeforeHandlesCompressedOldWal(t *testing.T) {
 	ctx := context.Background()
 	backend := st.NewInMemoryStorage()
 
-	putRawObject(t, backend, "000000010000000000000001.gz")
-	putRawObject(t, backend, "000000010000000000000002.zst.aes")
-	putRawObject(t, backend, "000000010000000000000003.lz4")
+	putRawObject(t, backend, "000000010000003C000000D8.gz")
+	putRawObject(t, backend, "000000010000003C000000D9.zst.aes")
+	putRawObject(t, backend, "000000010000003C000000DA.lz4")
 
 	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
 
-	err := cleaner.DeleteBefore(ctx, "000000010000000000000003")
+	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
 
 	require.NoError(t, err)
 
 	for _, deleted := range []string{
-		"000000010000000000000001.gz",
-		"000000010000000000000002.zst.aes",
+		"000000010000003C000000D8.gz",
+		"000000010000003C000000D9.zst.aes",
 	} {
 		exists, err := backend.Exists(ctx, deleted)
 		require.NoError(t, err)
 		assert.False(t, exists, "expected %s to be deleted", deleted)
 	}
 
-	exists, err := backend.Exists(ctx, "000000010000000000000003.lz4")
+	exists, err := backend.Exists(ctx, "000000010000003C000000DA.lz4")
 	require.NoError(t, err)
 	assert.True(t, exists)
 }
 
 func TestWALCleanerDeleteBeforeReturnsContextError(t *testing.T) {
 	backend := st.NewInMemoryStorage()
-	putRawObject(t, backend, "000000010000000000000001")
+	putRawObject(t, backend, "000000010000003C000000D8")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
 
-	err := cleaner.DeleteBefore(ctx, "000000010000000000000002")
+	err := cleaner.DeleteBefore(ctx, "000000010000003C000000D9")
 
 	assert.ErrorIs(t, err, context.Canceled)
 }
@@ -128,11 +128,11 @@ func (s *deleteFailStorage) Delete(_ context.Context, _ string) error {
 
 func TestWALCleanerDeleteBeforePropagatesDeleteError(t *testing.T) {
 	backend := &deleteFailStorage{InMemoryStorage: st.NewInMemoryStorage()}
-	putRawObject(t, backend, "000000010000000000000001")
+	putRawObject(t, backend, "000000010000003C000000D8")
 
 	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
 
-	err := cleaner.DeleteBefore(context.Background(), "000000010000000000000002")
+	err := cleaner.DeleteBefore(context.Background(), "000000010000003C000000D9")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "delete WAL")
@@ -150,7 +150,7 @@ func TestWALCleanerDeleteBeforePropagatesListError(t *testing.T) {
 	backend := &listFailStorage{InMemoryStorage: st.NewInMemoryStorage()}
 	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
 
-	err := cleaner.DeleteBefore(context.Background(), "000000010000000000000002")
+	err := cleaner.DeleteBefore(context.Background(), "000000010000003C000000D9")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "list WAL archive")
@@ -160,20 +160,20 @@ func TestWALCleanerDeleteBeforeIgnoresNestedPathBaseName(t *testing.T) {
 	ctx := context.Background()
 	backend := st.NewInMemoryStorage()
 
-	putRawObject(t, backend, "archive/000000010000000000000001")
-	putRawObject(t, backend, "archive/000000010000000000000003")
+	putRawObject(t, backend, "archive/000000010000003C000000D8")
+	putRawObject(t, backend, "archive/000000010000003C000000DA")
 
 	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
 
-	err := cleaner.DeleteBefore(ctx, "000000010000000000000003")
+	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
 
 	require.NoError(t, err)
 
-	oldExists, err := backend.Exists(ctx, "archive/000000010000000000000001")
+	oldExists, err := backend.Exists(ctx, "archive/000000010000003C000000D8")
 	require.NoError(t, err)
 	assert.False(t, oldExists)
 
-	boundaryExists, err := backend.Exists(ctx, "archive/000000010000000000000003")
+	boundaryExists, err := backend.Exists(ctx, "archive/000000010000003C000000DA")
 	require.NoError(t, err)
 	assert.True(t, boundaryExists)
 }
@@ -190,14 +190,49 @@ func TestWALCleanerDeleteBeforeWithRawPathStillDeletesRawObject(t *testing.T) {
 
 	// This test protects the current walCleaner behavior: it receives raw paths
 	// from ListInfoRaw and passes those same raw paths to Delete.
-	require.NoError(t, backend.Put(ctx, "000000010000000000000001.gz.aes", strings.NewReader("x")))
+	require.NoError(t, backend.Put(ctx, "000000010000003C000000D8.gz.aes", strings.NewReader("x")))
 
 	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
-	err := cleaner.DeleteBefore(ctx, "000000010000000000000002")
+	err := cleaner.DeleteBefore(ctx, "000000010000003C000000D9")
 	require.NoError(t, err)
 
-	_, err = backend.Get(ctx, "000000010000000000000001.gz.aes")
+	_, err = backend.Get(ctx, "000000010000003C000000D8.gz.aes")
 	assert.Error(t, err)
+}
+
+func TestWALCleanerDeleteBeforeMatchesConfiguredWalArchiveSubpath(t *testing.T) {
+	ctx := context.Background()
+	backend := st.NewInMemoryStorage()
+
+	// Production storage is already scoped to the wal-archive subpath.
+	// So the cleaner sees only WAL archive object names, not root receive-dir files
+	// such as 000000010000003C000000DC.partial or backups/<id>/*.
+	putRawObject(t, backend, "000000010000003C000000D8")
+	putRawObject(t, backend, "000000010000003C000000D9")
+	putRawObject(t, backend, "000000010000003C000000DA")
+	putRawObject(t, backend, "000000010000003C000000DB")
+
+	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
+	require.NoError(t, err)
+
+	for _, deleted := range []string{
+		"000000010000003C000000D8",
+		"000000010000003C000000D9",
+	} {
+		exists, err := backend.Exists(ctx, deleted)
+		require.NoError(t, err)
+		assert.False(t, exists, "expected %s to be deleted", deleted)
+	}
+
+	for _, kept := range []string{
+		"000000010000003C000000DA",
+		"000000010000003C000000DB",
+	} {
+		exists, err := backend.Exists(ctx, kept)
+		require.NoError(t, err)
+		assert.True(t, exists, "expected %s to be kept", kept)
+	}
 }
 
 func TestPutRawObjectHelperUsesReader(t *testing.T) {

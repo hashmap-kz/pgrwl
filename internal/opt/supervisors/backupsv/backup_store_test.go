@@ -188,16 +188,16 @@ func TestBackupStoreListBackupDirs(t *testing.T) {
 	storage := newTestStorage()
 	store := NewBackupStore(&config.Config{}, testLogger(), storage)
 
-	putManifest(t, storage, "F20260429T120000-root", testBackupResult("2026-04-29T12:00:00Z"))
-	putManifest(t, storage, "I20260429T130000-F20260429T120000", testBackupResult("2026-04-29T13:00:00Z"))
+	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
+	putManifest(t, storage, "20260502070500", testBackupResult("2026-05-02T07:05:00Z"))
 	require.NoError(t, storage.Put(ctx, "loose-file.txt", strings.NewReader("ignored")))
 
 	dirs, err := store.ListBackupDirs(ctx)
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]bool{
-		"F20260429T120000-root":             true,
-		"I20260429T130000-F20260429T120000": true,
+		"20260502065500": true,
+		"20260502070500": true,
 	}, dirs)
 }
 
@@ -206,9 +206,9 @@ func TestBackupStoreReadManifest(t *testing.T) {
 	storage := newTestStorage()
 	store := NewBackupStore(&config.Config{}, testLogger(), storage)
 
-	putManifest(t, storage, "F20260429T120000-root", testBackupResult("2026-04-29T12:00:00Z"))
+	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 
-	got, err := store.ReadManifest(ctx, "F20260429T120000-root")
+	got, err := store.ReadManifest(ctx, "20260502065500")
 
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -221,22 +221,22 @@ func TestBackupStoreDeleteBackupsDeletesOnlyRequestedTopLevelDirs(t *testing.T) 
 	storage := newTestStorage()
 	store := NewBackupStore(&config.Config{}, testLogger(), storage)
 
-	putManifest(t, storage, "F20260429T120000-root", testBackupResult("2026-04-29T12:00:00Z"))
-	putManifest(t, storage, "I20260429T130000-F20260429T120000", testBackupResult("2026-04-29T13:00:00Z"))
-	putManifest(t, storage, "I20260429T140000-I20260429T130000", testBackupResult("2026-04-29T14:00:00Z"))
+	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
+	putManifest(t, storage, "20260502070500", testBackupResult("2026-05-02T07:05:00Z"))
+	putManifest(t, storage, "20260502071500", testBackupResult("2026-05-02T07:15:00Z"))
 
 	err := store.DeleteBackups(ctx, []string{
-		"F20260429T120000-root",
-		"I20260429T130000-F20260429T120000",
+		"20260502065500",
+		"20260502070500",
 	})
 
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{
-		"F20260429T120000-root",
-		"I20260429T130000-F20260429T120000",
+		"20260502065500",
+		"20260502070500",
 	}, storage.deletedDirs)
 
-	exists, err := storage.Exists(ctx, "I20260429T140000-I20260429T130000/I20260429T140000-I20260429T130000.json")
+	exists, err := storage.Exists(ctx, "20260502071500/20260502071500.json")
 	require.NoError(t, err)
 	assert.True(t, exists)
 }
@@ -247,9 +247,9 @@ func TestBackupStoreDeleteBackupsPropagatesDeleteError(t *testing.T) {
 	storage.deleteDirErr = errors.New("delete failed")
 	store := NewBackupStore(&config.Config{}, testLogger(), storage)
 
-	putManifest(t, storage, "F20260429T120000-root", testBackupResult("2026-04-29T12:00:00Z"))
+	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 
-	err := store.DeleteBackups(ctx, []string{"F20260429T120000-root"})
+	err := store.DeleteBackups(ctx, []string{"20260502065500"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "delete backup")
@@ -260,12 +260,12 @@ func TestBackupStoreDeleteBackupsAllowsUnreadableManifest(t *testing.T) {
 	storage := newTestStorage()
 	store := NewBackupStore(&config.Config{}, testLogger(), storage)
 
-	require.NoError(t, storage.Put(ctx, "F20260429T120000-root/F20260429T120000-root.json", strings.NewReader("not-json")))
+	require.NoError(t, storage.Put(ctx, "20260502065500/20260502065500.json", strings.NewReader("not-json")))
 
-	err := store.DeleteBackups(ctx, []string{"F20260429T120000-root"})
+	err := store.DeleteBackups(ctx, []string{"20260502065500"})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"F20260429T120000-root"}, storage.deletedDirs)
+	assert.Equal(t, []string{"20260502065500"}, storage.deletedDirs)
 }
 
 func TestBackupStoreDeleteBackupsEmptyInputDoesNothing(t *testing.T) {
