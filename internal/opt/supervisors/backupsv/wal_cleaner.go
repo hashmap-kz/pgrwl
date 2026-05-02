@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
+	"strings"
 
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
@@ -46,6 +48,11 @@ func (c *walCleaner) DeleteBefore(ctx context.Context, keepFromWAL string) error
 	kept := 0
 
 	for _, wal := range wals {
+		if !isRootStoragePath(wal.Path) {
+			kept++
+			continue
+		}
+
 		name, history, ok := normalizeWALFilename(wal.Path)
 		if !ok {
 			kept++
@@ -88,4 +95,11 @@ func (c *walCleaner) DeleteBefore(ctx context.Context, keepFromWAL string) error
 	)
 
 	return nil
+}
+
+func isRootStoragePath(path string) bool {
+	clean := filepath.ToSlash(strings.TrimSpace(path))
+	clean = strings.TrimPrefix(clean, "./")
+
+	return clean != "" && !strings.Contains(clean, "/")
 }

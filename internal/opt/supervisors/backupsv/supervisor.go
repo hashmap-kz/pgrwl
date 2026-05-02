@@ -123,7 +123,7 @@ func (s *baseBackupSupervisor) RunCron(ctx context.Context) error {
 
 	s.log().Info("basebackup scheduler stopped")
 
-	return ctx.Err()
+	return nil
 }
 
 // Trigger starts a basebackup run synchronously.

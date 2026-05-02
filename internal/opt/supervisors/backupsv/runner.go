@@ -81,20 +81,6 @@ func (r *backupRunner) StartAsync(ctx context.Context, source string) (*BackupRu
 	}
 
 	go func() {
-		defer func() {
-			if v := recover(); v != nil {
-				errMsg := fmt.Sprintf("panic: %v", v)
-
-				r.l.Error("async basebackup run panicked",
-					slog.String("source", source),
-					slog.Any("panic", v),
-					slog.String("stack", string(debug.Stack())),
-				)
-
-				r.state.Finish(BackupRunFailed, errMsg)
-			}
-		}()
-
 		if err := r.runReserved(ctx, source); err != nil {
 			r.l.Error("async basebackup run failed",
 				slog.String("source", source),
@@ -127,6 +113,12 @@ func (r *backupRunner) runReserved(ctx context.Context, source string) (err erro
 	defer func() {
 		if rec := recover(); rec != nil {
 			err = fmt.Errorf("basebackup panicked: %v", rec)
+
+			r.l.Error("basebackup run panicked",
+				slog.String("source", source),
+				slog.Any("panic", rec),
+				slog.String("stack", string(debug.Stack())),
+			)
 		}
 
 		if err != nil {

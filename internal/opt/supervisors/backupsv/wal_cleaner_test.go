@@ -171,7 +171,7 @@ func TestWALCleanerDeleteBeforeIgnoresNestedPathBaseName(t *testing.T) {
 
 	oldExists, err := backend.Exists(ctx, "archive/000000010000003C000000D8")
 	require.NoError(t, err)
-	assert.False(t, oldExists)
+	assert.True(t, oldExists)
 
 	boundaryExists, err := backend.Exists(ctx, "archive/000000010000003C000000DA")
 	require.NoError(t, err)
