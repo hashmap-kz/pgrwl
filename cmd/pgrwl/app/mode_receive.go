@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/signal"
-	"strings"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -95,14 +95,19 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//////////////////////////////////////////////////////////////////////
 	// Init receive/archive dependencies before starting goroutines.
 
-	walStor, err := initWalStorageIfRequired(cfg, loggr, opts, pgrw)
+	walStor, err := initWalStorage(loggr, opts, pgrw)
 	if err != nil {
-		return fmt.Errorf("init storage: %w", err)
+		return fmt.Errorf("init wal storage: %w", err)
+	}
+
+	basebackupStor, err := initBasebackupStorage(cfg.Main.Directory)
+	if err != nil {
+		return fmt.Errorf("init basebackup storage: %w", err)
 	}
 
 	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.Opts{
 		Directory: opts.ReceiveDirectory,
-	})
+	}, basebackupStor, walStor)
 
 	// setup metrics
 	initMetrics(ctx, cfg, loggr)
@@ -160,7 +165,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 			}
 		}()
 
-		if err := basebackupSupervisor.Run(ctx); err != nil {
+		if err := basebackupSupervisor.RunCron(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
 				return
 			}
@@ -200,9 +205,8 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 				Cfg:     cfg,
 			},
 			Backup: &backupapi.Opts{
-				Gate:      basebackupSupervisor,
-				Directory: opts.ReceiveDirectory,
-				AppCtx:    ctx,
+				Supervisor: basebackupSupervisor,
+				AppCtx:     ctx,
 			},
 			Cfg: cfg,
 		})
@@ -220,38 +224,31 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 
 	//////////////////////////////////////////////////////////////////////
 	// ArchiveSupervisor.
-	//
-	// Run this goroutine only when storage is required.
-	//
-	// This remains critical. If storage/upload supervisor fails
-	// structurally, receive mode stops because this is part of WAL durability.
 
-	if walStor != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-			defer func() {
-				if r := recover(); r != nil {
-					sendFatalErr(fmt.Errorf("wal archive supervisor panicked: %v", r))
-				}
-			}()
-
-			u := receivesv.NewArchiveSupervisor(cfg, walStor, &receivesv.Opts{
-				ReceiveDirectory: opts.ReceiveDirectory,
-				PGRW:             pgrw,
-			})
-
-			if err := u.Run(ctx); err != nil {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-
-				sendFatalErr(fmt.Errorf("run wal archive supervisor: %w", err))
-				return
+		defer func() {
+			if r := recover(); r != nil {
+				sendFatalErr(fmt.Errorf("wal archive supervisor panicked: %v", r))
 			}
 		}()
-	}
+
+		u := receivesv.NewArchiveSupervisor(cfg, walStor, &receivesv.Opts{
+			ReceiveDirectory: opts.ReceiveDirectory,
+			PGRW:             pgrw,
+		})
+
+		if err := u.Run(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+
+			sendFatalErr(fmt.Errorf("run wal archive supervisor: %w", err))
+			return
+		}
+	}()
 
 	//////////////////////////////////////////////////////////////////////
 	// Wait for shutdown reason:
@@ -318,29 +315,6 @@ func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
 	}
 }
 
-// needWalArchiveSupervisorLoop decides whether we actually need to boot the storage.
-//
-// We don't need it if:
-//   - storage is localfs
-//   - no compression is configured
-//   - no encryption is configured
-func needWalArchiveSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
-	if cfg.IsLocalStor() {
-		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
-			strings.TrimSpace(cfg.Storage.Encryption.Algo) != ""
-
-		if !hasCfg {
-			l.Info("wal-supervisor loop is skipped",
-				slog.String("reason", "no compression/encryption configs for WAL local-storage"),
-			)
-		}
-
-		return hasCfg
-	}
-
-	return true
-}
-
 func initPgrw(ctx context.Context, opts *ReceiveModeOpts) (xlog.PgReceiveWal, error) {
 	pgrw, err := xlog.NewPgReceiver(ctx, &xlog.PgReceiveWalOpts{
 		ReceiveDirectory: opts.ReceiveDirectory,
@@ -354,33 +328,35 @@ func initPgrw(ctx context.Context, opts *ReceiveModeOpts) (xlog.PgReceiveWal, er
 	return pgrw, nil
 }
 
-func initWalStorageIfRequired(
-	cfg *config.Config,
+func initWalStorage(
 	loggr *slog.Logger,
 	opts *ReceiveModeOpts,
 	pgrw xlog.PgReceiveWal,
 ) (*st.VariadicStorage, error) {
 	loggr.Info("init storage")
 
-	var stor *st.VariadicStorage
+	walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
+	if err != nil {
+		return nil, fmt.Errorf("convert wal segment size: %w", err)
+	}
 
-	if needWalArchiveSupervisorLoop(cfg, loggr) {
-		walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
-		if err != nil {
-			return nil, fmt.Errorf("convert wal segment size: %w", err)
-		}
+	loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
 
-		loggr.Info("multipart chunk part (walSegSz)", slog.Int64("sz", walSegSz))
-
-		stor, err = api.SetupStorage(&api.SetupStorageOpts{
-			BaseDir:         opts.ReceiveDirectory,
-			SubPath:         config.LocalFSStorageSubpath,
-			S3PartSizeBytes: walSegSz,
-		})
-		if err != nil {
-			return nil, err
-		}
+	stor, err := api.SetupStorage(&api.SetupStorageOpts{
+		BaseDir:         opts.ReceiveDirectory,
+		SubPath:         config.LocalFSStorageSubpath,
+		S3PartSizeBytes: walSegSz,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return stor, nil
+}
+
+func initBasebackupStorage(baseDir string) (st.Storage, error) {
+	return api.SetupStorage(&api.SetupStorageOpts{
+		BaseDir: filepath.ToSlash(baseDir),
+		SubPath: config.BaseBackupSubpath,
+	})
 }

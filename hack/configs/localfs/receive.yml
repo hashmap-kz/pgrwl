@@ -20,14 +20,14 @@ log:
 
 storage:
   name: "local"
-  compression:
-    algo: gzip
+#  compression:
+#    algo: gzip
 #  encryption:
 #    algo: aes-256-gcm
 #    pass: qwerty123
 
 backup:
-  cron: "* * * * *"
+  cron: "*/5 * * * *"
 
 retention:
   enable: true
