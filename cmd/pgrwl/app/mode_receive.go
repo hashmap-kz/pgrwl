@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/backupapi"
 	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/receiveapi"
@@ -25,6 +26,8 @@ import (
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsv"
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesv"
 )
+
+const shutdownTimeout = 30 * time.Second
 
 type ReceiveModeOpts struct {
 	ReceiveDirectory string
@@ -273,7 +276,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 
 	loggr.Info("shutting down, waiting for goroutines...")
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(shutdownTimeout):
+		return fmt.Errorf("shutdown timeout: some goroutines did not stop")
+	}
 
 	// A fatal error may have appeared while goroutines were shutting down.
 	select {
