@@ -95,7 +95,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//////////////////////////////////////////////////////////////////////
 	// Init receive/archive dependencies before starting goroutines.
 
-	stor, err := initStorageIfRequired(cfg, loggr, opts, pgrw)
+	walStor, err := initWalStorageIfRequired(cfg, loggr, opts, pgrw)
 	if err != nil {
 		return fmt.Errorf("init storage: %w", err)
 	}
@@ -196,7 +196,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 			Receive: &receiveapi.Opts{
 				PGRW:    pgrw,
 				BaseDir: opts.ReceiveDirectory,
-				Storage: stor,
+				Storage: walStor,
 				Cfg:     cfg,
 			},
 			Backup: &backupapi.Opts{
@@ -223,10 +223,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//
 	// Run this goroutine only when storage is required.
 	//
-	// This remains critical. If storage/upload/retention supervisor fails
+	// This remains critical. If storage/upload supervisor fails
 	// structurally, receive mode stops because this is part of WAL durability.
 
-	if stor != nil {
+	if walStor != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -237,7 +237,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 				}
 			}()
 
-			u := receivesv.NewArchiveSupervisor(cfg, stor, &receivesv.Opts{
+			u := receivesv.NewArchiveSupervisor(cfg, walStor, &receivesv.Opts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
@@ -318,20 +318,20 @@ func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
 	}
 }
 
-// needSupervisorLoop decides whether we actually need to boot the storage.
+// needWalArchiveSupervisorLoop decides whether we actually need to boot the storage.
 //
 // We don't need it if:
 //   - storage is localfs
 //   - no compression is configured
 //   - no encryption is configured
-func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
+func needWalArchiveSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 	if cfg.IsLocalStor() {
 		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
 			strings.TrimSpace(cfg.Storage.Encryption.Algo) != ""
 
 		if !hasCfg {
-			l.Info("supervisor loop is skipped",
-				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
+			l.Info("wal-supervisor loop is skipped",
+				slog.String("reason", "no compression/encryption configs for WAL local-storage"),
 			)
 		}
 
@@ -354,7 +354,7 @@ func initPgrw(ctx context.Context, opts *ReceiveModeOpts) (xlog.PgReceiveWal, er
 	return pgrw, nil
 }
 
-func initStorageIfRequired(
+func initWalStorageIfRequired(
 	cfg *config.Config,
 	loggr *slog.Logger,
 	opts *ReceiveModeOpts,
@@ -364,7 +364,7 @@ func initStorageIfRequired(
 
 	var stor *st.VariadicStorage
 
-	if needSupervisorLoop(cfg, loggr) {
+	if needWalArchiveSupervisorLoop(cfg, loggr) {
 		walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
 		if err != nil {
 			return nil, fmt.Errorf("convert wal segment size: %w", err)

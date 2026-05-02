@@ -25,7 +25,7 @@ func TestNeedSupervisorLoop(t *testing.T) {
 				},
 			},
 		}
-		assert.False(t, needSupervisorLoop(cfg, logger))
+		assert.False(t, needWalArchiveSupervisorLoop(cfg, logger))
 	})
 
 	t.Run("localfs-2 with no compression, encryption, retention", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestNeedSupervisorLoop(t *testing.T) {
 				},
 			},
 		}
-		assert.False(t, needSupervisorLoop(cfg, logger))
+		assert.False(t, needWalArchiveSupervisorLoop(cfg, logger))
 	})
 
 	t.Run("localfs with compression enabled", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestNeedSupervisorLoop(t *testing.T) {
 				},
 			},
 		}
-		assert.True(t, needSupervisorLoop(cfg, logger))
+		assert.True(t, needWalArchiveSupervisorLoop(cfg, logger))
 	})
 
 	t.Run("localfs with encryption enabled", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestNeedSupervisorLoop(t *testing.T) {
 				},
 			},
 		}
-		assert.True(t, needSupervisorLoop(cfg, logger))
+		assert.True(t, needWalArchiveSupervisorLoop(cfg, logger))
 	})
 
 	t.Run("non-local storage", func(t *testing.T) {
@@ -74,6 +74,6 @@ func TestNeedSupervisorLoop(t *testing.T) {
 				Name: "s3",
 			},
 		}
-		assert.True(t, needSupervisorLoop(cfg, logger))
+		assert.True(t, needWalArchiveSupervisorLoop(cfg, logger))
 	})
 }
