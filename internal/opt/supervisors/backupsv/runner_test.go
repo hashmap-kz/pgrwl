@@ -79,8 +79,7 @@ func testLogger() *slog.Logger {
 }
 
 func newTestRunner(state BackupState, retention RetentionService, creator BaseBackupCreator) BackupRunner {
-	return NewBackupRunner(BackupRunnerOpts{
-		Logger:     testLogger(),
+	return NewBackupRunner(&BackupRunnerOpts{
 		State:      state,
 		Retention:  retention,
 		Basebackup: creator,

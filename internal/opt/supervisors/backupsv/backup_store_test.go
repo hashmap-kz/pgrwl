@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/jackc/pglogrepl"
-	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/stretchr/testify/assert"
@@ -186,7 +185,9 @@ func testBackupResult(startedAt string) backupdto.Result {
 func TestBackupStoreListBackupDirs(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestStorage()
-	store := NewBackupStore(&config.Config{}, testLogger(), storage)
+	store := NewBackupStore(&BackupSupervisorOpts{
+		BasebackupStor: storage,
+	})
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 	putManifest(t, storage, "20260502070500", testBackupResult("2026-05-02T07:05:00Z"))
@@ -204,7 +205,9 @@ func TestBackupStoreListBackupDirs(t *testing.T) {
 func TestBackupStoreReadManifest(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestStorage()
-	store := NewBackupStore(&config.Config{}, testLogger(), storage)
+	store := NewBackupStore(&BackupSupervisorOpts{
+		BasebackupStor: storage,
+	})
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 
@@ -219,7 +222,9 @@ func TestBackupStoreReadManifest(t *testing.T) {
 func TestBackupStoreDeleteBackupsDeletesOnlyRequestedTopLevelDirs(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestStorage()
-	store := NewBackupStore(&config.Config{}, testLogger(), storage)
+	store := NewBackupStore(&BackupSupervisorOpts{
+		BasebackupStor: storage,
+	})
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 	putManifest(t, storage, "20260502070500", testBackupResult("2026-05-02T07:05:00Z"))
@@ -245,7 +250,9 @@ func TestBackupStoreDeleteBackupsPropagatesDeleteError(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestStorage()
 	storage.deleteDirErr = errors.New("delete failed")
-	store := NewBackupStore(&config.Config{}, testLogger(), storage)
+	store := NewBackupStore(&BackupSupervisorOpts{
+		BasebackupStor: storage,
+	})
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 
@@ -258,7 +265,7 @@ func TestBackupStoreDeleteBackupsPropagatesDeleteError(t *testing.T) {
 func TestBackupStoreDeleteBackupsAllowsUnreadableManifest(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestStorage()
-	store := NewBackupStore(&config.Config{}, testLogger(), storage)
+	store := NewBackupStore(&BackupSupervisorOpts{BasebackupStor: storage})
 
 	require.NoError(t, storage.Put(ctx, "20260502065500/20260502065500.json", strings.NewReader("not-json")))
 
@@ -271,7 +278,7 @@ func TestBackupStoreDeleteBackupsAllowsUnreadableManifest(t *testing.T) {
 func TestBackupStoreDeleteBackupsEmptyInputDoesNothing(t *testing.T) {
 	ctx := context.Background()
 	storage := newTestStorage()
-	store := NewBackupStore(&config.Config{}, testLogger(), storage)
+	store := NewBackupStore(&BackupSupervisorOpts{})
 
 	err := store.DeleteBackups(ctx, nil)
 

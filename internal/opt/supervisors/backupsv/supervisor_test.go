@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/pgrwl/pgrwl/config"
+
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,9 +46,10 @@ func (r *fakeBackupRunner) StartAsync(_ context.Context, source string) (*Backup
 
 func newSupervisorForTest(state BackupState, runner BackupRunner) *baseBackupSupervisor {
 	return &baseBackupSupervisor{
-		l:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		cfg:    &config.Config{Backup: config.BackupConfig{Cron: "* * * * *"}},
-		opts:   &Opts{},
+		l: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		opts: &BackupSupervisorOpts{
+			Cfg: &config.Config{Backup: config.BackupConfig{Cron: "* * * * *"}},
+		},
 		state:  state,
 		runner: runner,
 		cron:   cron.New(),

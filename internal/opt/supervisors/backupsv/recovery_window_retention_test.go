@@ -82,10 +82,11 @@ func (c *fakeWALCleaner) DeleteBefore(_ context.Context, keepFromWAL string) err
 
 func newRetentionForTest(cfg *config.Config, store BackupStore, cleaner WALCleaner) *recoveryWindowRetention {
 	return &recoveryWindowRetention{
-		l:           testLogger(),
-		cfg:         cfg,
-		opts:        &Opts{},
-		walSegSz:    testWalSegSz,
+		l: testLogger(),
+		opts: &BackupSupervisorOpts{
+			Cfg:      cfg,
+			WalSegSz: testWalSegSz,
+		},
 		backupStore: store,
 		walCleaner:  cleaner,
 	}
@@ -145,7 +146,11 @@ func manifestResultWithWALRange(t *testing.T, startedAt string, topTimeline int3
 }
 
 func TestRecoveryWindowRetentionBackupBeginWALDoesNotMixManifestTimelineWithInvalidManifestLSN(t *testing.T) {
-	retention := &recoveryWindowRetention{walSegSz: testWalSegSz}
+	retention := &recoveryWindowRetention{
+		opts: &BackupSupervisorOpts{
+			WalSegSz: testWalSegSz,
+		},
+	}
 
 	topLevelLSN, err := pglogrepl.ParseLSN("0/1000000")
 	require.NoError(t, err)
@@ -169,7 +174,11 @@ func TestRecoveryWindowRetentionBackupBeginWALDoesNotMixManifestTimelineWithInva
 }
 
 func TestRecoveryWindowRetentionBackupBeginWALUsesFirstValidManifestWALRange(t *testing.T) {
-	retention := &recoveryWindowRetention{walSegSz: testWalSegSz}
+	retention := &recoveryWindowRetention{
+		opts: &BackupSupervisorOpts{
+			WalSegSz: testWalSegSz,
+		},
+	}
 
 	topLevelLSN, err := pglogrepl.ParseLSN("0/1000000")
 	require.NoError(t, err)
@@ -197,7 +206,9 @@ func TestRecoveryWindowRetentionBackupBeginWALUsesFirstValidManifestWALRange(t *
 }
 
 func TestRecoveryWindowRetentionBackupBeginWALReturnsEmptyWhenWalSegmentSizeIsZero(t *testing.T) {
-	retention := &recoveryWindowRetention{}
+	retention := &recoveryWindowRetention{
+		opts: &BackupSupervisorOpts{WalSegSz: 0},
+	}
 
 	lsn, err := pglogrepl.ParseLSN("0/1000000")
 	require.NoError(t, err)

@@ -8,11 +8,9 @@ import (
 
 	"github.com/jackc/pglogrepl"
 
-	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
-	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type RecoveryWindowRetention interface {
@@ -21,44 +19,28 @@ type RecoveryWindowRetention interface {
 
 type recoveryWindowRetention struct {
 	l           *slog.Logger
-	cfg         *config.Config
-	opts        *Opts
-	walSegSz    uint64
+	opts        *BackupSupervisorOpts
 	backupStore BackupStore
 	walCleaner  WALCleaner
 }
 
 var _ RecoveryWindowRetention = &recoveryWindowRetention{}
 
-func NewRecoveryWindowRetention(
-	cfg *config.Config,
-	opts *Opts,
-	l *slog.Logger,
-	basebackupStor st.Storage,
-	walStor *st.VariadicStorage,
-) RecoveryWindowRetention {
-	if opts == nil {
-		opts = &Opts{}
-	}
-
-	if l == nil {
-		l = slog.With(slog.String("component", "recovery-window-retention"))
-	}
-
+func NewRecoveryWindowRetention(opts *BackupSupervisorOpts) RecoveryWindowRetention {
 	return &recoveryWindowRetention{
-		l:           l,
-		cfg:         cfg,
+		l:           slog.With(slog.String("component", "recovery-window-retention")),
 		opts:        opts,
-		walSegSz:    opts.WalSegSz,
-		backupStore: NewBackupStore(cfg, l, basebackupStor),
-		walCleaner:  NewWALCleaner(opts, l, walStor),
+		backupStore: NewBackupStore(opts),
+		walCleaner:  NewWALCleaner(opts),
 	}
 }
 
 func (r *recoveryWindowRetention) RunBeforeBackup(ctx context.Context) error {
+	cfg := r.opts.Cfg
+
 	r.l.Info("starting retention",
 		slog.String("type", "recovery-window"),
-		slog.Duration("recovery_window", r.cfg.Retention.KeepDurationParsed),
+		slog.Duration("recovery_window", cfg.Retention.KeepDurationParsed),
 	)
 
 	successful, err := r.loadSuccessfulBackups(ctx)
@@ -72,13 +54,13 @@ func (r *recoveryWindowRetention) RunBeforeBackup(ctx context.Context) error {
 	}
 
 	minimumBackups := 1
-	if r.cfg.Retention.KeepLast != nil {
-		minimumBackups = *r.cfg.Retention.KeepLast
+	if cfg.Retention.KeepLast != nil {
+		minimumBackups = *cfg.Retention.KeepLast
 	}
 
 	anchor := chooseRecoveryWindowAnchor(
 		successful,
-		r.cfg.Retention.KeepDurationParsed,
+		cfg.Retention.KeepDurationParsed,
 		minimumBackups,
 		time.Now().UTC(),
 	)
@@ -155,7 +137,8 @@ func (r *recoveryWindowRetention) loadSuccessfulBackups(ctx context.Context) ([]
 }
 
 func (r *recoveryWindowRetention) backupBeginWAL(info *backupdto.Result) string {
-	if info == nil || r.walSegSz == 0 {
+	walSegSz := r.opts.WalSegSz
+	if info == nil || walSegSz == 0 {
 		return ""
 	}
 
@@ -187,12 +170,12 @@ func (r *recoveryWindowRetention) backupBeginWAL(info *backupdto.Result) string 
 		return ""
 	}
 
-	segNo := xlog.XLByteToSeg(uint64(startLSN), r.walSegSz)
+	segNo := xlog.XLByteToSeg(uint64(startLSN), walSegSz)
 
 	return xlog.XLogFileName(
 		conv.ToUint32(timelineID),
 		segNo,
-		r.walSegSz,
+		walSegSz,
 	)
 }
 
@@ -205,7 +188,7 @@ func (r *recoveryWindowRetention) logPlan(
 	r.l.Info("recovery-window retention plan",
 		slog.String("anchor_backup", anchor.name),
 		slog.String("keep_wal_from", anchor.beginWAL),
-		slog.Duration("recovery_window", r.cfg.Retention.KeepDurationParsed),
+		slog.Duration("recovery_window", r.opts.Cfg.Retention.KeepDurationParsed),
 		slog.Int("minimum_backups", minimumBackups),
 		slog.Int("successful_backups", successfulBackups),
 		slog.Int("delete_backups", len(backupsToDelete)),

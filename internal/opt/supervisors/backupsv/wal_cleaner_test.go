@@ -28,7 +28,7 @@ func putRawObject(t *testing.T, backend st.Storage, path string) {
 
 func TestWALCleanerDeleteBeforeRejectsEmptyBoundary(t *testing.T) {
 	backend := st.NewInMemoryStorage()
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 
 	err := cleaner.DeleteBefore(context.Background(), "")
 
@@ -48,7 +48,7 @@ func TestWALCleanerDeleteBeforeDeletesOnlyWalBeforeBoundary(t *testing.T) {
 	putRawObject(t, backend, "00000002.history")
 	putRawObject(t, backend, "README.txt")
 
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 
 	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
 
@@ -84,7 +84,7 @@ func TestWALCleanerDeleteBeforeHandlesCompressedOldWal(t *testing.T) {
 	putRawObject(t, backend, "000000010000003C000000D9.zst.aes")
 	putRawObject(t, backend, "000000010000003C000000DA.lz4")
 
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 
 	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
 
@@ -111,7 +111,7 @@ func TestWALCleanerDeleteBeforeReturnsContextError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 
 	err := cleaner.DeleteBefore(ctx, "000000010000003C000000D9")
 
@@ -130,7 +130,7 @@ func TestWALCleanerDeleteBeforePropagatesDeleteError(t *testing.T) {
 	backend := &deleteFailStorage{InMemoryStorage: st.NewInMemoryStorage()}
 	putRawObject(t, backend, "000000010000003C000000D8")
 
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 
 	err := cleaner.DeleteBefore(context.Background(), "000000010000003C000000D9")
 
@@ -148,7 +148,7 @@ func (s *listFailStorage) ListInfo(_ context.Context, _ string) ([]st.FileInfo, 
 
 func TestWALCleanerDeleteBeforePropagatesListError(t *testing.T) {
 	backend := &listFailStorage{InMemoryStorage: st.NewInMemoryStorage()}
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 
 	err := cleaner.DeleteBefore(context.Background(), "000000010000003C000000D9")
 
@@ -163,7 +163,7 @@ func TestWALCleanerDeleteBeforeIgnoresNestedPathBaseName(t *testing.T) {
 	putRawObject(t, backend, "archive/000000010000003C000000D8")
 	putRawObject(t, backend, "archive/000000010000003C000000DA")
 
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 
 	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
 
@@ -192,7 +192,7 @@ func TestWALCleanerDeleteBeforeWithRawPathStillDeletesRawObject(t *testing.T) {
 	// from ListInfoRaw and passes those same raw paths to Delete.
 	require.NoError(t, backend.Put(ctx, "000000010000003C000000D8.gz.aes", strings.NewReader("x")))
 
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 	err := cleaner.DeleteBefore(ctx, "000000010000003C000000D9")
 	require.NoError(t, err)
 
@@ -212,7 +212,7 @@ func TestWALCleanerDeleteBeforeMatchesConfiguredWalArchiveSubpath(t *testing.T) 
 	putRawObject(t, backend, "000000010000003C000000DA")
 	putRawObject(t, backend, "000000010000003C000000DB")
 
-	cleaner := NewWALCleaner(&Opts{}, testLogger(), newPlainVariadicStorage(t, backend))
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
 	err := cleaner.DeleteBefore(ctx, "000000010000003C000000DA")
 	require.NoError(t, err)
 

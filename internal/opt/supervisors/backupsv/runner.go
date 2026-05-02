@@ -8,7 +8,6 @@ import (
 )
 
 type BackupRunnerOpts struct {
-	Logger     *slog.Logger
 	State      BackupState
 	Retention  RetentionService
 	Basebackup BaseBackupCreator
@@ -20,8 +19,7 @@ type BackupRunner interface {
 }
 
 type backupRunner struct {
-	l *slog.Logger
-
+	l          *slog.Logger
 	state      BackupState
 	retention  RetentionService
 	basebackup BaseBackupCreator
@@ -29,14 +27,9 @@ type backupRunner struct {
 
 var _ BackupRunner = &backupRunner{}
 
-func NewBackupRunner(opts BackupRunnerOpts) BackupRunner {
-	l := opts.Logger
-	if l == nil {
-		l = slog.With(slog.String("component", "basebackup-runner"))
-	}
-
+func NewBackupRunner(opts *BackupRunnerOpts) BackupRunner {
 	return &backupRunner{
-		l:          l,
+		l:          slog.With(slog.String("component", "basebackup-runner")),
 		state:      opts.State,
 		retention:  opts.Retention,
 		basebackup: opts.Basebackup,

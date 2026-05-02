@@ -14,9 +14,12 @@ import (
 
 var ErrBackupAlreadyRunning = errors.New("basebackup is already running")
 
-type Opts struct {
-	Directory string
-	WalSegSz  uint64
+type BackupSupervisorOpts struct {
+	Directory      string
+	WalSegSz       uint64
+	BasebackupStor st.Storage
+	WalStor        *st.VariadicStorage
+	Cfg            *config.Config
 }
 
 type BaseBackupSupervisor interface {
@@ -28,8 +31,7 @@ type BaseBackupSupervisor interface {
 
 type baseBackupSupervisor struct {
 	l      *slog.Logger
-	cfg    *config.Config
-	opts   *Opts
+	opts   *BackupSupervisorOpts
 	state  BackupState
 	runner BackupRunner
 	cron   *cron.Cron
@@ -37,47 +39,57 @@ type baseBackupSupervisor struct {
 
 var _ BaseBackupSupervisor = &baseBackupSupervisor{}
 
-func NewBaseBackupSupervisor(
-	cfg *config.Config,
-	opts *Opts,
-	basebackupStor st.Storage,
-	walStor *st.VariadicStorage,
-) BaseBackupSupervisor {
-	if opts == nil {
-		opts = &Opts{}
+func NewBaseBackupSupervisor(opts *BackupSupervisorOpts) (BaseBackupSupervisor, error) {
+	err := checkOpts(opts)
+	if err != nil {
+		return nil, err
 	}
-
-	l := slog.With(slog.String("component", "basebackup-supervisor"))
 
 	state := NewBackupState()
 
-	retention := NewRetentionService(cfg, opts, l, basebackupStor, walStor)
-	creator := &basebackupCreator{
-		Directory: opts.Directory,
-	}
-
-	runner := NewBackupRunner(BackupRunnerOpts{
-		Logger:     l,
-		State:      state,
-		Retention:  retention,
-		Basebackup: creator,
+	runner := NewBackupRunner(&BackupRunnerOpts{
+		State:     state,
+		Retention: NewRetentionService(opts),
+		Basebackup: &basebackupCreator{
+			Directory: opts.Directory,
+		},
 	})
 
 	return &baseBackupSupervisor{
-		l:      l,
-		cfg:    cfg,
+		l:      slog.With(slog.String("component", "basebackup-supervisor")),
 		opts:   opts,
 		state:  state,
 		runner: runner,
 		cron:   newBackupCron(),
+	}, nil
+}
+
+func checkOpts(opts *BackupSupervisorOpts) error {
+	if opts == nil {
+		return fmt.Errorf("backup-supervisor, opts cannot be nil")
 	}
+	if opts.Directory == "" {
+		return fmt.Errorf("backup-supervisor, opts.Directory cannot be empty")
+	}
+	if opts.WalSegSz == 0 {
+		return fmt.Errorf("backup-supervisor, opts.WalSegSz cannot be 0")
+	}
+	if opts.BasebackupStor == nil {
+		return fmt.Errorf("backup-supervisor, opts.BasebackupStor cannot be nil")
+	}
+	if opts.WalStor == nil {
+		return fmt.Errorf("backup-supervisor, opts.WalStor cannot be nil")
+	}
+	if opts.Cfg == nil {
+		return fmt.Errorf("backup-supervisor, opts.Cfg cannot be nil")
+	}
+	return nil
 }
 
 func (s *baseBackupSupervisor) log() *slog.Logger {
 	if s.l != nil {
 		return s.l
 	}
-
 	return slog.With(slog.String("component", "basebackup-supervisor"))
 }
 
@@ -93,7 +105,9 @@ func (s *baseBackupSupervisor) log() *slog.Logger {
 //   - WAL cleanup failed
 //   - panic inside a scheduled backup run
 func (s *baseBackupSupervisor) RunCron(ctx context.Context) error {
-	_, err := s.cron.AddFunc(s.cfg.Backup.Cron, func() {
+	cfg := s.opts.Cfg
+
+	_, err := s.cron.AddFunc(cfg.Backup.Cron, func() {
 		if err := s.runner.Run(ctx, "cron"); err != nil {
 			s.handleRunError("scheduled", err)
 		}
@@ -105,7 +119,7 @@ func (s *baseBackupSupervisor) RunCron(ctx context.Context) error {
 	s.cron.Start()
 
 	s.log().Info("basebackup scheduler started",
-		slog.String("cron", s.cfg.Backup.Cron),
+		slog.String("cron", cfg.Backup.Cron),
 	)
 
 	<-ctx.Done()

@@ -11,7 +11,6 @@ import (
 	"github.com/pgrwl/pgrwl/internal/core/logger"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
-	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type BackupStore interface {
@@ -27,27 +26,21 @@ type BackupStore interface {
 }
 
 type backupStore struct {
-	l              *slog.Logger
-	cfg            *config.Config
-	basebackupStor st.Storage
+	l    *slog.Logger
+	opts *BackupSupervisorOpts
 }
 
 var _ BackupStore = &backupStore{}
 
-func NewBackupStore(cfg *config.Config, l *slog.Logger, stor st.Storage) BackupStore {
-	if l == nil {
-		l = slog.With(slog.String("component", "backup-store"))
-	}
-
+func NewBackupStore(opts *BackupSupervisorOpts) BackupStore {
 	return &backupStore{
-		l:              l,
-		cfg:            cfg,
-		basebackupStor: stor,
+		l:    slog.With(slog.String("component", "backup-store")),
+		opts: opts,
 	}
 }
 
 func (s *backupStore) ListBackupDirs(ctx context.Context) (map[string]bool, error) {
-	backupDirs, err := s.basebackupStor.ListTopLevelDirs(ctx, "")
+	backupDirs, err := s.opts.BasebackupStor.ListTopLevelDirs(ctx, "")
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +63,7 @@ func (s *backupStore) ReadManifest(
 		manifestFilename,
 	))
 
-	manifestRdr, err := s.basebackupStor.Get(ctx, manifestPath)
+	manifestRdr, err := s.opts.BasebackupStor.Get(ctx, manifestPath)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +85,9 @@ func (s *backupStore) DeleteBackups(
 		return nil
 	}
 
-	backupDirs, err := s.basebackupStor.ListTopLevelDirs(ctx, "")
+	stor := s.opts.BasebackupStor
+
+	backupDirs, err := stor.ListTopLevelDirs(ctx, "")
 	if err != nil {
 		return err
 	}
@@ -125,7 +120,7 @@ func (s *backupStore) DeleteBackups(
 
 		info, readManifestErr := s.ReadManifest(ctx, backupID)
 
-		if err := s.basebackupStor.DeleteDir(ctx, backupPath); err != nil {
+		if err := stor.DeleteDir(ctx, backupPath); err != nil {
 			return fmt.Errorf("delete backup %s: %w", backupPath, err)
 		}
 

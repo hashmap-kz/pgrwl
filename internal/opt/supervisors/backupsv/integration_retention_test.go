@@ -101,7 +101,7 @@ func TestIntegrationRetentionLocaldev(t *testing.T) {
 
 	retention := NewRecoveryWindowRetention(
 		cfg,
-		&Opts{WalSegSz: walSegSz},
+		&BackupSupervisorOpts{WalSegSz: walSegSz},
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		backupStorage,
 		walStorage,

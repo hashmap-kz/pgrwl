@@ -105,10 +105,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 		return fmt.Errorf("init basebackup storage: %w", err)
 	}
 
-	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.Opts{
-		Directory: opts.ReceiveDirectory,
-		WalSegSz:  pgrw.WalSegSz(),
-	}, basebackupStor, walStor)
+	basebackupSupervisor, err := backupsv.NewBaseBackupSupervisor(&backupsv.BackupSupervisorOpts{
+		Directory:      opts.ReceiveDirectory,
+		WalSegSz:       pgrw.WalSegSz(),
+		BasebackupStor: basebackupStor,
+		WalStor:        walStor,
+		Cfg:            cfg,
+	})
+	if err != nil {
+		return fmt.Errorf("init basebackup supervisor: %w", err)
+	}
 
 	// setup metrics
 	initMetrics(ctx, cfg, loggr)

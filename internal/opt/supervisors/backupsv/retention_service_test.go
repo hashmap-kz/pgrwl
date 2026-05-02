@@ -21,29 +21,20 @@ func TestNoopRetentionReturnsContextErrorOnly(t *testing.T) {
 }
 
 func TestNewRetentionServiceReturnsNoopWhenConfigNilOrDisabled(t *testing.T) {
-	backend := st.NewInMemoryStorage()
-	walStor := newPlainVariadicStorage(t, backend)
-
-	assert.IsType(t, NoopRetention{}, NewRetentionService(nil, &Opts{}, testLogger(), backend, walStor))
-	assert.IsType(t, NoopRetention{}, NewRetentionService(&config.Config{}, &Opts{}, testLogger(), backend, walStor))
+	assert.IsType(t, NoopRetention{}, NewRetentionService(&BackupSupervisorOpts{}))
+	assert.IsType(t, NoopRetention{}, NewRetentionService(&BackupSupervisorOpts{}))
 }
 
 func TestConfiguredRetentionReturnsContextErrorBeforeDoingWork(t *testing.T) {
-	backend := st.NewInMemoryStorage()
-	walStor := newPlainVariadicStorage(t, backend)
 	retention := &ConfiguredRetention{
-		l:              testLogger(),
-		cfg:            retentionConfigForTest(),
-		opts:           &Opts{},
-		basebackupStor: backend,
-		walStor:        walStor,
+		l:    testLogger(),
+		opts: &BackupSupervisorOpts{},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	err := retention.RunBeforeBackup(ctx)
-
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
@@ -51,11 +42,11 @@ func TestConfiguredRetentionDisabledReturnsNil(t *testing.T) {
 	backend := st.NewInMemoryStorage()
 	walStor := newPlainVariadicStorage(t, backend)
 	retention := &ConfiguredRetention{
-		l:              testLogger(),
-		cfg:            &config.Config{Retention: config.RetentionConfig{Enable: false}},
-		opts:           &Opts{},
-		basebackupStor: backend,
-		walStor:        walStor,
+		l: testLogger(),
+		opts: &BackupSupervisorOpts{
+			WalStor: walStor,
+			Cfg:     &config.Config{Retention: config.RetentionConfig{Enable: false}},
+		},
 	}
 
 	err := retention.RunBeforeBackup(context.Background())
@@ -68,14 +59,14 @@ func TestConfiguredRetentionUnsupportedTypeReturnsError(t *testing.T) {
 	walStor := newPlainVariadicStorage(t, backend)
 	retention := &ConfiguredRetention{
 		l: testLogger(),
-		cfg: &config.Config{Retention: config.RetentionConfig{
-			Enable:             true,
-			Type:               "unknown",
-			KeepDurationParsed: time.Hour,
-		}},
-		opts:           &Opts{},
-		basebackupStor: backend,
-		walStor:        walStor,
+		opts: &BackupSupervisorOpts{
+			WalStor: walStor,
+			Cfg: &config.Config{Retention: config.RetentionConfig{
+				Enable:             true,
+				Type:               "unknown",
+				KeepDurationParsed: time.Hour,
+			}},
+		},
 	}
 
 	err := retention.RunBeforeBackup(context.Background())
@@ -88,11 +79,11 @@ func TestConfiguredRetentionRecoveryWindowWithEmptyStorageSucceeds(t *testing.T)
 	backend := st.NewInMemoryStorage()
 	walStor := newPlainVariadicStorage(t, backend)
 	retention := &ConfiguredRetention{
-		l:              testLogger(),
-		cfg:            retentionConfigForTest(),
-		opts:           &Opts{},
-		basebackupStor: backend,
-		walStor:        walStor,
+		l: testLogger(),
+		opts: &BackupSupervisorOpts{
+			WalStor: walStor,
+			Cfg:     &config.Config{},
+		},
 	}
 
 	err := retention.RunBeforeBackup(context.Background())

@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
-
-	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type WALCleaner interface {
@@ -15,22 +13,16 @@ type WALCleaner interface {
 }
 
 type walCleaner struct {
-	l       *slog.Logger
-	opts    *Opts
-	walStor *st.VariadicStorage
+	l    *slog.Logger
+	opts *BackupSupervisorOpts
 }
 
 var _ WALCleaner = &walCleaner{}
 
-func NewWALCleaner(opts *Opts, l *slog.Logger, walStore *st.VariadicStorage) WALCleaner {
-	if l == nil {
-		l = slog.With(slog.String("component", "wal-cleaner"))
-	}
-
+func NewWALCleaner(opts *BackupSupervisorOpts) WALCleaner {
 	return &walCleaner{
-		l:       l,
-		opts:    opts,
-		walStor: walStore,
+		l:    slog.With(slog.String("component", "wal-cleaner")),
+		opts: opts,
 	}
 }
 
@@ -39,7 +31,9 @@ func (c *walCleaner) DeleteBefore(ctx context.Context, keepFromWAL string) error
 		return fmt.Errorf("keepFromWAL is empty")
 	}
 
-	wals, err := c.walStor.ListInfoRaw(ctx, "")
+	stor := c.opts.WalStor
+
+	wals, err := stor.ListInfoRaw(ctx, "")
 	if err != nil {
 		return fmt.Errorf("list WAL archive: %w", err)
 	}
@@ -81,7 +75,7 @@ func (c *walCleaner) DeleteBefore(ctx context.Context, keepFromWAL string) error
 			slog.String("keep_from", keepFromWAL),
 		)
 
-		if err := c.walStor.Delete(ctx, wal.Path); err != nil {
+		if err := stor.Delete(ctx, wal.Path); err != nil {
 			return fmt.Errorf("delete WAL %s: %w", wal.Path, err)
 		}
 

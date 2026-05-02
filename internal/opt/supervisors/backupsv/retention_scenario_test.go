@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,7 +21,9 @@ import (
 const retentionScenarioWalSegSize = 16 * 1024 * 1024
 
 func TestRecoveryWindowRetentionBackupBeginWALConvertsLSNToSegmentNumber(t *testing.T) {
-	retention := &recoveryWindowRetention{walSegSz: retentionScenarioWalSegSize}
+	retention := &recoveryWindowRetention{
+		opts: &BackupSupervisorOpts{WalSegSz: retentionScenarioWalSegSize},
+	}
 
 	lsn, err := pglogrepl.ParseLSN("3C/D9000000")
 	require.NoError(t, err)
@@ -39,7 +39,9 @@ func TestRecoveryWindowRetentionBackupBeginWALConvertsLSNToSegmentNumber(t *test
 }
 
 func TestRecoveryWindowRetentionBackupBeginWALUsesManifestWALRange(t *testing.T) {
-	retention := &recoveryWindowRetention{walSegSz: retentionScenarioWalSegSize}
+	retention := &recoveryWindowRetention{
+		opts: &BackupSupervisorOpts{WalSegSz: retentionScenarioWalSegSize},
+	}
 
 	topLevelLSN, err := pglogrepl.ParseLSN("3C/DB000000")
 	require.NoError(t, err)
@@ -92,11 +94,12 @@ func TestRetentionScenarioDeletesOnlyBackupsOlderThanAnchorAndWALBeforeAnchor(t 
 	}
 
 	retention := NewRecoveryWindowRetention(
-		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{WalSegSz: retentionScenarioWalSegSize},
-		retentionScenarioLogger(),
-		backupStorage,
-		retentionScenarioVariadicStorage(t, walBackend),
+		&BackupSupervisorOpts{
+			WalSegSz:       retentionScenarioWalSegSize,
+			Cfg:            retentionScenarioConfig(72*time.Hour, 1),
+			BasebackupStor: backupStorage,
+			WalStor:        retentionScenarioVariadicStorage(t, walBackend),
+		},
 	)
 
 	err := retention.RunBeforeBackup(ctx)
@@ -141,11 +144,12 @@ func TestRetentionScenarioKeepLastCanMoveAnchorEarlierForDurability(t *testing.T
 	// Without KeepLast=3, the anchor would be 20260425065500. KeepLast=3 moves
 	// it earlier to 20260424065500 so the newest 3 backups remain recoverable.
 	retention := NewRecoveryWindowRetention(
-		retentionScenarioConfig(72*time.Hour, 3),
-		&Opts{WalSegSz: retentionScenarioWalSegSize},
-		retentionScenarioLogger(),
-		backupStorage,
-		retentionScenarioVariadicStorage(t, walBackend),
+		&BackupSupervisorOpts{
+			WalSegSz:       retentionScenarioWalSegSize,
+			Cfg:            retentionScenarioConfig(72*time.Hour, 3),
+			BasebackupStor: backupStorage,
+			WalStor:        retentionScenarioVariadicStorage(t, walBackend),
+		},
 	)
 
 	err := retention.RunBeforeBackup(ctx)
@@ -177,11 +181,12 @@ func TestRetentionScenarioAllBackupsNewerThanWindowKeepsAllBackupsButPurgesPreAn
 	putScenarioRaw(t, walBackend, "000000010000003C000000DA")
 
 	retention := NewRecoveryWindowRetention(
-		retentionScenarioConfig(7*24*time.Hour, 1),
-		&Opts{WalSegSz: retentionScenarioWalSegSize},
-		retentionScenarioLogger(),
-		backupStorage,
-		retentionScenarioVariadicStorage(t, walBackend),
+		&BackupSupervisorOpts{
+			WalSegSz:       retentionScenarioWalSegSize,
+			Cfg:            retentionScenarioConfig(7*24*time.Hour, 1),
+			BasebackupStor: backupStorage,
+			WalStor:        retentionScenarioVariadicStorage(t, walBackend),
+		},
 	)
 
 	err := retention.RunBeforeBackup(ctx)
@@ -220,11 +225,12 @@ func TestRetentionScenarioSkipsBrokenBackupsWithoutDeletingThem(t *testing.T) {
 	putScenarioRaw(t, walBackend, "000000010000003C000000DA")
 
 	retention := NewRecoveryWindowRetention(
-		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{WalSegSz: retentionScenarioWalSegSize},
-		retentionScenarioLogger(),
-		backupStorage,
-		retentionScenarioVariadicStorage(t, walBackend),
+		&BackupSupervisorOpts{
+			WalSegSz:       retentionScenarioWalSegSize,
+			Cfg:            retentionScenarioConfig(72*time.Hour, 1),
+			BasebackupStor: backupStorage,
+			WalStor:        retentionScenarioVariadicStorage(t, walBackend),
+		},
 	)
 
 	err := retention.RunBeforeBackup(ctx)
@@ -254,11 +260,12 @@ func TestRetentionScenarioBackupDeleteFailureStopsBeforeWALCleanup(t *testing.T)
 	putScenarioRaw(t, walBackend, "000000010000003C000000D9")
 
 	retention := NewRecoveryWindowRetention(
-		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{WalSegSz: retentionScenarioWalSegSize},
-		retentionScenarioLogger(),
-		backupStorage,
-		retentionScenarioVariadicStorage(t, walBackend),
+		&BackupSupervisorOpts{
+			WalSegSz:       retentionScenarioWalSegSize,
+			Cfg:            retentionScenarioConfig(72*time.Hour, 1),
+			BasebackupStor: backupStorage,
+			WalStor:        retentionScenarioVariadicStorage(t, walBackend),
+		},
 	)
 
 	err := retention.RunBeforeBackup(ctx)
@@ -285,11 +292,12 @@ func TestRetentionScenarioWALDeleteFailureReturnsErrorAfterBackupDelete(t *testi
 	putScenarioRaw(t, walBackend, "000000010000003C000000D9")
 
 	retention := NewRecoveryWindowRetention(
-		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{WalSegSz: retentionScenarioWalSegSize},
-		retentionScenarioLogger(),
-		backupStorage,
-		retentionScenarioVariadicStorage(t, walBackend),
+		&BackupSupervisorOpts{
+			WalSegSz:       retentionScenarioWalSegSize,
+			Cfg:            retentionScenarioConfig(72*time.Hour, 1),
+			BasebackupStor: backupStorage,
+			WalStor:        retentionScenarioVariadicStorage(t, walBackend),
+		},
 	)
 
 	err := retention.RunBeforeBackup(ctx)
@@ -314,10 +322,6 @@ func retentionScenarioConfig(window time.Duration, keepLast int) *config.Config 
 			KeepLast:           &keepLast,
 		},
 	}
-}
-
-func retentionScenarioLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func retentionScenarioVariadicStorage(t *testing.T, backend st.Storage) *st.VariadicStorage {
