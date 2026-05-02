@@ -16,8 +16,8 @@ debug_config:
   enable_pprof: true
 
 log:
-  level: trace
-  format: text
+  level: debug
+  format: pretty
   add_source: true
 
 storage:

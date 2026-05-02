@@ -1,4 +1,4 @@
-package servemode
+package serveapi
 
 import (
 	"context"
@@ -19,35 +19,30 @@ type Service interface {
 	GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error)
 }
 
-type serveModeSvc struct {
+type svc struct {
 	l       *slog.Logger
 	baseDir string
 	storage *st.VariadicStorage
 }
 
-var _ Service = &serveModeSvc{}
+var _ Service = &svc{}
 
-type ServeServiceOpts struct {
-	BaseDir string
-	Storage *st.VariadicStorage
-}
-
-func NewServeModeService(opts *ServeServiceOpts) Service {
-	return &serveModeSvc{
+func NewService(opts *Opts) Service {
+	return &svc{
 		l:       slog.With("component", "serve-service"),
 		baseDir: opts.BaseDir,
 		storage: opts.Storage,
 	}
 }
 
-func (s *serveModeSvc) log() *slog.Logger {
+func (s *svc) log() *slog.Logger {
 	if s.l != nil {
 		return s.l
 	}
 	return slog.With("component", "serve-service")
 }
 
-func (s *serveModeSvc) GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error) {
+func (s *svc) GetWalFile(ctx context.Context, filename string) (io.ReadCloser, error) {
 	// 1) Fast-path: check that file exists locally
 	// 2) Check *.partial file locally
 	// 3) Fetch from storage (if it's not nil)

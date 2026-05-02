@@ -5,25 +5,29 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
+
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/backupapi"
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi/receiveapi"
+
+	"github.com/pgrwl/pgrwl/internal/opt/api/streamapi"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/core/conv"
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/api"
-	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode"
-	"github.com/pgrwl/pgrwl/internal/opt/api/backupmode/manualbackup"
-	receiveAPI "github.com/pgrwl/pgrwl/internal/opt/api/receivemode"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/backupmetrics"
 	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsv"
 	"github.com/pgrwl/pgrwl/internal/opt/supervisors/receivesv"
 )
+
+const shutdownTimeout = 30 * time.Second
 
 type ReceiveModeOpts struct {
 	ReceiveDirectory string
@@ -91,31 +95,17 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//////////////////////////////////////////////////////////////////////
 	// Init receive/archive dependencies before starting goroutines.
 
-	stor, err := initStorageIfRequired(cfg, loggr, opts, pgrw)
+	walStor, err := initWalStorageIfRequired(cfg, loggr, opts, pgrw)
 	if err != nil {
 		return fmt.Errorf("init storage: %w", err)
 	}
 
+	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.Opts{
+		Directory: opts.ReceiveDirectory,
+	})
+
 	// setup metrics
 	initMetrics(ctx, cfg, loggr)
-
-	//////////////////////////////////////////////////////////////////////
-	// Init optional basebackup components.
-	//
-	// In merged receive+backup mode:
-	//   - basebackup cron supervisor is optional/non-critical
-	//   - manual basebackup API is available through the same HTTP server
-	//   - cron and manual backup share the same backup gate
-
-	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.BaseBackupSupervisorOpts{
-		Directory: opts.ReceiveDirectory,
-	})
-
-	manualBackupSvc := manualbackup.New(manualbackup.Options{
-		Gate:      basebackupSupervisor,
-		Directory: opts.ReceiveDirectory,
-		AppCtx:    ctx,
-	})
 
 	var wg sync.WaitGroup
 
@@ -202,12 +192,19 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 			}
 		}()
 
-		handlers := initMergedReceiveHTTPHandler(&mergedReceiveHTTPOpts{
-			Cfg:                 cfg,
-			PGRW:                pgrw,
-			BaseDir:             opts.ReceiveDirectory,
-			Storage:             stor,
-			ManualBackupService: manualBackupSvc,
+		handlers := streamapi.Init(&streamapi.Opts{
+			Receive: &receiveapi.Opts{
+				PGRW:    pgrw,
+				BaseDir: opts.ReceiveDirectory,
+				Storage: walStor,
+				Cfg:     cfg,
+			},
+			Backup: &backupapi.Opts{
+				Gate:      basebackupSupervisor,
+				Directory: opts.ReceiveDirectory,
+				AppCtx:    ctx,
+			},
+			Cfg: cfg,
 		})
 
 		srv := api.NewHTTPServer(opts.ListenPort, handlers)
@@ -226,10 +223,10 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	//
 	// Run this goroutine only when storage is required.
 	//
-	// This remains critical. If storage/upload/retention supervisor fails
+	// This remains critical. If storage/upload supervisor fails
 	// structurally, receive mode stops because this is part of WAL durability.
 
-	if stor != nil {
+	if walStor != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -240,7 +237,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 				}
 			}()
 
-			u := receivesv.NewArchiveSupervisor(cfg, stor, &receivesv.ArchiveSupervisorOpts{
+			u := receivesv.NewArchiveSupervisor(cfg, walStor, &receivesv.Opts{
 				ReceiveDirectory: opts.ReceiveDirectory,
 				PGRW:             pgrw,
 			})
@@ -279,7 +276,16 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 
 	loggr.Info("shutting down, waiting for goroutines...")
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(shutdownTimeout):
+		return fmt.Errorf("shutdown timeout: some goroutines did not stop")
+	}
 
 	// A fatal error may have appeared while goroutines were shutting down.
 	select {
@@ -304,79 +310,28 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 	return runErr
 }
 
-type mergedReceiveHTTPOpts struct {
-	Cfg                 *config.Config
-	PGRW                xlog.PgReceiveWal
-	BaseDir             string
-	Storage             *st.VariadicStorage
-	ManualBackupService backupmode.BackupController
-}
-
-func initMergedReceiveHTTPHandler(opts *mergedReceiveHTTPOpts) http.Handler {
-	receiveHandlers := receiveAPI.Init(&receiveAPI.Opts{
-		PGRW:    opts.PGRW,
-		BaseDir: opts.BaseDir,
-		Storage: opts.Storage,
-		Cfg:     opts.Cfg,
-	})
-
-	backupHandlers := backupmode.Init(&backupmode.Opts{
-		Cfg:        opts.Cfg,
-		Controller: opts.ManualBackupService,
-	})
-
-	mux := http.NewServeMux()
-
-	// Exact endpoint:
-	//   POST /api/v1/basebackup
-	//   GET  /api/v1/basebackup
-	mux.Handle("/api/v1/basebackup", backupHandlers)
-
-	// Subtree endpoints:
-	//   GET /api/v1/basebackup/status
-	//   GET /api/v1/basebackup/health
-	mux.Handle("/api/v1/basebackup/", backupHandlers)
-
-	// Everything else remains receive-mode API:
-	//   /healthz
-	//   /api/v1/status
-	//   /api/v1/brief-config
-	//   /api/v1/snapshot
-	//   /api/v1/wals
-	//   /api/v1/backups
-	//   /api/v1/wal-before/{filename}
-	//   /metrics, if enabled by optional handlers
-	mux.Handle("/", receiveHandlers)
-
-	return mux
-}
-
 func initMetrics(ctx context.Context, cfg *config.Config, loggr *slog.Logger) {
 	if cfg.Metrics.Enable {
 		loggr.Debug("init prom metrics")
-
 		receivemetrics.InitPromMetrics(ctx)
-
-		// In merged receive+backup mode, expose backup metrics through the same
-		// HTTP server/Prometheus registry as receive metrics.
 		backupmetrics.InitPromMetrics(ctx)
 	}
 }
 
-// needSupervisorLoop decides whether we actually need to boot the storage.
+// needWalArchiveSupervisorLoop decides whether we actually need to boot the storage.
 //
 // We don't need it if:
 //   - storage is localfs
 //   - no compression is configured
 //   - no encryption is configured
-func needSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
+func needWalArchiveSupervisorLoop(cfg *config.Config, l *slog.Logger) bool {
 	if cfg.IsLocalStor() {
 		hasCfg := strings.TrimSpace(cfg.Storage.Compression.Algo) != "" ||
 			strings.TrimSpace(cfg.Storage.Encryption.Algo) != ""
 
 		if !hasCfg {
-			l.Info("supervisor loop is skipped",
-				slog.String("reason", "no compression/encryption or retention configs for local-storage"),
+			l.Info("wal-supervisor loop is skipped",
+				slog.String("reason", "no compression/encryption configs for WAL local-storage"),
 			)
 		}
 
@@ -399,7 +354,7 @@ func initPgrw(ctx context.Context, opts *ReceiveModeOpts) (xlog.PgReceiveWal, er
 	return pgrw, nil
 }
 
-func initStorageIfRequired(
+func initWalStorageIfRequired(
 	cfg *config.Config,
 	loggr *slog.Logger,
 	opts *ReceiveModeOpts,
@@ -409,7 +364,7 @@ func initStorageIfRequired(
 
 	var stor *st.VariadicStorage
 
-	if needSupervisorLoop(cfg, loggr) {
+	if needWalArchiveSupervisorLoop(cfg, loggr) {
 		walSegSz, err := conv.Uint64ToInt64(pgrw.WalSegSz())
 		if err != nil {
 			return nil, fmt.Errorf("convert wal segment size: %w", err)

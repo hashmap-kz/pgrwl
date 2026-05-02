@@ -1,4 +1,4 @@
-package servemode
+package serveapi
 
 import (
 	"log/slog"
@@ -7,7 +7,7 @@ import (
 	"github.com/pgrwl/pgrwl/internal/opt/api/middleware"
 )
 
-func initHandlers(controller *ServeController) http.Handler {
+func initHandlers(controller *Handler) http.Handler {
 	l := slog.With("component", "serve-api")
 
 	// init middlewares

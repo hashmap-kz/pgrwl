@@ -48,21 +48,21 @@ type BackupRunState struct {
 	LastError  string          `json:"last_error,omitempty"`
 }
 
-type BaseBackupSupervisorOpts struct {
+type Opts struct {
 	Directory string
 }
 
 type BaseBackupSupervisor struct {
 	l             *slog.Logger
 	cfg           *config.Config
-	opts          *BaseBackupSupervisorOpts
+	opts          *Opts
 	backupRunning tryMutex
 
 	stateMu sync.RWMutex
 	state   BackupRunState
 }
 
-func NewBaseBackupSupervisor(cfg *config.Config, opts *BaseBackupSupervisorOpts) *BaseBackupSupervisor {
+func NewBaseBackupSupervisor(cfg *config.Config, opts *Opts) *BaseBackupSupervisor {
 	return &BaseBackupSupervisor{
 		l:    slog.With(slog.String("component", "basebackup-supervisor")),
 		cfg:  cfg,

@@ -81,7 +81,7 @@ func TestArchiveSupervisor_PerformUploads(t *testing.T) {
 	}
 
 	stor := stormock.NewInMemoryStorage()
-	sup := NewArchiveSupervisor(cfg, stor, &ArchiveSupervisorOpts{
+	sup := NewArchiveSupervisor(cfg, stor, &Opts{
 		ReceiveDirectory: dir,
 		PGRW:             mockPGRW,
 	})
@@ -111,7 +111,7 @@ func TestArchiveSupervisor_UploadOneFile(t *testing.T) {
 
 	stor := stormock.NewInMemoryStorage()
 	cfg := &config.Config{}
-	sup := NewArchiveSupervisor(cfg, stor, &ArchiveSupervisorOpts{})
+	sup := NewArchiveSupervisor(cfg, stor, &Opts{})
 
 	err := sup.uploadOneFile(ctx, uploadBundle{walFilePath: walFile})
 	assert.NoError(t, err)
