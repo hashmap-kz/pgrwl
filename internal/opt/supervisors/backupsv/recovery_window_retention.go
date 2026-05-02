@@ -187,9 +187,11 @@ func (r *recoveryWindowRetention) backupBeginWAL(
 		return ""
 	}
 
+	segNo := xlog.XLByteToSeg(uint64(startLSN), startupInfo.WalSegSz)
+
 	return xlog.XLogFileName(
 		conv.ToUint32(timelineID),
-		uint64(startLSN),
+		segNo,
 		startupInfo.WalSegSz,
 	)
 }

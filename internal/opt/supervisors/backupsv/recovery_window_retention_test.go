@@ -168,6 +168,7 @@ func TestRecoveryWindowRetentionLoadSuccessfulBackupsSkipsUnreadableAndInvalidBa
 
 func TestRecoveryWindowRetentionBackupBeginWALUsesManifestWALRangeWhenPresent(t *testing.T) {
 	retention := newRetentionForTest(retentionConfigForTest(), newFakeBackupStore(), &fakeWALCleaner{})
+
 	info := manifestResultWithWALRange(
 		t,
 		"2026-04-29T12:00:00Z",
@@ -177,9 +178,14 @@ func TestRecoveryWindowRetentionBackupBeginWALUsesManifestWALRangeWhenPresent(t 
 		2,
 	)
 
-	got := retention.backupBeginWAL(info, testStartupInfo())
+	startupInfo := testStartupInfo()
 
-	assert.Equal(t, xlog.XLogFileName(2, uint64(pglogrepl.LSN(0x3000000)), testStartupInfo().WalSegSz), got)
+	got := retention.backupBeginWAL(info, startupInfo)
+
+	segNo := xlog.XLByteToSeg(uint64(pglogrepl.LSN(0x3000000)), startupInfo.WalSegSz)
+	expected := xlog.XLogFileName(2, segNo, startupInfo.WalSegSz)
+
+	assert.Equal(t, expected, got)
 }
 
 func TestRecoveryWindowRetentionRunBeforeBackupDeletesOldBackupsThenCleansWAL(t *testing.T) {
