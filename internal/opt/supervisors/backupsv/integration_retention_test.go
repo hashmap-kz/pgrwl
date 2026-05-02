@@ -20,20 +20,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 // TestIntegrationRetentionLocaldev exercises the real recovery-window
-// retention path against:
-//   - a local PostgreSQL instance, used to read the real WAL segment size;
-//   - a local SeaweedFS S3 gateway, used through the real S3 storage backend.
+// retention path against a local SeaweedFS S3 gateway, used through the real
+// S3 storage backend.
 //
 // It intentionally writes objects using the real pgrwl layout:
 //
@@ -47,10 +44,7 @@ func TestIntegrationRetentionLocaldev(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
-	startupInfo := loadPostgresStartupInfoForIntegration(t, ctx, env.pgConn)
-	if startupInfo.WalSegSz == 0 {
-		t.Fatal("PostgreSQL returned zero WAL segment size")
-	}
+	walSegSz := uint64(16 * 1024 * 1024)
 
 	s3Client := newIntegrationS3Client(t, ctx, env)
 	ensureIntegrationBucket(t, ctx, s3Client, env.bucket)
@@ -107,13 +101,13 @@ func TestIntegrationRetentionLocaldev(t *testing.T) {
 
 	retention := NewRecoveryWindowRetention(
 		cfg,
-		&Opts{},
+		&Opts{WalSegSz: walSegSz},
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		backupStorage,
 		walStorage,
 	)
 
-	err = retention.RunBeforeBackup(ctx, startupInfo)
+	err = retention.RunBeforeBackup(ctx)
 	require.NoError(t, err)
 
 	assertIntegrationMissing(t, ctx, backupStorage, "20260502065500/20260502065500.json")
@@ -138,7 +132,6 @@ func TestIntegrationRetentionLocaldev(t *testing.T) {
 }
 
 type retentionIntegrationEnv struct {
-	pgConn           string
 	s3Endpoint       string
 	s3AccessKey      string
 	s3SecretKey      string
@@ -151,11 +144,9 @@ type retentionIntegrationEnv struct {
 func loadRetentionIntegrationEnv(t *testing.T) retentionIntegrationEnv {
 	t.Helper()
 
-	pgConn := "postgres://postgres:postgres@127.0.0.1:15432/postgres?sslmode=disable"
 	s3Endpoint := "http://127.0.0.1:8333"
 
 	return retentionIntegrationEnv{
-		pgConn:           pgConn,
 		s3Endpoint:       s3Endpoint,
 		s3AccessKey:      "pgrwl",
 		s3SecretKey:      "pgrwl-secret",
@@ -164,20 +155,6 @@ func loadRetentionIntegrationEnv(t *testing.T) retentionIntegrationEnv {
 		usePathStyle:     true,
 		disableTLSVerify: true,
 	}
-}
-
-func loadPostgresStartupInfoForIntegration(t *testing.T, ctx context.Context, pgConnString string) *xlog.StartupInfo {
-	t.Helper()
-
-	conn, err := pgconn.Connect(ctx, pgConnString)
-	require.NoError(t, err)
-	defer func() { _ = conn.Close(context.Background()) }()
-
-	startupInfo, err := xlog.GetStartupInfo(conn)
-	require.NoError(t, err)
-	require.NotNil(t, startupInfo)
-
-	return startupInfo
 }
 
 func newIntegrationS3Client(t *testing.T, ctx context.Context, env retentionIntegrationEnv) *s3.Client {

@@ -6,23 +6,23 @@ import (
 	"log/slog"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
 type RetentionService interface {
-	RunBeforeBackup(ctx context.Context, startupInfo *xlog.StartupInfo) error
+	RunBeforeBackup(ctx context.Context) error
 }
 
 type NoopRetention struct{}
 
-func (NoopRetention) RunBeforeBackup(ctx context.Context, _ *xlog.StartupInfo) error {
+func (NoopRetention) RunBeforeBackup(ctx context.Context) error {
 	return ctx.Err()
 }
 
 func NewRetentionService(
 	cfg *config.Config,
-	opts *Opts, l *slog.Logger,
+	opts *Opts,
+	l *slog.Logger,
 	basebackupStor st.Storage,
 	walStor *st.VariadicStorage,
 ) RetentionService {
@@ -55,10 +55,7 @@ func (r *ConfiguredRetention) log() *slog.Logger {
 	return slog.With(slog.String("component", "basebackup-retention"))
 }
 
-func (r *ConfiguredRetention) RunBeforeBackup(
-	ctx context.Context,
-	startupInfo *xlog.StartupInfo,
-) error {
+func (r *ConfiguredRetention) RunBeforeBackup(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -70,7 +67,7 @@ func (r *ConfiguredRetention) RunBeforeBackup(
 	switch r.cfg.Retention.Type {
 	case config.RetentionTypeRecoveryWindow:
 		retention := NewRecoveryWindowRetention(r.cfg, r.opts, r.log(), r.basebackupStor, r.walStor)
-		return retention.RunBeforeBackup(ctx, startupInfo)
+		return retention.RunBeforeBackup(ctx)
 
 	default:
 		return fmt.Errorf(

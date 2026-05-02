@@ -14,7 +14,6 @@ import (
 
 	"github.com/jackc/pglogrepl"
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backupdto"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +23,7 @@ import (
 const retentionScenarioWalSegSize = 16 * 1024 * 1024
 
 func TestRecoveryWindowRetentionBackupBeginWALConvertsLSNToSegmentNumber(t *testing.T) {
-	retention := &recoveryWindowRetention{}
+	retention := &recoveryWindowRetention{walSegSz: retentionScenarioWalSegSize}
 
 	lsn, err := pglogrepl.ParseLSN("3C/D9000000")
 	require.NoError(t, err)
@@ -34,17 +33,13 @@ func TestRecoveryWindowRetentionBackupBeginWALConvertsLSNToSegmentNumber(t *test
 		StartLSN:   lsn,
 	}
 
-	startupInfo := &xlog.StartupInfo{
-		WalSegSz: 16 * 1024 * 1024,
-	}
-
-	got := retention.backupBeginWAL(info, startupInfo)
+	got := retention.backupBeginWAL(info)
 
 	assert.Equal(t, "000000010000003C000000D9", got)
 }
 
 func TestRecoveryWindowRetentionBackupBeginWALUsesManifestWALRange(t *testing.T) {
-	retention := &recoveryWindowRetention{}
+	retention := &recoveryWindowRetention{walSegSz: retentionScenarioWalSegSize}
 
 	topLevelLSN, err := pglogrepl.ParseLSN("3C/DB000000")
 	require.NoError(t, err)
@@ -63,11 +58,7 @@ func TestRecoveryWindowRetentionBackupBeginWALUsesManifestWALRange(t *testing.T)
 		},
 	}
 
-	startupInfo := &xlog.StartupInfo{
-		WalSegSz: 16 * 1024 * 1024,
-	}
-
-	got := retention.backupBeginWAL(info, startupInfo)
+	got := retention.backupBeginWAL(info)
 
 	assert.Equal(t, "000000010000003C000000D9", got)
 }
@@ -102,13 +93,13 @@ func TestRetentionScenarioDeletesOnlyBackupsOlderThanAnchorAndWALBeforeAnchor(t 
 
 	retention := NewRecoveryWindowRetention(
 		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{},
+		&Opts{WalSegSz: retentionScenarioWalSegSize},
 		retentionScenarioLogger(),
 		backupStorage,
 		retentionScenarioVariadicStorage(t, walBackend),
 	)
 
-	err := retention.RunBeforeBackup(ctx, retentionScenarioStartupInfo())
+	err := retention.RunBeforeBackup(ctx)
 	require.NoError(t, err)
 
 	assertScenarioMissing(t, backupStorage, "20260422065500/20260422065500.json")
@@ -151,13 +142,13 @@ func TestRetentionScenarioKeepLastCanMoveAnchorEarlierForDurability(t *testing.T
 	// it earlier to 20260424065500 so the newest 3 backups remain recoverable.
 	retention := NewRecoveryWindowRetention(
 		retentionScenarioConfig(72*time.Hour, 3),
-		&Opts{},
+		&Opts{WalSegSz: retentionScenarioWalSegSize},
 		retentionScenarioLogger(),
 		backupStorage,
 		retentionScenarioVariadicStorage(t, walBackend),
 	)
 
-	err := retention.RunBeforeBackup(ctx, retentionScenarioStartupInfo())
+	err := retention.RunBeforeBackup(ctx)
 	require.NoError(t, err)
 
 	assertScenarioMissing(t, backupStorage, "20260422065500/20260422065500.json")
@@ -187,13 +178,13 @@ func TestRetentionScenarioAllBackupsNewerThanWindowKeepsAllBackupsButPurgesPreAn
 
 	retention := NewRecoveryWindowRetention(
 		retentionScenarioConfig(7*24*time.Hour, 1),
-		&Opts{},
+		&Opts{WalSegSz: retentionScenarioWalSegSize},
 		retentionScenarioLogger(),
 		backupStorage,
 		retentionScenarioVariadicStorage(t, walBackend),
 	)
 
-	err := retention.RunBeforeBackup(ctx, retentionScenarioStartupInfo())
+	err := retention.RunBeforeBackup(ctx)
 	require.NoError(t, err)
 
 	// All backups are newer than the recovery window start. The oldest successful
@@ -230,13 +221,13 @@ func TestRetentionScenarioSkipsBrokenBackupsWithoutDeletingThem(t *testing.T) {
 
 	retention := NewRecoveryWindowRetention(
 		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{},
+		&Opts{WalSegSz: retentionScenarioWalSegSize},
 		retentionScenarioLogger(),
 		backupStorage,
 		retentionScenarioVariadicStorage(t, walBackend),
 	)
 
-	err := retention.RunBeforeBackup(ctx, retentionScenarioStartupInfo())
+	err := retention.RunBeforeBackup(ctx)
 	require.NoError(t, err)
 
 	assertScenarioExists(t, backupStorage, "20260401065500/20260401065500.json")
@@ -264,13 +255,13 @@ func TestRetentionScenarioBackupDeleteFailureStopsBeforeWALCleanup(t *testing.T)
 
 	retention := NewRecoveryWindowRetention(
 		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{},
+		&Opts{WalSegSz: retentionScenarioWalSegSize},
 		retentionScenarioLogger(),
 		backupStorage,
 		retentionScenarioVariadicStorage(t, walBackend),
 	)
 
-	err := retention.RunBeforeBackup(ctx, retentionScenarioStartupInfo())
+	err := retention.RunBeforeBackup(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "purge old backups")
 
@@ -295,13 +286,13 @@ func TestRetentionScenarioWALDeleteFailureReturnsErrorAfterBackupDelete(t *testi
 
 	retention := NewRecoveryWindowRetention(
 		retentionScenarioConfig(72*time.Hour, 1),
-		&Opts{},
+		&Opts{WalSegSz: retentionScenarioWalSegSize},
 		retentionScenarioLogger(),
 		backupStorage,
 		retentionScenarioVariadicStorage(t, walBackend),
 	)
 
-	err := retention.RunBeforeBackup(ctx, retentionScenarioStartupInfo())
+	err := retention.RunBeforeBackup(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "purge old WALs")
 
@@ -327,10 +318,6 @@ func retentionScenarioConfig(window time.Duration, keepLast int) *config.Config 
 
 func retentionScenarioLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
-}
-
-func retentionScenarioStartupInfo() *xlog.StartupInfo {
-	return &xlog.StartupInfo{WalSegSz: retentionScenarioWalSegSize}
 }
 
 func retentionScenarioVariadicStorage(t *testing.T, backend st.Storage) *st.VariadicStorage {

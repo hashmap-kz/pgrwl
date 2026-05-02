@@ -107,6 +107,7 @@ func RunReceiveMode(opts *ReceiveModeOpts) error {
 
 	basebackupSupervisor := backupsv.NewBaseBackupSupervisor(cfg, &backupsv.Opts{
 		Directory: opts.ReceiveDirectory,
+		WalSegSz:  pgrw.WalSegSz(),
 	}, basebackupStor, walStor)
 
 	// setup metrics

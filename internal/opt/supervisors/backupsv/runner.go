@@ -5,24 +5,18 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
-	"sync"
-
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 )
 
 type BackupRunnerOpts struct {
-	Logger      *slog.Logger
-	State       BackupState
-	Retention   RetentionService
-	Basebackup  BaseBackupCreator
-	StartupInfo *xlog.StartupInfo
+	Logger     *slog.Logger
+	State      BackupState
+	Retention  RetentionService
+	Basebackup BaseBackupCreator
 }
 
 type BackupRunner interface {
 	Run(ctx context.Context, source string) error
 	StartAsync(ctx context.Context, source string) (*BackupRunState, error)
-	SetStartupInfo(info *xlog.StartupInfo)
-	StartupInfo() *xlog.StartupInfo
 }
 
 type backupRunner struct {
@@ -31,9 +25,6 @@ type backupRunner struct {
 	state      BackupState
 	retention  RetentionService
 	basebackup BaseBackupCreator
-
-	startupMu   sync.RWMutex
-	startupInfo *xlog.StartupInfo
 }
 
 var _ BackupRunner = &backupRunner{}
@@ -45,25 +36,11 @@ func NewBackupRunner(opts BackupRunnerOpts) BackupRunner {
 	}
 
 	return &backupRunner{
-		l:           l,
-		state:       opts.State,
-		retention:   opts.Retention,
-		basebackup:  opts.Basebackup,
-		startupInfo: opts.StartupInfo,
+		l:          l,
+		state:      opts.State,
+		retention:  opts.Retention,
+		basebackup: opts.Basebackup,
 	}
-}
-
-func (r *backupRunner) SetStartupInfo(info *xlog.StartupInfo) {
-	r.startupMu.Lock()
-	r.startupInfo = info
-	r.startupMu.Unlock()
-}
-
-func (r *backupRunner) StartupInfo() *xlog.StartupInfo {
-	r.startupMu.RLock()
-	defer r.startupMu.RUnlock()
-
-	return r.startupInfo
 }
 
 func (r *backupRunner) Run(ctx context.Context, source string) error {
@@ -95,10 +72,6 @@ func (r *backupRunner) StartAsync(ctx context.Context, source string) (*BackupRu
 func (r *backupRunner) reserve(ctx context.Context, source string) (*BackupRunState, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
-	}
-
-	if r.StartupInfo() == nil {
-		return nil, fmt.Errorf("startup info is not loaded")
 	}
 
 	if !r.state.Begin(source) {
@@ -133,12 +106,7 @@ func (r *backupRunner) runReserved(ctx context.Context, source string) (err erro
 		slog.String("source", source),
 	)
 
-	startupInfo := r.StartupInfo()
-	if startupInfo == nil {
-		return fmt.Errorf("startup info is not loaded")
-	}
-
-	if err := r.retention.RunBeforeBackup(ctx, startupInfo); err != nil {
+	if err := r.retention.RunBeforeBackup(ctx); err != nil {
 		return fmt.Errorf("retention before basebackup: %w", err)
 	}
 

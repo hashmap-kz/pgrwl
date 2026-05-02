@@ -9,7 +9,6 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
@@ -17,6 +16,7 @@ var ErrBackupAlreadyRunning = errors.New("basebackup is already running")
 
 type Opts struct {
 	Directory string
+	WalSegSz  uint64
 }
 
 type BaseBackupSupervisor interface {
@@ -43,6 +43,10 @@ func NewBaseBackupSupervisor(
 	basebackupStor st.Storage,
 	walStor *st.VariadicStorage,
 ) BaseBackupSupervisor {
+	if opts == nil {
+		opts = &Opts{}
+	}
+
 	l := slog.With(slog.String("component", "basebackup-supervisor"))
 
 	state := NewBackupState()
@@ -53,11 +57,10 @@ func NewBaseBackupSupervisor(
 	}
 
 	runner := NewBackupRunner(BackupRunnerOpts{
-		Logger:      l,
-		State:       state,
-		Retention:   retention,
-		Basebackup:  creator,
-		StartupInfo: nil,
+		Logger:     l,
+		State:      state,
+		Retention:  retention,
+		Basebackup: creator,
 	})
 
 	return &baseBackupSupervisor{
@@ -81,8 +84,6 @@ func (s *baseBackupSupervisor) log() *slog.Logger {
 // RunCron starts the basebackup scheduler and blocks until ctx is canceled.
 //
 // Fatal/setup errors are returned:
-//   - replication connection cannot be established
-//   - startup info cannot be loaded
 //   - cron expression is invalid
 //
 // Per-backup errors are logged and do not stop the scheduler:
@@ -92,14 +93,7 @@ func (s *baseBackupSupervisor) log() *slog.Logger {
 //   - WAL cleanup failed
 //   - panic inside a scheduled backup run
 func (s *baseBackupSupervisor) RunCron(ctx context.Context) error {
-	startupInfo, err := s.loadStartupInfo(ctx)
-	if err != nil {
-		return err
-	}
-
-	s.runner.SetStartupInfo(startupInfo)
-
-	_, err = s.cron.AddFunc(s.cfg.Backup.Cron, func() {
+	_, err := s.cron.AddFunc(s.cfg.Backup.Cron, func() {
 		if err := s.runner.Run(ctx, "cron"); err != nil {
 			s.handleRunError("scheduled", err)
 		}
@@ -164,10 +158,6 @@ func (s *baseBackupSupervisor) handleRunError(kind string, err error) {
 	default:
 		s.log().Error(kind+" basebackup run failed", slog.Any("err", err))
 	}
-}
-
-func (s *baseBackupSupervisor) loadStartupInfo(ctx context.Context) (*xlog.StartupInfo, error) {
-	return LoadStartupInfo(ctx, s.log())
 }
 
 func newBackupCron() *cron.Cron {

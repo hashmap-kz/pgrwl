@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testWalSegSz = 16 * 1024 * 1024
+
 type fakeBackupStore struct {
 	dirs      map[string]bool
 	manifests map[string]*backupdto.Result
@@ -83,6 +85,7 @@ func newRetentionForTest(cfg *config.Config, store BackupStore, cleaner WALClean
 		l:           testLogger(),
 		cfg:         cfg,
 		opts:        &Opts{},
+		walSegSz:    testWalSegSz,
 		backupStore: store,
 		walCleaner:  cleaner,
 	}
@@ -142,7 +145,7 @@ func manifestResultWithWALRange(t *testing.T, startedAt string, topTimeline int3
 }
 
 func TestRecoveryWindowRetentionBackupBeginWALDoesNotMixManifestTimelineWithInvalidManifestLSN(t *testing.T) {
-	retention := &recoveryWindowRetention{}
+	retention := &recoveryWindowRetention{walSegSz: testWalSegSz}
 
 	topLevelLSN, err := pglogrepl.ParseLSN("0/1000000")
 	require.NoError(t, err)
@@ -160,13 +163,13 @@ func TestRecoveryWindowRetentionBackupBeginWALDoesNotMixManifestTimelineWithInva
 		},
 	}
 
-	got := retention.backupBeginWAL(info, testStartupInfo())
+	got := retention.backupBeginWAL(info)
 
 	assert.Equal(t, "000000010000000000000001", got)
 }
 
 func TestRecoveryWindowRetentionBackupBeginWALUsesFirstValidManifestWALRange(t *testing.T) {
-	retention := &recoveryWindowRetention{}
+	retention := &recoveryWindowRetention{walSegSz: testWalSegSz}
 
 	topLevelLSN, err := pglogrepl.ParseLSN("0/1000000")
 	require.NoError(t, err)
@@ -188,7 +191,7 @@ func TestRecoveryWindowRetentionBackupBeginWALUsesFirstValidManifestWALRange(t *
 		},
 	}
 
-	got := retention.backupBeginWAL(info, testStartupInfo())
+	got := retention.backupBeginWAL(info)
 
 	assert.Equal(t, "000000030000000000000003", got)
 }
@@ -204,7 +207,7 @@ func TestRecoveryWindowRetentionBackupBeginWALReturnsEmptyWhenWalSegmentSizeIsZe
 		StartLSN:   lsn,
 	}
 
-	got := retention.backupBeginWAL(info, &xlog.StartupInfo{})
+	got := retention.backupBeginWAL(info)
 
 	assert.Empty(t, got)
 }
@@ -226,7 +229,7 @@ func TestRecoveryWindowRetentionLoadSuccessfulBackupsSkipsUnreadableAndInvalidBa
 
 	retention := newRetentionForTest(retentionConfigForTest(), store, &fakeWALCleaner{})
 
-	got, err := retention.loadSuccessfulBackups(context.Background(), testStartupInfo())
+	got, err := retention.loadSuccessfulBackups(context.Background())
 
 	require.NoError(t, err)
 	require.Len(t, got, 1)
@@ -246,12 +249,10 @@ func TestRecoveryWindowRetentionBackupBeginWALUsesManifestWALRangeWhenPresent(t 
 		2,
 	)
 
-	startupInfo := testStartupInfo()
+	got := retention.backupBeginWAL(info)
 
-	got := retention.backupBeginWAL(info, startupInfo)
-
-	segNo := xlog.XLByteToSeg(uint64(pglogrepl.LSN(0x3000000)), startupInfo.WalSegSz)
-	expected := xlog.XLogFileName(2, segNo, startupInfo.WalSegSz)
+	segNo := xlog.XLByteToSeg(uint64(pglogrepl.LSN(0x3000000)), testWalSegSz)
+	expected := xlog.XLogFileName(2, segNo, testWalSegSz)
 
 	assert.Equal(t, expected, got)
 }
@@ -273,7 +274,7 @@ func TestRecoveryWindowRetentionRunBeforeBackupDeletesOldBackupsThenCleansWAL(t 
 	cfg.Retention.KeepDurationParsed = 72 * time.Hour
 	retention := newRetentionForTest(cfg, store, cleaner)
 
-	err := retention.RunBeforeBackup(context.Background(), testStartupInfo())
+	err := retention.RunBeforeBackup(context.Background())
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"20260422065500"}, store.deleted)
@@ -295,7 +296,7 @@ func TestRecoveryWindowRetentionRunBeforeBackupDoesNotCleanWALIfBackupDeleteFail
 	cleaner := &fakeWALCleaner{}
 	retention := newRetentionForTest(retentionConfigForTest(), store, cleaner)
 
-	err := retention.RunBeforeBackup(context.Background(), testStartupInfo())
+	err := retention.RunBeforeBackup(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "purge old backups")
@@ -310,7 +311,7 @@ func TestRecoveryWindowRetentionRunBeforeBackupReturnsWALCleanerError(t *testing
 	cleaner := &fakeWALCleaner{err: errors.New("wal cleanup failed")}
 	retention := newRetentionForTest(retentionConfigForTest(), store, cleaner)
 
-	err := retention.RunBeforeBackup(context.Background(), testStartupInfo())
+	err := retention.RunBeforeBackup(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "purge old WALs")
@@ -322,7 +323,7 @@ func TestRecoveryWindowRetentionRunBeforeBackupSkipsWhenNoSuccessfulBackups(t *t
 	cleaner := &fakeWALCleaner{}
 	retention := newRetentionForTest(retentionConfigForTest(), store, cleaner)
 
-	err := retention.RunBeforeBackup(context.Background(), testStartupInfo())
+	err := retention.RunBeforeBackup(context.Background())
 
 	require.NoError(t, err)
 	assert.Empty(t, store.deleted)

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,13 +17,10 @@ type fakeRetentionService struct {
 	calls int
 	err   error
 	panic any
-
-	seenStartupInfo *xlog.StartupInfo
 }
 
-func (f *fakeRetentionService) RunBeforeBackup(ctx context.Context, startupInfo *xlog.StartupInfo) error {
+func (f *fakeRetentionService) RunBeforeBackup(ctx context.Context) error {
 	f.calls++
-	f.seenStartupInfo = startupInfo
 
 	if f.panic != nil {
 		panic(f.panic)
@@ -82,38 +78,18 @@ func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func testStartupInfo() *xlog.StartupInfo {
-	return &xlog.StartupInfo{WalSegSz: 16 * 1024 * 1024}
-}
-
-func newTestRunner(state BackupState, retention RetentionService, creator BaseBackupCreator, startupInfo *xlog.StartupInfo) BackupRunner {
+func newTestRunner(state BackupState, retention RetentionService, creator BaseBackupCreator) BackupRunner {
 	return NewBackupRunner(BackupRunnerOpts{
-		Logger:      testLogger(),
-		State:       state,
-		Retention:   retention,
-		Basebackup:  creator,
-		StartupInfo: startupInfo,
+		Logger:     testLogger(),
+		State:      state,
+		Retention:  retention,
+		Basebackup: creator,
 	})
-}
-
-func TestBackupRunnerRunFailsWhenStartupInfoMissing(t *testing.T) {
-	state := NewBackupState()
-	retention := &fakeRetentionService{}
-	creator := &fakeBaseBackupCreator{}
-	runner := newTestRunner(state, retention, creator, nil)
-
-	err := runner.Run(context.Background(), "manual")
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "startup info is not loaded")
-	assert.Equal(t, 0, retention.calls)
-	assert.Equal(t, 0, creator.calls)
-	assert.Equal(t, BackupRunIdle, state.Snapshot().Status)
 }
 
 func TestBackupRunnerRunFailsWhenContextAlreadyCanceled(t *testing.T) {
 	state := NewBackupState()
-	runner := newTestRunner(state, &fakeRetentionService{}, &fakeBaseBackupCreator{}, testStartupInfo())
+	runner := newTestRunner(state, &fakeRetentionService{}, &fakeBaseBackupCreator{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -128,16 +104,13 @@ func TestBackupRunnerRunSucceedsAndMarksStateSucceeded(t *testing.T) {
 	state := NewBackupState()
 	retention := &fakeRetentionService{}
 	creator := &fakeBaseBackupCreator{}
-	runner := newTestRunner(state, retention, creator, testStartupInfo())
+	runner := newTestRunner(state, retention, creator)
 
 	err := runner.Run(context.Background(), "manual")
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, retention.calls)
 	assert.Equal(t, 1, creator.calls)
-	assert.NotNil(t, retention.seenStartupInfo)
-	assert.Equal(t, uint64(16*1024*1024), retention.seenStartupInfo.WalSegSz)
-
 	snap := state.Snapshot()
 	assert.False(t, snap.Running)
 	assert.Equal(t, BackupRunSucceeded, snap.Status)
@@ -151,7 +124,7 @@ func TestBackupRunnerRunRetentionFailureSkipsBasebackupAndMarksFailed(t *testing
 	state := NewBackupState()
 	retention := &fakeRetentionService{err: errors.New("retention failed")}
 	creator := &fakeBaseBackupCreator{}
-	runner := newTestRunner(state, retention, creator, testStartupInfo())
+	runner := newTestRunner(state, retention, creator)
 
 	err := runner.Run(context.Background(), "cron")
 
@@ -170,7 +143,7 @@ func TestBackupRunnerRunBasebackupFailureMarksFailed(t *testing.T) {
 	state := NewBackupState()
 	retention := &fakeRetentionService{}
 	creator := &fakeBaseBackupCreator{err: errors.New("basebackup failed")}
-	runner := newTestRunner(state, retention, creator, testStartupInfo())
+	runner := newTestRunner(state, retention, creator)
 
 	err := runner.Run(context.Background(), "cron")
 
@@ -189,7 +162,7 @@ func TestBackupRunnerRunRecoversRetentionPanicAndMarksFailed(t *testing.T) {
 	state := NewBackupState()
 	retention := &fakeRetentionService{panic: "retention boom"}
 	creator := &fakeBaseBackupCreator{}
-	runner := newTestRunner(state, retention, creator, testStartupInfo())
+	runner := newTestRunner(state, retention, creator)
 
 	err := runner.Run(context.Background(), "cron")
 
@@ -208,7 +181,7 @@ func TestBackupRunnerRunRecoversBasebackupPanicAndMarksFailed(t *testing.T) {
 	state := NewBackupState()
 	retention := &fakeRetentionService{}
 	creator := &fakeBaseBackupCreator{panic: "creator boom"}
-	runner := newTestRunner(state, retention, creator, testStartupInfo())
+	runner := newTestRunner(state, retention, creator)
 
 	err := runner.Run(context.Background(), "cron")
 
@@ -227,7 +200,7 @@ func TestBackupRunnerRunReturnsAlreadyRunning(t *testing.T) {
 	state := NewBackupState()
 	require.True(t, state.Begin("existing"))
 
-	runner := newTestRunner(state, &fakeRetentionService{}, &fakeBaseBackupCreator{}, testStartupInfo())
+	runner := newTestRunner(state, &fakeRetentionService{}, &fakeBaseBackupCreator{})
 
 	err := runner.Run(context.Background(), "manual")
 
@@ -235,22 +208,10 @@ func TestBackupRunnerRunReturnsAlreadyRunning(t *testing.T) {
 	assert.Equal(t, "existing", state.Snapshot().Source)
 }
 
-func TestBackupRunnerStartupInfoIsSettable(t *testing.T) {
-	state := NewBackupState()
-	runner := newTestRunner(state, &fakeRetentionService{}, &fakeBaseBackupCreator{}, nil)
-
-	assert.Nil(t, runner.StartupInfo())
-
-	info := testStartupInfo()
-	runner.SetStartupInfo(info)
-
-	assert.Same(t, info, runner.StartupInfo())
-}
-
 func TestBackupRunnerStartAsyncReservesImmediatelyAndEventuallySucceeds(t *testing.T) {
 	state := NewBackupState()
 	creator := newBlockingBaseBackupCreator()
-	runner := newTestRunner(state, &fakeRetentionService{}, creator, testStartupInfo())
+	runner := newTestRunner(state, &fakeRetentionService{}, creator)
 
 	running, err := runner.StartAsync(context.Background(), "manual")
 	require.NoError(t, err)
@@ -281,7 +242,7 @@ func TestBackupRunnerStartAsyncEventuallyMarksFailure(t *testing.T) {
 	state := NewBackupState()
 	creator := newBlockingBaseBackupCreator()
 	creator.err = errors.New("async failed")
-	runner := newTestRunner(state, &fakeRetentionService{}, creator, testStartupInfo())
+	runner := newTestRunner(state, &fakeRetentionService{}, creator)
 
 	_, err := runner.StartAsync(context.Background(), "manual")
 	require.NoError(t, err)
@@ -306,7 +267,7 @@ func TestBackupRunnerStartAsyncEventuallyMarksFailure(t *testing.T) {
 func TestBackupRunnerStartAsyncRecoversPanicAndMarksFailure(t *testing.T) {
 	state := NewBackupState()
 	creator := &fakeBaseBackupCreator{panic: "async panic"}
-	runner := newTestRunner(state, &fakeRetentionService{}, creator, testStartupInfo())
+	runner := newTestRunner(state, &fakeRetentionService{}, creator)
 
 	_, err := runner.StartAsync(context.Background(), "manual")
 	require.NoError(t, err)

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/pgrwl/pgrwl/config"
-	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +20,6 @@ type fakeBackupRunner struct {
 	runErr          error
 	startAsyncErr   error
 	state           BackupRunState
-	startupInfo     *xlog.StartupInfo
 }
 
 var _ BackupRunner = (*fakeBackupRunner)(nil)
@@ -44,9 +42,6 @@ func (r *fakeBackupRunner) StartAsync(_ context.Context, source string) (*Backup
 	}
 	return &state, nil
 }
-
-func (r *fakeBackupRunner) SetStartupInfo(info *xlog.StartupInfo) { r.startupInfo = info }
-func (r *fakeBackupRunner) StartupInfo() *xlog.StartupInfo        { return r.startupInfo }
 
 func newSupervisorForTest(state BackupState, runner BackupRunner) *baseBackupSupervisor {
 	return &baseBackupSupervisor{

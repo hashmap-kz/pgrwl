@@ -16,16 +16,14 @@ import (
 )
 
 type RecoveryWindowRetention interface {
-	RunBeforeBackup(
-		ctx context.Context,
-		startupInfo *xlog.StartupInfo,
-	) error
+	RunBeforeBackup(ctx context.Context) error
 }
 
 type recoveryWindowRetention struct {
 	l           *slog.Logger
 	cfg         *config.Config
 	opts        *Opts
+	walSegSz    uint64
 	backupStore BackupStore
 	walCleaner  WALCleaner
 }
@@ -39,6 +37,10 @@ func NewRecoveryWindowRetention(
 	basebackupStor st.Storage,
 	walStor *st.VariadicStorage,
 ) RecoveryWindowRetention {
+	if opts == nil {
+		opts = &Opts{}
+	}
+
 	if l == nil {
 		l = slog.With(slog.String("component", "recovery-window-retention"))
 	}
@@ -47,21 +49,19 @@ func NewRecoveryWindowRetention(
 		l:           l,
 		cfg:         cfg,
 		opts:        opts,
+		walSegSz:    opts.WalSegSz,
 		backupStore: NewBackupStore(cfg, l, basebackupStor),
 		walCleaner:  NewWALCleaner(opts, l, walStor),
 	}
 }
 
-func (r *recoveryWindowRetention) RunBeforeBackup(
-	ctx context.Context,
-	startupInfo *xlog.StartupInfo,
-) error {
+func (r *recoveryWindowRetention) RunBeforeBackup(ctx context.Context) error {
 	r.l.Info("starting retention",
 		slog.String("type", "recovery-window"),
 		slog.Duration("recovery_window", r.cfg.Retention.KeepDurationParsed),
 	)
 
-	successful, err := r.loadSuccessfulBackups(ctx, startupInfo)
+	successful, err := r.loadSuccessfulBackups(ctx)
 	if err != nil {
 		return err
 	}
@@ -103,10 +103,7 @@ func (r *recoveryWindowRetention) RunBeforeBackup(
 	return nil
 }
 
-func (r *recoveryWindowRetention) loadSuccessfulBackups(
-	ctx context.Context,
-	startupInfo *xlog.StartupInfo,
-) ([]recoveryWindowBackup, error) {
+func (r *recoveryWindowRetention) loadSuccessfulBackups(ctx context.Context) ([]recoveryWindowBackup, error) {
 	backupDirs, err := r.backupStore.ListBackupDirs(ctx)
 	if err != nil {
 		return nil, err
@@ -136,7 +133,7 @@ func (r *recoveryWindowRetention) loadSuccessfulBackups(
 			continue
 		}
 
-		beginWAL := r.backupBeginWAL(info, startupInfo)
+		beginWAL := r.backupBeginWAL(info)
 		if beginWAL == "" {
 			r.l.Warn("backup skipped by retention because begin WAL cannot be determined",
 				slog.String("backup_id", backupID),
@@ -157,11 +154,8 @@ func (r *recoveryWindowRetention) loadSuccessfulBackups(
 	return successful, nil
 }
 
-func (r *recoveryWindowRetention) backupBeginWAL(
-	info *backupdto.Result,
-	startupInfo *xlog.StartupInfo,
-) string {
-	if info == nil || startupInfo == nil || startupInfo.WalSegSz <= 0 {
+func (r *recoveryWindowRetention) backupBeginWAL(info *backupdto.Result) string {
+	if info == nil || r.walSegSz == 0 {
 		return ""
 	}
 
@@ -193,12 +187,12 @@ func (r *recoveryWindowRetention) backupBeginWAL(
 		return ""
 	}
 
-	segNo := xlog.XLByteToSeg(uint64(startLSN), startupInfo.WalSegSz)
+	segNo := xlog.XLByteToSeg(uint64(startLSN), r.walSegSz)
 
 	return xlog.XLogFileName(
 		conv.ToUint32(timelineID),
 		segNo,
-		startupInfo.WalSegSz,
+		r.walSegSz,
 	)
 }
 
