@@ -125,7 +125,6 @@ type RetentionConfig struct {
 	Value string `json:"value,omitzero" env:"PGRWL_BACKUP_RETENTION_VALUE"`
 
 	KeepDurationParsed time.Duration `json:"-"`
-	KeepCountParsed    int64         `json:"-"`
 
 	KeepLast *int `json:"keep_last,omitzero" env:"PGRWL_BACKUP_RETENTION_KEEP_LAST"`
 }

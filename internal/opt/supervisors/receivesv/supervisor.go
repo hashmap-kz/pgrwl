@@ -3,7 +3,6 @@ package receivesv
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -11,6 +10,8 @@ import (
 	"github.com/pgrwl/pgrwl/internal/core/xlog"
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
+
+const defaultUploadInterval = 10 * time.Second
 
 type Opts struct {
 	ReceiveDirectory string
@@ -48,7 +49,8 @@ func (u *ArchiveSupervisor) log() *slog.Logger {
 func (u *ArchiveSupervisor) Run(ctx context.Context) error {
 	uploadInterval := u.cfg.Receiver.Uploader.SyncIntervalParsed
 	if uploadInterval <= 0 {
-		return fmt.Errorf("invalid upload sync interval: %s", uploadInterval)
+		uploadInterval = defaultUploadInterval
+		u.log().Info("upload interval set to default", slog.Duration("duration", defaultUploadInterval))
 	}
 
 	uploadTicker := time.NewTicker(uploadInterval)

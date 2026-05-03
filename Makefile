@@ -126,3 +126,20 @@ build-linux-ui:
 image-ui: ## Build and push Docker image to localhost:5000
 	docker buildx build -t localhost:5000/pgrwl-ui -f Dockerfile-ui .
 	docker push localhost:5000/pgrwl-ui
+
+### tags based integration tests
+
+INTEG_COMPOSE_FILE ?= test/integration/environ/docker-compose-integ-localdev.yml
+
+.PHONY: integ-up
+integ-up:
+	docker compose -f $(INTEG_COMPOSE_FILE) up -d
+
+.PHONY: test-integration-backupsv
+test-integration-backupsv:
+	go test -tags=integration_localdev ./internal/opt/supervisors/backupsv \
+		-run TestIntegrationRetentionLocaldev \
+		-count=1 -v
+
+.PHONY: integ-test-backupsv
+integ-test-backupsv: integ-up test-integration-backupsv

@@ -40,6 +40,8 @@ curl -X GET http://localhost:5000/v2/pgrwl/tags/list
   Pass: minioadmin123
   ```
 
+- pgrwl-ui: http://localhost:30272/ui
+
 ### Verification:
 
 ```

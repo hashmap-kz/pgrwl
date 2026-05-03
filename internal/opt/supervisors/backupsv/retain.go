@@ -33,8 +33,10 @@ func chooseRecoveryWindowAnchor(
 		minimumBackups = 1
 	}
 
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].startedAt.Before(backups[j].startedAt)
+	sorted := slices.Clone(backups)
+
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].startedAt.Before(sorted[j].startedAt)
 	})
 
 	windowStart := now.Add(-recoveryWindow)
@@ -43,8 +45,8 @@ func chooseRecoveryWindowAnchor(
 
 	// Barman-like recovery window:
 	// choose newest backup that started before or at window start.
-	for i := range backups {
-		if backups[i].startedAt.After(windowStart) {
+	for i := range sorted {
+		if sorted[i].startedAt.After(windowStart) {
 			continue
 		}
 
@@ -58,15 +60,16 @@ func chooseRecoveryWindowAnchor(
 	}
 
 	// Safety: keep at least minimumBackups newest backups.
-	keptCount := len(backups) - anchorIdx
+	keptCount := len(sorted) - anchorIdx
 	if keptCount < minimumBackups {
-		anchorIdx = len(backups) - minimumBackups
+		anchorIdx = len(sorted) - minimumBackups
 		if anchorIdx < 0 {
 			anchorIdx = 0
 		}
 	}
 
-	return &backups[anchorIdx]
+	anchor := sorted[anchorIdx]
+	return &anchor
 }
 
 func backupsOlderThanAnchor(backups []recoveryWindowBackup, anchor *recoveryWindowBackup) []string {

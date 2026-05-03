@@ -117,6 +117,8 @@ then run: `docker compose up -d`
 services:
   # ---------------------------------------------------------------------------
   # PostgreSQL primary
+  #
+  # psql "postgres://postgres:postgres@localhost:15432/postgres?sslmode=disable"
   # ---------------------------------------------------------------------------
 
   pg-primary:
@@ -130,7 +132,7 @@ services:
     ports:
       - "15432:5432"
     volumes:
-      - pg-primary-data:/var/lib/postgresql/17/main
+      - pg-primary-data:/var/lib/postgresql/data
     command: >
       -c config_file=/etc/postgresql/postgresql.conf
       -c hba_file=/etc/postgresql/pg_hba.conf
