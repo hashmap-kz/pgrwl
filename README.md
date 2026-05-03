@@ -117,6 +117,8 @@ then run: `docker compose up -d`
 services:
   # ---------------------------------------------------------------------------
   # PostgreSQL primary
+  #
+  # psql "postgres://postgres:postgres@localhost:15432/postgres?sslmode=disable"
   # ---------------------------------------------------------------------------
 
   pg-primary:
