@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -100,11 +98,12 @@ func TestIntegrationRetentionLocaldev(t *testing.T) {
 	}
 
 	retention := NewRecoveryWindowRetention(
-		cfg,
-		&BackupSupervisorOpts{WalSegSz: walSegSz},
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
-		backupStorage,
-		walStorage,
+		&BackupSupervisorOpts{
+			WalSegSz:       walSegSz,
+			BasebackupStor: backupStorage,
+			WalStor:        walStorage,
+			Cfg:            cfg,
+		},
 	)
 
 	err = retention.RunBeforeBackup(ctx)
