@@ -2,7 +2,7 @@
 set -euo pipefail
 
 (
-  cd ../../../ && make image
+  cd ../../../ && make image && make image-ui
 )
 
 kubectl create ns pgrwl-test --dry-run=client -oyaml | kubectl apply -f -
@@ -33,6 +33,7 @@ kubectl apply -f manifests/
 kubectl -n pgrwl-test rollout restart sts postgres
 kubectl -n pgrwl-test rollout restart sts minio
 kubectl -n pgrwl-test rollout restart sts pgrwl-receive
+kubectl -n pgrwl-test rollout restart sts pgrwl-ui
 kubectl -n mon rollout restart sts prometheus
 kubectl -n mon rollout restart deploy grafana
 kubectl -n mon rollout restart sts loki

@@ -38,3 +38,7 @@ nodes:
       - containerPort: 30271
         hostPort: 30271
         protocol: TCP
+      # pgrwl-ui
+      - containerPort: 30272
+        hostPort: 30272
+        protocol: TCP

@@ -335,7 +335,7 @@ func duration(started, finished time.Time) string {
 	if started.IsZero() || finished.IsZero() || finished.Before(started) {
 		return "-"
 	}
-	return finished.Sub(started).String()
+	return finished.Sub(started).Round(time.Millisecond).String()
 }
 
 type RestoreReadiness struct {
