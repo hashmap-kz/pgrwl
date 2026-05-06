@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/sethvargo/go-envconfig"
+	yamlv3 "gopkg.in/yaml.v3"
 
 	"sigs.k8s.io/yaml"
 )
@@ -372,7 +375,9 @@ func mustLoadCfg(path string) (*Config, error) {
 			return nil, err
 		}
 	case ".yml", ".yaml":
-		if err := yaml.Unmarshal(expand(configData), &cfg); err != nil {
+		expanded := expand(configData)
+		warnUnknownYAMLKeys(expanded)
+		if err := yaml.Unmarshal(expanded, &cfg); err != nil {
 			return nil, err
 		}
 	default:
@@ -380,6 +385,75 @@ func mustLoadCfg(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func warnUnknownYAMLKeys(data []byte) {
+	for _, key := range unknownYAMLKeys(data, reflect.TypeOf(Config{})) {
+		slog.Warn("unknown config key", slog.String("key", key))
+	}
+}
+
+func unknownYAMLKeys(data []byte, typ reflect.Type) []string {
+	var root yamlv3.Node
+	if err := yamlv3.Unmarshal(data, &root); err != nil || len(root.Content) == 0 {
+		return nil
+	}
+
+	return collectUnknownYAMLKeys(root.Content[0], typ, "")
+}
+
+func collectUnknownYAMLKeys(node *yamlv3.Node, typ reflect.Type, prefix string) []string {
+	typ = indirectType(typ)
+	if node == nil || node.Kind != yamlv3.MappingNode || typ.Kind() != reflect.Struct {
+		return nil
+	}
+
+	fields := jsonFieldsByName(typ)
+	var unknown []string
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+		key := keyNode.Value
+		path := key
+		if prefix != "" {
+			path = prefix + "." + key
+		}
+
+		field, ok := fields[key]
+		if !ok {
+			unknown = append(unknown, path)
+			continue
+		}
+
+		unknown = append(unknown, collectUnknownYAMLKeys(valueNode, field.Type, path)...)
+	}
+	return unknown
+}
+
+func jsonFieldsByName(typ reflect.Type) map[string]reflect.StructField {
+	fields := make(map[string]reflect.StructField)
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		name := strings.Split(field.Tag.Get("json"), ",")[0]
+		if name == "" {
+			name = field.Name
+		}
+		if name == "-" {
+			continue
+		}
+		fields[name] = field
+	}
+	return fields
+}
+
+func indirectType(typ reflect.Type) reflect.Type {
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	return typ
 }
 
 // validate checks that all required fields in the config are set appropriately.

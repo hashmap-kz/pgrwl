@@ -1,8 +1,11 @@
 package config
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -192,6 +195,47 @@ func TestFromEnvsInvalidValuesReturnErrors(t *testing.T) {
 	assert.Nil(t, cfg)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "receiver.uploader.sync_interval cannot parse")
+}
+
+func TestUnknownYAMLKeysReportsNestedPaths(t *testing.T) {
+	keys := unknownYAMLKeys([]byte(`main:
+  listen_port: 9090
+recevier:
+  slot: typo
+storage:
+  name: s3
+  s3:
+    bukcet: typo-bucket
+`), reflect.TypeOf(Config{}))
+
+	assert.ElementsMatch(t, []string{"recevier", "storage.s3.bukcet"}, keys)
+}
+
+func TestMustLoadCfgWarnsOnUnknownYAMLKeys(t *testing.T) {
+	var logs bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelWarn})))
+	t.Cleanup(func() {
+		slog.SetDefault(originalLogger)
+	})
+
+	path := writeConfigForTest(t, `main:
+  listen_port: 9090
+  directory: /tmp/pgrwl
+recevier:
+  slot: receive_slot
+receiver:
+  slot: receive_slot
+backup:
+  cron: "* * * * *"
+storage:
+  name: local
+`)
+
+	_, err := mustLoadCfg(path)
+	assert.NoError(t, err)
+	assert.Contains(t, logs.String(), "unknown config key")
+	assert.Contains(t, logs.String(), "recevier")
 }
 
 func TestValidate_Config(t *testing.T) {
