@@ -338,7 +338,7 @@ func FromEnvs(mode string) (*Config, error) {
 	once.Do(func() {
 		config = new(Config)
 
-		cfgErr := envconfig.Process(context.TODO(), config)
+		cfgErr = envconfig.Process(context.TODO(), config)
 		if cfgErr != nil {
 			return
 		}

@@ -1,6 +1,9 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +14,7 @@ func TestExpandEnvsWithPrefix(t *testing.T) {
 	// Set test environment variables
 	t.Setenv("PGRWL_FOO", "foo-val")
 	t.Setenv("PGRWL_BAR", "bar-val")
+	t.Setenv("PGRWL_EMPTY", "")
 	t.Setenv("OTHER_BAZ", "should-not-expand")
 
 	tests := []struct {
@@ -50,6 +54,12 @@ func TestExpandEnvsWithPrefix(t *testing.T) {
 			expected: "value=",
 		},
 		{
+			name:     "defined empty env var with correct prefix",
+			input:    "value=${PGRWL_EMPTY}",
+			prefix:   "PGRWL_",
+			expected: "value=",
+		},
+		{
 			name:     "empty input string",
 			input:    "",
 			prefix:   "PGRWL_",
@@ -75,6 +85,113 @@ func TestExpandEnvsWithPrefix(t *testing.T) {
 			assert.Equal(t, tt.expected, out)
 		})
 	}
+}
+
+func TestMustLoadCfgExpandsPGRWLEnvsAndLeavesOtherPlaceholders(t *testing.T) {
+	t.Setenv("PGRWL_MAIN_DIRECTORY", "/var/lib/pgrwl")
+	t.Setenv("PGRWL_STORAGE_S3_URL", "https://s3.example.com")
+	t.Setenv("PGRWL_STORAGE_S3_ACCESS_KEY_ID", "access-key")
+	t.Setenv("PGRWL_STORAGE_S3_SECRET_ACCESS_KEY", "secret-key")
+	t.Setenv("PGRWL_STORAGE_S3_BUCKET", "wal-bucket")
+
+	path := writeConfigForTest(t, `main:
+  listen_port: 9090
+  directory: ${PGRWL_MAIN_DIRECTORY}
+receiver:
+  slot: receive_slot
+  uploader:
+    sync_interval: 10s
+    max_concurrency: 2
+backup:
+  cron: "* * * * *"
+storage:
+  name: s3
+  s3:
+    url: ${PGRWL_STORAGE_S3_URL}
+    access_key_id: ${PGRWL_STORAGE_S3_ACCESS_KEY_ID}
+    secret_access_key: ${PGRWL_STORAGE_S3_SECRET_ACCESS_KEY}
+    bucket: ${PGRWL_STORAGE_S3_BUCKET}
+    region: ${OTHER_REGION}
+`)
+
+	cfg, err := mustLoadCfg(path)
+	assert.NoError(t, err)
+	assert.Equal(t, "/var/lib/pgrwl", cfg.Main.Directory)
+	assert.Equal(t, "https://s3.example.com", cfg.Storage.S3.URL)
+	assert.Equal(t, "access-key", cfg.Storage.S3.AccessKeyID)
+	assert.Equal(t, "secret-key", cfg.Storage.S3.SecretAccessKey)
+	assert.Equal(t, "wal-bucket", cfg.Storage.S3.Bucket)
+	assert.Equal(t, "${OTHER_REGION}", cfg.Storage.S3.Region)
+}
+
+func TestFromFileValidatesExpandedEnvPlaceholders(t *testing.T) {
+	resetConfigForTest(t)
+
+	t.Setenv("PGRWL_MAIN_DIRECTORY", "/tmp/pgrwl")
+	t.Setenv("PGRWL_STORAGE_S3_URL", "https://s3.example.com")
+	t.Setenv("PGRWL_STORAGE_S3_ACCESS_KEY_ID", "access-key")
+	t.Setenv("PGRWL_STORAGE_S3_SECRET_ACCESS_KEY", "secret-key")
+	t.Setenv("PGRWL_STORAGE_S3_BUCKET", "wal-bucket")
+	t.Setenv("PGRWL_STORAGE_S3_REGION", "us-east-1")
+
+	path := writeConfigForTest(t, `main:
+  listen_port: 9090
+  directory: ${PGRWL_MAIN_DIRECTORY}
+receiver:
+  slot: receive_slot
+  uploader:
+    sync_interval: 10s
+    max_concurrency: 2
+log:
+  level: trace
+  format: json
+backup:
+  cron: "* * * * *"
+storage:
+  name: s3
+  s3:
+    url: ${PGRWL_STORAGE_S3_URL}
+    access_key_id: ${PGRWL_STORAGE_S3_ACCESS_KEY_ID}
+    secret_access_key: ${PGRWL_STORAGE_S3_SECRET_ACCESS_KEY}
+    bucket: ${PGRWL_STORAGE_S3_BUCKET}
+    region: ${PGRWL_STORAGE_S3_REGION}
+`)
+
+	cfg, err := FromFile(path, ModeReceive)
+	assert.NoError(t, err)
+	assert.Equal(t, "/tmp/pgrwl", cfg.Main.Directory)
+	assert.Equal(t, 10*time.Second, cfg.Receiver.Uploader.SyncIntervalParsed)
+	assert.Equal(t, "secret-key", cfg.Storage.S3.SecretAccessKey)
+	assert.True(t, Verbose)
+}
+
+func TestFromEnvsAppliesOverridesAndParsesValues(t *testing.T) {
+	resetConfigForTest(t)
+	setValidReceiveEnvForTest(t)
+
+	cfg, err := FromEnvs(ModeReceive)
+	assert.NoError(t, err)
+	assert.Equal(t, 9090, cfg.Main.ListenPort)
+	assert.Equal(t, "/env/pgrwl", cfg.Main.Directory)
+	assert.Equal(t, "env_slot", cfg.Receiver.Slot)
+	assert.Equal(t, "15s", cfg.Receiver.Uploader.SyncInterval)
+	assert.Equal(t, 15*time.Second, cfg.Receiver.Uploader.SyncIntervalParsed)
+	assert.Equal(t, 3, cfg.Receiver.Uploader.MaxConcurrency)
+	assert.True(t, cfg.Metrics.Enable)
+	assert.Equal(t, "https://env-s3.example.com", cfg.Storage.S3.URL)
+	assert.Equal(t, "env-secret", cfg.Storage.S3.SecretAccessKey)
+	assert.True(t, Verbose)
+}
+
+func TestFromEnvsInvalidValuesReturnErrors(t *testing.T) {
+	resetConfigForTest(t)
+	setValidReceiveEnvForTest(t)
+	t.Setenv("PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL", "not-a-duration")
+
+	cfg, err := FromEnvs(ModeReceive)
+	assert.Nil(t, cfg)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "receiver.uploader.sync_interval cannot parse")
 }
 
 func TestValidate_Config(t *testing.T) {
@@ -228,4 +345,39 @@ func TestValidate_SuccessMinimalReceiveConfig(t *testing.T) {
 	err := validate(cfg, ModeReceive)
 	assert.Error(t, err)
 	assert.Equal(t, 10*time.Second, cfg.Receiver.Uploader.SyncIntervalParsed)
+}
+
+func resetConfigForTest(t *testing.T) {
+	t.Helper()
+	once = sync.Once{}
+	cfgErr = nil
+	config = nil
+	Verbose = false
+}
+
+func writeConfigForTest(t *testing.T, contents string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yml")
+	err := os.WriteFile(path, []byte(contents), 0o600)
+	assert.NoError(t, err)
+	return path
+}
+
+func setValidReceiveEnvForTest(t *testing.T) {
+	t.Helper()
+	t.Setenv("PGRWL_MAIN_LISTEN_PORT", "9090")
+	t.Setenv("PGRWL_MAIN_DIRECTORY", "/env/pgrwl")
+	t.Setenv("PGRWL_RECEIVER_SLOT", "env_slot")
+	t.Setenv("PGRWL_RECEIVER_UPLOADER_SYNC_INTERVAL", "15s")
+	t.Setenv("PGRWL_RECEIVER_UPLOADER_MAX_CONCURRENCY", "3")
+	t.Setenv("PGRWL_BACKUP_CRON", "* * * * *")
+	t.Setenv("PGRWL_METRICS_ENABLE", "true")
+	t.Setenv("PGRWL_LOG_LEVEL", "trace")
+	t.Setenv("PGRWL_LOG_FORMAT", "json")
+	t.Setenv("PGRWL_STORAGE_NAME", "s3")
+	t.Setenv("PGRWL_STORAGE_S3_URL", "https://env-s3.example.com")
+	t.Setenv("PGRWL_STORAGE_S3_ACCESS_KEY_ID", "env-access")
+	t.Setenv("PGRWL_STORAGE_S3_SECRET_ACCESS_KEY", "env-secret")
+	t.Setenv("PGRWL_STORAGE_S3_BUCKET", "env-bucket")
+	t.Setenv("PGRWL_STORAGE_S3_REGION", "us-east-1")
 }
