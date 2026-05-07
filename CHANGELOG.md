@@ -1,22 +1,22 @@
 # Changelog
 
-This changelog summarizes the latest 30 GitHub releases. Full generated release notes are available from each linked release.
+This changelog summarizes the latest 30 GitHub releases. Fully generated release notes are available from each linked release.
 
 ## [v1.0.35](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.35) - 2026-05-03
 
 - Added backup supervisor unit tests and local development integration tests.
-- Refactored the basebackup API and all-in-one mode internals.
-- Updated local development, Kubernetes, dashboard, and README assets.
+- Refactored the basebackup API and `all-in-one` mode internals.
+- Updated local development, Kubernetes manifests, Grafana dashboards, and README assets.
 
 ## [v1.0.34](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.34) - 2026-05-01
 
-- Added all-in-one mode, inter-component auth, manual basebackup API support, and recovery-window retention.
+- Added `all-in-one` mode, manual basebackup API support, and `recovery-window` retention.
 - Reworked serve/receive/backup error handling and shutdown behavior.
 - Updated examples, docs, and integration test coverage around the new design.
 
 ## [v1.0.33](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.33) - 2026-04-26
 
-- Added UI v3 configuration defaults and dashboard config documentation.
+- Added UI (v3) with configuration defaults and dashboard config documentation.
 - Fixed UI layout, WAL file extension handling, and screenshot assets.
 - Prepared UI release/build automation updates.
 
@@ -49,39 +49,23 @@ This changelog summarizes the latest 30 GitHub releases. Full generated release 
 - Transferred the project to the organization namespace.
 - Updated Helm chart versioning and related documentation.
 
-## [pgrwl-0.0.7](https://github.com/pgrwl/pgrwl/releases/tag/pgrwl-0.0.7) - 2026-03-28
-
-- Helm chart release for the cloud-native PostgreSQL WAL receiver.
-
 ## [v1.0.27](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.27) - 2026-03-28
 
 - Added multipart S3 uploader support.
 - Added integration tests for multipart S3 uploads, remote-only WAL restore, and storage behavior.
 - Updated Go, chart, storage, and release workflow dependencies.
 
-## [pgrwl-0.0.5](https://github.com/pgrwl/pgrwl/releases/tag/pgrwl-0.0.5) - 2026-03-28
-
-- Helm chart release for the cloud-native PostgreSQL WAL receiver.
-
 ## [v1.0.26](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.26) - 2025-12-04
 
 - Expanded integration tests for tablespaces, streaming files, dynamic storage, and scheduled runs.
 - Improved test isolation, parallel execution, and debugging scripts.
-- Continued basebackup module cleanup and restore-tablepace fixes.
-
-## [pgrwl-0.0.3](https://github.com/pgrwl/pgrwl/releases/tag/pgrwl-0.0.3) - 2025-12-04
-
-- Helm chart release for the cloud-native PostgreSQL WAL receiver.
+- Continued basebackup module cleanup and restore-tablespace fixes.
 
 ## [v1.0.25](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.25) - 2025-11-23
 
 - Added PostgreSQL 18 and multi-version integration test support.
 - Improved integration test caching and image tagging.
 - Updated chart versioning and CI restore rules.
-
-## [pgrwl-0.0.2](https://github.com/pgrwl/pgrwl/releases/tag/pgrwl-0.0.2) - 2025-11-23
-
-- Helm chart release for the cloud-native PostgreSQL WAL receiver.
 
 ## [v1.0.24](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.24) - 2025-11-22
 
@@ -99,10 +83,6 @@ This changelog summarizes the latest 30 GitHub releases. Full generated release 
 
 - Added the initial Helm chart implementation.
 
-## [pgrwl-helm-chart-0.0.1](https://github.com/pgrwl/pgrwl/releases/tag/pgrwl-0.0.1) - 2025-07-02
-
-- Initial Helm chart release for the cloud-native PostgreSQL WAL receiver.
-
 ## [v1.0.21](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.21) - 2025-06-29
 
 - Added basebackup metrics.
@@ -117,7 +97,7 @@ This changelog summarizes the latest 30 GitHub releases. Full generated release 
 
 ## [v1.0.19](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.19) - 2025-06-15
 
-- Added time/count based basebackup retention.
+- Added time/count-based basebackup retention.
 - Refactored shared option components and storage manifest placement.
 - Updated Kubernetes manifests, config reference, and disaster recovery docs.
 
