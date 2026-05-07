@@ -1,0 +1,41 @@
+name: API compatibility
+
+on:
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  relimpact:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Install relimpact
+        run: |
+          go install github.com/hashmap-kz/relimpact@latest
+
+      - name: Generate Markdown API report
+        run: |
+          relimpact \
+            --old="${{ github.event.pull_request.base.sha }}" \
+            --new="${{ github.event.pull_request.head.sha }}" \
+            --format=markdown \
+            > api-report.md
+
+      - name: Comment API report on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: relimpact-api-report
+          recreate: true
+          path: api-report.md
