@@ -19,13 +19,24 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: "1.24"
 
       - name: Install relimpact
-        run: |
-          go install github.com/hashmap-kz/relimpact@latest
+        run: go install github.com/hashmap-kz/relimpact@latest
+
+      - name: Cache relimpact API snapshots
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/relimpact
+          # Key includes base SHA - cache is valid as long as the base commit
+          # hasn't changed. Restores from any previous PR against the same base.
+          key: relimpact-v4-${{ github.event.pull_request.base.sha }}
+          restore-keys: |
+            relimpact-v4-
 
       - name: Generate Markdown API report
+        env:
+          RELIMPACT_API_CACHE_DIR: ~/.cache/relimpact
         run: |
           relimpact \
             --old="${{ github.event.pull_request.base.sha }}" \
