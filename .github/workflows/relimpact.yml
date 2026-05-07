@@ -27,14 +27,12 @@ jobs:
       - name: Cache relimpact API snapshots
         uses: actions/cache@v5
         with:
-          path: ~/.cache/relimpact
+          path: ${{ env.HOME }}/.cache/relimpact
           key: relimpact-${{ github.event.pull_request.base.sha }}
           restore-keys: |
             relimpact-
 
       - name: Generate Markdown API report
-        env:
-          RELIMPACT_API_CACHE_DIR: ~/.cache/relimpact
         run: |
           relimpact \
             --old="${{ github.event.pull_request.base.sha }}" \
