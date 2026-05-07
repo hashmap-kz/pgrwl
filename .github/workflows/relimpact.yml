@@ -41,7 +41,7 @@ jobs:
             > api-report.md
 
       - name: Comment API report on PR
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: relimpact-api-report
           recreate: true
