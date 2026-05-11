@@ -44,11 +44,7 @@ x_remake_config() {
   },
   "receiver": {
      "slot": "pgrwl_v5",
-     "no_loop": true,
-     "uploader": {
-       "sync_interval": "3s",
-       "max_concurrency": 4
-     }
+     "no_loop": true
   },
   "log": {
     "level": "${LOG_LEVEL_DEFAULT}",
