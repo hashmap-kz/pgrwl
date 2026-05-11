@@ -11,7 +11,7 @@ import (
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
-const defaultUploadInterval = 10 * time.Second
+const defaultUploadInterval = 5 * time.Minute
 
 type Opts struct {
 	ReceiveDirectory string
