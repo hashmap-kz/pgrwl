@@ -1,64 +1,60 @@
 package storecrypt
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
-	"github.com/pgrwl/pgrwl/config"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/pgrwl/pgrwl/internal/core/logger"
+	"github.com/minio/minio-go/v7"
 )
 
 const (
-	MinS3PartSize     int64 = 5 * 1024 * 1024
-	DefaultS3PartSize int64 = 16 * 1024 * 1024
-	DefaultS3Conc           = 2
-	MaxS3UploadParts  int64 = 10000
+	MinS3PartSize int64 = 5 * 1024 * 1024
+	DefaultS3Conc       = 2
 
 	// MultipartDefaultPartSizeBytes is used for large unknown-size streams
 	// such as base backups. 256 MiB x 10000 parts = ~2.44 TiB max object.
 	MultipartDefaultPartSizeBytes = 256 * 1024 * 1024
 )
 
+// S3Options configures the S3 storage backend.
 type S3Options struct {
+	// PartSizeBytes sets the multipart upload part size for streaming
+	// (unknown-size) uploads. For seekable files minio computes the optimal
+	// part size from the file size automatically. Defaults to
+	// MultipartDefaultPartSizeBytes when zero.
 	PartSizeBytes int64
 	Concurrency   int
 	Log           *slog.Logger
 }
 
 type s3Storage struct {
-	client   *s3.Client
-	bucket   string
-	prefix   string
-	partSize int64 // part size for the streaming multipart path
-	uploader *transfermanager.Client
-	log      *slog.Logger
+	client      *minio.Client
+	bucket      string
+	prefix      string
+	partSize    uint64 // part size for streaming (unknown-size) uploads
+	concurrency uint
+	log         *slog.Logger
 }
 
 var _ Storage = &s3Storage{}
 
-func NewS3Storage(client *s3.Client, bucket, prefix string) Storage {
+// NewS3Storage creates an S3 storage backend with default options.
+func NewS3Storage(client *minio.Client, bucket, prefix string) Storage {
 	return NewS3StorageWithOptions(client, bucket, prefix, S3Options{})
 }
 
-func NewS3StorageWithOptions(client *s3.Client, bucket, prefix string, opts S3Options) Storage {
+// NewS3StorageWithOptions creates an S3 storage backend with the given options.
+func NewS3StorageWithOptions(client *minio.Client, bucket, prefix string, opts S3Options) Storage {
 	partSize := opts.PartSizeBytes
 	if partSize <= 0 {
-		partSize = DefaultS3PartSize
-	}
-	if partSize < MinS3PartSize {
-		partSize = MinS3PartSize
+		partSize = MultipartDefaultPartSizeBytes
 	}
 
 	concurrency := opts.Concurrency
@@ -66,25 +62,13 @@ func NewS3StorageWithOptions(client *s3.Client, bucket, prefix string, opts S3Op
 		concurrency = DefaultS3Conc
 	}
 
-	tmClient := transfermanager.New(client, func(o *transfermanager.Options) {
-		o.PartSizeBytes = partSize
-		o.Concurrency = concurrency
-	})
-
-	// streamPartSize: the part size used when the reader has unknown size
-	// (e.g. after compression/encryption wraps it in an io.Pipe).
-	streamPartSize := opts.PartSizeBytes
-	if streamPartSize <= 0 {
-		streamPartSize = MultipartDefaultPartSizeBytes
-	}
-
 	return &s3Storage{
-		client:   client,
-		bucket:   bucket,
-		prefix:   filepath.ToSlash(strings.TrimPrefix(prefix, "/")),
-		partSize: streamPartSize,
-		uploader: tmClient,
-		log:      opts.Log,
+		client:      client,
+		bucket:      bucket,
+		prefix:      filepath.ToSlash(strings.TrimPrefix(prefix, "/")),
+		partSize:    uint64(partSize),
+		concurrency: uint(concurrency),
+		log:         opts.Log,
 	}
 }
 
@@ -94,142 +78,80 @@ func (s *s3Storage) fullPath(path string) string {
 
 func (s *s3Storage) logf() *slog.Logger {
 	if s.log != nil {
-		return s.log.With(
-			slog.String("component", "storage-s3"),
-			slog.String("bucket", s.bucket),
-		)
+		return s.log.With(slog.String("component", "storage-s3"), slog.String("bucket", s.bucket))
 	}
-	return slog.Default().With(
-		slog.String("component", "storage-s3"),
-		slog.String("bucket", s.bucket),
-	)
+	return slog.Default().With(slog.String("component", "storage-s3"), slog.String("bucket", s.bucket))
 }
 
-// CreateUploader creates a new S3 uploader with the given part size and concurrency.
-func CreateUploader(client *s3.Client, partSize int64, concurrency int) *transfermanager.Client {
-	if partSize <= 0 {
-		partSize = DefaultS3PartSize
-	}
-	if partSize < MinS3PartSize {
-		partSize = MinS3PartSize
-	}
-	if concurrency <= 0 {
-		concurrency = DefaultS3Conc
-	}
-
-	return transfermanager.New(client, func(o *transfermanager.Options) {
-		o.PartSizeBytes = partSize
-		o.Concurrency = concurrency
-	})
-}
-
-// ChooseUploadPartSize returns a safe part size for an expected object size.
-// If size <= 0, it returns a good streaming default.
-func ChooseUploadPartSize(size int64) int64 {
-	if size <= 0 {
-		return DefaultS3PartSize
-	}
-
-	partSize := (size + MaxS3UploadParts - 1) / MaxS3UploadParts
-	if partSize < MinS3PartSize {
-		partSize = MinS3PartSize
-	}
-
-	// round up to whole MiB for cleaner values
-	const mib = int64(1024 * 1024)
-	if rem := partSize % mib; rem != 0 {
-		partSize += mib - rem
-	}
-
-	return partSize
-}
-
+// Put uploads r to remotePath.
+//
+// For *os.File readers the file size is known: minio uses MinS3PartSize as the
+// base and scales it up automatically to stay within the 10 000-part limit.
+// For all other readers (pipes, compressed streams) the size is unknown and
+// s.partSize (256 MiB by default) is used as the streaming chunk size.
 func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) error {
 	fullPath := s.fullPath(remotePath)
 
-	log := s.logf().With(
-		slog.String("path", remotePath),
-		slog.String("s3_key", fullPath),
-	)
+	size := int64(-1) // unknown by default
+	opts := minio.PutObjectOptions{
+		PartSize:   s.partSize,
+		NumThreads: s.concurrency,
+	}
 
-	// If we know the size, use transfermanager with computed part size.
-	if f, ok := isSeekable(r); ok {
-		st, err := f.Stat()
-		if err == nil {
-			size := st.Size()
-			partSize := ChooseUploadPartSize(size)
-			uploader := CreateUploader(s.client, partSize, DefaultS3Conc)
-
-			log.Debug("using seekable upload path",
-				slog.Int64("size_bytes", size),
-				slog.Int64("part_size_bytes", partSize),
-				slog.Int("concurrency", DefaultS3Conc),
-			)
-
+	if f, ok := r.(*os.File); ok {
+		if st, err := f.Stat(); err == nil {
+			size = st.Size()
+			// Start from MinS3PartSize (5 MiB) so any file larger than that
+			// is uploaded via multipart. For very large files, scale up so
+			// the part count stays within the 10 000-part S3 limit.
+			// (minio-go's internal default is 16 MiB, which would silently
+			// fall back to single-PUT for files between 5 MiB and 16 MiB.)
+			partSize := MinS3PartSize
+			if size > partSize*10000 {
+				partSize = (size + 9999) / 10000
+			}
+			opts.PartSize = uint64(partSize)
 			if _, err := f.Seek(0, io.SeekStart); err != nil {
-				return fmt.Errorf("seek file for %q: %w", fullPath, err)
+				return fmt.Errorf("seek %q: %w", fullPath, err)
 			}
-
-			_, err = uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
-				Bucket: aws.String(s.bucket),
-				Key:    aws.String(fullPath),
-				Body:   f,
-			})
-			if err != nil {
-				return fmt.Errorf("s3 upload %q: %w", fullPath, err)
-			}
-			return nil
 		}
 	}
 
-	log.Debug("using streaming multipart upload path",
-		slog.Int64("part_size_bytes", s.partSize),
+	s.logf().Debug("put object",
+		slog.String("s3_key", fullPath),
+		slog.Int64("size_bytes", size),
+		slog.Uint64("part_size_bytes", opts.PartSize),
 	)
 
-	// Unknown-size stream: use manual multipart upload.
-	// Part size is configured per-instance: large for backups (256 MiB),
-	// small for WAL segments (16 MiB). See WALPartSizeBytes / MultipartDefaultPartSizeBytes.
-	return s.putMultipartStream(ctx, fullPath, r, s.partSize)
+	if _, err := s.client.PutObject(ctx, s.bucket, fullPath, r, size, opts); err != nil {
+		return fmt.Errorf("put %q: %w", fullPath, err)
+	}
+	return nil
 }
 
 func (s *s3Storage) Get(ctx context.Context, remotePath string) (io.ReadCloser, error) {
-	remotePath = s.fullPath(remotePath)
-
-	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(remotePath),
-	})
+	fullPath := s.fullPath(remotePath)
+	obj, err := s.client.GetObject(ctx, s.bucket, fullPath, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to read object from S3: %w", err)
+		return nil, fmt.Errorf("get %q: %w", fullPath, err)
 	}
-	return out.Body, nil
+	return obj, nil
 }
 
 func (s *s3Storage) List(ctx context.Context, remotePath string) ([]string, error) {
 	fullPath := s.fullPath(remotePath)
 	var objects []string
 
-	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.bucket),
-		Prefix: aws.String(fullPath),
-	})
-
-	// Iterate over pages of results
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get page: %w", err)
+	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:    fullPath,
+		Recursive: true,
+	}) {
+		if obj.Err != nil {
+			return nil, fmt.Errorf("list %q: %w", fullPath, obj.Err)
 		}
-
-		for _, obj := range page.Contents {
-			rel, err := filepath.Rel(s.prefix, *obj.Key)
-			if err != nil {
-				return nil, err
-			}
-			objects = append(objects, filepath.ToSlash(rel))
-		}
+		rel := strings.TrimPrefix(strings.TrimPrefix(obj.Key, s.prefix), "/")
+		objects = append(objects, rel)
 	}
-
 	return objects, nil
 }
 
@@ -237,187 +159,117 @@ func (s *s3Storage) ListInfo(ctx context.Context, remotePath string) ([]FileInfo
 	fullPath := s.fullPath(remotePath)
 	var objects []FileInfo
 
-	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.bucket),
-		Prefix: aws.String(fullPath),
-	})
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get page: %w", err)
+	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:    fullPath,
+		Recursive: true,
+	}) {
+		if obj.Err != nil {
+			return nil, fmt.Errorf("list %q: %w", fullPath, obj.Err)
 		}
-
-		// Iterate over pages of results
-		for _, obj := range page.Contents {
-			key := aws.ToString(obj.Key)
-
-			// Normalize S3 keys using strings, not filepath
-			rel := strings.TrimPrefix(key, s.prefix)
-			rel = strings.TrimPrefix(rel, "/")
-
-			objects = append(objects, FileInfo{
-				Path:    filepath.ToSlash(rel),
-				ModTime: aws.ToTime(obj.LastModified),
-				Size:    aws.ToInt64(obj.Size),
-			})
-		}
+		rel := strings.TrimPrefix(strings.TrimPrefix(obj.Key, s.prefix), "/")
+		objects = append(objects, FileInfo{
+			Path:    filepath.ToSlash(rel),
+			ModTime: obj.LastModified,
+			Size:    obj.Size,
+		})
 	}
-
 	return objects, nil
 }
 
 func (s *s3Storage) Delete(ctx context.Context, remotePath string) error {
 	fullPath := s.fullPath(remotePath)
-
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: &s.bucket,
-		Key:    &fullPath,
-	})
-	return err
+	if err := s.client.RemoveObject(ctx, s.bucket, fullPath, minio.RemoveObjectOptions{}); err != nil {
+		return fmt.Errorf("delete %q: %w", fullPath, err)
+	}
+	return nil
 }
 
 func (s *s3Storage) DeleteAll(ctx context.Context, remotePath string) error {
-	return s.deleteAllVersions(ctx, remotePath)
+	prefix := s.fullPath(remotePath)
+	if prefix != "" && !endsWithSlash(prefix) {
+		prefix += "/"
+	}
+	return s.deleteWithPrefix(ctx, prefix)
 }
 
 func (s *s3Storage) DeleteDir(ctx context.Context, remotePath string) error {
-	err := s.deleteAllVersions(ctx, remotePath)
-	if err != nil {
+	prefix := s.fullPath(remotePath)
+	if prefix != "" && !endsWithSlash(prefix) {
+		prefix += "/"
+	}
+	if err := s.deleteWithPrefix(ctx, prefix); err != nil {
 		return err
 	}
 	return s.Delete(ctx, remotePath)
 }
 
 func (s *s3Storage) DeleteAllBulk(ctx context.Context, paths []string) error {
-	return s.deleteAllVersionsBulk(ctx, paths)
+	var lastErr error
+	for _, path := range paths {
+		if err := s.deleteWithPrefix(ctx, s.fullPath(path)); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
 }
 
-func (s *s3Storage) deleteAllVersions(ctx context.Context, remotePath string) error {
-	prefix := s.fullPath(remotePath)
-	if prefix != "" && !endsWithSlash(prefix) {
-		prefix += "/"
-	}
+// deleteWithPrefix lists all objects (including all versions and delete markers)
+// under prefix and removes them in a streaming fashion via RemoveObjects.
+func (s *s3Storage) deleteWithPrefix(ctx context.Context, prefix string) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	paginator := s3.NewListObjectVersionsPaginator(s.client, &s3.ListObjectVersionsInput{
-		Bucket: &s.bucket,
-		Prefix: &prefix,
+	objectsCh := s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:       prefix,
+		Recursive:    true,
+		WithVersions: true,
 	})
 
-	var toDelete []s3types.ObjectIdentifier
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("list object versions: %w", err)
-		}
+	removeCh := make(chan minio.ObjectInfo)
+	var wg sync.WaitGroup
+	var listErr error
 
-		for i := range page.Versions {
-			version := page.Versions[i]
-			toDelete = append(toDelete, s3types.ObjectIdentifier{
-				Key:       version.Key,
-				VersionId: version.VersionId,
-			})
-		}
-		for _, marker := range page.DeleteMarkers {
-			toDelete = append(toDelete, s3types.ObjectIdentifier{
-				Key:       marker.Key,
-				VersionId: marker.VersionId,
-			})
-		}
-	}
-
-	for i := 0; i < len(toDelete); i += 1000 {
-		end := i + 1000
-		if end > len(toDelete) {
-			end = len(toDelete)
-		}
-
-		_, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: &s.bucket,
-			Delete: &s3types.Delete{
-				Objects: toDelete[i:end],
-				Quiet:   aws.Bool(true),
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("delete versions: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) error {
-	var objectsToDelete []s3types.ObjectIdentifier
-
-	for _, path := range paths {
-		prefix := s.fullPath(path)
-
-		paginator := s3.NewListObjectVersionsPaginator(s.client, &s3.ListObjectVersionsInput{
-			Bucket: &s.bucket,
-			Prefix: &prefix,
-		})
-
-		for paginator.HasMorePages() {
-			page, err := paginator.NextPage(ctx)
-			if err != nil {
-				return fmt.Errorf("list object versions for %q: %w", prefix, err)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(removeCh)
+		for obj := range objectsCh {
+			if obj.Err != nil {
+				listErr = fmt.Errorf("list %q: %w", prefix, obj.Err)
+				return
 			}
-			for i := range page.Versions {
-				version := page.Versions[i]
-				objectsToDelete = append(objectsToDelete, s3types.ObjectIdentifier{
-					Key:       version.Key,
-					VersionId: version.VersionId,
-				})
-			}
-			for i := range page.DeleteMarkers {
-				deleteMarker := page.DeleteMarkers[i]
-				objectsToDelete = append(objectsToDelete, s3types.ObjectIdentifier{
-					Key:       deleteMarker.Key,
-					VersionId: deleteMarker.VersionId,
-				})
+			select {
+			case removeCh <- obj:
+			case <-ctx.Done():
+				return
 			}
 		}
+	}()
+
+	var removeErr error
+	for rErr := range s.client.RemoveObjects(ctx, s.bucket, removeCh, minio.RemoveObjectsOptions{}) {
+		removeErr = fmt.Errorf("delete %q: %w", rErr.ObjectName, rErr.Err)
+		cancel() // stop listing on first remove failure
 	}
 
-	// Split into chunks of 1000 due to S3 limit per DeleteObjects request
-	const batchSize = 1000
-	for i := 0; i < len(objectsToDelete); i += batchSize {
-		end := i + batchSize
-		if end > len(objectsToDelete) {
-			end = len(objectsToDelete)
-		}
+	wg.Wait() // wait for listing goroutine before reading listErr
 
-		_, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: &s.bucket,
-			Delete: &s3types.Delete{
-				Objects: objectsToDelete[i:end],
-				Quiet:   aws.Bool(true),
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("delete objects batch %d-%d: %w", i, end, err)
-		}
+	if removeErr != nil {
+		return removeErr
 	}
-
-	return nil
+	return listErr
 }
 
 func (s *s3Storage) Exists(ctx context.Context, remotePath string) (bool, error) {
-	remotePath = s.fullPath(remotePath)
-
-	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(remotePath),
-	})
+	fullPath := s.fullPath(remotePath)
+	_, err := s.client.StatObject(ctx, s.bucket, fullPath, minio.StatObjectOptions{})
 	if err != nil {
-		var nf *s3types.NotFound
-		if errors.As(err, &nf) {
+		if minio.ToErrorResponse(err).StatusCode == http.StatusNotFound {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("stat %q: %w", fullPath, err)
 	}
-	return true, nil // S3 has no dirs, so it's a valid file
+	return true, nil
 }
 
 func (s *s3Storage) ListTopLevelDirs(ctx context.Context, prefix string) (map[string]bool, error) {
@@ -426,31 +278,26 @@ func (s *s3Storage) ListTopLevelDirs(ctx context.Context, prefix string) (map[st
 		remotePath += "/"
 	}
 
-	input := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(s.bucket),
-		Delimiter: aws.String("/"), // Groups results by prefix (like top-level directories)
-		Prefix:    aws.String(remotePath),
-	}
-
-	output, err := s.client.ListObjectsV2(ctx, input)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list objects in bucket: %w", err)
-	}
-
-	// Extract top-level prefixes (directories)
 	prefixes := make(map[string]bool)
-	for _, prefix := range output.CommonPrefixes {
-		if prefix.Prefix == nil {
+	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:    remotePath,
+		Recursive: false,
+	}) {
+		if obj.Err != nil {
+			return nil, fmt.Errorf("list top-level dirs %q: %w", remotePath, obj.Err)
+		}
+		if !strings.HasSuffix(obj.Key, "/") {
 			continue
 		}
-		prefixClean := strings.TrimSuffix(*prefix.Prefix, "/")
-		rel, err := filepath.Rel(s.prefix, prefixClean)
-		if err != nil {
-			return nil, err
+		// Strip s.prefix (not remotePath) so the result is relative to the
+		// storage root, matching the contract of the old filepath.Rel(s.prefix, ...).
+		rel := strings.TrimPrefix(obj.Key, s.prefix)
+		rel = strings.TrimPrefix(rel, "/")
+		rel = strings.TrimSuffix(rel, "/")
+		if rel != "" {
+			prefixes[rel] = true
 		}
-		prefixes[filepath.ToSlash(rel)] = true
 	}
-
 	return prefixes, nil
 }
 
@@ -462,170 +309,20 @@ func (s *s3Storage) Rename(ctx context.Context, oldRemotePath, newRemotePath str
 		return nil
 	}
 
-	// Copy source object to destination key
-	copySource := s.bucket + "/" + srcKey
-
-	_, err := s.client.CopyObject(ctx, &s3.CopyObjectInput{
-		Bucket:     aws.String(s.bucket),
-		CopySource: aws.String(copySource),
-		Key:        aws.String(dstKey),
-	})
+	_, err := s.client.CopyObject(ctx,
+		minio.CopyDestOptions{Bucket: s.bucket, Object: dstKey},
+		minio.CopySrcOptions{Bucket: s.bucket, Object: srcKey},
+	)
 	if err != nil {
-		return fmt.Errorf("copy object %q -> %q: %w", srcKey, dstKey, err)
+		return fmt.Errorf("copy %q -> %q: %w", srcKey, dstKey, err)
 	}
 
-	// Delete source object (only latest version if bucket is versioned)
-	_, err = s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(srcKey),
-	})
-	if err != nil {
-		return fmt.Errorf("delete source after copy %q: %w", srcKey, err)
+	if err := s.client.RemoveObject(ctx, s.bucket, srcKey, minio.RemoveObjectOptions{}); err != nil {
+		return fmt.Errorf("delete source %q after rename: %w", srcKey, err)
 	}
-
 	return nil
 }
 
 func endsWithSlash(s string) bool {
 	return s != "" && s[len(s)-1] == '/'
-}
-
-// multipart upload
-
-func isSeekable(r io.Reader) (*os.File, bool) {
-	f, ok := r.(*os.File)
-	if !ok {
-		return nil, false
-	}
-	return f, true
-}
-
-func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r io.Reader, partSize int64) error {
-	if partSize < MinS3PartSize {
-		partSize = MinS3PartSize
-	}
-
-	log := s.logf().With(
-		slog.String("s3_key", remotePath),
-		slog.Int64("part_size_bytes", partSize),
-	)
-
-	createOut, err := s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(remotePath),
-	})
-	if err != nil {
-		return fmt.Errorf("create multipart upload %q: %w", remotePath, err)
-	}
-
-	uploadID := aws.ToString(createOut.UploadId)
-	completedParts := make([]s3types.CompletedPart, 0, 128)
-
-	abort := func(abortErr error) error {
-		//nolint:errcheck
-		_, _ = s.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
-			Bucket:   aws.String(s.bucket),
-			Key:      aws.String(remotePath),
-			UploadId: aws.String(uploadID),
-		})
-		return abortErr
-	}
-
-	buf := make([]byte, partSize)
-	var partNumber int32 = 1
-
-	for {
-		n, readErr := io.ReadFull(r, buf)
-
-		switch {
-		case readErr == nil:
-			// full part
-		case errors.Is(readErr, io.ErrUnexpectedEOF):
-			// final partial part
-		case errors.Is(readErr, io.EOF):
-			// no more data
-			n = 0
-		default:
-			return abort(fmt.Errorf("read source for %q: %w", remotePath, readErr))
-		}
-
-		if n > 0 {
-			if int64(partNumber) > MaxS3UploadParts {
-				return abort(fmt.Errorf(
-					"multipart upload exceeded %d parts for %q; choose larger part size than %d bytes",
-					MaxS3UploadParts, remotePath, partSize,
-				))
-			}
-
-			if config.Verbose {
-				log.LogAttrs(ctx, logger.LevelTrace, "uploading multipart chunk",
-					slog.Int64("part_number", int64(partNumber)),
-					slog.Int("chunk_size_bytes", n),
-				)
-			}
-
-			upOut, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
-				Bucket:        aws.String(s.bucket),
-				Key:           aws.String(remotePath),
-				UploadId:      aws.String(uploadID),
-				PartNumber:    aws.Int32(partNumber),
-				Body:          bytes.NewReader(buf[:n]),
-				ContentLength: aws.Int64(int64(n)),
-			})
-			if err != nil {
-				return abort(fmt.Errorf("upload part %d for %q: %w", partNumber, remotePath, err))
-			}
-
-			completedParts = append(completedParts, s3types.CompletedPart{
-				ETag:       upOut.ETag,
-				PartNumber: aws.Int32(partNumber),
-			})
-
-			if config.Verbose {
-				log.LogAttrs(ctx, logger.LevelTrace, "multipart chunk uploaded",
-					slog.Int64("part_number", int64(partNumber)),
-					slog.Int("chunk_size_bytes", n),
-				)
-			}
-
-			partNumber++
-		}
-
-		if errors.Is(readErr, io.ErrUnexpectedEOF) || errors.Is(readErr, io.EOF) {
-			break
-		}
-	}
-
-	// empty object
-	if len(completedParts) == 0 {
-		_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(s.bucket),
-			Key:    aws.String(remotePath),
-			Body:   bytes.NewReader(nil),
-		})
-		if err != nil {
-			return abort(fmt.Errorf("put empty object %q: %w", remotePath, err))
-		}
-		return nil
-	}
-
-	_, err = s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
-		Bucket:   aws.String(s.bucket),
-		Key:      aws.String(remotePath),
-		UploadId: aws.String(uploadID),
-		MultipartUpload: &s3types.CompletedMultipartUpload{
-			Parts: completedParts,
-		},
-	})
-	if err != nil {
-		return abort(fmt.Errorf("complete multipart upload %q: %w", remotePath, err))
-	}
-
-	if config.Verbose {
-		log.LogAttrs(ctx, logger.LevelTrace, "multipart upload completed",
-			slog.Int("parts", len(completedParts)),
-		)
-	}
-
-	return nil
 }

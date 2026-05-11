@@ -6,18 +6,19 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/pkg/sftp"
 
+	"github.com/minio/minio-go/v7"
 	clients "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
 )
 
-func createS3Client() *s3.Client {
+func createS3Client() *minio.Client {
 	client, err := clients.NewS3Client(&clients.S3Config{
 		EndpointURL:     "https://localhost:9000",
 		AccessKeyID:     "minioadmin",
@@ -70,4 +71,60 @@ func genPaths(nested int) string {
 
 func rnd(min, max int) int {
 	return rand.Intn(max-min+1) + min
+}
+
+func getenv(key, fallback string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	return v
+}
+
+func getenvInt64(t *testing.T, key string, fallback int64) int64 {
+	t.Helper()
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parsed
+}
+
+func getenvBool(key string, fallback bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return b
+}
+
+// createSparseFile returns an *os.File whose Stat().Size() == size but that
+// occupies only one filesystem block on disk (sparse file). Only the final byte
+// is written; all other bytes read as zero. This lets callers simulate large
+// file uploads without allocating disk space.
+func createSparseFile(t *testing.T, size int64) *os.File {
+	t.Helper()
+
+	f, err := os.CreateTemp("", "s3-sparse-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(f.Name()) })
+
+	_, err = f.Seek(size-1, io.SeekStart)
+	require.NoError(t, err)
+
+	_, err = f.Write([]byte{0})
+	require.NoError(t, err)
+
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	return f
 }

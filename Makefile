@@ -103,6 +103,13 @@ test-integ-storage:
 	@cd test/integration/storage/environ && bash run.sh
 	go test -tags=integration_storage -v ./test/integration/storage/... | tee test-integ-fast.log
 
+.PHONY: test-integ-storage-stream
+test-integ-storage-stream:
+	@cd test/integration/storage/environ && bash run.sh
+	S3_LARGE_STREAM_SIZE=$$((10 * 1024 * 1024 * 1024)) \
+	go test -tags=integration_storage ./test/integration/storage \
+		-run TestS3StoragePutUnknownSizeStreamMultipart \
+		-v
 .PHONY: test-integ-storage-highload
 test-integ-storage-highload:
 	@cd test/integration/storage/environ && bash run.sh
