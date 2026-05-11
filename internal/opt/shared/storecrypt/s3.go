@@ -101,10 +101,16 @@ func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) err
 	if f, ok := r.(*os.File); ok {
 		if st, err := f.Stat(); err == nil {
 			size = st.Size()
-			// Use MinS3PartSize so any file >5 MiB is uploaded via multipart.
-			// minio auto-scales part size upward for very large files to stay
-			// within the 10 000-part limit.
-			opts.PartSize = uint64(MinS3PartSize)
+			// Start from MinS3PartSize (5 MiB) so any file larger than that
+			// is uploaded via multipart. For very large files, scale up so
+			// the part count stays within the 10 000-part S3 limit.
+			// (minio-go's internal default is 16 MiB, which would silently
+			// fall back to single-PUT for files between 5 MiB and 16 MiB.)
+			partSize := MinS3PartSize
+			if size > partSize*10000 {
+				partSize = (size + 9999) / 10000
+			}
+			opts.PartSize = uint64(partSize)
 			if _, err := f.Seek(0, io.SeekStart); err != nil {
 				return fmt.Errorf("seek %q: %w", fullPath, err)
 			}

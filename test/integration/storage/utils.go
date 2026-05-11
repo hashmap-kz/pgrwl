@@ -105,3 +105,26 @@ func getenvBool(key string, fallback bool) bool {
 	}
 	return b
 }
+
+// createSparseFile returns an *os.File whose Stat().Size() == size but that
+// occupies only one filesystem block on disk (sparse file). Only the final byte
+// is written; all other bytes read as zero. This lets callers simulate large
+// file uploads without allocating disk space.
+func createSparseFile(t *testing.T, size int64) *os.File {
+	t.Helper()
+
+	f, err := os.CreateTemp("", "s3-sparse-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(f.Name()) })
+
+	_, err = f.Seek(size-1, io.SeekStart)
+	require.NoError(t, err)
+
+	_, err = f.Write([]byte{0})
+	require.NoError(t, err)
+
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	return f
+}
