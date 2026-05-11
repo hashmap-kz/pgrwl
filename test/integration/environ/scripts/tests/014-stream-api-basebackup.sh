@@ -195,9 +195,9 @@ x_trigger_basebackup() {
   code="$(x_http_json POST "${BASEBACKUP_START_URL}" "/tmp/basebackup-start.json")"
   cat "/tmp/basebackup-start.json" || true
 
-  if [[ "${code}" != "202" ]]; then
+  if [[ "${code}" != "200" ]]; then
     cat "${LOG_FILE}" || true
-    log_fatal "expected POST /api/v1/basebackup to return 202, got ${code}"
+    log_fatal "expected POST /api/v1/basebackup to return 200, got ${code}"
   fi
 
   local status
