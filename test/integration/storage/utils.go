@@ -6,18 +6,19 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/pkg/sftp"
 
+	"github.com/minio/minio-go/v7"
 	clients "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
 )
 
-func createS3Client() *s3.Client {
+func createS3Client() *minio.Client {
 	client, err := clients.NewS3Client(&clients.S3Config{
 		EndpointURL:     "https://localhost:9000",
 		AccessKeyID:     "minioadmin",
@@ -70,4 +71,37 @@ func genPaths(nested int) string {
 
 func rnd(min, max int) int {
 	return rand.Intn(max-min+1) + min
+}
+
+func getenv(key, fallback string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	return v
+}
+
+func getenvInt64(t *testing.T, key string, fallback int64) int64 {
+	t.Helper()
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parsed
+}
+
+func getenvBool(key string, fallback bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return b
 }
