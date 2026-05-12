@@ -1,6 +1,6 @@
 //go:build integration_localdev
 
-package backupsv
+package localdev
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pgrwl/pgrwl/internal/opt/supervisors/backupsv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -97,8 +99,8 @@ func TestIntegrationRetentionLocaldev(t *testing.T) {
 		},
 	}
 
-	retention := NewRecoveryWindowRetention(
-		&BackupSupervisorOpts{
+	retention := backupsv.NewRecoveryWindowRetention(
+		&backupsv.BackupSupervisorOpts{
 			WalSegSz:       walSegSz,
 			BasebackupStor: backupStorage,
 			WalStor:        walStorage,

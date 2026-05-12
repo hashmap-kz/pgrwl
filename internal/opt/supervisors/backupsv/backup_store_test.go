@@ -88,6 +88,7 @@ func testBackupResult(startedAt string) backupdto.Result {
 		BytesTotal: 1234,
 	}
 }
+
 func TestBackupStoreListBackupDirs(t *testing.T) {
 	ctx := context.Background()
 	storage := st.NewInMemoryStorage()
