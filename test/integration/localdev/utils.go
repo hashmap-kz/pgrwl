@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -148,6 +151,55 @@ func assertIntegrationMissing(t *testing.T, ctx context.Context, storage st.Stor
 	}
 	require.NoError(t, err)
 	assert.False(t, exists, "expected %s to be deleted", path)
+}
+
+func assertIntegrationBytes(t *testing.T, ctx context.Context, storage st.Storage, path string, want []byte) {
+	t.Helper()
+
+	rc, err := storage.Get(ctx, path)
+	require.NoError(t, err)
+	defer rc.Close()
+
+	data, err := io.ReadAll(rc)
+	require.NoError(t, err)
+	assert.Equal(t, want, data, "content mismatch for %s", path)
+}
+
+func writeIntegrationConfig(t *testing.T, env retentionIntegrationEnv, mainDir string) string {
+	t.Helper()
+
+	path := t.TempDir() + "/pgrwl-config.json"
+	data := fmt.Sprintf(`{
+  "main": {
+    "listen_port": 8080,
+    "directory": %q
+  },
+  "receiver": {
+    "slot": "pgrwl_integration",
+    "uploader": {
+      "sync_interval": "10s",
+      "max_concurrency": 2
+    }
+  },
+  "backup": {
+    "cron": "* * * * *"
+  },
+  "storage": {
+    "name": "s3",
+    "s3": {
+      "url": %q,
+      "access_key_id": %q,
+      "secret_access_key": %q,
+      "bucket": %q,
+      "region": %q,
+      "use_path_style": %t,
+      "disable_ssl": %t
+    }
+  }
+}`, mainDir, env.s3Endpoint, env.s3AccessKey, env.s3SecretKey, env.bucket, env.region, env.usePathStyle, env.disableTLSVerify)
+
+	require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
+	return path
 }
 
 func isIntegrationNotFoundErr(err error) bool {

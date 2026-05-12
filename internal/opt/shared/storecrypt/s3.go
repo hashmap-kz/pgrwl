@@ -417,6 +417,9 @@ func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) e
 			}
 			for i := range page.Versions {
 				version := page.Versions[i]
+				if aws.ToString(version.Key) != prefix {
+					continue
+				}
 				objectsToDelete = append(objectsToDelete, s3types.ObjectIdentifier{
 					Key:       version.Key,
 					VersionId: version.VersionId,
@@ -424,6 +427,9 @@ func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) e
 			}
 			for i := range page.DeleteMarkers {
 				deleteMarker := page.DeleteMarkers[i]
+				if aws.ToString(deleteMarker.Key) != prefix {
+					continue
+				}
 				objectsToDelete = append(objectsToDelete, s3types.ObjectIdentifier{
 					Key:       deleteMarker.Key,
 					VersionId: deleteMarker.VersionId,
