@@ -233,11 +233,9 @@ func (s *s3Storage) List(ctx context.Context, remotePath string) ([]string, erro
 		}
 
 		for _, obj := range page.Contents {
-			rel, err := filepath.Rel(s.prefix, *obj.Key)
-			if err != nil {
-				return nil, err
-			}
-			objects = append(objects, filepath.ToSlash(rel))
+			rel := strings.TrimPrefix(aws.ToString(obj.Key), s.prefix)
+			rel = strings.TrimPrefix(rel, "/")
+			objects = append(objects, rel)
 		}
 	}
 
@@ -282,8 +280,8 @@ func (s *s3Storage) Delete(ctx context.Context, remotePath string) error {
 	fullPath := s.fullPath(remotePath)
 
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: &s.bucket,
-		Key:    &fullPath,
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(fullPath),
 	})
 	return err
 }
@@ -437,29 +435,28 @@ func (s *s3Storage) ListTopLevelDirs(ctx context.Context, prefix string) (map[st
 		remotePath += "/"
 	}
 
-	input := &s3.ListObjectsV2Input{
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
 		Bucket:    aws.String(s.bucket),
 		Delimiter: aws.String("/"), // Groups results by prefix (like top-level directories)
 		Prefix:    aws.String(remotePath),
-	}
-
-	output, err := s.client.ListObjectsV2(ctx, input)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list objects in bucket: %w", err)
-	}
+	})
 
 	// Extract top-level prefixes (directories)
 	prefixes := make(map[string]bool)
-	for _, prefix := range output.CommonPrefixes {
-		if prefix.Prefix == nil {
-			continue
-		}
-		prefixClean := strings.TrimSuffix(*prefix.Prefix, "/")
-		rel, err := filepath.Rel(s.prefix, prefixClean)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to list objects in bucket: %w", err)
 		}
-		prefixes[filepath.ToSlash(rel)] = true
+		for _, prefix := range page.CommonPrefixes {
+			if prefix.Prefix == nil {
+				continue
+			}
+			prefixClean := strings.TrimSuffix(*prefix.Prefix, "/")
+			rel := strings.TrimPrefix(prefixClean, s.prefix)
+			rel = strings.TrimPrefix(rel, "/")
+			prefixes[rel] = true
+		}
 	}
 
 	return prefixes, nil
