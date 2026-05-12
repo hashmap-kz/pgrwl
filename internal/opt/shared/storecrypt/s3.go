@@ -123,6 +123,16 @@ func joinS3Key(prefix, name string) string {
 	return pathpkg.Join(prefix, name)
 }
 
+func s3DirPrefix(key string) string {
+	if key == "" {
+		return ""
+	}
+	if !endsWithSlash(key) {
+		key += "/"
+	}
+	return key
+}
+
 func (s *s3Storage) fullPath(name string) string {
 	return joinS3Key(s.prefix, name)
 }
@@ -260,7 +270,7 @@ func (s *s3Storage) Get(ctx context.Context, remotePath string) (io.ReadCloser, 
 }
 
 func (s *s3Storage) List(ctx context.Context, remotePath string) ([]string, error) {
-	fullPath := s.fullPath(remotePath)
+	fullPath := s3DirPrefix(s.fullPath(remotePath))
 	var objects []string
 
 	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
@@ -284,7 +294,7 @@ func (s *s3Storage) List(ctx context.Context, remotePath string) ([]string, erro
 }
 
 func (s *s3Storage) ListInfo(ctx context.Context, remotePath string) ([]FileInfo, error) {
-	fullPath := s.fullPath(remotePath)
+	fullPath := s3DirPrefix(s.fullPath(remotePath))
 	var objects []FileInfo
 
 	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{

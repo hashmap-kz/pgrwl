@@ -1,6 +1,7 @@
 package storecrypt
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -426,4 +427,26 @@ func TestIsSeekable(t *testing.T) {
 		assert.False(t, ok)
 		assert.Nil(t, got)
 	})
+}
+
+func TestChooseUploadPartSize_StaysWithinS3PartLimit(t *testing.T) {
+	sizes := []int64{
+		1 << 30,   // 1 GiB
+		50 << 30,  // 50 GiB
+		500 << 30, // 500 GiB
+		1 << 40,   // 1 TiB
+		2 << 40,   // 2 TiB
+	}
+
+	for _, size := range sizes {
+		t.Run(fmt.Sprintf("size_%d", size), func(t *testing.T) {
+			partSize := ChooseUploadPartSize(size)
+
+			assert.GreaterOrEqual(t, partSize, MinS3PartSize)
+			assert.LessOrEqual(t, partSize, MaxS3PartSize)
+
+			parts := (size + partSize - 1) / partSize
+			assert.LessOrEqual(t, parts, MaxS3UploadParts)
+		})
+	}
 }
