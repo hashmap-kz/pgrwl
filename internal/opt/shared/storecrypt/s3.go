@@ -8,9 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
+
+	pathpkg "path"
 
 	"github.com/pgrwl/pgrwl/config"
 
@@ -69,7 +70,7 @@ func NewS3StorageWithOptions(client *s3.Client, bucket, prefix string, opts S3Op
 	return &s3Storage{
 		client:         client,
 		bucket:         bucket,
-		prefix:         filepath.ToSlash(strings.TrimPrefix(prefix, "/")),
+		prefix:         cleanS3Prefix(prefix),
 		streamPartSize: streamPartSize,
 		concurrency:    normalizeConcurrency(opts.Concurrency),
 		log:            opts.Log,
@@ -99,8 +100,50 @@ func normalizeConcurrency(c int) int {
 	return c
 }
 
-func (s *s3Storage) fullPath(path string) string {
-	return filepath.ToSlash(filepath.Join(s.prefix, path))
+func cleanS3Prefix(prefix string) string {
+	prefix = strings.Trim(prefix, "/")
+	if prefix == "" || prefix == "." {
+		return ""
+	}
+	return pathpkg.Clean(prefix)
+}
+
+func joinS3Key(prefix, name string) string {
+	name = strings.TrimPrefix(name, "/")
+	if name == "" || name == "." {
+		return prefix
+	}
+	if prefix == "" {
+		clean := pathpkg.Clean(name)
+		if clean == "." {
+			return ""
+		}
+		return clean
+	}
+	return pathpkg.Join(prefix, name)
+}
+
+func (s *s3Storage) fullPath(name string) string {
+	return joinS3Key(s.prefix, name)
+}
+
+func (s *s3Storage) relativeKey(key string) string {
+	key = strings.TrimPrefix(key, "/")
+
+	if s.prefix == "" {
+		return key
+	}
+
+	if key == s.prefix {
+		return ""
+	}
+
+	prefix := s.prefix + "/"
+	if strings.HasPrefix(key, prefix) {
+		return strings.TrimPrefix(key, prefix)
+	}
+
+	return key
 }
 
 func (s *s3Storage) logf() *slog.Logger {
@@ -233,9 +276,7 @@ func (s *s3Storage) List(ctx context.Context, remotePath string) ([]string, erro
 		}
 
 		for _, obj := range page.Contents {
-			rel := strings.TrimPrefix(aws.ToString(obj.Key), s.prefix)
-			rel = strings.TrimPrefix(rel, "/")
-			objects = append(objects, rel)
+			objects = append(objects, s.relativeKey(aws.ToString(obj.Key)))
 		}
 	}
 
@@ -256,17 +297,9 @@ func (s *s3Storage) ListInfo(ctx context.Context, remotePath string) ([]FileInfo
 		if err != nil {
 			return nil, fmt.Errorf("failed to get page: %w", err)
 		}
-
-		// Iterate over pages of results
 		for _, obj := range page.Contents {
-			key := aws.ToString(obj.Key)
-
-			// Normalize S3 keys using strings, not filepath
-			rel := strings.TrimPrefix(key, s.prefix)
-			rel = strings.TrimPrefix(rel, "/")
-
 			objects = append(objects, FileInfo{
-				Path:    filepath.ToSlash(rel),
+				Path:    s.relativeKey(aws.ToString(obj.Key)),
 				ModTime: aws.ToTime(obj.LastModified),
 				Size:    aws.ToInt64(obj.Size),
 			})
@@ -452,10 +485,8 @@ func (s *s3Storage) ListTopLevelDirs(ctx context.Context, prefix string) (map[st
 			if prefix.Prefix == nil {
 				continue
 			}
-			prefixClean := strings.TrimSuffix(*prefix.Prefix, "/")
-			rel := strings.TrimPrefix(prefixClean, s.prefix)
-			rel = strings.TrimPrefix(rel, "/")
-			prefixes[rel] = true
+			prefixClean := strings.TrimSuffix(aws.ToString(prefix.Prefix), "/")
+			prefixes[s.relativeKey(prefixClean)] = true
 		}
 	}
 
