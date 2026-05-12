@@ -17,144 +17,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testStorage struct {
-	files map[string][]byte
+type recordingStorage struct {
+	st.Storage
 
 	listTopLevelDirsErr error
 	deleteDirErr        error
 	getErr              error
-	deletedDirs         []string
+
+	deletedDirs []string
 }
 
-var _ st.Storage = (*testStorage)(nil)
+func newRecordingMemoryStorage() (*recordingStorage, *st.InMemoryStorage) {
+	base := st.NewInMemoryStorage()
 
-func newTestStorage() *testStorage {
-	return &testStorage{files: make(map[string][]byte)}
+	return &recordingStorage{
+		Storage: base,
+	}, base
 }
 
-func (s *testStorage) Put(_ context.Context, path string, r io.Reader) error {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return err
-	}
-	s.files[path] = data
-	return nil
-}
-
-func (s *testStorage) Get(_ context.Context, path string) (io.ReadCloser, error) {
+func (s *recordingStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
 	if s.getErr != nil {
 		return nil, s.getErr
 	}
-	data, ok := s.files[path]
-	if !ok {
-		return nil, errors.New("not found")
-	}
-	return io.NopCloser(bytes.NewReader(data)), nil
+	return s.Storage.Get(ctx, path)
 }
 
-func (s *testStorage) List(_ context.Context, prefix string) ([]string, error) {
-	var out []string
-	prefix = strings.TrimSuffix(prefix, "/")
-	if prefix != "" {
-		prefix += "/"
-	}
-	for path := range s.files {
-		if strings.HasPrefix(path, prefix) {
-			out = append(out, path)
-		}
-	}
-	return out, nil
-}
-
-func (s *testStorage) ListInfo(ctx context.Context, prefix string) ([]st.FileInfo, error) {
-	files, err := s.List(ctx, prefix)
-	if err != nil {
-		return nil, err
-	}
-	infos := make([]st.FileInfo, 0, len(files))
-	for _, path := range files {
-		infos = append(infos, st.FileInfo{Path: path, Size: int64(len(s.files[path]))})
-	}
-	return infos, nil
-}
-
-func (s *testStorage) Delete(_ context.Context, path string) error {
-	delete(s.files, path)
-	return nil
-}
-
-func (s *testStorage) DeleteAll(_ context.Context, path string) error {
-	prefix := strings.TrimSuffix(path, "/")
-	if prefix != "" {
-		prefix += "/"
-	}
-	for key := range s.files {
-		if key == path || strings.HasPrefix(key, prefix) {
-			delete(s.files, key)
-		}
-	}
-	return nil
-}
-
-func (s *testStorage) DeleteDir(ctx context.Context, path string) error {
+func (s *recordingStorage) DeleteDir(ctx context.Context, path string) error {
 	if s.deleteDirErr != nil {
 		return s.deleteDirErr
 	}
+
 	s.deletedDirs = append(s.deletedDirs, path)
-	return s.DeleteAll(ctx, path)
+	return s.Storage.DeleteDir(ctx, path)
 }
 
-func (s *testStorage) DeleteAllBulk(ctx context.Context, paths []string) error {
-	for _, path := range paths {
-		if err := s.DeleteAll(ctx, path); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *testStorage) Exists(_ context.Context, path string) (bool, error) {
-	_, ok := s.files[path]
-	return ok, nil
-}
-
-func (s *testStorage) ListTopLevelDirs(ctx context.Context, prefix string) (map[string]bool, error) {
+func (s *recordingStorage) ListTopLevelDirs(ctx context.Context, prefix string) (map[string]bool, error) {
 	if s.listTopLevelDirsErr != nil {
 		return nil, s.listTopLevelDirsErr
 	}
-	prefix = strings.TrimSuffix(prefix, "/")
-	if prefix != "" {
-		prefix += "/"
-	}
-
-	out := make(map[string]bool)
-	for path := range s.files {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-		if !strings.HasPrefix(path, prefix) {
-			continue
-		}
-		rel := strings.TrimPrefix(path, prefix)
-		idx := strings.Index(rel, "/")
-		if idx <= 0 {
-			continue
-		}
-		out[rel[:idx]] = true
-	}
-	return out, nil
+	return s.Storage.ListTopLevelDirs(ctx, prefix)
 }
 
-func (s *testStorage) Rename(_ context.Context, oldPath, newPath string) error {
-	data, ok := s.files[oldPath]
-	if !ok {
-		return errors.New("not found")
-	}
-	s.files[newPath] = data
-	delete(s.files, oldPath)
-	return nil
+func newTestBackupStore(storage st.Storage) BackupStore {
+	return NewBackupStore(&BackupSupervisorOpts{
+		BasebackupStor: storage,
+	})
 }
 
 //nolint:gocritic
@@ -181,13 +88,10 @@ func testBackupResult(startedAt string) backupdto.Result {
 		BytesTotal: 1234,
 	}
 }
-
 func TestBackupStoreListBackupDirs(t *testing.T) {
 	ctx := context.Background()
-	storage := newTestStorage()
-	store := NewBackupStore(&BackupSupervisorOpts{
-		BasebackupStor: storage,
-	})
+	storage := st.NewInMemoryStorage()
+	store := newTestBackupStore(storage)
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 	putManifest(t, storage, "20260502070500", testBackupResult("2026-05-02T07:05:00Z"))
@@ -204,10 +108,8 @@ func TestBackupStoreListBackupDirs(t *testing.T) {
 
 func TestBackupStoreReadManifest(t *testing.T) {
 	ctx := context.Background()
-	storage := newTestStorage()
-	store := NewBackupStore(&BackupSupervisorOpts{
-		BasebackupStor: storage,
-	})
+	storage := st.NewInMemoryStorage()
+	store := newTestBackupStore(storage)
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 
@@ -221,10 +123,8 @@ func TestBackupStoreReadManifest(t *testing.T) {
 
 func TestBackupStoreDeleteBackupsDeletesOnlyRequestedTopLevelDirs(t *testing.T) {
 	ctx := context.Background()
-	storage := newTestStorage()
-	store := NewBackupStore(&BackupSupervisorOpts{
-		BasebackupStor: storage,
-	})
+	storage, base := newRecordingMemoryStorage()
+	store := newTestBackupStore(storage)
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 	putManifest(t, storage, "20260502070500", testBackupResult("2026-05-02T07:05:00Z"))
@@ -241,18 +141,21 @@ func TestBackupStoreDeleteBackupsDeletesOnlyRequestedTopLevelDirs(t *testing.T) 
 		"20260502070500",
 	}, storage.deletedDirs)
 
-	exists, err := storage.Exists(ctx, "20260502071500/20260502071500.json")
+	exists, err := base.Exists(ctx, "20260502071500/20260502071500.json")
 	require.NoError(t, err)
 	assert.True(t, exists)
+
+	exists, err = base.Exists(ctx, "20260502065500/20260502065500.json")
+	require.NoError(t, err)
+	assert.False(t, exists)
 }
 
 func TestBackupStoreDeleteBackupsPropagatesDeleteError(t *testing.T) {
 	ctx := context.Background()
-	storage := newTestStorage()
+	storage, _ := newRecordingMemoryStorage()
 	storage.deleteDirErr = errors.New("delete failed")
-	store := NewBackupStore(&BackupSupervisorOpts{
-		BasebackupStor: storage,
-	})
+
+	store := newTestBackupStore(storage)
 
 	putManifest(t, storage, "20260502065500", testBackupResult("2026-05-02T06:55:00Z"))
 
@@ -264,10 +167,13 @@ func TestBackupStoreDeleteBackupsPropagatesDeleteError(t *testing.T) {
 
 func TestBackupStoreDeleteBackupsAllowsUnreadableManifest(t *testing.T) {
 	ctx := context.Background()
-	storage := newTestStorage()
-	store := NewBackupStore(&BackupSupervisorOpts{BasebackupStor: storage})
+	storage, _ := newRecordingMemoryStorage()
+	store := newTestBackupStore(storage)
 
-	require.NoError(t, storage.Put(ctx, "20260502065500/20260502065500.json", strings.NewReader("not-json")))
+	require.NoError(t, storage.Put(ctx,
+		"20260502065500/20260502065500.json",
+		strings.NewReader("not-json"),
+	))
 
 	err := store.DeleteBackups(ctx, []string{"20260502065500"})
 
@@ -277,8 +183,8 @@ func TestBackupStoreDeleteBackupsAllowsUnreadableManifest(t *testing.T) {
 
 func TestBackupStoreDeleteBackupsEmptyInputDoesNothing(t *testing.T) {
 	ctx := context.Background()
-	storage := newTestStorage()
-	store := NewBackupStore(&BackupSupervisorOpts{})
+	storage, _ := newRecordingMemoryStorage()
+	store := newTestBackupStore(storage)
 
 	err := store.DeleteBackups(ctx, nil)
 
