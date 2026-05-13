@@ -54,26 +54,6 @@ func TestInMemoryStorage_Delete(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestInMemoryStorage_DeleteAll(t *testing.T) {
-	ctx := context.Background()
-	s := NewInMemoryStorage()
-
-	err := s.Put(ctx, "dir/file1", bytes.NewReader([]byte("1")))
-	assert.NoError(t, err)
-	err = s.Put(ctx, "dir/file2", bytes.NewReader([]byte("2")))
-	assert.NoError(t, err)
-	err = s.Put(ctx, "other/file3", bytes.NewReader([]byte("3")))
-	assert.NoError(t, err)
-
-	err = s.DeleteAll(ctx, "dir")
-	assert.NoError(t, err)
-
-	_, err = s.Get(ctx, "dir/file1")
-	assert.Error(t, err)
-	_, err = s.Get(ctx, "other/file3")
-	assert.NoError(t, err)
-}
-
 func TestInMemoryStorage_List(t *testing.T) {
 	ctx := context.Background()
 	s := NewInMemoryStorage()
@@ -195,33 +175,6 @@ func TestInMemoryStorage_DeleteDir(t *testing.T) {
 	assert.Error(t, err)
 	_, err = s.Get(ctx, "dir2/sub/file5.txt")
 	assert.Error(t, err)
-}
-
-func TestInMemoryStorage_DeleteAllBulk(t *testing.T) {
-	ctx := context.Background()
-	s := NewInMemoryStorage()
-
-	// Prepare several directories
-	assert.NoError(t, s.Put(ctx, "a/file1.txt", strings.NewReader("a1")))
-	assert.NoError(t, s.Put(ctx, "a/file2.txt", strings.NewReader("a2")))
-	assert.NoError(t, s.Put(ctx, "b/file3.txt", strings.NewReader("b1")))
-	assert.NoError(t, s.Put(ctx, "c/file4.txt", strings.NewReader("c1")))
-
-	// Bulk delete "a" and "b"
-	err := s.DeleteAllBulk(ctx, []string{"a", "b"})
-	assert.NoError(t, err)
-
-	// a/* and b/* should be gone
-	_, err = s.Get(ctx, "a/file1.txt")
-	assert.Error(t, err)
-	_, err = s.Get(ctx, "a/file2.txt")
-	assert.Error(t, err)
-	_, err = s.Get(ctx, "b/file3.txt")
-	assert.Error(t, err)
-
-	// c/* should still exist
-	_, err = s.Get(ctx, "c/file4.txt")
-	assert.NoError(t, err)
 }
 
 func TestInMemoryStorage_GetNonExisting(t *testing.T) {

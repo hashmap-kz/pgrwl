@@ -29,14 +29,8 @@ type Storage interface {
 	// Delete removes the specified file.
 	Delete(ctx context.Context, remotePath string) error
 
-	// DeleteAll removes all files and directories in a specified path.
-	DeleteAll(ctx context.Context, remotePath string) error
-
 	// DeleteDir removes a directory (or prefix) with its content.
 	DeleteDir(ctx context.Context, remotePath string) error
-
-	// DeleteAllBulk removes all files and directories in a specified list of paths.
-	DeleteAllBulk(ctx context.Context, paths []string) error
 
 	// Exists checks whether a file exists.
 	Exists(ctx context.Context, remotePath string) (bool, error)

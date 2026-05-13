@@ -94,7 +94,7 @@ func (s *InMemoryStorage) Delete(_ context.Context, path string) error {
 	return nil
 }
 
-func (s *InMemoryStorage) DeleteAll(ctx context.Context, path string) error {
+func (s *InMemoryStorage) DeleteDir(ctx context.Context, path string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -112,21 +112,6 @@ func (s *InMemoryStorage) DeleteAll(ctx context.Context, path string) error {
 		}
 	}
 
-	return nil
-}
-
-func (s *InMemoryStorage) DeleteDir(ctx context.Context, path string) error {
-	// For this in-memory implementation, directories are just prefixes.
-	// Semantically, DeleteDir and DeleteAll are equivalent, so reuse the logic.
-	return s.DeleteAll(ctx, path)
-}
-
-func (s *InMemoryStorage) DeleteAllBulk(ctx context.Context, paths []string) error {
-	for _, p := range paths {
-		if err := s.DeleteAll(ctx, p); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

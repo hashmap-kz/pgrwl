@@ -185,7 +185,7 @@ func TestStorage_WALArchiveLayout_DeleteAllBulkDeletesExactWALsOnly(t *testing.T
 				putStorageText(t, ctx, store, p, "keep-me")
 			}
 
-			require.NoError(t, store.DeleteAllBulk(ctx, deleteMe))
+			require.NoError(t, deleteAllBulk(ctx, store, deleteMe))
 
 			for _, p := range deleteMe {
 				assertStorageMissing(t, ctx, store, p)

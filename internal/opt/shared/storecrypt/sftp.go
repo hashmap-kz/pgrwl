@@ -66,6 +66,9 @@ func (s *sftpStorage) List(_ context.Context, remotePath string) ([]string, erro
 	walker := s.client.Walk(fullPath)
 	for walker.Step() {
 		if err := walker.Err(); err != nil {
+			if os.IsNotExist(err) || strings.Contains(err.Error(), "file does not exist") {
+				return nil, nil
+			}
 			return nil, fmt.Errorf("error walking directory: %w", err)
 		}
 		stat := walker.Stat()
@@ -125,47 +128,6 @@ func (s *sftpStorage) Delete(_ context.Context, remotePath string) error {
 
 func (s *sftpStorage) DeleteDir(_ context.Context, remotePath string) error {
 	return s.client.RemoveAll(s.fullPath(remotePath))
-}
-
-func (s *sftpStorage) DeleteAll(_ context.Context, remotePath string) error {
-	fullPath := s.fullPath(remotePath)
-
-	entries, err := s.client.ReadDir(fullPath)
-	if err != nil {
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "file does not exist") {
-			return nil
-		}
-		return fmt.Errorf("reading directory %q: %w", fullPath, err)
-	}
-
-	for _, entry := range entries {
-		pathToRemove := path.Join(fullPath, entry.Name())
-		err := s.client.RemoveAll(pathToRemove)
-		if err != nil {
-			errMsg := err.Error()
-			if strings.Contains(errMsg, "file does not exist") {
-				return nil
-			}
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *sftpStorage) DeleteAllBulk(_ context.Context, paths []string) error {
-	for i := range paths {
-		fullPath := s.fullPath(paths[i])
-		err := s.client.RemoveAll(fullPath)
-		if err != nil {
-			errMsg := err.Error()
-			if strings.Contains(errMsg, "file does not exist") {
-				return nil
-			}
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *sftpStorage) Exists(_ context.Context, remotePath string) (bool, error) {

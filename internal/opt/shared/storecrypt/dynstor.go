@@ -306,23 +306,6 @@ func (vs *VariadicStorage) DeleteDir(ctx context.Context, path string) error {
 	return vs.Backend.DeleteDir(ctx, path)
 }
 
-func (vs *VariadicStorage) DeleteAll(ctx context.Context, path string) error {
-	path = filepath.ToSlash(path)
-	return vs.Backend.DeleteAll(ctx, path)
-}
-
-// DeleteAllBulk deletes all known variants for each logical path. This
-// delegates to Delete to keep the "multi-variant" semantics consistent.
-func (vs *VariadicStorage) DeleteAllBulk(ctx context.Context, paths []string) error {
-	var lastErr error
-	for _, p := range paths {
-		if err := vs.Delete(ctx, p); err != nil {
-			lastErr = err
-		}
-	}
-	return lastErr
-}
-
 // Exists returns true if any variant for the logical path exists.
 func (vs *VariadicStorage) Exists(ctx context.Context, path string) (bool, error) {
 	path = filepath.ToSlash(path)

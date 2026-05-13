@@ -126,36 +126,6 @@ func (l *localStorage) DeleteDir(_ context.Context, remotePath string) error {
 	return os.RemoveAll(l.fullPath(remotePath))
 }
 
-func (l *localStorage) DeleteAll(_ context.Context, remotePath string) error {
-	fullPath := l.fullPath(remotePath)
-
-	entries, err := os.ReadDir(fullPath)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		path := filepath.Join(fullPath, entry.Name())
-		err := os.RemoveAll(path)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (l *localStorage) DeleteAllBulk(_ context.Context, paths []string) error {
-	for i := range paths {
-		fullPath := l.fullPath(paths[i])
-		err := os.RemoveAll(fullPath)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (l *localStorage) Exists(_ context.Context, remotePath string) (bool, error) {
 	fullPath := l.fullPath(remotePath)
 

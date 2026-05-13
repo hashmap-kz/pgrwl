@@ -102,7 +102,7 @@ func TestStorage_HighLoad2000(t *testing.T) {
 
 	for name, store := range storages {
 		t.Run(name, func(t *testing.T) {
-			require.NoError(t, store.DeleteAll(ctx, ""), "[%s] DeleteAll before test", name)
+			require.NoError(t, deleteAll(ctx, store, ""), "[%s] deleteAll before test", name)
 
 			const fileCount = 2000
 			content := []byte("this is a stress test file content")
@@ -137,7 +137,7 @@ func TestStorage_HighLoad2000(t *testing.T) {
 			}
 
 			// Cleanup
-			require.NoError(t, store.DeleteAll(ctx, "hl"), "[%s] DeleteAll cleanup failed", name)
+			require.NoError(t, deleteAll(ctx, store, "hl"), "[%s] deleteAll cleanup failed", name)
 			finalList, err := store.List(ctx, "hl")
 			require.NoError(t, err)
 			assert.Empty(t, finalList, "[%s] Files not cleaned up", name)

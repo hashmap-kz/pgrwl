@@ -361,7 +361,7 @@ func TestVariadicStorage_PutGet_RoundTrip_AllWriteExts(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Delete / DeleteAllBulk / Exists
+// Delete / Exists
 // -----------------------------------------------------------------------------
 
 func TestVariadicStorage_Delete_RemovesAllVariants(t *testing.T) {
@@ -393,38 +393,6 @@ func TestVariadicStorage_Delete_RemovesAllVariants(t *testing.T) {
 			t.Fatalf("expected no wal/seg* variants, found %q", k)
 		}
 	}
-}
-
-func TestVariadicStorage_DeleteAllBulk_LogicalNames(t *testing.T) {
-	ctx := context.Background()
-
-	gzipPair := &CodecPair{
-		Compressor:   codec.GzipCompressor{},
-		Decompressor: codec.GzipDecompressor{},
-	}
-	alg := Algorithms{
-		Gzip: gzipPair,
-	}
-
-	mem := NewInMemoryStorage()
-	mem.Files["bulk/f1.gz"] = []byte("1")
-	mem.Files["bulk/f2.gz"] = []byte("2")
-	mem.Files["bulk/f3.gz"] = []byte("3")
-
-	vs, err := NewVariadicStorage(mem, alg, ".gz")
-	require.NoError(t, err)
-
-	err = vs.DeleteAllBulk(ctx, []string{"bulk/f1", "bulk/f3"})
-	require.NoError(t, err)
-
-	// Only bulk/f2.gz should remain
-	_, ok1 := mem.Files["bulk/f1.gz"]
-	_, ok3 := mem.Files["bulk/f3.gz"]
-	_, ok2 := mem.Files["bulk/f2.gz"]
-
-	assert.False(t, ok1)
-	assert.False(t, ok3)
-	assert.True(t, ok2)
 }
 
 func TestVariadicStorage_Exists_AnyVariant(t *testing.T) {
