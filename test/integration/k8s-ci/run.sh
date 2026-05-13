@@ -52,21 +52,20 @@ kubectl apply -f manifests/
 # timeout = 5m
 
 timeout 300 bash -c '
-while true; do
-  wals=$(curl -fsS http://127.0.0.1:30266/api/v1/wals | jq "type == \"array\" and length > 0")
-  backups=$(curl -fsS http://127.0.0.1:30266/api/v1/backups | jq "type == \"array\" and length > 0")
-
-  if [[ "$wals" == "true" && "$backups" == "true" ]]; then
-    echo "OK"
-    exit 0
-  fi
-
-  echo "waiting: wals_ok=$wals backups_ok=$backups"
+until \
+  curl -fsS http://127.0.0.1:30266/api/v1/wals    | jq -e "type == \"array\" and length > 0" >/dev/null && \
+  curl -fsS http://127.0.0.1:30266/api/v1/backups | jq -e "type == \"array\" and length > 0" >/dev/null
+do
+  echo "waiting: WALs/backups are not available yet"
   sleep 5
 done
+echo "OK: WALs and backups are available"
 '
 
-# check UI
-timeout 180 bash -c 'until \
-  [[ "$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:30272/healthz)" == "200" ]]; \
-do sleep 2; done'
+timeout 180 bash -c '
+until [[ "$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:30272/healthz)" == "200" ]]; do
+  echo "waiting: UI healthz is not 200 yet"
+  sleep 2
+done
+echo "OK: UI healthz returned 200"
+'
