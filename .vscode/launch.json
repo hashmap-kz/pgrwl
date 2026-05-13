@@ -15,7 +15,8 @@
       ],
       "envFile": "${workspaceFolder}/.vscode/pg.env",
       "env": {
-        "PGRWL_MAIN_DIRECTORY": "${workspaceFolder}/wals"
+        "PGRWL_MAIN_DIRECTORY": "${workspaceFolder}/wals",
+        "PGRWL_BACKUP_CRON": "* * * * *"
       }
     },
     {

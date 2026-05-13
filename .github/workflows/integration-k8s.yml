@@ -1,0 +1,36 @@
+---
+name: Integration Tests (k8s)
+
+on:
+  push:
+    branches: &branches
+      - "master"
+      - "release/**"
+    paths-ignore: &paths-ignore
+      - ".run/**"
+      - ".vscode/**"
+      - "docs/**"
+      - "examples/**"
+      - "charts/**"
+      - "hack/**"
+      - "ui/static/**"
+      - "**/*.md"
+      - "**/*.gitignore"
+      - "**/*.gitattributes"
+      - "Makefile"
+      - ".golangci.yml"
+  pull_request:
+    branches: *branches
+    paths-ignore: *paths-ignore
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run tests
+        run: |
+          make test-integ-k8s-ci

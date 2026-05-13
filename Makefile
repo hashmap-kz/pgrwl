@@ -137,3 +137,13 @@ image-ui: ## Build and push Docker image to localhost:5000
 test-integ-localdev:
 	@cd test/integration/localdev/environ && bash run.sh
 	go test -tags=integration_localdev -v ./test/integration/localdev/... | tee test-integ-localdev.log
+
+######################################################################
+### k8s related integration tests (CI oriented)
+######################################################################
+
+.PHONY: test-integ-k8s-ci
+test-integ-k8s-ci:
+	$(MAKE) image
+	$(MAKE) image-ui
+	@cd test/integration/k8s-ci && bash run.sh
