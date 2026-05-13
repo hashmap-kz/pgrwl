@@ -7,6 +7,7 @@ containerdConfigPatches:
 name: "pgrwl"
 nodes:
   - role: control-plane
+    image: kindest/node:v1.34.0
     extraPortMappings:
       - containerPort: 30000
         hostPort: 30000
