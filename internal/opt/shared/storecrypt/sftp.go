@@ -97,6 +97,9 @@ func (s *sftpStorage) ListInfo(_ context.Context, remotePath string) ([]FileInfo
 	walker := s.client.Walk(fullPath)
 	for walker.Step() {
 		if err := walker.Err(); err != nil {
+			if os.IsNotExist(err) || strings.Contains(err.Error(), "file does not exist") {
+				return nil, nil
+			}
 			return nil, fmt.Errorf("error walking directory: %w", err)
 		}
 		stat := walker.Stat()

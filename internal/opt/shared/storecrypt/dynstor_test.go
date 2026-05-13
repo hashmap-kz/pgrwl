@@ -395,6 +395,34 @@ func TestVariadicStorage_Delete_RemovesAllVariants(t *testing.T) {
 	}
 }
 
+func TestVariadicStorage_DeleteDir_DelegatesAndClearsAllVariants(t *testing.T) {
+	ctx := context.Background()
+
+	gzipPair := &CodecPair{
+		Compressor:   codec.GzipCompressor{},
+		Decompressor: codec.GzipDecompressor{},
+	}
+	alg := Algorithms{Gzip: gzipPair}
+
+	mem := NewInMemoryStorage()
+	mem.Files["wal/seg1.gz"] = []byte("gz1")
+	mem.Files["wal/seg2.gz"] = []byte("gz2")
+	mem.Files["other/seg3.gz"] = []byte("gz3")
+
+	vs, err := NewVariadicStorage(mem, alg, ".gz")
+	require.NoError(t, err)
+
+	require.NoError(t, vs.DeleteDir(ctx, "wal"))
+
+	for k := range mem.Files {
+		if strings.HasPrefix(k, "wal/") {
+			t.Fatalf("expected no wal/* keys after DeleteDir, found %q", k)
+		}
+	}
+	_, ok := mem.Files["other/seg3.gz"]
+	require.True(t, ok, "other/ should be untouched")
+}
+
 func TestVariadicStorage_Exists_AnyVariant(t *testing.T) {
 	ctx := context.Background()
 

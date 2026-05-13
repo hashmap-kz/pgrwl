@@ -149,6 +149,9 @@ func (l *localStorage) ListTopLevelDirs(_ context.Context, prefix string) (map[s
 
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return result, nil
+		}
 		return nil, err
 	}
 
