@@ -2,6 +2,13 @@
 
 This changelog summarizes the latest 30 GitHub releases. Fully generated release notes are available from each linked release.
 
+## [v1.0.36](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.36) - 2026-05-13
+
+- Multipart logic improved (s3)
+- Integration tests for k8s, storage layout, related workflows
+- CLI simplified
+- API compatibility workflow (relimpact)
+
 ## [v1.0.35](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.35) - 2026-05-03
 
 - Added backup supervisor unit tests and local development integration tests.
