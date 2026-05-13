@@ -144,6 +144,4 @@ test-integ-localdev:
 
 .PHONY: test-integ-k8s-ci
 test-integ-k8s-ci:
-	$(MAKE) image
-	$(MAKE) image-ui
 	@cd test/integration/k8s-ci && bash run.sh
