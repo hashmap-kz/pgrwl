@@ -530,3 +530,53 @@ func BenchmarkStorage_PutGet(b *testing.B) {
 		})
 	}
 }
+
+func TestStorage_DeleteAllBulk_DoesNotDeletePrefixCollisions(t *testing.T) {
+	ctx := context.TODO()
+	storages := initStoragesT(t, t.Name())
+
+	for name, store := range storages {
+		t.Run(name, func(t *testing.T) {
+			files := []string{
+				"bulk/f1.txt",
+				"bulk/f1.txt.extra",
+				"bulk/f10.txt",
+				"bulk/f3.txt",
+			}
+
+			for _, f := range files {
+				require.NoError(t, store.Put(ctx, f, bytes.NewReader([]byte(f))))
+			}
+
+			require.NoError(t, store.DeleteAllBulk(ctx, []string{"bulk/f1.txt"}))
+
+			ex, err := store.Exists(ctx, "bulk/f1.txt")
+			require.NoError(t, err)
+			assert.False(t, ex)
+
+			for _, shouldRemain := range []string{"bulk/f1.txt.extra", "bulk/f10.txt", "bulk/f3.txt"} {
+				ex, err := store.Exists(ctx, shouldRemain)
+				require.NoError(t, err)
+				assert.True(t, ex, "%s should not be deleted by prefix collision", shouldRemain)
+			}
+		})
+	}
+}
+
+func TestStorage_List_DoesNotReturnPrefixSibling(t *testing.T) {
+	ctx := context.TODO()
+	storages := initStoragesT(t, t.Name())
+
+	for name, store := range storages {
+		t.Run(name, func(t *testing.T) {
+			require.NoError(t, store.Put(ctx, "repo/base/a.txt", bytes.NewReader([]byte("a"))))
+			require.NoError(t, store.Put(ctx, "repo/base-old/b.txt", bytes.NewReader([]byte("b"))))
+
+			listed, err := store.List(ctx, "repo/base")
+			require.NoError(t, err)
+
+			assert.Contains(t, listed, "repo/base/a.txt")
+			assert.NotContains(t, listed, "repo/base-old/b.txt")
+		})
+	}
+}

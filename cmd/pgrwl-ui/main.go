@@ -46,6 +46,9 @@ func main() {
 	})
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 	server.Mount(mux)
 
 	httpServer := &http.Server{
