@@ -352,8 +352,8 @@ func (s *s3Storage) deleteAllVersions(ctx context.Context, remotePath string) er
 	}
 
 	paginator := s3.NewListObjectVersionsPaginator(s.client, &s3.ListObjectVersionsInput{
-		Bucket: &s.bucket,
-		Prefix: &prefix,
+		Bucket: aws.String(s.bucket),
+		Prefix: aws.String(prefix),
 	})
 
 	var toDelete []s3types.ObjectIdentifier
@@ -385,7 +385,7 @@ func (s *s3Storage) deleteAllVersions(ctx context.Context, remotePath string) er
 		}
 
 		_, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: &s.bucket,
+			Bucket: aws.String(s.bucket),
 			Delete: &s3types.Delete{
 				Objects: toDelete[i:end],
 				Quiet:   aws.Bool(true),
@@ -406,8 +406,8 @@ func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) e
 		prefix := s.fullPath(path)
 
 		paginator := s3.NewListObjectVersionsPaginator(s.client, &s3.ListObjectVersionsInput{
-			Bucket: &s.bucket,
-			Prefix: &prefix,
+			Bucket: aws.String(s.bucket),
+			Prefix: aws.String(prefix),
 		})
 
 		for paginator.HasMorePages() {
@@ -417,9 +417,6 @@ func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) e
 			}
 			for i := range page.Versions {
 				version := page.Versions[i]
-				if aws.ToString(version.Key) != prefix {
-					continue
-				}
 				objectsToDelete = append(objectsToDelete, s3types.ObjectIdentifier{
 					Key:       version.Key,
 					VersionId: version.VersionId,
@@ -427,9 +424,6 @@ func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) e
 			}
 			for i := range page.DeleteMarkers {
 				deleteMarker := page.DeleteMarkers[i]
-				if aws.ToString(deleteMarker.Key) != prefix {
-					continue
-				}
 				objectsToDelete = append(objectsToDelete, s3types.ObjectIdentifier{
 					Key:       deleteMarker.Key,
 					VersionId: deleteMarker.VersionId,
@@ -447,7 +441,7 @@ func (s *s3Storage) deleteAllVersionsBulk(ctx context.Context, paths []string) e
 		}
 
 		_, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: &s.bucket,
+			Bucket: aws.String(s.bucket),
 			Delete: &s3types.Delete{
 				Objects: objectsToDelete[i:end],
 				Quiet:   aws.Bool(true),
