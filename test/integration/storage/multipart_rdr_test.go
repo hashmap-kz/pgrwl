@@ -1,3 +1,5 @@
+//go:build integration_storage
+
 package integration
 
 import (
@@ -6,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/opt/shared/readers"
+	"github.com/pgrwl/pgrwl/internal/opt/shared/fakereaders"
 	storage "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +23,7 @@ func TestS3Storage_PutMultipart50Gi(t *testing.T) {
 	prefix := t.Name()
 	st := storage.NewS3Storage(client, "backups", prefix)
 
-	r := readers.NewFakeLargeReader(readers.S50Gi)
+	r := fakereaders.NewFakeLargeReader(fakereaders.Size50Gi)
 	// wrap to hide size (IMPORTANT)
 	reader := io.NopCloser(r)
 
@@ -32,5 +34,5 @@ func TestS3Storage_PutMultipart50Gi(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(info))
-	require.Equal(t, readers.S50Gi, info[0].Size)
+	require.Equal(t, fakereaders.Size50Gi, info[0].Size)
 }

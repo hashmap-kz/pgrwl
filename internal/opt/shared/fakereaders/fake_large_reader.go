@@ -1,4 +1,4 @@
-package readers
+package fakereaders
 
 import "io"
 
