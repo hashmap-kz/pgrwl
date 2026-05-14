@@ -1,0 +1,24 @@
+// NOTE: This works only if Put() retries
+
+func TestS3Storage_Put_RetryableStream(t *testing.T) {
+	st := newTestStorage(t)
+
+	failOnce := true
+
+	reader := io.NopCloser(
+		NewRetryableReader(func() io.Reader {
+			if failOnce {
+				failOnce = false
+				return NewFlakyReader(FlakyConfig{
+					Size:   1024 * 1024,
+					FailAt: []int64{0},
+				})
+			}
+			return NewFakeLargeReader(1024 * 1024)
+		}, 3),
+	)
+
+	err := st.Put(context.Background(), "retry.bin", reader)
+
+	require.NoError(t, err)
+}
