@@ -59,38 +59,7 @@ func (s *sftpStorage) Get(_ context.Context, remotePath string) (io.ReadCloser, 
 	return f, nil
 }
 
-func (s *sftpStorage) List(_ context.Context, remotePath string) ([]string, error) {
-	fullPath := s.fullPath(remotePath)
-	var result []string
-
-	walker := s.client.Walk(fullPath)
-	for walker.Step() {
-		if err := walker.Err(); err != nil {
-			if os.IsNotExist(err) || strings.Contains(err.Error(), "file does not exist") {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("error walking directory: %w", err)
-		}
-		stat := walker.Stat()
-		if stat == nil {
-			continue
-		}
-		if stat.IsDir() {
-			continue
-		}
-		if walker.Path() != fullPath {
-			rel, err := filepath.Rel(s.baseDir, walker.Path())
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, rel)
-		}
-	}
-
-	return result, nil
-}
-
-func (s *sftpStorage) ListInfo(_ context.Context, remotePath string) ([]FileInfo, error) {
+func (s *sftpStorage) List(_ context.Context, remotePath string) ([]FileInfo, error) {
 	fullPath := s.fullPath(remotePath)
 	var result []FileInfo
 

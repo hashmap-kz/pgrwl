@@ -83,7 +83,7 @@ func TestInMemoryStorage_List(t *testing.T) {
 	assert.Len(t, files, 3)
 
 	for _, file := range files {
-		assert.True(t, expected[file], "unexpected file listed: %s", file)
+		assert.True(t, expected[file.Path], "unexpected file listed: %s", file)
 	}
 }
 
@@ -95,7 +95,7 @@ func TestInMemoryStorage_ListInfo(t *testing.T) {
 	assert.NoError(t, err)
 	err = s.Put(ctx, "a/b/d.txt", bytes.NewReader([]byte("another")))
 	assert.NoError(t, err)
-	infos, err := s.ListInfo(ctx, "a/b")
+	infos, err := s.List(ctx, "a/b")
 	assert.NoError(t, err)
 	assert.Len(t, infos, 2)
 }
@@ -202,15 +202,23 @@ func TestInMemoryStorage_RootPrefixOperations(t *testing.T) {
 	require.NoError(t, s.Put(ctx, "dir2/file2.txt", strings.NewReader("2")))
 	require.NoError(t, s.Put(ctx, "loose.txt", strings.NewReader("3")))
 
+	fileInfoToStrList := func(fi []FileInfo) []string {
+		r := []string{}
+		for i := range fi {
+			r = append(r, fi[i].Path)
+		}
+		return r
+	}
+
 	files, err := s.List(ctx, "")
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{
 		"dir1/file1.txt",
 		"dir2/file2.txt",
 		"loose.txt",
-	}, files)
+	}, fileInfoToStrList(files))
 
-	infos, err := s.ListInfo(ctx, "")
+	infos, err := s.List(ctx, "")
 	require.NoError(t, err)
 	assert.Len(t, infos, 3)
 

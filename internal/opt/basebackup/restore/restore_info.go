@@ -12,7 +12,7 @@ import (
 	st "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 )
 
-func makeRestoreInfo(backupID string, backupFiles []string) *backupdto.RestoreInfo {
+func makeRestoreInfo(backupID string, backupFiles []st.FileInfo) *backupdto.RestoreInfo {
 	loggr := slog.With(slog.String("component", "restore"), slog.String("id", backupID))
 	r := backupdto.RestoreInfo{}
 
@@ -22,24 +22,24 @@ func makeRestoreInfo(backupID string, backupFiles []string) *backupdto.RestoreIn
 
 	for _, fname := range backupFiles {
 		// slight cleanup of path for querying
-		tmp := filepath.ToSlash(fname)
+		tmp := filepath.ToSlash(fname.Path)
 		tmp = strings.TrimPrefix(tmp, backupID+"/")
 
 		// check that files we have
 		isManifest := strings.HasPrefix(tmp, backupID+".json")
 		correctFile := isManifest || strings.HasSuffix(tmp, ".tar")
 		if !correctFile {
-			loggr.Warn("skipping unknown type of file", slog.String("name", fname))
+			loggr.Warn("skipping unknown type of file", slog.String("name", fname.Path))
 			continue
 		}
 
 		// build result
 		if isManifest {
-			r.ManifestFile = fname
+			r.ManifestFile = fname.Path
 		} else if strings.HasPrefix(tmp, "base.") {
-			r.BaseTar = fname
+			r.BaseTar = fname.Path
 		} else {
-			r.TablespacesTars = append(r.TablespacesTars, fname)
+			r.TablespacesTars = append(r.TablespacesTars, fname.Path)
 		}
 	}
 	return &r

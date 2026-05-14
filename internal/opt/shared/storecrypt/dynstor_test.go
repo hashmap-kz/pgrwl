@@ -509,7 +509,7 @@ func TestVariadicStorage_ListInfo_RewritesPath(t *testing.T) {
 	vs, err := NewVariadicStorage(mem, alg, ".gz.aes")
 	require.NoError(t, err)
 
-	info, err := vs.ListInfo(ctx, "p")
+	info, err := vs.List(ctx, "p")
 	require.NoError(t, err)
 
 	//nolint:prealloc

@@ -148,7 +148,7 @@ func TestStorage_List(t *testing.T) {
 
 			listed, err := store.List(ctx, "list")
 			require.NoError(t, err, "[%s] List failed", name)
-			assert.ElementsMatch(t, files, listed, "[%s] Listed files mismatch", name)
+			assert.ElementsMatch(t, files, fileInfoToStrList(listed), "[%s] Listed files mismatch", name)
 		})
 	}
 }
@@ -196,7 +196,7 @@ func TestStorage_ListInfo(t *testing.T) {
 
 			var listedPaths []string
 
-			listed, err := store.ListInfo(ctx, "list")
+			listed, err := store.List(ctx, "list")
 			require.NoError(t, err, "[%s] List failed", name)
 
 			for _, elem := range listed {
@@ -395,7 +395,7 @@ func TestStorage_Rename(t *testing.T) {
 			// List under "rename" should show only dst
 			listed, err := store.List(ctx, "rename")
 			require.NoError(t, err, "[%s] List(\"rename\") failed", name)
-			assert.ElementsMatch(t, []string{dst}, listed, "[%s] List result mismatch after Rename", name)
+			assert.ElementsMatch(t, []string{dst}, fileInfoToStrList(listed), "[%s] List result mismatch after Rename", name)
 		})
 	}
 }

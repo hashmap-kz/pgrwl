@@ -49,22 +49,7 @@ func (s *InMemoryStorage) Get(_ context.Context, path string) (io.ReadCloser, er
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
-func (s *InMemoryStorage) List(_ context.Context, path string) ([]string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	prefix := storagePrefix(path)
-
-	keys := make([]string, 0)
-	for k := range s.Files {
-		if strings.HasPrefix(k, prefix) {
-			keys = append(keys, k)
-		}
-	}
-	return keys, nil
-}
-
-func (s *InMemoryStorage) ListInfo(_ context.Context, path string) ([]FileInfo, error) {
+func (s *InMemoryStorage) List(_ context.Context, path string) ([]FileInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

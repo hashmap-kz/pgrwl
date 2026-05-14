@@ -37,7 +37,7 @@ func TestS3Storage_PutMultipart50Gi(t *testing.T) {
 	err := st.Put(ctx, "stream.bin", reader)
 	require.NoError(t, err)
 
-	info, err := st.ListInfo(ctx, "")
+	info, err := st.List(ctx, "")
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(info))

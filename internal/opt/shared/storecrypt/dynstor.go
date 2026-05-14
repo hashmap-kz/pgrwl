@@ -249,24 +249,11 @@ func (vs *VariadicStorage) Get(ctx context.Context, path string) (io.ReadCloser,
 	return pipe.DecryptAndDecompressOptional(rc, t.crypter, t.decompressor)
 }
 
-// List lists logical paths (without transform extensions).
-func (vs *VariadicStorage) List(ctx context.Context, prefix string) ([]string, error) {
+// List lists FileInfo entries but rewrites the Path field to the
+// logical name (without extensions).
+func (vs *VariadicStorage) List(ctx context.Context, prefix string) ([]FileInfo, error) {
 	prefix = filepath.ToSlash(prefix)
 	files, err := vs.Backend.List(ctx, prefix)
-	if err != nil {
-		return nil, err
-	}
-	for i := range files {
-		files[i] = vs.decodePath(files[i])
-	}
-	return files, nil
-}
-
-// ListInfo lists FileInfo entries but rewrites the Path field to the
-// logical name (without extensions).
-func (vs *VariadicStorage) ListInfo(ctx context.Context, prefix string) ([]FileInfo, error) {
-	prefix = filepath.ToSlash(prefix)
-	files, err := vs.Backend.ListInfo(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +265,7 @@ func (vs *VariadicStorage) ListInfo(ctx context.Context, prefix string) ([]FileI
 
 func (vs *VariadicStorage) ListInfoRaw(ctx context.Context, prefix string) ([]FileInfo, error) {
 	prefix = filepath.ToSlash(prefix)
-	files, err := vs.Backend.ListInfo(ctx, prefix)
+	files, err := vs.Backend.List(ctx, prefix)
 	if err != nil {
 		return nil, err
 	}

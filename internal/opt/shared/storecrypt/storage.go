@@ -20,11 +20,8 @@ type Storage interface {
 	// Get retrieves a remote file as a stream. Caller must close the reader.
 	Get(ctx context.Context, remotePath string) (io.ReadCloser, error)
 
-	// List returns all file names under the given directory.
-	List(ctx context.Context, remotePath string) ([]string, error)
-
-	// ListInfo returns all file infos under the given directory.
-	ListInfo(ctx context.Context, remotePath string) ([]FileInfo, error)
+	// List returns all file infos under the given directory.
+	List(ctx context.Context, remotePath string) ([]FileInfo, error)
 
 	// Delete removes the specified file.
 	Delete(ctx context.Context, remotePath string) error

@@ -144,31 +144,7 @@ func (s *s3Storage) Get(ctx context.Context, remotePath string) (io.ReadCloser, 
 	return out.Body, nil
 }
 
-func (s *s3Storage) List(ctx context.Context, remotePath string) ([]string, error) {
-	fullPath := s3DirPrefix(s.fullPath(remotePath))
-	var objects []string
-
-	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.bucket),
-		Prefix: aws.String(fullPath),
-	})
-
-	// Iterate over pages of results
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get page: %w", err)
-		}
-
-		for _, obj := range page.Contents {
-			objects = append(objects, s.relativeKey(aws.ToString(obj.Key)))
-		}
-	}
-
-	return objects, nil
-}
-
-func (s *s3Storage) ListInfo(ctx context.Context, remotePath string) ([]FileInfo, error) {
+func (s *s3Storage) List(ctx context.Context, remotePath string) ([]FileInfo, error) {
 	fullPath := s3DirPrefix(s.fullPath(remotePath))
 	var objects []FileInfo
 
