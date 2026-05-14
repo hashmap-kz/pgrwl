@@ -142,7 +142,7 @@ type listFailStorage struct {
 	*st.InMemoryStorage
 }
 
-func (s *listFailStorage) ListInfo(_ context.Context, _ string) ([]st.FileInfo, error) {
+func (s *listFailStorage) List(_ context.Context, _ string) ([]st.FileInfo, error) {
 	return nil, errors.New("list failed")
 }
 

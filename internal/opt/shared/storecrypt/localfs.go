@@ -68,28 +68,7 @@ func (l *localStorage) Get(_ context.Context, remotePath string) (io.ReadCloser,
 	return os.Open(l.fullPath(remotePath))
 }
 
-func (l *localStorage) List(_ context.Context, remotePath string) ([]string, error) {
-	fullPath := l.fullPath(remotePath)
-	var result []string
-
-	err := filepath.WalkDir(fullPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("error accessing path %q: %w", path, err)
-		}
-		if d.IsDir() {
-			return nil
-		}
-		rel, err := filepath.Rel(l.baseDir, path)
-		if err != nil {
-			return err
-		}
-		result = append(result, filepath.ToSlash(rel))
-		return nil
-	})
-	return result, err
-}
-
-func (l *localStorage) ListInfo(_ context.Context, remotePath string) ([]FileInfo, error) {
+func (l *localStorage) List(_ context.Context, remotePath string) ([]FileInfo, error) {
 	fullPath := l.fullPath(remotePath)
 	var result []FileInfo
 

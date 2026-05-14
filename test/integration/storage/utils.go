@@ -79,7 +79,7 @@ func deleteAll(ctx context.Context, s clients.Storage, remotePath string) error 
 		return err
 	}
 	for _, f := range files {
-		if err := s.Delete(ctx, f); err != nil {
+		if err := s.Delete(ctx, f.Path); err != nil {
 			return err
 		}
 	}
@@ -93,4 +93,12 @@ func deleteAllBulk(ctx context.Context, s clients.Storage, paths []string) error
 		}
 	}
 	return nil
+}
+
+func fileInfoToStrList(fi []clients.FileInfo) []string {
+	r := []string{}
+	for i := range fi {
+		r = append(r, fi[i].Path)
+	}
+	return r
 }

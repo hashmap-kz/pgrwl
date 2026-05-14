@@ -47,7 +47,7 @@ func TestIntegrationLocaldev_ListDoesNotReturnPrefixSiblings(t *testing.T) {
 	listed, err := storage.List(ctx, "20260502070500")
 	require.NoError(t, err)
 
-	assert.Contains(t, listed, "20260502070500/manifest.json", "target backup should be listed")
+	assert.Contains(t, fileInfoToStrList(listed), "20260502070500/manifest.json", "target backup should be listed")
 	for _, key := range listed {
 		assert.True(t, strings.HasPrefix(key, "20260502070500/"),
 			"List returned sibling key %q - expected only \"20260502070500/\" prefix", key)

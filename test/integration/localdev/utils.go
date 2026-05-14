@@ -223,3 +223,11 @@ func deleteAllBulk(ctx context.Context, s st.Storage, paths []string) error {
 	}
 	return nil
 }
+
+func fileInfoToStrList(fi []st.FileInfo) []string {
+	r := []string{}
+	for i := range fi {
+		r = append(r, fi[i].Path)
+	}
+	return r
+}

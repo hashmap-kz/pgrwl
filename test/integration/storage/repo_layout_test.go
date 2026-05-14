@@ -131,7 +131,7 @@ func TestStorage_WALArchiveLayout_ListInfoRootObjectsAndNestedObjects(t *testing
 				putStorageText(t, ctx, store, p, p)
 			}
 
-			infos, err := store.ListInfo(ctx, "wal-archive")
+			infos, err := store.List(ctx, "wal-archive")
 			require.NoError(t, err)
 
 			var paths []string
@@ -268,7 +268,7 @@ func TestStorage_BasebackupArtifactsRoundTrip(t *testing.T) {
 				wantPaths = append(wantPaths, p)
 			}
 
-			assert.ElementsMatch(t, wantPaths, listed)
+			assert.ElementsMatch(t, wantPaths, fileInfoToStrList(listed))
 		})
 	}
 }
