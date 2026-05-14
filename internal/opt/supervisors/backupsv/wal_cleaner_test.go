@@ -142,20 +142,19 @@ type listFailStorage struct {
 	*st.InMemoryStorage
 }
 
-func (s *listFailStorage) ListInfo(_ context.Context, _ string) ([]st.FileInfo, error) {
+func (s *listFailStorage) List(_ context.Context, _ string) ([]st.FileInfo, error) {
 	return nil, errors.New("list failed")
 }
 
-// TODO: re-visit
-// func TestWALCleanerDeleteBeforePropagatesListError(t *testing.T) {
-// 	backend := &listFailStorage{InMemoryStorage: st.NewInMemoryStorage()}
-// 	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
-//
-// 	err := cleaner.DeleteBefore(context.Background(), "000000010000003C000000D9")
-//
-// 	require.Error(t, err)
-// 	assert.Contains(t, err.Error(), "list WAL archive")
-// }
+func TestWALCleanerDeleteBeforePropagatesListError(t *testing.T) {
+	backend := &listFailStorage{InMemoryStorage: st.NewInMemoryStorage()}
+	cleaner := NewWALCleaner(&BackupSupervisorOpts{WalStor: newPlainVariadicStorage(t, backend)})
+
+	err := cleaner.DeleteBefore(context.Background(), "000000010000003C000000D9")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list WAL archive")
+}
 
 func TestWALCleanerDeleteBeforeIgnoresNestedPathBaseName(t *testing.T) {
 	ctx := context.Background()
