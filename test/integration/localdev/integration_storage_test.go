@@ -37,7 +37,7 @@ func TestIntegrationLocaldev_ListDoesNotReturnPrefixSiblings(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	putIntegrationObject(t, ctx, storage, "20260502070500/manifest.json", `{}`)
@@ -71,7 +71,7 @@ func TestIntegrationLocaldev_DeleteDirDoesNotDeleteSiblings(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	putIntegrationObject(t, ctx, storage, "20260502070500/20260502070500.json", `{}`)
@@ -106,7 +106,7 @@ func TestIntegrationLocaldev_EmptyObjectRoundTrip(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	err := storage.Put(ctx, "empty.json", strings.NewReader(""))
@@ -143,7 +143,7 @@ func TestIntegrationLocaldev_ListTopLevelDirsProjectLayout(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	putIntegrationObject(t, ctx, storage, "backups/20260502070500/20260502070500.json", `{}`)
@@ -159,41 +159,6 @@ func TestIntegrationLocaldev_ListTopLevelDirsProjectLayout(t *testing.T) {
 		"backups/20260502070500":     true,
 		"backups/20260502070500-old": true,
 	}, dirs)
-}
-
-// TestIntegrationLocaldev_DeleteAllDoesNotDeleteSiblings verifies that
-// DeleteAll("backupA") deletes only backupA/ contents, not backupA-old/.
-func TestIntegrationLocaldev_DeleteAllDoesNotDeleteSiblings(t *testing.T) {
-	env := loadRetentionIntegrationEnv(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	s3Client := newIntegrationS3Client(t, ctx, env)
-	ensureIntegrationBucket(t, ctx, s3Client, env.bucket)
-
-	runPrefix := fmt.Sprintf("pgrwl-storage-it/%d", time.Now().UTC().UnixNano())
-	storage := st.NewS3Storage(s3Client, env.bucket, runPrefix)
-
-	t.Cleanup(func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
-	})
-
-	putIntegrationObject(t, ctx, storage, "20260502070500/20260502070500.json", `{}`)
-	putIntegrationObject(t, ctx, storage, "20260502070500/base.tar", "base payload")
-	putIntegrationObject(t, ctx, storage, "20260502070500-old/20260502070500-old.json", `{}`)
-	putIntegrationObject(t, ctx, storage, "20260502070500X/20260502070500X.json", `{}`)
-
-	err := storage.DeleteAll(ctx, "20260502070500")
-	require.NoError(t, err)
-
-	assertIntegrationMissing(t, ctx, storage, "20260502070500/20260502070500.json")
-	assertIntegrationMissing(t, ctx, storage, "20260502070500/base.tar")
-
-	assertIntegrationExists(t, ctx, storage, "20260502070500-old/20260502070500-old.json")
-	assertIntegrationExists(t, ctx, storage, "20260502070500X/20260502070500X.json")
 }
 
 // TestIntegrationLocaldev_DeleteAllBulkDeletesExactObjectsOnly verifies that
@@ -213,7 +178,7 @@ func TestIntegrationLocaldev_DeleteAllBulkDeletesExactObjectsOnly(t *testing.T) 
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	deleteMe := []string{
@@ -236,7 +201,7 @@ func TestIntegrationLocaldev_DeleteAllBulkDeletesExactObjectsOnly(t *testing.T) 
 		putIntegrationObject(t, ctx, storage, path, "keep-me")
 	}
 
-	err := storage.DeleteAllBulk(ctx, deleteMe)
+	err := deleteAllBulk(ctx, storage, deleteMe)
 	require.NoError(t, err)
 
 	for _, path := range deleteMe {
@@ -264,7 +229,7 @@ func TestIntegrationLocaldev_ListInfoReturnsRelativePathSizeAndModTime(t *testin
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	objects := map[string]string{
@@ -309,7 +274,7 @@ func TestIntegrationLocaldev_RenameCopiesContentAndDeletesSource(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	putIntegrationObject(t, ctx, storage, "tmp/object.txt", "rename payload")
@@ -348,7 +313,7 @@ func TestIntegrationLocaldev_SeekableAndStreamingPutRoundTrip(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = storage.DeleteAll(cleanupCtx, "")
+		_ = storage.DeleteDir(cleanupCtx, "")
 	})
 
 	seekablePayload := []byte("seekable upload payload")
@@ -388,7 +353,7 @@ func TestIntegrationLocaldev_SetupStorageS3ProjectSubpaths(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
-		_ = rawStorage.DeleteAll(cleanupCtx, runPrefix)
+		_ = rawStorage.DeleteDir(cleanupCtx, runPrefix)
 	})
 
 	configPath := writeIntegrationConfig(t, env, runPrefix)

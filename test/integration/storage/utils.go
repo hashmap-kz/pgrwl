@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -70,4 +71,26 @@ func genPaths(nested int) string {
 
 func rnd(min, max int) int {
 	return rand.Intn(max-min+1) + min
+}
+
+func deleteAll(ctx context.Context, s clients.Storage, remotePath string) error {
+	files, err := s.List(ctx, remotePath)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if err := s.Delete(ctx, f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteAllBulk(ctx context.Context, s clients.Storage, paths []string) error {
+	for _, p := range paths {
+		if err := s.Delete(ctx, p); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -77,7 +77,7 @@ func TestDynStorage_CrossReadWrite_AllVariants(t *testing.T) {
 		for rName, reader := range storages {
 			t.Run(fmt.Sprintf("write=%s/read=%s", wName, rName), func(t *testing.T) {
 				// Clean backend before each pair
-				require.NoError(t, backend.DeleteAll(ctx, ""), "cleanup before pair")
+				require.NoError(t, deleteAll(ctx, backend, ""), "cleanup before pair")
 
 				// Write through writer
 				err := writer.Put(ctx, logicalPath, bytes.NewReader(content))
@@ -110,7 +110,7 @@ func TestDynStorage_Get_UsesHighestPriorityVariant(t *testing.T) {
 	require.NotNil(t, stPlain)
 
 	backend := stPlain.Backend
-	require.NoError(t, backend.DeleteAll(ctx, ""), "initial cleanup")
+	require.NoError(t, deleteAll(ctx, backend, ""), "initial cleanup")
 
 	const logical = "wal/000000010000000000000002"
 
@@ -144,7 +144,7 @@ func TestDynStorage_Delete_RemovesAllVariantsIntegration(t *testing.T) {
 	require.NotNil(t, stPlain)
 	backend := stPlain.Backend
 
-	require.NoError(t, backend.DeleteAll(ctx, ""), "initial cleanup")
+	require.NoError(t, deleteAll(ctx, backend, ""), "initial cleanup")
 
 	const logical = "wal/000000010000000000000003"
 	content := []byte("payload")
@@ -187,7 +187,7 @@ func TestDynStorage_Get_WithExplicitExtension(t *testing.T) {
 	require.NotNil(t, stGzAes)
 	backend := stGzAes.Backend
 
-	require.NoError(t, backend.DeleteAll(ctx, ""), "initial cleanup")
+	require.NoError(t, deleteAll(ctx, backend, ""), "initial cleanup")
 
 	const logical = "wal/000000010000000000000004"
 	content := []byte("explicit gz.aes")
@@ -218,7 +218,7 @@ func TestDynStorage_Rename_SingleVariant(t *testing.T) {
 	require.NotNil(t, stGzAes)
 
 	backend := stGzAes.Backend
-	require.NoError(t, backend.DeleteAll(ctx, ""), "initial cleanup")
+	require.NoError(t, deleteAll(ctx, backend, ""), "initial cleanup")
 
 	const (
 		oldLogical = "wal/000000010000000000000010"
@@ -283,7 +283,7 @@ func TestDynStorage_Rename_AllVariantsLogical(t *testing.T) {
 	require.NotNil(t, stPlain)
 	backend := stPlain.Backend
 
-	require.NoError(t, backend.DeleteAll(ctx, ""), "initial cleanup")
+	require.NoError(t, deleteAll(ctx, backend, ""), "initial cleanup")
 
 	const (
 		oldLogical = "wal/000000010000000000000011"
@@ -360,7 +360,7 @@ func TestDynStorage_Rename_WithExplicitExtension_MultiVariant(t *testing.T) {
 	require.NotNil(t, stGzAes)
 	backend := stGzAes.Backend
 
-	require.NoError(t, backend.DeleteAll(ctx, ""), "initial cleanup")
+	require.NoError(t, deleteAll(ctx, backend, ""), "initial cleanup")
 
 	const (
 		baseOld = "wal/000000010000000000000012"

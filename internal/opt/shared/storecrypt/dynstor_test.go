@@ -361,7 +361,7 @@ func TestVariadicStorage_PutGet_RoundTrip_AllWriteExts(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Delete / DeleteAllBulk / Exists
+// Delete / Exists
 // -----------------------------------------------------------------------------
 
 func TestVariadicStorage_Delete_RemovesAllVariants(t *testing.T) {
@@ -395,36 +395,32 @@ func TestVariadicStorage_Delete_RemovesAllVariants(t *testing.T) {
 	}
 }
 
-func TestVariadicStorage_DeleteAllBulk_LogicalNames(t *testing.T) {
+func TestVariadicStorage_DeleteDir_DelegatesAndClearsAllVariants(t *testing.T) {
 	ctx := context.Background()
 
 	gzipPair := &CodecPair{
 		Compressor:   codec.GzipCompressor{},
 		Decompressor: codec.GzipDecompressor{},
 	}
-	alg := Algorithms{
-		Gzip: gzipPair,
-	}
+	alg := Algorithms{Gzip: gzipPair}
 
 	mem := NewInMemoryStorage()
-	mem.Files["bulk/f1.gz"] = []byte("1")
-	mem.Files["bulk/f2.gz"] = []byte("2")
-	mem.Files["bulk/f3.gz"] = []byte("3")
+	mem.Files["wal/seg1.gz"] = []byte("gz1")
+	mem.Files["wal/seg2.gz"] = []byte("gz2")
+	mem.Files["other/seg3.gz"] = []byte("gz3")
 
 	vs, err := NewVariadicStorage(mem, alg, ".gz")
 	require.NoError(t, err)
 
-	err = vs.DeleteAllBulk(ctx, []string{"bulk/f1", "bulk/f3"})
-	require.NoError(t, err)
+	require.NoError(t, vs.DeleteDir(ctx, "wal"))
 
-	// Only bulk/f2.gz should remain
-	_, ok1 := mem.Files["bulk/f1.gz"]
-	_, ok3 := mem.Files["bulk/f3.gz"]
-	_, ok2 := mem.Files["bulk/f2.gz"]
-
-	assert.False(t, ok1)
-	assert.False(t, ok3)
-	assert.True(t, ok2)
+	for k := range mem.Files {
+		if strings.HasPrefix(k, "wal/") {
+			t.Fatalf("expected no wal/* keys after DeleteDir, found %q", k)
+		}
+	}
+	_, ok := mem.Files["other/seg3.gz"]
+	require.True(t, ok, "other/ should be untouched")
 }
 
 func TestVariadicStorage_Exists_AnyVariant(t *testing.T) {

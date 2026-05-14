@@ -246,12 +246,12 @@ func TestStorage_DeleteAll(t *testing.T) {
 				require.NoError(t, err, "[%s] Put failed for %s", name, f)
 			}
 
-			err := store.DeleteAll(ctx, "bulk")
-			require.NoError(t, err, "[%s] DeleteAll failed", name)
+			err := deleteAll(ctx, store, "bulk")
+			require.NoError(t, err, "[%s] deleteAll failed", name)
 
 			listed, err := store.List(ctx, "bulk")
-			require.NoError(t, err, "[%s] List after DeleteAll failed", name)
-			assert.Empty(t, listed, "[%s] Files not deleted by DeleteAll", name)
+			require.NoError(t, err, "[%s] List after deleteAll failed", name)
+			assert.Empty(t, listed, "[%s] Files not deleted by deleteAll", name)
 		})
 	}
 }
@@ -299,12 +299,12 @@ func TestStorage_DeleteAllBulk(t *testing.T) {
 				require.NoError(t, err, "[%s] Put failed for %s", name, f)
 			}
 
-			err := store.DeleteAllBulk(ctx, []string{"bulk/f1.txt", "bulk/f3.txt"})
-			require.NoError(t, err, "[%s] DeleteAllBulk failed", name)
+			err := deleteAllBulk(ctx, store, []string{"bulk/f1.txt", "bulk/f3.txt"})
+			require.NoError(t, err, "[%s] deleteAllBulk failed", name)
 
 			listed, err := store.List(ctx, "bulk")
-			require.NoError(t, err, "[%s] List after DeleteAllBulk failed", name)
-			assert.Equal(t, 1, len(listed), "[%s] Expect a single file remain after DeleteAllBulk", name)
+			require.NoError(t, err, "[%s] List after deleteAllBulk failed", name)
+			assert.Equal(t, 1, len(listed), "[%s] Expect a single file remain after deleteAllBulk", name)
 		})
 	}
 }
@@ -315,7 +315,7 @@ func TestStorage_PutObjectsWithPrefixes(t *testing.T) {
 
 	for name, r := range storages {
 		t.Run(name, func(t *testing.T) {
-			assert.NoError(t, r.DeleteAll(ctx, ""), "[%s] DeleteAll before put", name)
+			assert.NoError(t, deleteAll(ctx, r, ""), "[%s] deleteAll before put", name)
 
 			// Upload 100 files with random nested prefixes
 			for i := 0; i < 100; i++ {
@@ -333,7 +333,7 @@ func TestStorage_PutObjectsWithPrefixes(t *testing.T) {
 			assert.Equal(t, 100, len(list), "[%s] Expected 100 files, got %d", name, len(list))
 
 			// Cleanup
-			require.NoError(t, r.DeleteAll(ctx, ""), "[%s] DeleteAll after test", name)
+			require.NoError(t, deleteAll(ctx, r, ""), "[%s] deleteAll after test", name)
 
 			// Confirm clean
 			list, err = r.List(ctx, "")
@@ -354,7 +354,7 @@ func TestStorage_Rename(t *testing.T) {
 			content := []byte("rename me please")
 
 			// Ensure clean state
-			require.NoError(t, store.DeleteAll(ctx, ""), "[%s] DeleteAll before test failed", name)
+			require.NoError(t, deleteAll(ctx, store, ""), "[%s] deleteAll before test failed", name)
 
 			// Put source
 			err := store.Put(ctx, src, bytes.NewReader(content))
@@ -410,7 +410,7 @@ func TestStorage_RenameSamePathNoop(t *testing.T) {
 			content := []byte("same path rename")
 
 			// Ensure clean state
-			require.NoError(t, store.DeleteAll(ctx, ""), "[%s] DeleteAll before test failed", name)
+			require.NoError(t, deleteAll(ctx, store, ""), "[%s] deleteAll before test failed", name)
 
 			// Put file
 			err := store.Put(ctx, path, bytes.NewReader(content))
@@ -442,7 +442,7 @@ func TestStorage_HighLoad100(t *testing.T) {
 
 	for name, store := range storages {
 		t.Run(name, func(t *testing.T) {
-			require.NoError(t, store.DeleteAll(ctx, ""), "[%s] DeleteAll before test", name)
+			require.NoError(t, deleteAll(ctx, store, ""), "[%s] deleteAll before test", name)
 
 			const fileCount = 100
 			content := []byte("this is a stress test file content")
@@ -477,7 +477,7 @@ func TestStorage_HighLoad100(t *testing.T) {
 			}
 
 			// Cleanup
-			require.NoError(t, store.DeleteAll(ctx, "hl"), "[%s] DeleteAll cleanup failed", name)
+			require.NoError(t, deleteAll(ctx, store, "hl"), "[%s] deleteAll cleanup failed", name)
 			finalList, err := store.List(ctx, "hl")
 			require.NoError(t, err)
 			assert.Empty(t, finalList, "[%s] Files not cleaned up", name)
@@ -525,8 +525,8 @@ func BenchmarkStorage_PutGet(b *testing.B) {
 			b.StopTimer()
 
 			// Cleanup
-			err := store.DeleteAll(ctx, "bench")
-			require.NoError(b, err, "[%s] DeleteAll cleanup failed", name)
+			err := deleteAll(ctx, store, "bench")
+			require.NoError(b, err, "[%s] deleteAll cleanup failed", name)
 		})
 	}
 }
@@ -548,7 +548,7 @@ func TestStorage_DeleteAllBulk_DoesNotDeletePrefixCollisions(t *testing.T) {
 				require.NoError(t, store.Put(ctx, f, bytes.NewReader([]byte(f))))
 			}
 
-			require.NoError(t, store.DeleteAllBulk(ctx, []string{"bulk/f1.txt"}))
+			require.NoError(t, deleteAllBulk(ctx, store, []string{"bulk/f1.txt"}))
 
 			ex, err := store.Exists(ctx, "bulk/f1.txt")
 			require.NoError(t, err)

@@ -214,3 +214,12 @@ func isIntegrationNotFoundErr(err error) bool {
 
 	return strings.Contains(strings.ToLower(err.Error()), "notfound") || strings.Contains(strings.ToLower(err.Error()), "not found")
 }
+
+func deleteAllBulk(ctx context.Context, s st.Storage, paths []string) error {
+	for _, p := range paths {
+		if err := s.Delete(ctx, p); err != nil {
+			return err
+		}
+	}
+	return nil
+}

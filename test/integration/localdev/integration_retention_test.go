@@ -49,9 +49,9 @@ func TestIntegrationRetentionLocaldev(t *testing.T) {
 
 		// Delete through both scoped storages first, then delete the whole run prefix
 		// as a best-effort safety net.
-		_ = backupStorage.DeleteAll(cleanupCtx, "")
-		_ = walRawStorage.DeleteAll(cleanupCtx, "")
-		_ = st.NewS3Storage(s3Client, env.bucket, runPrefix).DeleteAll(cleanupCtx, "")
+		_ = backupStorage.DeleteDir(cleanupCtx, "")
+		_ = walRawStorage.DeleteDir(cleanupCtx, "")
+		_ = st.NewS3Storage(s3Client, env.bucket, runPrefix).DeleteDir(cleanupCtx, "")
 	})
 
 	now := time.Now().UTC()
