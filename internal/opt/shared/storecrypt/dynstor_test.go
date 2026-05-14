@@ -480,13 +480,22 @@ func TestVariadicStorage_List_RewritesLogicalNames_NoDedup(t *testing.T) {
 	list, err := vs.List(ctx, "p")
 	require.NoError(t, err)
 
+	//nolint:prealloc
+	fileInfoToStrList := func(fi []FileInfo) []string {
+		r := []string{}
+		for i := range fi {
+			r = append(r, fi[i].Path)
+		}
+		return r
+	}
+
 	// decodePath will map:
 	//   p/a.gz      -> p/a
 	//   p/a.gz.aes  -> p/a
 	//   p/b         -> p/b
 	//   p/b.aes     -> p/b
 	// Important: no dedup => 4 results.
-	assert.ElementsMatch(t, []string{"p/a", "p/a", "p/b", "p/b"}, list)
+	assert.ElementsMatch(t, []string{"p/a", "p/a", "p/b", "p/b"}, fileInfoToStrList(list))
 }
 
 func TestVariadicStorage_ListInfo_RewritesPath(t *testing.T) {

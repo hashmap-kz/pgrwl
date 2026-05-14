@@ -202,6 +202,7 @@ func TestInMemoryStorage_RootPrefixOperations(t *testing.T) {
 	require.NoError(t, s.Put(ctx, "dir2/file2.txt", strings.NewReader("2")))
 	require.NoError(t, s.Put(ctx, "loose.txt", strings.NewReader("3")))
 
+	//nolint:prealloc
 	fileInfoToStrList := func(fi []FileInfo) []string {
 		r := []string{}
 		for i := range fi {
