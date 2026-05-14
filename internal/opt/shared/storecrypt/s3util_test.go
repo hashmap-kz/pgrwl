@@ -367,7 +367,7 @@ func TestChooseUploadPartSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, ChooseUploadPartSize(tt.size))
+			assert.Equal(t, tt.want, chooseUploadPartSize(tt.size))
 		})
 	}
 }
@@ -440,7 +440,7 @@ func TestChooseUploadPartSize_StaysWithinS3PartLimit(t *testing.T) {
 
 	for _, size := range sizes {
 		t.Run(fmt.Sprintf("size_%d", size), func(t *testing.T) {
-			partSize := ChooseUploadPartSize(size)
+			partSize := chooseUploadPartSize(size)
 
 			assert.GreaterOrEqual(t, partSize, MinS3PartSize)
 			assert.LessOrEqual(t, partSize, MaxS3PartSize)

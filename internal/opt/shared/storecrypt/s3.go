@@ -1,23 +1,18 @@
 package storecrypt
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
-
-	pathpkg "path"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/pgrwl/pgrwl/internal/core/logger"
 )
 
 const (
@@ -75,85 +70,6 @@ func NewS3StorageWithOptions(client *s3.Client, bucket, prefix string, opts S3Op
 	}
 }
 
-func normalizeS3PartSize(partSize int64) int64 {
-	if partSize <= 0 {
-		return DefaultS3PartSize
-	}
-	if partSize < MinS3PartSize {
-		return MinS3PartSize
-	}
-	if partSize > MaxS3PartSize {
-		return MaxS3PartSize
-	}
-	return partSize
-}
-
-func normalizeConcurrency(c int) int {
-	if c <= 0 {
-		return DefaultS3Conc
-	}
-	if c > MaxS3Conc {
-		return MaxS3Conc
-	}
-	return c
-}
-
-func cleanS3Prefix(prefix string) string {
-	prefix = strings.Trim(prefix, "/")
-	if prefix == "" || prefix == "." {
-		return ""
-	}
-	return pathpkg.Clean(prefix)
-}
-
-func joinS3Key(prefix, name string) string {
-	name = strings.TrimPrefix(name, "/")
-	if name == "" || name == "." {
-		return prefix
-	}
-	if prefix == "" {
-		clean := pathpkg.Clean(name)
-		if clean == "." {
-			return ""
-		}
-		return clean
-	}
-	return pathpkg.Join(prefix, name)
-}
-
-func s3DirPrefix(key string) string {
-	if key == "" {
-		return ""
-	}
-	if !endsWithSlash(key) {
-		key += "/"
-	}
-	return key
-}
-
-func (s *s3Storage) fullPath(name string) string {
-	return joinS3Key(s.prefix, name)
-}
-
-func (s *s3Storage) relativeKey(key string) string {
-	key = strings.TrimPrefix(key, "/")
-
-	if s.prefix == "" {
-		return key
-	}
-
-	if key == s.prefix {
-		return ""
-	}
-
-	prefix := s.prefix + "/"
-	if strings.HasPrefix(key, prefix) {
-		return strings.TrimPrefix(key, prefix)
-	}
-
-	return key
-}
-
 func (s *s3Storage) logf() *slog.Logger {
 	if s.log != nil {
 		return s.log.With(
@@ -165,45 +81,6 @@ func (s *s3Storage) logf() *slog.Logger {
 		slog.String("component", "storage-s3"),
 		slog.String("bucket", s.bucket),
 	)
-}
-
-// CreateUploader creates a new S3 uploader with the given part size and concurrency.
-func CreateUploader(client *s3.Client, partSize int64, concurrency int) *transfermanager.Client {
-	return transfermanager.New(client, func(o *transfermanager.Options) {
-		o.PartSizeBytes = normalizeS3PartSize(partSize)
-		o.Concurrency = normalizeConcurrency(concurrency)
-	})
-}
-
-// ChooseUploadPartSize returns a safe part size for a known or estimated object size.
-// If size <= 0, it returns the default known-size upload part size.
-func ChooseUploadPartSize(size int64) int64 {
-	if size <= 0 {
-		return DefaultS3PartSize
-	}
-
-	// Examples:
-	//
-	// object-size = 16Mi = 1048576 bytes
-	// (1048576 + 10000 - 1) / 10000 = 106 bytes
-	//
-	// object-size = 50GiB = 53687091200 bytes
-	// (53687091200 + 10000 - 1) / 10000 = 5368710 bytes = ~5.12MiB
-	//
-	// object-size = 500GiB = 536870912000 bytes
-	// (536870912000 + 10000 - 1) / 10000 = 5368710 bytes = ~51.2MiB
-	partSize := (size + MaxS3UploadParts - 1) / MaxS3UploadParts
-	if partSize < MinS3PartSize {
-		partSize = MinS3PartSize
-	}
-
-	// round up to whole MiB for cleaner values
-	const mib = int64(1024 * 1024)
-	if rem := partSize % mib; rem != 0 {
-		partSize += mib - rem
-	}
-
-	return normalizeS3PartSize(partSize)
 }
 
 func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) error {
@@ -219,8 +96,8 @@ func (s *s3Storage) Put(ctx context.Context, remotePath string, r io.Reader) err
 		st, err := f.Stat()
 		if err == nil {
 			size := st.Size()
-			partSize := ChooseUploadPartSize(size)
-			uploader := CreateUploader(s.client, partSize, s.concurrency)
+			partSize := chooseUploadPartSize(size)
+			uploader := createUploader(s.client, partSize, s.concurrency)
 
 			log.Debug("using seekable upload path",
 				slog.Int64("size_bytes", size),
@@ -465,162 +342,6 @@ func (s *s3Storage) Rename(ctx context.Context, oldRemotePath, newRemotePath str
 	if err != nil {
 		return fmt.Errorf("delete source after copy %q: %w", srcKey, err)
 	}
-
-	return nil
-}
-
-func endsWithSlash(s string) bool {
-	return s != "" && s[len(s)-1] == '/'
-}
-
-// multipart upload
-
-func isSeekable(r io.Reader) (*os.File, bool) {
-	f, ok := r.(*os.File)
-	if !ok {
-		return nil, false
-	}
-	return f, true
-}
-
-func (s *s3Storage) abortMultipartUpload(remotePath, uploadID string) {
-	// NOTE: dedicated context used on purpose
-	ctx, cancel := context.WithTimeout(context.Background(), MultipartAbortTimeout)
-	defer cancel()
-
-	_, err := s.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
-		Bucket:   aws.String(s.bucket),
-		Key:      aws.String(remotePath),
-		UploadId: aws.String(uploadID),
-	})
-	if err != nil {
-		s.logf().Warn("failed to abort multipart upload",
-			slog.String("s3_key", remotePath),
-			slog.String("upload_id", uploadID),
-			slog.Any("error", err),
-		)
-	}
-}
-
-func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r io.Reader, partSize int64) error {
-	partSize = normalizeS3PartSize(partSize)
-
-	log := s.logf().With(
-		slog.String("s3_key", remotePath),
-		slog.Int64("part_size_bytes", partSize),
-	)
-
-	createOut, err := s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(remotePath),
-	})
-	if err != nil {
-		return fmt.Errorf("create multipart upload %q: %w", remotePath, err)
-	}
-
-	uploadID := aws.ToString(createOut.UploadId)
-	completedParts := make([]s3types.CompletedPart, 0, 128)
-
-	abortOnError := func(cause error) error {
-		s.abortMultipartUpload(remotePath, uploadID)
-		return cause
-	}
-
-	buf := make([]byte, partSize)
-	var partNumber int32 = 1
-
-	for {
-		n, readErr := io.ReadFull(r, buf)
-
-		switch {
-		case readErr == nil:
-			// full part
-		case errors.Is(readErr, io.ErrUnexpectedEOF):
-			// final partial part
-		case errors.Is(readErr, io.EOF):
-			// no more data
-			n = 0
-		default:
-			return abortOnError(fmt.Errorf("read source for %q: %w", remotePath, readErr))
-		}
-
-		if n > 0 {
-			if int64(partNumber) > MaxS3UploadParts {
-				return abortOnError(fmt.Errorf(
-					"multipart upload exceeded %d parts for %q; choose larger part size than %d bytes",
-					MaxS3UploadParts, remotePath, partSize,
-				))
-			}
-
-			log.LogAttrs(ctx, logger.LevelTrace, "uploading multipart chunk",
-				slog.Int64("part_number", int64(partNumber)),
-				slog.Int("chunk_size_bytes", n),
-			)
-
-			upOut, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
-				Bucket:        aws.String(s.bucket),
-				Key:           aws.String(remotePath),
-				UploadId:      aws.String(uploadID),
-				PartNumber:    aws.Int32(partNumber),
-				Body:          bytes.NewReader(buf[:n]),
-				ContentLength: aws.Int64(int64(n)),
-			})
-			if err != nil {
-				return abortOnError(fmt.Errorf("upload part %d for %q: %w", partNumber, remotePath, err))
-			}
-
-			completedParts = append(completedParts, s3types.CompletedPart{
-				ETag:       upOut.ETag,
-				PartNumber: aws.Int32(partNumber),
-			})
-
-			log.LogAttrs(ctx, logger.LevelTrace, "multipart chunk uploaded",
-				slog.Int64("part_number", int64(partNumber)),
-				slog.Int("chunk_size_bytes", n),
-			)
-
-			partNumber++
-		}
-
-		if errors.Is(readErr, io.ErrUnexpectedEOF) || errors.Is(readErr, io.EOF) {
-			break
-		}
-	}
-
-	// empty object
-	if len(completedParts) == 0 {
-		// We created a multipart upload, but S3 cannot complete a multipart
-		// upload with zero parts. Abort it first, then store the empty object
-		// with regular PutObject.
-		s.abortMultipartUpload(remotePath, uploadID)
-
-		_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(s.bucket),
-			Key:    aws.String(remotePath),
-			Body:   bytes.NewReader(nil),
-		})
-		if err != nil {
-			return fmt.Errorf("put empty object %q: %w", remotePath, err)
-		}
-
-		return nil
-	}
-
-	_, err = s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
-		Bucket:   aws.String(s.bucket),
-		Key:      aws.String(remotePath),
-		UploadId: aws.String(uploadID),
-		MultipartUpload: &s3types.CompletedMultipartUpload{
-			Parts: completedParts,
-		},
-	})
-	if err != nil {
-		return abortOnError(fmt.Errorf("complete multipart upload %q: %w", remotePath, err))
-	}
-
-	log.LogAttrs(ctx, logger.LevelTrace, "multipart upload completed",
-		slog.Int("parts", len(completedParts)),
-	)
 
 	return nil
 }
