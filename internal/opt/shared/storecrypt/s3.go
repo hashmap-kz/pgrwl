@@ -13,8 +13,6 @@ import (
 
 	pathpkg "path"
 
-	"github.com/pgrwl/pgrwl/config"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -554,12 +552,10 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				))
 			}
 
-			if config.Verbose {
-				log.LogAttrs(ctx, logger.LevelTrace, "uploading multipart chunk",
-					slog.Int64("part_number", int64(partNumber)),
-					slog.Int("chunk_size_bytes", n),
-				)
-			}
+			log.LogAttrs(ctx, logger.LevelTrace, "uploading multipart chunk",
+				slog.Int64("part_number", int64(partNumber)),
+				slog.Int("chunk_size_bytes", n),
+			)
 
 			upOut, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
 				Bucket:        aws.String(s.bucket),
@@ -578,12 +574,10 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 				PartNumber: aws.Int32(partNumber),
 			})
 
-			if config.Verbose {
-				log.LogAttrs(ctx, logger.LevelTrace, "multipart chunk uploaded",
-					slog.Int64("part_number", int64(partNumber)),
-					slog.Int("chunk_size_bytes", n),
-				)
-			}
+			log.LogAttrs(ctx, logger.LevelTrace, "multipart chunk uploaded",
+				slog.Int64("part_number", int64(partNumber)),
+				slog.Int("chunk_size_bytes", n),
+			)
 
 			partNumber++
 		}
@@ -624,11 +618,9 @@ func (s *s3Storage) putMultipartStream(ctx context.Context, remotePath string, r
 		return abortOnError(fmt.Errorf("complete multipart upload %q: %w", remotePath, err))
 	}
 
-	if config.Verbose {
-		log.LogAttrs(ctx, logger.LevelTrace, "multipart upload completed",
-			slog.Int("parts", len(completedParts)),
-		)
-	}
+	log.LogAttrs(ctx, logger.LevelTrace, "multipart upload completed",
+		slog.Int("parts", len(completedParts)),
+	)
 
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pgrwl/pgrwl/internal/core/logger"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/fakereaders"
 	storage "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,12 @@ import (
 
 func TestS3Storage_PutMultipart50Gi(t *testing.T) {
 	t.Parallel()
+
+	logger.Init(&logger.Opts{
+		Level:     "trace",
+		Format:    "text",
+		AddSource: true,
+	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
@@ -34,5 +41,5 @@ func TestS3Storage_PutMultipart50Gi(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(info))
-	require.Equal(t, fakereaders.Size50Gi, info[0].Size)
+	require.Equal(t, int64(fakereaders.Size50Gi), int64(info[0].Size))
 }
