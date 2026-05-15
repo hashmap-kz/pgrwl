@@ -5,9 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
-
-	"github.com/pgrwl/pgrwl/internal/opt/metrics/receivemetrics"
 )
 
 var ErrJobQueueFull = errors.New("job queue full")
@@ -49,12 +46,7 @@ func (q *JobQueue) Start(ctx context.Context) {
 				return
 			case job := <-q.jobs:
 				q.log().Info("run job", slog.String("job-name", job.Name))
-				start := time.Now()
-
 				job.Run(ctx)
-
-				receivemetrics.M.IncJobsExecuted(job.Name)
-				receivemetrics.M.ObserveJobDuration(job.Name, time.Since(start).Seconds())
 				q.log().Info("fin job", slog.String("job-name", job.Name))
 			}
 		}
@@ -62,14 +54,11 @@ func (q *JobQueue) Start(ctx context.Context) {
 }
 
 func (q *JobQueue) Submit(name string, jobFunc func(ctx context.Context)) error {
-	receivemetrics.M.IncJobsSubmitted(name)
-
 	job := NamedJob{Name: name, Run: jobFunc}
 	select {
 	case q.jobs <- job:
 		return nil
 	default:
-		receivemetrics.M.IncJobsDropped(name)
 		return fmt.Errorf("%w: %s", ErrJobQueueFull, name)
 	}
 }
