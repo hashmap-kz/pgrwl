@@ -145,6 +145,11 @@ x_start_serving() {
     2> >(tee -a "$LOG_FILE" >&2) &
 
   SERVE_PID=$!
+
+  # Wait for the HTTP server to be ready before returning.
+  # PostgreSQL's restore_command connects to this port immediately on startup;
+  # without this wait there is a race where the command fails and recovery aborts.
+  x_wait_http_ok "http://127.0.0.1:7070/healthz" 30
 }
 
 x_search_errors_in_logs() {
