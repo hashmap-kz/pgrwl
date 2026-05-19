@@ -49,7 +49,7 @@ func TestIntegrationLocaldev_ListDoesNotReturnPrefixSiblings(t *testing.T) {
 
 	assert.Contains(t, fileInfoToStrList(listed), "20260502070500/manifest.json", "target backup should be listed")
 	for _, key := range listed {
-		assert.True(t, strings.HasPrefix(key, "20260502070500/"),
+		assert.True(t, strings.HasPrefix(key.Path, "20260502070500/"),
 			"List returned sibling key %q - expected only \"20260502070500/\" prefix", key)
 	}
 }
@@ -240,7 +240,7 @@ func TestIntegrationLocaldev_ListInfoReturnsRelativePathSizeAndModTime(t *testin
 		putIntegrationObject(t, ctx, storage, path, body)
 	}
 
-	infos, err := storage.ListInfo(ctx, "backups/20260502070500")
+	infos, err := storage.List(ctx, "backups/20260502070500")
 	require.NoError(t, err)
 	require.Len(t, infos, len(objects))
 
