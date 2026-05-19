@@ -20,12 +20,11 @@ BUILD="${BUILD:-}"
 COMPOSE_FILE="${SCRIPT_DIR}/docker-compose-par.yml"
 PROJECT="pgrwl_par_${PG_MAJOR}"
 
-# TODO: fix pg_004_sftp
-
 ALL_TESTS=(
   pg_001_fundamental
   pg_002_write_loop
   pg_003_s3
+  pg_004_sftp
   pg_005_restore_localfs
   pg_006_restore_s3
   pg_007_tablespaces_localfs
