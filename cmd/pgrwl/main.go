@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pgrwl/pgrwl/config"
 	"github.com/pgrwl/pgrwl/internal/opt/basebackup/backup"
@@ -74,6 +75,15 @@ func daemonCmd() *cliv3.Command {
 			var err error
 
 			mode := c.String(modeKey)
+			if strings.TrimSpace(mode) == "" {
+				return fmt.Errorf("daemon-cmd: empty mode")
+			}
+
+			isDaemonMode := mode == config.ModeReceive || mode == config.ModeServe
+			if !isDaemonMode {
+				return fmt.Errorf("daemon-cmd: unknown mode '%s'", mode)
+			}
+
 			cfg, err := cmd.LoadConfig(c.String(configKey), mode)
 			if err != nil {
 				return err
@@ -106,7 +116,7 @@ func daemonCmd() *cliv3.Command {
 				}
 			}
 
-			return fmt.Errorf("unknown mode: %s", mode)
+			return nil
 		},
 	}
 }
