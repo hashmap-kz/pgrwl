@@ -158,7 +158,8 @@ test-integ-k8s-ci:
 
 .PHONY: clean
 clean: ## Remove build artifacts and logs
-	@rm -rf bin/ dist/ test/integration/environ/bin/ *.log
+	@rm -rf bin/ dist/ test/integration/environ/bin/
+	@find -type f -name '*.log' -delete
 
 .PHONY: help
 help: ## Show this help
