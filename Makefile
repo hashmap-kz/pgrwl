@@ -59,11 +59,11 @@ image: ## Build and push Docker image to localhost:5000
 
 .PHONY: test-integ-scripts-17
 test-integ-scripts-17: ## Slow tests (that runs inside containers)
-	@currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=17 bash run-tests.sh | tee $$currdir/test-integ-scripts-17.log
+	@set -o pipefail; currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=17 bash run-tests.sh | tee $$currdir/test-integ-scripts-17.log
 
 .PHONY: test-integ-scripts-18
 test-integ-scripts-18: ## Slow tests (that runs inside containers)
-	@currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=18 bash run-tests.sh | tee $$currdir/test-integ-scripts-18.log
+	@set -o pipefail; currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=18 bash run-tests.sh | tee $$currdir/test-integ-scripts-18.log
 
 .PHONY: test-integ-par-17
 test-integ-par-17: ## Run integration script-tests in parallel (PG17)
