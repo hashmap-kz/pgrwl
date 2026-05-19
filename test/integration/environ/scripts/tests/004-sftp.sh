@@ -11,7 +11,11 @@ x_remake_config() {
   },
   "receiver": {
      "slot": "pgrwl_v5",
-     "no_loop": true
+     "no_loop": true,
+     "uploader": {
+       "sync_interval": "1s",
+       "max_concurrency": 4
+     }
   },
   "log": {
     "level": "${LOG_LEVEL_DEFAULT}",
@@ -57,6 +61,7 @@ x_backup_restore() {
   # run wal-receivers
   echo_delim "running wal-receivers"
   x_start_receiver "/tmp/config.json"
+  sleep 10
 
   # make a basebackup before doing anything
   echo_delim "creating basebackup"

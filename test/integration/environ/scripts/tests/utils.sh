@@ -11,6 +11,7 @@ cleanup() {
   # save content for debug
   mkdir -p "${TEST_STATE_PATH}"
   cp -a /tmp/* "${TEST_STATE_PATH}/"
+  cp /var/log/postgresql/pg.log "${TEST_STATE_PATH}/pg.log" 2>/dev/null || true
   # cleanup state
   rm -rf /tmp/*
 }
@@ -19,8 +20,8 @@ trap cleanup EXIT
 export BASEBACKUP_PATH="/tmp/basebackup"
 export WAL_PATH="/tmp/wal-archive"
 export LOG_FILE="/tmp/pgrwl.log"
-export LOG_LEVEL_DEFAULT=info
-export LOG_FORMAT_DEFAULT=pretty
+export LOG_LEVEL_DEFAULT=debug
+export LOG_FORMAT_DEFAULT=text
 export PG_RECEIVEWAL_WAL_PATH="/tmp/wal-archive-pg_receivewal"
 export PG_RECEIVEWAL_LOG_FILE="/tmp/pg_receivewal.log"
 export BACKGROUND_INSERTS_SCRIPT_PATH="/var/lib/postgresql/scripts/gendata/inserts.sh"
@@ -41,11 +42,11 @@ export PGDATABASE="postgres"
 
 x_remake_buckets() {
   minio-mc alias set local https://minio:9000 minioadmin minioadmin123 --insecure
-  minio-mc rb --force local/backups --insecure || true
+  minio-mc rb --force "local/${TEST_NAME}" --insecure || true
 
   # Wait until bucket is really gone
   for i in {1..10}; do
-    if minio-mc ls local/backups --insecure >/dev/null 2>&1; then
+    if minio-mc ls "local/${TEST_NAME}" --insecure >/dev/null 2>&1; then
       log_info "Waiting for bucket to be deleted..."
       sleep 1
     else
@@ -54,8 +55,8 @@ x_remake_buckets() {
     fi
   done
 
-  minio-mc mb local/backups --insecure || true
-  minio-mc version enable local/backups --insecure
+  minio-mc mb "local/${TEST_NAME}" --insecure || true
+  minio-mc version enable "local/${TEST_NAME}" --insecure
 }
 
 x_kill_proc_rmrf_tmp() {
@@ -145,6 +146,11 @@ x_start_serving() {
     2> >(tee -a "$LOG_FILE" >&2) &
 
   SERVE_PID=$!
+
+  # Wait for the HTTP server to be ready before returning.
+  # PostgreSQL's restore_command connects to this port immediately on startup;
+  # without this wait there is a race where the command fails and recovery aborts.
+  x_wait_http_ok "http://127.0.0.1:7070/healthz" 30
 }
 
 x_search_errors_in_logs() {

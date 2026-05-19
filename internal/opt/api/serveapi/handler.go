@@ -26,7 +26,7 @@ func (c *Handler) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request)
 
 	file, err := c.Service.GetWalFile(r.Context(), filename)
 	if err != nil {
-		http.Error(w, "file not found locally", http.StatusNotFound)
+		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
 	defer file.Close()

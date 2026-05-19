@@ -1,23 +1,18 @@
-# Makefile for controlling PostgreSQL streaming replication mini-cluster
-
-# Variables
 PG_MAJOR ?= 17
 COMPOSE = PG_MAJOR=$(PG_MAJOR) docker compose
 COMPOSE_FILE = docker-compose.yml
-
-# Targets
 
 .PHONY: up down ps logs promote status primary standby clean restart
 
 # Start the cluster
 up:
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build
-	@echo "✅ Cluster is starting..."
+	@echo "Cluster is starting..."
 
 # Stop the cluster
 down:
 	$(COMPOSE) -f $(COMPOSE_FILE) down -v
-	@echo "🛑 Cluster is stopped."
+	@echo "Cluster is stopped."
 
 # Show running containers
 ps:
@@ -30,7 +25,7 @@ logs:
 # Promote the standby
 promote:
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-standby bash -c "su postgres -c 'pg_ctl promote -D /var/lib/postgresql/data'"
-	@echo "🎉 Standby promoted to primary!"
+	@echo "Standby promoted to primary!"
 
 # Show replication status on standby
 status-standby:
@@ -51,7 +46,7 @@ restart:
 # Completely clean up volumes and containers
 clean:
 	$(COMPOSE) -f $(COMPOSE_FILE) down -v
-	@echo "🧹 Containers and volumes are removed."
+	@echo "Containers and volumes are removed."
 
 create-slot:
 	$(COMPOSE) -f $(COMPOSE_FILE) exec pg-standby bash -c "su postgres -c 'pg_receivewal --no-password --no-loop --slot=pg_receivewal --create-slot --if-not-exists'"

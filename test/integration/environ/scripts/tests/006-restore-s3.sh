@@ -38,7 +38,7 @@ x_remake_config() {
       "url": "https://minio:9000",
       "access_key_id": "minioadmin",
       "secret_access_key": "minioadmin123",
-      "bucket": "backups",
+      "bucket": "${TEST_NAME}",
       "region": "main",
       "use_path_style": true,
       "disable_ssl": true
