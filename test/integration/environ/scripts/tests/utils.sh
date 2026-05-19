@@ -11,6 +11,7 @@ cleanup() {
   # save content for debug
   mkdir -p "${TEST_STATE_PATH}"
   cp -a /tmp/* "${TEST_STATE_PATH}/"
+  cp /var/log/postgresql/pg.log "${TEST_STATE_PATH}/pg.log" 2>/dev/null || true
   # cleanup state
   rm -rf /tmp/*
 }
