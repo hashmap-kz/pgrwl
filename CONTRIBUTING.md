@@ -70,6 +70,10 @@ make test
 # Requires Docker and Docker Compose to be installed
 make test-integ-scripts
 
+# Parallel integration tests (NOTE: ~20 containers)
+make test-integ-par-17
+make test-integ-par-18
+
 # This builds the release artifacts using GoReleaser in snapshot mode (nothing is published).
 # Requires goreleaser to be installed
 make snapshot
