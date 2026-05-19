@@ -1,12 +1,8 @@
-# Variables
-APP_NAME 	 := pgrwl
-OUTPUT   	 := $(APP_NAME)
+APP_NAME 	   := pgrwl
+OUTPUT   	   := $(APP_NAME)
 OUTPUT_UI    := pgrwl-ui
 COV_REPORT 	 := coverage.txt
-TEST_FLAGS 	 := -v -race -timeout 30s
 INSTALL_DIR  := /usr/local/bin
-PROFILE_DIR  := ./pprof
-PPROF_SERVER := http://localhost:7070
 
 ifeq ($(OS),Windows_NT)
 	OUTPUT := $(APP_NAME).exe
@@ -35,7 +31,7 @@ lint: ## Run golangci-lint
 .PHONY: install
 install: build ## Install the binary to $(INSTALL_DIR)
 	@echo "Installing bin/$(OUTPUT) to $(INSTALL_DIR)..."
-	@install -m 0755 bin/$(OUTPUT) $(INSTALL_DIR)
+	@sudo chmod +x bin/$(OUTPUT) && sudo cp bin/$(OUTPUT) $(INSTALL_DIR)
 
 .PHONY: snapshot
 snapshot: ## Run snapshot build with goreleaser
@@ -43,7 +39,7 @@ snapshot: ## Run snapshot build with goreleaser
 
 .PHONY: test
 test: ## Run unit tests
-	go test -v -race -cover ./...
+	go test -v -race -cover -timeout 5m ./...
 
 .PHONY: test-cov
 test-cov: ## Run tests with coverage report
