@@ -575,8 +575,9 @@ func TestStorage_List_DoesNotReturnPrefixSibling(t *testing.T) {
 			listed, err := store.List(ctx, "repo/base")
 			require.NoError(t, err)
 
-			assert.Contains(t, listed, "repo/base/a.txt")
-			assert.NotContains(t, listed, "repo/base-old/b.txt")
+			paths := fileInfoToStrList(listed)
+			assert.Contains(t, paths, "repo/base/a.txt")
+			assert.NotContains(t, paths, "repo/base-old/b.txt")
 		})
 	}
 }

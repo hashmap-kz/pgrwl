@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 APP_NAME 	   := pgrwl
 OUTPUT   	   := $(APP_NAME)
 OUTPUT_UI    := pgrwl-ui
@@ -103,12 +105,12 @@ pprof1: ## Collect allocs, heap, CPU, and trace profiles
 .PHONY: test-integ-storage
 test-integ-storage: ## Integration tests for storage layer only
 	@cd test/integration/storage/environ && bash run.sh
-	go test -tags=integration_storage -v ./test/integration/storage/... | tee test-integ-storage.log
+	set -o pipefail; go test -tags=integration_storage -v ./test/integration/storage/... | tee test-integ-storage.log
 
 .PHONY: test-integ-storage-highload
 test-integ-storage-highload:
 	@cd test/integration/storage/environ && bash run.sh
-	go test -tags=integration_storage_highload -v ./test/integration/storage/... | tee test-integ-storage-highload.log
+	set -o pipefail; go test -tags=integration_storage_highload -v ./test/integration/storage/... | tee test-integ-storage-highload.log
 
 .PHONY: test-integ-storage-teardown
 test-integ-storage-teardown:
@@ -138,7 +140,7 @@ image-ui: ## Build and push Docker image to localhost:5000
 .PHONY: test-integ-localdev
 test-integ-localdev:
 	@cd test/integration/localdev/environ && bash run.sh
-	go test -tags=integration_localdev -v ./test/integration/localdev/... | tee test-integ-localdev.log
+	set -o pipefail; go test -tags=integration_localdev -v ./test/integration/localdev/... | tee test-integ-localdev.log
 
 ######################################################################
 ### k8s related integration tests (CI oriented)
