@@ -66,8 +66,9 @@ fi
 echo "==> starting infra (minio, sshd, toxiproxy)..."
 _dc up -d minio sshd toxiproxy
 
-LOG_DIR=$(mktemp -d)
-trap '_dc down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$LOG_DIR"' EXIT
+LOG_DIR="${SCRIPT_DIR}/test_logs"
+rm -rf "$LOG_DIR" && mkdir -p "$LOG_DIR"
+trap '_dc down -v --remove-orphans >/dev/null 2>&1 || true' EXIT
 
 run_test() {
   local test="$1"
