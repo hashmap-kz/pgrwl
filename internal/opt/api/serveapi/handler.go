@@ -2,7 +2,6 @@ package serveapi
 
 import (
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/pgrwl/pgrwl/internal/opt/shared/x/httpx"
@@ -27,7 +26,6 @@ func (c *Handler) WalFileDownloadHandler(w http.ResponseWriter, r *http.Request)
 
 	file, err := c.Service.GetWalFile(r.Context(), filename)
 	if err != nil {
-		slog.Error("wal file not found", slog.String("filename", filename), slog.Any("err", err))
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
