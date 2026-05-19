@@ -25,3 +25,7 @@ wals/
 restore_tmp/
 test_logs/
 bench-runs/
+
+# in progress
+AGENTS.md
+CODESTYLE.md

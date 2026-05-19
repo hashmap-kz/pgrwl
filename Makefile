@@ -54,6 +54,14 @@ test-integ-scripts-17: ## Slow tests (that runs inside containers)
 test-integ-scripts-18: ## Slow tests (that runs inside containers)
 	@currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=18 bash run-tests.sh | tee $$currdir/test-integ-scripts.log
 
+.PHONY: test-integ-par-17
+test-integ-par-17: ## Run integration script-tests in parallel (PG17)
+	@cd test/integration/environ && BUILD=1 PG_MAJOR=17 bash run-tests-par.sh
+
+.PHONY: test-integ-par-18
+test-integ-par-18: ## Run integration script-tests in parallel (PG18)
+	@cd test/integration/environ && BUILD=1 PG_MAJOR=18 bash run-tests-par.sh
+
 .PHONY: image
 image: ## Build and push Docker image to localhost:5000
 	docker buildx build -t localhost:5000/pgrwl .
