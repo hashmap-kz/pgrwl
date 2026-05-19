@@ -2,6 +2,12 @@
 
 This changelog summarizes the latest 30 GitHub releases. Fully generated release notes are available from each linked release.
 
+## [v1.0.37](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.37) - 2026-05-19
+
+- Fake-reader for simulate streaming multipart upload
+- Run integration tests in parallel
+- Simplify storage API
+
 ## [v1.0.36](https://github.com/pgrwl/pgrwl/releases/tag/v1.0.36) - 2026-05-13
 
 - Multipart logic improved (s3)
