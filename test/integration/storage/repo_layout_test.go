@@ -65,7 +65,7 @@ func TestStorage_BackupLayout_ListOneBackupDoesNotReturnSiblingPrefix(t *testing
 			assert.ElementsMatch(t, []string{
 				"backups/" + backupID + "/" + backupID + ".json",
 				"backups/" + backupID + "/base.tar",
-			}, listed)
+			}, fileInfoToStrList(listed))
 		})
 	}
 }
