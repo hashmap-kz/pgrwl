@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pgrwl/pgrwl/internal/core/logger"
 	"github.com/pgrwl/pgrwl/internal/opt/shared/fakereaders"
 	storage "github.com/pgrwl/pgrwl/internal/opt/shared/storecrypt"
 	"github.com/stretchr/testify/require"
@@ -16,12 +15,6 @@ import (
 
 func TestS3Storage_PutMultipart50Gi(t *testing.T) {
 	t.Parallel()
-
-	logger.Init(&logger.Opts{
-		Level:     "trace",
-		Format:    "text",
-		AddSource: true,
-	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
