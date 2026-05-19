@@ -1,4 +1,5 @@
-SHELL := /bin/bash
+SHELL         := /bin/bash
+.SHELLFLAGS   := -eu -o pipefail -c
 
 APP_NAME 	   := pgrwl
 OUTPUT   	   := $(APP_NAME)
@@ -59,11 +60,11 @@ image: ## Build and push Docker image to localhost:5000
 
 .PHONY: test-integ-scripts-17
 test-integ-scripts-17: ## Slow tests (that runs inside containers)
-	@set -o pipefail; currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=17 bash run-tests.sh | tee $$currdir/test-integ-scripts-17.log
+	@cd test/integration/environ && PG_MAJOR=17 bash run-tests.sh | tee $(CURDIR)/test-integ-scripts-17.log
 
 .PHONY: test-integ-scripts-18
 test-integ-scripts-18: ## Slow tests (that runs inside containers)
-	@set -o pipefail; currdir=$$(pwd) && cd test/integration/environ && PG_MAJOR=18 bash run-tests.sh | tee $$currdir/test-integ-scripts-18.log
+	@cd test/integration/environ && PG_MAJOR=18 bash run-tests.sh | tee $(CURDIR)/test-integ-scripts-18.log
 
 .PHONY: test-integ-par-17
 test-integ-par-17: ## Run integration script-tests in parallel (PG17)
@@ -105,12 +106,12 @@ pprof1: ## Collect allocs, heap, CPU, and trace profiles
 .PHONY: test-integ-storage
 test-integ-storage: ## Integration tests for storage layer only
 	@cd test/integration/storage/environ && bash run.sh
-	set -o pipefail; go test -tags=integration_storage -v ./test/integration/storage/... | tee test-integ-storage.log
+	go test -tags=integration_storage -v ./test/integration/storage/... | tee test-integ-storage.log
 
 .PHONY: test-integ-storage-highload
 test-integ-storage-highload:
 	@cd test/integration/storage/environ && bash run.sh
-	set -o pipefail; go test -tags=integration_storage_highload -v ./test/integration/storage/... | tee test-integ-storage-highload.log
+	go test -tags=integration_storage_highload -v ./test/integration/storage/... | tee test-integ-storage-highload.log
 
 .PHONY: test-integ-storage-teardown
 test-integ-storage-teardown:
@@ -140,7 +141,7 @@ image-ui: ## Build and push Docker image to localhost:5000
 .PHONY: test-integ-localdev
 test-integ-localdev:
 	@cd test/integration/localdev/environ && bash run.sh
-	set -o pipefail; go test -tags=integration_localdev -v ./test/integration/localdev/... | tee test-integ-localdev.log
+	go test -tags=integration_localdev -v ./test/integration/localdev/... | tee test-integ-localdev.log
 
 ######################################################################
 ### k8s related integration tests (CI oriented)
